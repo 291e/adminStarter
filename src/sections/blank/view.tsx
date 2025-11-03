@@ -6,6 +6,7 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 
 import { DashboardContent } from 'src/layouts/dashboard';
+import { Button } from '@/components/ui/button';
 
 // ----------------------------------------------------------------------
 
@@ -36,7 +37,8 @@ export function BlankView({ title = 'Blank', description, sx }: Props) {
     <DashboardContent maxWidth="xl">
       <Typography variant="h4"> {title} </Typography>
       {description && <Typography sx={{ mt: 1 }}> {description} </Typography>}
-
+      <div className="bg-red-500">11</div>
+      <Button>Click me</Button>
       {renderContent()}
     </DashboardContent>
   );

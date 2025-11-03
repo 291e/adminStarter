@@ -2,7 +2,7 @@ import path from 'path';
 import checker from 'vite-plugin-checker';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react-swc';
-
+import tailwindcss from '@tailwindcss/vite';
 // ----------------------------------------------------------------------
 
 const PORT = 8081;
@@ -22,9 +22,16 @@ export default defineConfig({
         initialIsOpen: false,
       },
     }),
+    tailwindcss(),
   ],
   resolve: {
     alias: [
+      // ▼▼▼ 이 객체를 추가하세요 ▼▼▼
+      {
+        find: '@',
+        replacement: path.resolve(process.cwd(), 'src'),
+      },
+      // ▲▲▲ 여기까지 ▲▲▲
       {
         find: /^src(.+)/,
         replacement: path.resolve(process.cwd(), 'src/$1'),
