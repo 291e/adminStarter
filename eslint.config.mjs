@@ -175,9 +175,13 @@ export const customConfig = {
   },
   rules: {
     ...commonRules(),
-    ...importRules(),
     ...unusedImportsRules(),
-    ...sortImportsRules(),
+    // turn off import/perfectionist sorting rules
+    'perfectionist/sort-imports': 0,
+    'perfectionist/sort-named-imports': 0,
+    'perfectionist/sort-exports': 0,
+    'perfectionist/sort-named-exports': 0,
+    'import/newline-after-import': 0,
   },
 };
 

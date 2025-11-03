@@ -14,13 +14,14 @@ import { usePathname } from '../hooks';
 
 // ----------------------------------------------------------------------
 
-const IndexPage = lazy(() => import('src/pages/dashboard/one'));
-const PageTwo = lazy(() => import('src/pages/dashboard/two'));
-const PageThree = lazy(() => import('src/pages/dashboard/three'));
-const PageFour = lazy(() => import('src/pages/dashboard/four'));
-const PageFive = lazy(() => import('src/pages/dashboard/five'));
-const PageSix = lazy(() => import('src/pages/dashboard/six'));
-
+const IndexPage = lazy(() => import('src/pages/dashboard/page'));
+const OrganizationPage = lazy(() => import('src/pages/dashboard/organization/page'));
+const OrganizationCreatePage = lazy(() => import('src/pages/dashboard/organization/create'));
+const OrganizationEditPage = lazy(() => import('src/pages/dashboard/organization/edit'));
+const OperationPage = lazy(() => import('src/pages/dashboard/operation/page'));
+const RiskReportPage = lazy(() => import('src/pages/dashboard/operation/page'));
+const SafetyReportPage = lazy(() => import('src/pages/dashboard/operation/safetyReport/page'));
+const SafetySystemPage = lazy(() => import('src/pages/dashboard/safetySystem/page'));
 // ----------------------------------------------------------------------
 
 function SuspenseOutlet() {
@@ -44,15 +45,26 @@ export const dashboardRoutes: RouteObject[] = [
     element: CONFIG.auth.skip ? dashboardLayout() : <AuthGuard>{dashboardLayout()}</AuthGuard>,
     children: [
       { element: <IndexPage />, index: true },
-      { path: 'two', element: <PageTwo /> },
-      { path: 'three', element: <PageThree /> },
       {
-        path: 'group',
+        path: 'organization',
         children: [
-          { element: <PageFour />, index: true },
-          { path: 'five', element: <PageFive /> },
-          { path: 'six', element: <PageSix /> },
+          { element: <OrganizationPage />, index: true },
+          { path: 'create', element: <OrganizationCreatePage /> },
+          { path: ':id/edit', element: <OrganizationEditPage /> },
         ],
+      },
+      {
+        path: 'operation',
+        children: [
+          { element: <OperationPage />, index: true },
+          { path: 'risk-report', element: <RiskReportPage /> },
+          { path: 'safety-report', element: <SafetyReportPage /> },
+        ],
+      },
+      {
+        path: 'safety-system',
+        element: <SafetySystemPage />,
+        index: true,
       },
     ],
   },

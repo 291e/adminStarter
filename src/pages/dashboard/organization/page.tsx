@@ -1,17 +1,17 @@
 import { CONFIG } from 'src/global-config';
 
-import { BlankView } from 'src/sections/blank/view';
+import { OrganizationView } from 'src/sections/Organization/view';
 
 // ----------------------------------------------------------------------
 
-const metadata = { title: `Page five | Dashboard - ${CONFIG.appName}` };
+const metadata = { title: `조직관리 | Dashboard - ${CONFIG.appName}` };
 
 export default function Page() {
   return (
     <>
       <title>{metadata.title}</title>
 
-      <BlankView title="Page five" />
+      <OrganizationView title="조직관리" />
     </>
   );
 }

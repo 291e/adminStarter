@@ -53,13 +53,10 @@ export const navData: NavSectionProps['data'] = [
     subheader: 'Overview',
     items: [
       {
-        title: 'One',
+        title: '대시보드',
         path: paths.dashboard.root,
         icon: ICONS.dashboard,
-        info: <Label>v{CONFIG.appVersion}</Label>,
       },
-      { title: 'Two', path: paths.dashboard.two, icon: ICONS.ecommerce },
-      { title: 'Three', path: paths.dashboard.three, icon: ICONS.analytics },
     ],
   },
   /**
@@ -69,14 +66,23 @@ export const navData: NavSectionProps['data'] = [
     subheader: 'Management',
     items: [
       {
-        title: 'Group',
-        path: paths.dashboard.group.root,
+        title: '조직관리',
+        path: paths.dashboard.organization.root,
+        icon: ICONS.folder,
+      },
+      {
+        title: '현장 운영 관리',
+        path: paths.dashboard.operation.root,
         icon: ICONS.user,
         children: [
-          { title: 'Four', path: paths.dashboard.group.root },
-          { title: 'Five', path: paths.dashboard.group.five },
-          { title: 'Six', path: paths.dashboard.group.six },
+          { title: '위험 보고', path: paths.dashboard.operation.riskReport },
+          { title: '안전보건 정보', path: paths.dashboard.operation.safetyReport },
         ],
+      },
+      {
+        title: '안전보건체계 관리',
+        path: paths.dashboard.safetySystem.root,
+        icon: ICONS.folder,
       },
     ],
   },
