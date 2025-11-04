@@ -50,9 +50,14 @@ export const paths = {
       root: `${ROOTS.DASHBOARD}/operation`,
       riskReport: `${ROOTS.DASHBOARD}/operation/risk-report`,
       safetyReport: `${ROOTS.DASHBOARD}/operation/safety-report`,
+      educationReport: `${ROOTS.DASHBOARD}/operation/education-report`,
+      libraryReport: `${ROOTS.DASHBOARD}/operation/library-report`,
     },
     safetySystem: {
       root: `${ROOTS.DASHBOARD}/safety-system`,
+    },
+    systemSetting: {
+      root: `${ROOTS.DASHBOARD}/system-setting`,
     },
   },
 };

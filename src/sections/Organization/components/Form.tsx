@@ -15,13 +15,13 @@ import { fDateTime } from 'src/utils/format-time';
 import { useNavigate } from 'react-router';
 import { Iconify } from 'src/components/iconify';
 
-import type { OrganizationMember } from 'src/_mock/_organization';
+import type { Member } from 'src/_mock/_member';
 
 type Props = {
-  value?: OrganizationMember | null;
+  value?: Member | null;
   mode: 'create' | 'edit';
   onCancel: () => void;
-  onSubmit?: (payload: Partial<OrganizationMember>) => void;
+  onSubmit?: (payload: Partial<Member>) => void;
   onSearchAddress?: () => void;
   lastAccessIp?: string;
 };
@@ -34,12 +34,12 @@ export default function OrganizationForm({
   onSearchAddress,
   lastAccessIp,
 }: Props) {
-  const [orgName, setOrgName] = React.useState<string>(value?.orgName ?? '');
-  const [name, setName] = React.useState<string>(value?.name ?? '');
-  const [phone, setPhone] = React.useState<string>(value?.phone ?? '');
-  const [email, setEmail] = React.useState<string>(value?.email ?? '');
-  const [address, setAddress] = React.useState<string>(value?.address ?? '');
-  const [status, setStatus] = React.useState<'active' | 'inactive'>(value?.status ?? 'active');
+  const [orgName, setOrgName] = React.useState<string>(value?.memberName ?? '');
+  const [name, setName] = React.useState<string>(value?.memberNameOrg ?? '');
+  const [phone, setPhone] = React.useState<string>(value?.memberPhone ?? '');
+  const [email, setEmail] = React.useState<string>(value?.memberEmail ?? '');
+  const [address, setAddress] = React.useState<string>(value?.memberAddress ?? '');
+  const [status, setStatus] = React.useState<string>(value?.memberStatus ?? '');
   const [orgType, setOrgType] = React.useState<'' | '운영사' | '회원사'>('');
 
   const navigate = useNavigate();
@@ -50,7 +50,14 @@ export default function OrganizationForm({
       : Boolean(orgName && name && phone && email && address);
 
   const handleSubmit = () => {
-    onSubmit?.({ orgName, name, phone, email, address, status });
+    onSubmit?.({
+      memberName: orgName,
+      memberNameOrg: name,
+      memberPhone: phone,
+      memberEmail: email,
+      memberAddress: address,
+      memberStatus: status,
+    });
   };
 
   return (
@@ -93,9 +100,7 @@ export default function OrganizationForm({
               <>
                 <LabeledText
                   label="등록일"
-                  value={
-                    value?.registeredAt ? fDateTime(value.registeredAt, 'YYYY-MM-DD HH:mm:ss') : ''
-                  }
+                  value={value?.createAt ? fDateTime(value.createAt, 'YYYY-MM-DD HH:mm:ss') : ''}
                 />
                 <LabeledText label="최근 접속 IP" value={lastAccessIp ?? '-'} />
               </>
@@ -131,8 +136,8 @@ export default function OrganizationForm({
               <LabeledText
                 label="접속일"
                 value={
-                  value?.lastAccessedAt
-                    ? fDateTime(value.lastAccessedAt, 'YYYY-MM-DD HH:mm:ss')
+                  value?.lastSigninDate
+                    ? fDateTime(value.lastSigninDate, 'YYYY-MM-DD HH:mm:ss')
                     : ''
                 }
               />

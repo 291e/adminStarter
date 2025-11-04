@@ -10,11 +10,11 @@ import Typography from '@mui/material/Typography';
 import Avatar from '@mui/material/Avatar';
 import Chip from '@mui/material/Chip';
 
-import type { OrganizationMember } from 'src/_mock/_organization';
+import type { Member } from 'src/_mock/_member';
 import { fDateTime } from 'src/utils/format-time';
 
 type Props = {
-  rows: OrganizationMember[];
+  rows: Member[];
 };
 
 export default function OrganizationTableEdit({ rows }: Props) {
@@ -40,42 +40,46 @@ export default function OrganizationTableEdit({ rows }: Props) {
         </TableHead>
         <TableBody>
           {rows.map((row) => (
-            <TableRow key={row.id} hover>
-              <TableCell>{row.order}</TableCell>
+            <TableRow key={row.memberIdx} hover>
+              <TableCell>{row.memberIdx}</TableCell>
               <TableCell>
                 <Stack>
                   <Typography variant="body2">
-                    {fDateTime(row.registeredAt, 'YYYY-MM-DD HH:mm:ss')}
+                    {fDateTime(row.createAt, 'YYYY-MM-DD HH:mm:ss')}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {fDateTime(row.lastAccessedAt, 'YYYY-MM-DD HH:mm:ss')}
+                    {fDateTime(row.lastSigninDate, 'YYYY-MM-DD HH:mm:ss')}
                   </Typography>
                 </Stack>
               </TableCell>
               <TableCell>
                 <Stack direction="row" spacing={1.5} alignItems="center">
-                  <Avatar src={row.avatarUrl} alt={row.name} sx={{ width: 32, height: 32 }} />
+                  <Avatar
+                    src={row.memberThumbnail}
+                    alt={row.memberName}
+                    sx={{ width: 32, height: 32 }}
+                  />
                   <Stack>
-                    <Typography variant="subtitle2">{row.name}</Typography>
+                    <Typography variant="subtitle2">{row.memberName}</Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {row.position}
+                      {row.memberRole}
                     </Typography>
                   </Stack>
                 </Stack>
               </TableCell>
-              <TableCell>{row.department}</TableCell>
+              <TableCell>{row.companyBranchIdx}</TableCell>
               <TableCell>
                 <Stack>
-                  <Typography variant="body2">{row.phone}</Typography>
+                  <Typography variant="body2">{row.memberPhone}</Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {row.email}
+                    {row.memberEmail}
                   </Typography>
                 </Stack>
               </TableCell>
-              <TableCell>{row.role}</TableCell>
-              <TableCell>{row.nationality}</TableCell>
+              <TableCell>{row.memberRole}</TableCell>
+              <TableCell>{row.memberLang}</TableCell>
               <TableCell align="center">
-                {row.status === 'active' ? (
+                {row.memberStatus === 'active' ? (
                   <Chip label="활성" size="small" color="success" variant="soft" />
                 ) : (
                   <Chip label="비활성" size="small" sx={{ bgcolor: 'grey.300' }} />
@@ -89,6 +93,3 @@ export default function OrganizationTableEdit({ rows }: Props) {
     </TableContainer>
   );
 }
-
-
-

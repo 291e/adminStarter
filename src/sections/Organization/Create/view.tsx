@@ -5,7 +5,7 @@ import OrganizationBreadcrumbs from '../components/Breadcrumbs';
 import OrganizationForm from '../components/Form';
 import OrganizationFilters from '../components/Filters';
 import OrganizationPagination from '../components/Pagination';
-import { _organizationMembers } from 'src/_mock';
+import { mockMembers } from 'src/_mock';
 import { useOrganization } from '../hooks/use-organization';
 import OrganizationTableCreate from './components/Table';
 
@@ -14,7 +14,7 @@ type Props = {
 };
 
 export default function OrganizationCreateView({ sx }: Props) {
-  const logic = useOrganization(_organizationMembers);
+  const logic = useOrganization(mockMembers());
 
   return (
     <DashboardContent maxWidth="xl">

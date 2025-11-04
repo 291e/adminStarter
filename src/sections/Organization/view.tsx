@@ -6,16 +6,15 @@ import Divider from '@mui/material/Divider';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 
-import { _organizationMembers } from 'src/_mock';
 import { DashboardContent } from 'src/layouts/dashboard';
 import OrganizationBreadcrumbs from './components/Breadcrumbs';
 import OrganizationFilters from './components/Filters';
 import OrganizationTable from './components/Table';
 import OrganizationPagination from './components/Pagination';
 import { useOrganization } from './hooks/use-organization';
-import type { OrganizationMember } from 'src/_mock/_organization';
 import { useNavigate } from 'react-router';
 import React from 'react';
+import { mockMembers } from 'src/_mock';
 
 // ----------------------------------------------------------------------
 
@@ -26,7 +25,7 @@ type Props = {
 };
 
 export function OrganizationView({ title = 'Blank', description, sx }: Props) {
-  const logic = useOrganization(_organizationMembers);
+  const logic = useOrganization(mockMembers());
   const navigate = useNavigate();
 
   const renderContent = () => (
@@ -52,7 +51,15 @@ export function OrganizationView({ title = 'Blank', description, sx }: Props) {
 
       <OrganizationTable
         rows={logic.filtered}
-        onEdit={(row) => navigate(`/dashboard/organization/${row.id}/edit`)}
+        onViewDetail={(row) => navigate(`/dashboard/organization/${row.memberIdx}`)}
+        onDeactivate={(row) => {
+          // 비활성화 로직 추가
+          console.log('비활성화:', row);
+        }}
+        onDelete={(row) => {
+          // 삭제 로직 추가
+          console.log('삭제:', row);
+        }}
       />
 
       <Divider sx={{ mt: 2, mb: 1 }} />

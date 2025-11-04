@@ -1,4 +1,4 @@
-import type { OrganizationMember } from 'src/_mock/_organization';
+import type { Member } from 'src/_mock/_member';
 import { useMemo, useState, useCallback } from 'react';
 
 // ----------------------------------------------------------------------
@@ -23,11 +23,11 @@ export type UseOrganizationResult = {
   rowsPerPage: number;
   onChangePage: (page: number) => void;
   onChangeRowsPerPage: (rows: number) => void;
-  filtered: OrganizationMember[];
+  filtered: Member[];
   total: number;
 };
 
-export function useOrganization(members: OrganizationMember[]): UseOrganizationResult {
+export function useOrganization(members: Member[]): UseOrganizationResult {
   const [tab, setTab] = useState<string>('all');
   const [filters, setFilters] = useState<OrganizationFilters>({ q1: '', q2: '', q3: '' });
   const [searchField, setSearchField] = useState<
@@ -62,11 +62,13 @@ export function useOrganization(members: OrganizationMember[]): UseOrganizationR
           text.toLowerCase().includes((filters.q2 || '').toLowerCase());
         const fieldMatch =
           searchField === 'all'
-            ? [m.orgName, m.name, m.phone, m.email, m.address].some((s) => query(s))
-            : query(String(m[searchField] ?? ''));
-        const t1 = filters.q1 ? `${m.status}`.includes(filters.q1) : true;
-        const t3 = filters.q3 ? `${m.status}`.includes(filters.q3) : true;
-        const byTab = tab === 'all' ? true : m.status === (tab as 'active' | 'inactive');
+            ? [m.memberName, m.memberNameOrg, m.memberPhone, m.memberEmail, m.memberAddress].some(
+                (s) => s && query(s)
+              )
+            : query(String(m[searchField as keyof Member] ?? ''));
+        const t1 = filters.q1 ? `${m.memberStatus}`.includes(filters.q1) : true;
+        const t3 = filters.q3 ? `${m.memberStatus}`.includes(filters.q3) : true;
+        const byTab = tab === 'all' ? true : m.memberStatus === (tab as 'active' | 'inactive');
         return fieldMatch && t1 && t3 && byTab;
       }),
     [members, filters, tab]
@@ -75,8 +77,8 @@ export function useOrganization(members: OrganizationMember[]): UseOrganizationR
   const total = filteredAll.length;
 
   const countAll = members.length;
-  const countActive = members.filter((m) => m.status === 'active').length;
-  const countInactive = members.filter((m) => m.status === 'inactive').length;
+  const countActive = members.filter((m) => m.memberStatus === 'active').length;
+  const countInactive = members.filter((m) => m.memberStatus === 'inactive').length;
 
   const filtered = useMemo(() => {
     const start = page * rowsPerPage;

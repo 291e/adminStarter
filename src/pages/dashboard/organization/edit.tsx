@@ -2,12 +2,12 @@ import { CONFIG } from 'src/global-config';
 
 import { useParams } from 'react-router';
 import OrganizationEditView from 'src/sections/Organization/Edit/view';
-import { _organizationMembers } from 'src/_mock';
+import { mockMembers } from 'src/_mock';
 
 export default function Page() {
   const params = useParams();
   const id = params.id as string;
-  const value = _organizationMembers.find((m) => m.id === id) || null;
+  const value = mockMembers().find((m) => m.memberIdx === parseInt(id)) || null;
   const metadata = { title: `조직 수정 | Dashboard - ${CONFIG.appName}` };
 
   return (

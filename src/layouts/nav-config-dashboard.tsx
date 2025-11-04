@@ -68,21 +68,28 @@ export const navData: NavSectionProps['data'] = [
       {
         title: '조직관리',
         path: paths.dashboard.organization.root,
-        icon: ICONS.folder,
+        icon: ICONS.job,
       },
       {
         title: '현장 운영 관리',
         path: paths.dashboard.operation.root,
-        icon: ICONS.user,
+        icon: ICONS.tour,
         children: [
           { title: '위험 보고', path: paths.dashboard.operation.riskReport },
           { title: '안전보건 정보', path: paths.dashboard.operation.safetyReport },
+          { title: '교육이수 현황', path: paths.dashboard.operation.educationReport },
+          { title: '라이브러리', path: paths.dashboard.operation.libraryReport },
         ],
       },
       {
         title: '안전보건체계 관리',
         path: paths.dashboard.safetySystem.root,
-        icon: ICONS.folder,
+        icon: ICONS.lock,
+      },
+      {
+        title: '시스템 설정',
+        path: paths.dashboard.systemSetting.root,
+        icon: ICONS.lock,
       },
     ],
   },

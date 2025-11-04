@@ -21,7 +21,21 @@ const OrganizationEditPage = lazy(() => import('src/pages/dashboard/organization
 const OperationPage = lazy(() => import('src/pages/dashboard/operation/page'));
 const RiskReportPage = lazy(() => import('src/pages/dashboard/operation/page'));
 const SafetyReportPage = lazy(() => import('src/pages/dashboard/operation/safetyReport/page'));
+const EducationReportPage = lazy(
+  () => import('src/pages/dashboard/operation/educationReport/page')
+);
+const LibraryReportPage = lazy(() => import('src/pages/dashboard/operation/libraryReport/page'));
 const SafetySystemPage = lazy(() => import('src/pages/dashboard/safetySystem/page'));
+const SafetySystemRisk2200ListPage = lazy(
+  () => import('src/pages/dashboard/safetySystem/[safety_id]/risk-2200/page')
+);
+const SafetySystemRisk2200CreatePage = lazy(
+  () => import('src/pages/dashboard/safetySystem/[safety_id]/risk-2200/create/page')
+);
+const SafetySystemRisk2200DetailPage = lazy(
+  () => import('src/pages/dashboard/safetySystem/[safety_id]/risk-2200/[risk_id]/page')
+);
+const SystemSettingPage = lazy(() => import('src/pages/dashboard/systemSetting/page'));
 // ----------------------------------------------------------------------
 
 function SuspenseOutlet() {
@@ -59,11 +73,35 @@ export const dashboardRoutes: RouteObject[] = [
           { element: <OperationPage />, index: true },
           { path: 'risk-report', element: <RiskReportPage /> },
           { path: 'safety-report', element: <SafetyReportPage /> },
+          { path: 'education-report', element: <EducationReportPage /> },
+          {
+            path: 'library-report',
+            element: <LibraryReportPage />,
+          },
         ],
       },
       {
         path: 'safety-system',
-        element: <SafetySystemPage />,
+        children: [
+          { element: <SafetySystemPage />, index: true },
+          {
+            path: ':safety_id',
+            children: [
+              {
+                path: 'risk-2200',
+                children: [
+                  { element: <SafetySystemRisk2200ListPage />, index: true },
+                  { path: 'create', element: <SafetySystemRisk2200CreatePage /> },
+                  { path: ':risk_id', element: <SafetySystemRisk2200DetailPage /> },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        path: 'system-setting',
+        element: <SystemSettingPage />,
         index: true,
       },
     ],

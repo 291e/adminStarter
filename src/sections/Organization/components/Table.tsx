@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -8,18 +10,40 @@ import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
+import Menu from '@mui/material/Menu';
+import MenuList from '@mui/material/MenuList';
+import MenuItem from '@mui/material/MenuItem';
+import Divider from '@mui/material/Divider';
 
-import type { OrganizationMember } from 'src/_mock/_organization';
+import type { Member } from 'src/_mock/_member';
 import Chip from '@mui/material/Chip';
 import { fDateTime } from 'src/utils/format-time';
 import { Iconify } from 'src/components/iconify';
-
+import { mockCompanies } from 'src/_mock/_company';
 type Props = {
-  rows: OrganizationMember[];
-  onEdit?: (row: OrganizationMember) => void;
+  rows: Member[];
+  onViewDetail?: (row: Member) => void;
+  onDeactivate?: (row: Member) => void;
+  onDelete?: (row: Member) => void;
 };
 
-export default function OrganizationTable({ rows, onEdit }: Props) {
+export default function OrganizationTable({ rows, onViewDetail, onDeactivate, onDelete }: Props) {
+  const [menuAnchorEl, setMenuAnchorEl] = useState<{ [key: string]: HTMLElement | null }>({});
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
+  const handleOpenMenu = (event: React.MouseEvent<HTMLElement>, rowId: string) => {
+    event.stopPropagation();
+    setMenuAnchorEl((prev) => ({ ...prev, [rowId]: event.currentTarget }));
+    setOpenMenuId(rowId);
+  };
+
+  const handleCloseMenu = (rowId: string) => {
+    setMenuAnchorEl((prev) => ({ ...prev, [rowId]: null }));
+    setOpenMenuId(null);
+  };
+
+  const companies = mockCompanies();
+
   return (
     <TableContainer component={Paper} sx={{ mt: 2, overflowX: 'auto' }}>
       <Table size="small" stickyHeader sx={{ minWidth: 1600 }}>
@@ -42,44 +66,102 @@ export default function OrganizationTable({ rows, onEdit }: Props) {
 
         <TableBody>
           {rows.map((row, idx) => (
-            <TableRow key={row.id} hover>
-              <TableCell>{row.order}</TableCell>
+            <TableRow key={row.memberIdx} hover>
+              <TableCell>{row.memberIdx}</TableCell>
               <TableCell>
                 <Stack>
                   <Typography variant="body2">
-                    {fDateTime(row.registeredAt, 'YYYY-MM-DD HH:mm:ss')}
+                    {fDateTime(row.createAt, 'YYYY-MM-DD HH:mm:ss')}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {fDateTime(row.lastAccessedAt, 'YYYY-MM-DD HH:mm:ss')}
+                    {fDateTime(row.lastSigninDate, 'YYYY-MM-DD HH:mm:ss')}
                   </Typography>
                 </Stack>
               </TableCell>
               <TableCell>
-                <Typography variant="subtitle2">{row.orgName}</Typography>
+                <Typography variant="subtitle2">
+                  {companies.find((c) => c.companyIdx === row.companyIdx)?.companyName}
+                </Typography>
               </TableCell>
-              <TableCell>{row.name}</TableCell>
+              <TableCell>{row.memberName}</TableCell>
               <TableCell>
                 <Stack>
-                  <Typography variant="body2">{row.phone}</Typography>
+                  <Typography variant="body2">{row.memberPhone}</Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {row.email}
+                    {row.memberEmail}
                   </Typography>
                 </Stack>
               </TableCell>
               <TableCell>
-                <Typography variant="body2">{row.address}</Typography>
+                <Typography variant="body2">{row.memberAddress}</Typography>
               </TableCell>
               <TableCell align="center">
-                {row.status === 'active' ? (
+                {row.memberStatus === 'active' ? (
                   <Chip label="활성" size="small" color="success" variant="soft" />
                 ) : (
                   <Chip label="비활성" size="small" sx={{ bgcolor: 'grey.300' }} />
                 )}
               </TableCell>
               <TableCell align="right">
-                <IconButton size="small" onClick={() => onEdit?.(row)}>
-                  <Iconify icon="solar:pen-bold" width={16} />
+                <IconButton
+                  size="small"
+                  onClick={(e) => handleOpenMenu(e, row.memberIdx.toString())}
+                  aria-label="actions"
+                >
+                  <Iconify icon="eva:more-vertical-fill" width={16} />
                 </IconButton>
+                <Menu
+                  open={openMenuId === row.memberIdx.toString()}
+                  anchorEl={menuAnchorEl[row.memberIdx.toString()]}
+                  onClose={() => handleCloseMenu(row.memberIdx.toString())}
+                  anchorOrigin={{
+                    vertical: 'bottom',
+                    horizontal: 'right',
+                  }}
+                  transformOrigin={{
+                    vertical: 'top',
+                    horizontal: 'right',
+                  }}
+                  slotProps={{
+                    paper: {
+                      sx: { minWidth: 120 },
+                    },
+                  }}
+                >
+                  <MenuList>
+                    <MenuItem
+                      onClick={() => {
+                        handleCloseMenu(row.memberIdx.toString());
+                        onViewDetail?.(row);
+                      }}
+                    >
+                      상세 보기
+                    </MenuItem>
+                    <MenuItem
+                      onClick={() => {
+                        handleCloseMenu(row.memberIdx.toString());
+                        onDeactivate?.(row);
+                      }}
+                    >
+                      비활성화
+                    </MenuItem>
+                    <Divider />
+                    <MenuItem
+                      onClick={() => {
+                        handleCloseMenu(row.memberIdx.toString());
+                        onDelete?.(row);
+                      }}
+                      sx={{
+                        color: 'error.main',
+                        '&:hover': {
+                          bgcolor: 'error.lighter',
+                        },
+                      }}
+                    >
+                      삭제
+                    </MenuItem>
+                  </MenuList>
+                </Menu>
               </TableCell>
             </TableRow>
           ))}

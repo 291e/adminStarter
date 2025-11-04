@@ -49,6 +49,8 @@
     "dayjs": "^1.11.13",
     "es-toolkit": "^1.39.3",
     "framer-motion": "^12.18.1",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^3.0.3",
     "minimal-shared": "^1.0.15",
     "nprogress": "^0.2.0",
     "react": "^19.1.0",

@@ -1,6 +1,7 @@
 import { CONFIG } from 'src/global-config';
 
 import { BlankView } from 'src/sections/blank/view';
+import { SafetyReportView } from 'src/sections/SafetyReport/view';
 
 // ----------------------------------------------------------------------
 
@@ -10,7 +11,7 @@ export default function Page() {
   return (
     <>
       <title>{metadata.title}</title>
-      <BlankView title="안전보고서" />
+      <SafetyReportView title="안전보고서" />
     </>
   );
 }
