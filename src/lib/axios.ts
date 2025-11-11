@@ -81,4 +81,7 @@ export const endpoints = {
     details: '/api/product/details',
     search: '/api/product/search',
   },
+  member: {
+    list: '/safeyoui/api/member',
+  },
 } as const;

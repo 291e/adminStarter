@@ -1,31 +1,75 @@
 import type { IconButtonProps } from '@mui/material/IconButton';
 
 import { m } from 'framer-motion';
+import { usePopover } from 'minimal-shared/hooks';
 
-import Badge from '@mui/material/Badge';
 import SvgIcon from '@mui/material/SvgIcon';
 import IconButton from '@mui/material/IconButton';
+import MenuList from '@mui/material/MenuList';
+import MenuItem from '@mui/material/MenuItem';
+import ListItemText from '@mui/material/ListItemText';
 
-import { useSettingsContext } from 'src/components/settings';
+import { useRouter } from 'src/routes/hooks';
+import { useAuthContext } from 'src/auth/hooks';
+import { signOut } from 'src/auth/context/jwt/action';
+
+import { CustomPopover } from 'src/components/custom-popover';
+import { Iconify } from 'src/components/iconify';
 import { varTap, varHover, transitionTap } from 'src/components/animate';
 
 // ----------------------------------------------------------------------
 
 export function SettingsButton({ sx, ...other }: IconButtonProps) {
-  const settings = useSettingsContext();
+  const router = useRouter();
+  const { checkUserSession } = useAuthContext();
+  const { open, anchorEl, onClose, onOpen } = usePopover();
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      await checkUserSession?.();
+      onClose();
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const renderMenuActions = () => (
+    <CustomPopover
+      open={open}
+      anchorEl={anchorEl}
+      onClose={onClose}
+      slotProps={{ paper: { sx: { p: 0 } } }}
+    >
+      <MenuList>
+        <MenuItem onClick={handleLogout}>
+          <ListItemText primary="로그아웃" />
+        </MenuItem>
+      </MenuList>
+    </CustomPopover>
+  );
 
   return (
-    <IconButton
-      component={m.button}
-      whileTap={varTap(0.96)}
-      whileHover={varHover(1.04)}
-      transition={transitionTap()}
-      aria-label="Settings button"
-      onClick={settings.onToggleDrawer}
-      sx={[{ p: 0, width: 40, height: 40 }, ...(Array.isArray(sx) ? sx : [sx])]}
-      {...other}
-    >
-      <Badge color="error" variant="dot" invisible={!settings.canReset}>
+    <>
+      <IconButton
+        component={m.button}
+        whileTap={varTap(0.96)}
+        whileHover={varHover(1.04)}
+        transition={transitionTap()}
+        aria-label="Settings button"
+        onClick={onOpen}
+        sx={[
+          (theme) => ({
+            p: 0,
+            width: 40,
+            height: 40,
+            ...(open && { bgcolor: theme.vars.palette.action.selected }),
+          }),
+          ...(Array.isArray(sx) ? sx : [sx]),
+        ]}
+        {...other}
+      >
         <SvgIcon>
           {/** https://icon-sets.iconify.design/solar/settings-bold-duotone/ */}
           <m.path
@@ -42,7 +86,9 @@ export function SettingsButton({ sx, ...other }: IconButtonProps) {
             d="M15.523 12c0 1.657-1.354 3-3.023 3c-1.67 0-3.023-1.343-3.023-3S10.83 9 12.5 9c1.67 0 3.023 1.343 3.023 3"
           />
         </SvgIcon>
-      </Badge>
-    </IconButton>
+      </IconButton>
+
+      {renderMenuActions()}
+    </>
   );
 }

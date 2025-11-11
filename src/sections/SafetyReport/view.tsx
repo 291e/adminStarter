@@ -32,14 +32,6 @@ export function SafetyReportView({ title = 'Blank', description, sx }: Props) {
 
   const renderContent = () => (
     <>
-      <SafetyReportBreadcrumbs
-        items={[{ label: '대시보드', href: '/' }, { label: title }]}
-        onCreate={() => navigate('/dashboard/safety-report/create')}
-        onDocumentTypeManagement={() =>
-          navigate('/dashboard/safety-report/document-type-management')
-        }
-      />
-
       <SafetyReportFilters
         documentType={logic.documentType}
         onChangeDocumentType={logic.onChangeDocumentType}
@@ -73,6 +65,14 @@ export function SafetyReportView({ title = 'Blank', description, sx }: Props) {
     <DashboardContent maxWidth="xl">
       <Typography variant="h4"> {title} </Typography>
       {description && <Typography sx={{ mt: 1 }}> {description} </Typography>}
+
+      <SafetyReportBreadcrumbs
+        items={[{ label: '대시보드', href: '/' }, { label: title }]}
+        onCreate={() => navigate('/dashboard/safety-report/create')}
+        onDocumentTypeManagement={() =>
+          navigate('/dashboard/safety-report/document-type-management')
+        }
+      />
 
       <Box sx={[(theme) => ({ mt: 2, width: 1 }), ...(Array.isArray(sx) ? sx : [sx])]}>
         {renderContent()}

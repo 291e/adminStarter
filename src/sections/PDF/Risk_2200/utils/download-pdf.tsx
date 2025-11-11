@@ -24,7 +24,13 @@ export async function downloadDocumentPDF(documentId: string, safetyId: string):
     const itemNumber = Number(parts[1]);
     const documentNumber = Number(parts[2]);
 
-    // item 정보 가져오기
+    // TODO: TanStack Query Hook(useQuery)으로 문서 정보 가져오기 (PDF 다운로드용)
+    // const { data: documentInfo } = useQuery({
+    //   queryKey: ['risk2200DocumentInfo', documentId],
+    //   queryFn: () => getRisk2200DocumentInfo(documentId),
+    //   enabled: !!documentId,
+    // });
+    // 목업 데이터 사용
     const item = getItem(safetyIdx, itemNumber);
 
     // 숨겨진 컨테이너 생성 (화면 밖으로 이동, display: none 사용 안 함)

@@ -15,7 +15,7 @@ import MenuList from '@mui/material/MenuList';
 import MenuItem from '@mui/material/MenuItem';
 import Divider from '@mui/material/Divider';
 
-import type { Member } from 'src/_mock/_member';
+import type { Member } from 'src/sections/Organization/types/member';
 import Chip from '@mui/material/Chip';
 import { fDateTime } from 'src/utils/format-time';
 import { Iconify } from 'src/components/iconify';
@@ -44,6 +44,29 @@ export default function OrganizationTable({ rows, onViewDetail, onDeactivate, on
 
   const companies = mockCompanies();
 
+  // 구분 매핑 함수
+  const getDivisionLabel = (member: Member): string => {
+    if (member.memberRole === 'operator' || member.memberRole === 'admin') {
+      return '운영사';
+    }
+    if (member.memberRole === 'member') {
+      return '회원사';
+    }
+    if (member.memberRole === 'distributor') {
+      return '총판';
+    }
+    if (member.memberRole === 'agency') {
+      return '대리점';
+    }
+    if (member.memberRole === 'dealer') {
+      return '딜러';
+    }
+    if (member.memberStatus === 'inactive' || !member.memberRole) {
+      return '비회원';
+    }
+    return '기타';
+  };
+
   return (
     <TableContainer component={Paper} sx={{ mt: 2, overflowX: 'auto' }}>
       <Table size="small" stickyHeader sx={{ minWidth: 1600 }}>
@@ -51,6 +74,7 @@ export default function OrganizationTable({ rows, onViewDetail, onDeactivate, on
           <TableRow>
             <TableCell width={72}>순번</TableCell>
             <TableCell width={220}>등록일 / 접속일</TableCell>
+            <TableCell width={100}>구분</TableCell>
             <TableCell width={200}>조직명</TableCell>
             <TableCell width={160}>이름</TableCell>
             <TableCell width={260}>전화번호 / 이메일</TableCell>
@@ -77,6 +101,9 @@ export default function OrganizationTable({ rows, onViewDetail, onDeactivate, on
                     {fDateTime(row.lastSigninDate, 'YYYY-MM-DD HH:mm:ss')}
                   </Typography>
                 </Stack>
+              </TableCell>
+              <TableCell>
+                <Typography variant="body2">{getDivisionLabel(row)}</Typography>
               </TableCell>
               <TableCell>
                 <Typography variant="subtitle2">

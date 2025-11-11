@@ -75,8 +75,11 @@ export const navData: NavSectionProps['data'] = [
         path: paths.dashboard.operation.root,
         icon: ICONS.tour,
         children: [
-          { title: '위험 보고', path: paths.dashboard.operation.riskReport },
-          { title: '안전보건 정보', path: paths.dashboard.operation.safetyReport },
+          { title: '채팅', path: paths.dashboard.operation.chat },
+          {
+            title: '위험 보고',
+            path: paths.dashboard.operation.riskReport,
+          },
           { title: '교육이수 현황', path: paths.dashboard.operation.educationReport },
           { title: '라이브러리', path: paths.dashboard.operation.libraryReport },
         ],
@@ -87,9 +90,18 @@ export const navData: NavSectionProps['data'] = [
         icon: ICONS.lock,
       },
       {
-        title: '시스템 설정',
+        title: '설정 및 관리',
         path: paths.dashboard.systemSetting.root,
         icon: ICONS.lock,
+        children: [
+          { title: '서비스 관리', path: paths.dashboard.systemSetting.serviceSetting },
+          { title: '코드 관리', path: paths.dashboard.systemSetting.codeSetting },
+          { title: 'API 관리', path: paths.dashboard.systemSetting.apiSetting },
+          {
+            title: '업종별 체크리스트',
+            path: paths.dashboard.systemSetting.industryChecklistSetting,
+          },
+        ],
       },
     ],
   },

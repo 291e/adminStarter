@@ -1,5 +1,5 @@
 import Box from '@mui/material/Box';
-import type { Table1300Row } from '../types/table-data';
+import type { Table1300Row } from '../../types/table-data';
 
 // ----------------------------------------------------------------------
 

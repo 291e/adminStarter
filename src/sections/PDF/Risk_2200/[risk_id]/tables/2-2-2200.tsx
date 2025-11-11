@@ -1,7 +1,7 @@
 import React from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import type { Table2200Row } from '../types/table-data';
+import type { Table2200Row } from '../../types/table-data';
 
 type Props = { data?: Table2200Row[] };
 

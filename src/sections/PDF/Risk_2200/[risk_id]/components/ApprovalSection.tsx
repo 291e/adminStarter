@@ -12,9 +12,16 @@ import { Iconify } from 'src/components/iconify';
 type Props = {
   onAddSignature?: () => void;
   is2100Series?: boolean; // 2100번대 문서 여부
+  riskId?: string; // 문서 ID
 };
 
-export default function ApprovalSection({ onAddSignature, is2100Series = false }: Props) {
+export default function ApprovalSection({ onAddSignature, is2100Series = false, riskId }: Props) {
+  // TODO: TanStack Query Hook(useQuery)으로 결재 정보 가져오기
+  // const { data: approvalInfo } = useQuery({
+  //   queryKey: ['risk2200ApprovalInfo', riskId],
+  //   queryFn: () => getRisk2200ApprovalInfo(riskId!),
+  //   enabled: !!riskId,
+  // });
   // 2100번대는 피그마 디자인에 맞게 4개 컬럼 (결재, 작성, 검토, 승인)
   if (is2100Series) {
     return (
@@ -121,8 +128,11 @@ export default function ApprovalSection({ onAddSignature, is2100Series = false }
                     textAlign: 'center',
                   }}
                 >
+                  {/* TODO: TanStack Query로 가져온 작성자 정보 표시 */}
+                  {/* {approvalInfo?.writer?.name || '유승용'} */}
                   유승용
                   <br />
+                  {/* {approvalInfo?.writer?.date || '2025-10-20'} */}
                   2025-10-20
                 </Typography>
               </td>
@@ -136,8 +146,11 @@ export default function ApprovalSection({ onAddSignature, is2100Series = false }
                     textAlign: 'center',
                   }}
                 >
+                  {/* TODO: TanStack Query로 가져온 검토자 정보 표시 */}
+                  {/* {approvalInfo?.reviewer?.name || '양종일'} */}
                   양종일
                   <br />
+                  {/* {approvalInfo?.reviewer?.date || '2025-10-25'} */}
                   2025-10-25
                 </Typography>
               </td>
@@ -151,8 +164,11 @@ export default function ApprovalSection({ onAddSignature, is2100Series = false }
                     textAlign: 'center',
                   }}
                 >
+                  {/* TODO: TanStack Query로 가져온 승인자 정보 표시 */}
+                  {/* {approvalInfo?.approver?.name || '박찬배'} */}
                   박찬배
                   <br />
+                  {/* {approvalInfo?.approver?.date || '2025-10-27'} */}
                   2025-10-27
                 </Typography>
               </td>
@@ -163,7 +179,17 @@ export default function ApprovalSection({ onAddSignature, is2100Series = false }
           <Button
             variant="contained"
             size="small"
-            onClick={onAddSignature}
+            onClick={() => {
+              // TODO: TanStack Query Hook(useMutation)으로 서명 추가
+              // const mutation = useMutation({
+              //   mutationFn: (signatureData: Risk2200SignatureParams) => addRisk2200Signature(signatureData),
+              //   onSuccess: () => {
+              //     queryClient.invalidateQueries({ queryKey: ['risk2200ApprovalInfo'] });
+              //   },
+              // });
+              // mutation.mutate({ riskId, signatureType: 'writer' });
+              onAddSignature();
+            }}
             sx={{
               bgcolor: '#078dee',
               minHeight: 28,
@@ -296,6 +322,8 @@ export default function ApprovalSection({ onAddSignature, is2100Series = false }
                 fontWeight: 400,
               }}
             >
+              {/* TODO: TanStack Query로 가져온 결재 일자 표시 */}
+              {/* {approvalInfo?.approvalDate || "'25. 5 .9"} */}
               &apos;25. 5 .9
             </td>
           </tr>
@@ -304,7 +332,17 @@ export default function ApprovalSection({ onAddSignature, is2100Series = false }
       <Button
         variant="contained"
         size="small"
-        onClick={onAddSignature}
+        onClick={() => {
+          // TODO: TanStack Query Hook(useMutation)으로 서명 추가
+          // const mutation = useMutation({
+          //   mutationFn: (signatureData: Risk2200SignatureParams) => addRisk2200Signature(signatureData),
+          //   onSuccess: () => {
+          //     queryClient.invalidateQueries({ queryKey: ['risk2200ApprovalInfo'] });
+          //   },
+          // });
+          // mutation.mutate({ riskId, signatureType: 'approver' });
+          onAddSignature?.();
+        }}
         sx={{
           bgcolor: '#078dee',
           minHeight: 28,

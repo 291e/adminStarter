@@ -8,9 +8,20 @@ import MenuItem from '@mui/material/MenuItem';
 import InputLabel from '@mui/material/InputLabel';
 import FormControl from '@mui/material/FormControl';
 
+type DivisionType =
+  | 'all'
+  | 'operator'
+  | 'member'
+  | 'distributor'
+  | 'agency'
+  | 'dealer'
+  | 'nonmember';
+
 type Props = {
   tab: string;
   onChangeTab: (value: string) => void;
+  division: DivisionType;
+  onChangeDivision: (value: DivisionType) => void;
   q1: string;
   q2: string;
   q3: string;
@@ -18,13 +29,15 @@ type Props = {
   countAll: number;
   countActive: number;
   countInactive: number;
-  searchField: 'all' | 'orgName' | 'name' | 'phone' | 'email' | 'address';
-  setSearchField: (v: 'all' | 'orgName' | 'name' | 'phone' | 'email' | 'address') => void;
+  searchField: 'all' | 'orgName' | 'manager';
+  setSearchField: (v: 'all' | 'orgName' | 'manager') => void;
 };
 
 export default function OrganizationFilters({
   tab,
   onChangeTab,
+  division,
+  onChangeDivision,
   q1,
   q2,
   q3,
@@ -73,16 +86,20 @@ export default function OrganizationFilters({
 
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
         <FormControl size="small" sx={{ minWidth: 120 }}>
-          <InputLabel id="filter-label">필터</InputLabel>
+          <InputLabel id="filter-label">구분</InputLabel>
           <Select
             labelId="filter-label"
-            label="필터"
-            value={tab}
-            onChange={(e) => onChangeTab(e.target.value)}
+            label="구분"
+            value={division}
+            onChange={(e) => onChangeDivision(e.target.value as DivisionType)}
           >
             <MenuItem value="all">전체</MenuItem>
-            <MenuItem value="active">활성</MenuItem>
-            <MenuItem value="inactive">비활성</MenuItem>
+            <MenuItem value="operator">운영사</MenuItem>
+            <MenuItem value="member">회원사</MenuItem>
+            <MenuItem value="distributor">총판</MenuItem>
+            <MenuItem value="agency">대리점</MenuItem>
+            <MenuItem value="dealer">딜러</MenuItem>
+            <MenuItem value="nonmember">비회원</MenuItem>
           </Select>
         </FormControl>
         <FormControl size="small" sx={{ minWidth: 160 }}>
@@ -91,14 +108,11 @@ export default function OrganizationFilters({
             labelId="search-field-label"
             label="검색어 필터"
             value={searchField}
-            onChange={(e) => setSearchField(e.target.value as any)}
+            onChange={(e) => setSearchField(e.target.value as 'all' | 'orgName' | 'manager')}
           >
-            <MenuItem value="all">전체</MenuItem>
+            <MenuItem value="all">전체 검색</MenuItem>
             <MenuItem value="orgName">조직명</MenuItem>
-            <MenuItem value="name">이름</MenuItem>
-            <MenuItem value="phone">전화번호</MenuItem>
-            <MenuItem value="email">이메일</MenuItem>
-            <MenuItem value="address">주소</MenuItem>
+            <MenuItem value="manager">담당자</MenuItem>
           </Select>
         </FormControl>
         <TextField

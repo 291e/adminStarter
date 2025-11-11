@@ -40,7 +40,12 @@ export function Logo({
   );
 
   const fullLogo = (
-    <img alt="Full logo" src={`${CONFIG.assetsDir}/logo/Logo.svg`} width="100%" height="100%" />
+    <img
+      alt="Full logo"
+      src={`${CONFIG.assetsDir}/logo/logo-full.svg`}
+      width="100%"
+      height="100%"
+    />
   );
 
   return (
@@ -52,9 +57,9 @@ export function Logo({
       className={mergeClasses([logoClasses.root, className])}
       sx={[
         {
-          width: 82,
-          height: 14,
-          ...(!isSingle && { width: 165, height: 28 }),
+          width: 167,
+          height: 30,
+          ...(!isSingle && { width: 82, height: 14 }),
           ...(disabled && { pointerEvents: 'none' }),
         },
         ...(Array.isArray(sx) ? sx : [sx]),

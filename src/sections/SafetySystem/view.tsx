@@ -28,8 +28,6 @@ export function SafetySystemView({ title = 'Blank', description, sx }: Props) {
 
   const renderContent = () => (
     <>
-      <SafetySystemBreadcrumbs items={[{ label: '대시보드', href: '/' }, { label: title }]} />
-
       <SafetySystemTable
         rows={logic.filtered}
         onViewGuide={(system, item) => {
@@ -46,6 +44,8 @@ export function SafetySystemView({ title = 'Blank', description, sx }: Props) {
     <DashboardContent maxWidth="xl">
       <Typography variant="h4"> {title} </Typography>
       {description && <Typography sx={{ mt: 1 }}> {description} </Typography>}
+
+      <SafetySystemBreadcrumbs items={[{ label: '대시보드', href: '/' }, { label: title }]} />
 
       <Box sx={[(theme) => ({ mt: 2, width: 1 }), ...(Array.isArray(sx) ? sx : [sx])]}>
         {renderContent()}

@@ -1,6 +1,7 @@
 import 'src/global.css';
 
 import { useEffect } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { usePathname } from 'src/routes/hooks';
 
@@ -14,6 +15,19 @@ import { AuthProvider } from 'src/auth/context/jwt';
 
 // ----------------------------------------------------------------------
 
+// TanStack Query Client 설정
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5분
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
+
+// ----------------------------------------------------------------------
+
 type AppProps = {
   children: React.ReactNode;
 };
@@ -22,20 +36,22 @@ export default function App({ children }: AppProps) {
   useScrollToTop();
 
   return (
-    <AuthProvider>
-      <SettingsProvider defaultSettings={defaultSettings}>
-        <ThemeProvider
-          modeStorageKey={themeConfig.modeStorageKey}
-          defaultMode={themeConfig.defaultMode}
-        >
-          <MotionLazy>
-            <ProgressBar />
-            <SettingsDrawer defaultSettings={defaultSettings} />
-            {children}
-          </MotionLazy>
-        </ThemeProvider>
-      </SettingsProvider>
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <SettingsProvider defaultSettings={defaultSettings}>
+          <ThemeProvider
+            modeStorageKey={themeConfig.modeStorageKey}
+            defaultMode={themeConfig.defaultMode}
+          >
+            <MotionLazy>
+              <ProgressBar />
+              <SettingsDrawer defaultSettings={defaultSettings} />
+              {children}
+            </MotionLazy>
+          </ThemeProvider>
+        </SettingsProvider>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }
 

@@ -33,7 +33,7 @@ export function AuthSplitSection({
   methods,
   layoutQuery = 'md',
   title = 'Manage the job',
-  imgUrl = `${CONFIG.assetsDir}/assets/illustrations/illustration-dashboard.webp`,
+  imgUrl = `${CONFIG.assetsDir}/assets/background/Banner.svg`,
   subtitle = '이편한 자동화 기술 관리자 페이지',
   ...other
 }: AuthSplitSectionProps) {
@@ -42,10 +42,7 @@ export function AuthSplitSection({
       sx={[
         (theme) => ({
           ...theme.mixins.bgGradient({
-            images: [
-              `linear-gradient(0deg, ${varAlpha(theme.vars.palette.background.defaultChannel, 0.92)}, ${varAlpha(theme.vars.palette.background.defaultChannel, 0.92)})`,
-              `url(${CONFIG.assetsDir}/assets/background/background-3-blur.webp)`,
-            ],
+            images: [`url(${CONFIG.assetsDir}/assets/background/Banner.svg)`],
           }),
           px: 3,
           pb: 3,
@@ -66,60 +63,7 @@ export function AuthSplitSection({
       ]}
       {...other}
     >
-      <div>
-        <Typography variant="h3" sx={{ textAlign: 'center' }}>
-          {title}
-        </Typography>
-
-        {subtitle && (
-          <Typography sx={{ color: 'text.secondary', textAlign: 'center', mt: 2 }}>
-            {subtitle}
-          </Typography>
-        )}
-      </div>
-
-      <Box
-        component="img"
-        alt="Dashboard illustration"
-        src={imgUrl}
-        sx={{ width: 1, aspectRatio: '4/3', objectFit: 'cover' }}
-      />
-
-      {!!methods?.length && method && (
-        <Box component="ul" sx={{ gap: 2, display: 'flex' }}>
-          {methods.map((option) => {
-            const selected = method === option.label.toLowerCase();
-
-            return (
-              <Box
-                key={option.label}
-                component="li"
-                sx={{
-                  ...(!selected && {
-                    cursor: 'not-allowed',
-                    filter: 'grayscale(1)',
-                  }),
-                }}
-              >
-                <Tooltip title={option.label} placement="top">
-                  <Link
-                    component={RouterLink}
-                    href={option.path}
-                    sx={{ ...(!selected && { pointerEvents: 'none' }) }}
-                  >
-                    <Box
-                      component="img"
-                      alt={option.label}
-                      src={option.icon}
-                      sx={{ width: 32, height: 32 }}
-                    />
-                  </Link>
-                </Tooltip>
-              </Box>
-            );
-          })}
-        </Box>
-      )}
+      <Box sx={{ width: 1, aspectRatio: '4/3', objectFit: 'cover' }} />
     </Box>
   );
 }

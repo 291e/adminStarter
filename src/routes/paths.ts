@@ -22,6 +22,12 @@ export const paths = {
     jwt: {
       signIn: `${ROOTS.AUTH}/jwt/sign-in`,
       signUp: `${ROOTS.AUTH}/jwt/sign-up`,
+      findId: `${ROOTS.AUTH}/jwt/find-id`,
+      findIdSuccess: `${ROOTS.AUTH}/jwt/find-id-success`,
+      findIdFail: `${ROOTS.AUTH}/jwt/find-id-fail`,
+      resetPassword: `${ROOTS.AUTH}/jwt/reset-password`,
+      resetPasswordNew: `${ROOTS.AUTH}/jwt/reset-password-new`,
+      verifyCode: `${ROOTS.AUTH}/jwt/verify-code`,
     },
     firebase: {
       signIn: `${ROOTS.AUTH}/firebase/sign-in`,
@@ -45,11 +51,13 @@ export const paths = {
     root: ROOTS.DASHBOARD,
     organization: {
       root: `${ROOTS.DASHBOARD}/organization`,
+      detail: (id: string) => `${ROOTS.DASHBOARD}/organization/detail/${id}`,
     },
     operation: {
       root: `${ROOTS.DASHBOARD}/operation`,
+      chat: `${ROOTS.DASHBOARD}/operation/chat`,
       riskReport: `${ROOTS.DASHBOARD}/operation/risk-report`,
-      safetyReport: `${ROOTS.DASHBOARD}/operation/safety-report`,
+      riskReportCreate: `${ROOTS.DASHBOARD}/operation/risk-report/create`,
       educationReport: `${ROOTS.DASHBOARD}/operation/education-report`,
       libraryReport: `${ROOTS.DASHBOARD}/operation/library-report`,
     },
@@ -58,6 +66,10 @@ export const paths = {
     },
     systemSetting: {
       root: `${ROOTS.DASHBOARD}/system-setting`,
+      serviceSetting: `${ROOTS.DASHBOARD}/system-setting/service-setting`,
+      codeSetting: `${ROOTS.DASHBOARD}/system-setting/code-setting`,
+      apiSetting: `${ROOTS.DASHBOARD}/system-setting/api-setting`,
+      industryChecklistSetting: `${ROOTS.DASHBOARD}/system-setting/industry-checklist-setting`,
     },
   },
 };

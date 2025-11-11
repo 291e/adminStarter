@@ -23,6 +23,12 @@ export default function DocumentInfo({
   onDocumentDateChange,
   onApprovalDeadlineChange,
 }: Props) {
+  // TODO: TanStack Query Hook(useQuery)으로 임시 저장된 문서 정보 가져오기 (문서번호 표시용)
+  // const { data: temporaryDocument } = useQuery({
+  //   queryKey: ['risk2200TemporaryDocument', documentId],
+  //   queryFn: () => getRisk2200TemporaryDocument(documentId),
+  //   enabled: !!documentId,
+  // });
   return (
     <Box
       sx={{
@@ -54,6 +60,8 @@ export default function DocumentInfo({
               lineHeight: '22px',
             }}
           >
+            {/* TODO: 등록 시 서버에서 받은 문서번호 또는 임시 저장된 문서의 문서번호 표시 */}
+            {/* {temporaryDocument?.documentNumber || documentNumber || '등록 시 자동으로 부여 됩니다.'} */}
             {documentNumber || '등록 시 자동으로 부여 됩니다.'}
           </Typography>
         </Box>

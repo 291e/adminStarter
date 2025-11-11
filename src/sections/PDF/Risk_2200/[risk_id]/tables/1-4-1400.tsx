@@ -1,6 +1,6 @@
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import type { Table1400Data } from '../types/table-data';
+import type { Table1400Data } from '../../types/table-data';
 
 // ----------------------------------------------------------------------
 

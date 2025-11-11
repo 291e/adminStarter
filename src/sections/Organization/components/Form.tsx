@@ -15,7 +15,7 @@ import { fDateTime } from 'src/utils/format-time';
 import { useNavigate } from 'react-router';
 import { Iconify } from 'src/components/iconify';
 
-import type { Member } from 'src/_mock/_member';
+import type { Member } from 'src/sections/Organization/types/member';
 
 type Props = {
   value?: Member | null;

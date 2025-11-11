@@ -1,26 +1,23 @@
 import type { RiskReport } from 'src/_mock/_risk-report';
 import { useMemo, useState, useCallback } from 'react';
+import type { Dayjs } from 'dayjs';
 
 // ----------------------------------------------------------------------
-
-export type RiskReportFilters = {
-  q1: string;
-  q2: string;
-  q3: string;
-};
 
 export type UseOperationResult = {
   tab: string;
   onChangeTab: (value: string) => void;
-  filters: RiskReportFilters;
-  onChangeFilters: (partial: Partial<RiskReportFilters>) => void;
+  startDate: Dayjs | null;
+  onChangeStartDate: (value: Dayjs | null) => void;
+  endDate: Dayjs | null;
+  onChangeEndDate: (value: Dayjs | null) => void;
   countAll: number;
   countConfirmed: number;
   countUnconfirmed: number;
-  searchField: 'all' | 'title' | 'location' | 'content' | 'author' | 'reporter';
-  setSearchField: (
-    v: 'all' | 'title' | 'location' | 'content' | 'author' | 'reporter'
-  ) => void;
+  searchField: 'reporter' | 'author' | '';
+  setSearchField: (v: 'reporter' | 'author' | '') => void;
+  searchValue: string;
+  onChangeSearchValue: (value: string) => void;
   page: number;
   rowsPerPage: number;
   onChangePage: (page: number) => void;
@@ -31,10 +28,10 @@ export type UseOperationResult = {
 
 export function useOperation(reports: RiskReport[]): UseOperationResult {
   const [tab, setTab] = useState<string>('all');
-  const [filters, setFilters] = useState<RiskReportFilters>({ q1: '', q2: '', q3: '' });
-  const [searchField, setSearchField] = useState<
-    'all' | 'title' | 'location' | 'content' | 'author' | 'reporter'
-  >('all');
+  const [startDate, setStartDate] = useState<Dayjs | null>(null);
+  const [endDate, setEndDate] = useState<Dayjs | null>(null);
+  const [searchField, setSearchField] = useState<'reporter' | 'author' | ''>('');
+  const [searchValue, setSearchValue] = useState<string>('');
   const [page, setPage] = useState<number>(0);
   const [rowsPerPage, setRowsPerPage] = useState<number>(10);
 
@@ -43,8 +40,18 @@ export function useOperation(reports: RiskReport[]): UseOperationResult {
     setPage(0);
   }, []);
 
-  const onChangeFilters = useCallback((partial: Partial<RiskReportFilters>) => {
-    setFilters((prev) => ({ ...prev, ...partial }));
+  const onChangeStartDate = useCallback((value: Dayjs | null) => {
+    setStartDate(value);
+    setPage(0);
+  }, []);
+
+  const onChangeEndDate = useCallback((value: Dayjs | null) => {
+    setEndDate(value);
+    setPage(0);
+  }, []);
+
+  const onChangeSearchValue = useCallback((value: string) => {
+    setSearchValue(value);
     setPage(0);
   }, []);
 
@@ -60,21 +67,32 @@ export function useOperation(reports: RiskReport[]): UseOperationResult {
   const filteredAll = useMemo(
     () =>
       reports.filter((r) => {
-        const query = (text: string) =>
-          text.toLowerCase().includes((filters.q2 || '').toLowerCase());
+        // 검색 필드 매칭
         const fieldMatch =
-          searchField === 'all'
-            ? [r.title, r.location, r.content, r.author, r.reporter].some((s) => query(s))
-            : query(String(r[searchField] ?? ''));
-        const t1 = filters.q1 ? `${r.status}`.includes(filters.q1) : true;
-        const t3 = filters.q3 ? `${r.status}`.includes(filters.q3) : true;
+          searchValue && searchField
+            ? String(r[searchField] ?? '').toLowerCase().includes(searchValue.toLowerCase())
+            : true;
+
+        // 날짜 필터링
+        const dateMatch =
+          startDate && endDate
+            ? (() => {
+                const reportDate = new Date(r.registeredAt);
+                const start = startDate.toDate();
+                const end = endDate.toDate();
+                return reportDate >= start && reportDate <= end;
+              })()
+            : true;
+
+        // 탭 필터링
         const byTab =
           tab === 'all'
             ? true
             : r.status === (tab === 'confirmed' ? 'confirmed' : 'unconfirmed');
-        return fieldMatch && t1 && t3 && byTab;
+
+        return fieldMatch && dateMatch && byTab;
       }),
-    [reports, filters, tab, searchField]
+    [reports, searchField, searchValue, startDate, endDate, tab]
   );
 
   const total = filteredAll.length;
@@ -91,13 +109,17 @@ export function useOperation(reports: RiskReport[]): UseOperationResult {
   return {
     tab,
     onChangeTab,
-    filters,
-    onChangeFilters,
+    startDate,
+    onChangeStartDate,
+    endDate,
+    onChangeEndDate,
     countAll,
     countConfirmed,
     countUnconfirmed,
     searchField,
     setSearchField,
+    searchValue,
+    onChangeSearchValue,
     page,
     rowsPerPage,
     onChangePage,

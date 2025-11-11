@@ -55,6 +55,12 @@ export function Risk_2200View({
     const element = pdfRef.current;
     if (!element) return;
 
+    // TODO: TanStack Query Hook(useQuery)으로 문서 정보 가져오기 (PDF 파일명 생성용)
+    // const { data: documentInfo } = useQuery({
+    //   queryKey: ['risk2200DocumentInfo', riskId],
+    //   queryFn: () => getRisk2200DocumentInfo(riskId!),
+    //   enabled: !!riskId,
+    // });
     const filename = riskId
       ? `위험요인_제거·대체_및_통제_등록_${riskId}_${formattedDate.replace(/[\s:]/g, '_')}.pdf`
       : `위험요인_제거·대체_및_통제_등록_${formattedDate.replace(/[\s:]/g, '_')}.pdf`;
@@ -91,7 +97,25 @@ export function Risk_2200View({
   };
 
   const handleSampleView = () => {
+    // TODO: TanStack Query Hook(useQuery)으로 샘플 문서 조회
+    // const { data: sampleDocument } = useQuery({
+    //   queryKey: ['risk2200SampleDocument', safetyIdx, itemNumber],
+    //   queryFn: () => getRisk2200SampleDocument({ safetyIdx, itemNumber }),
+    //   enabled: !!safetyIdx && !!itemNumber,
+    // });
     console.log('샘플 보기');
+  };
+
+  const handleAddSignature = () => {
+    // TODO: TanStack Query Hook(useMutation)으로 서명 추가
+    // const mutation = useMutation({
+    //   mutationFn: (signatureData: Risk2200SignatureParams) => addRisk2200Signature(signatureData),
+    //   onSuccess: () => {
+    //     queryClient.invalidateQueries({ queryKey: ['risk2200ApprovalInfo', riskId] });
+    //   },
+    // });
+    // mutation.mutate({ riskId, signatureType: 'writer' });
+    console.log('서명 추가');
   };
 
   // riskId에서 문서 정보 추출 (형식: safetyIdx-itemNumber-documentNumber)
@@ -109,6 +133,13 @@ export function Risk_2200View({
       })()
     : null;
 
+  // TODO: TanStack Query Hook(useQuery)으로 문서 상세 정보 가져오기
+  // const { data: documentDetail } = useQuery({
+  //   queryKey: ['risk2200DocumentDetail', riskId],
+  //   queryFn: () => getRisk2200DocumentDetail(riskId!),
+  //   enabled: !!riskId,
+  // });
+  // 목업 데이터 사용
   const documentTableData = extractedInfo
     ? getTableDataByDocument(
         extractedInfo.safetyIdx,
@@ -121,7 +152,13 @@ export function Risk_2200View({
   const safetyIdx = item?.safetyIdx || system?.safetyIdx || extractedInfo?.safetyIdx;
   const itemNumber = item?.itemNumber || extractedInfo?.itemNumber;
 
-  // safetyIdx와 itemNumber에 따라 테이블 데이터 가져오기 (기본값용)
+  // TODO: TanStack Query Hook(useQuery)으로 테이블 데이터 가져오기 (기본값용)
+  // const { data: tableData } = useQuery({
+  //   queryKey: ['risk2200TableData', safetyIdx, itemNumber],
+  //   queryFn: () => getRisk2200TableData({ safetyIdx, itemNumber }),
+  //   enabled: !!safetyIdx && !!itemNumber,
+  // });
+  // 목업 데이터 사용
   const tableData = getRiskAssessmentTableData(safetyIdx, itemNumber);
 
   // 2100번대 문서 여부 확인 (safetyIdx=2, itemNumber=1)
@@ -137,7 +174,13 @@ export function Risk_2200View({
   // 2200번대 문서 여부 확인 (safetyIdx=2, itemNumber=2)
   const is2200Series = safetyIdx === 2 && itemNumber === 2;
 
-  // item 정보가 없으면 추출된 정보로부터 가져오기
+  // TODO: TanStack Query Hook(useQuery)으로 item 정보 가져오기
+  // const { data: itemInfo } = useQuery({
+  //   queryKey: ['risk2200ItemInfo', safetyIdx, itemNumber],
+  //   queryFn: () => getRisk2200ItemInfo({ safetyIdx, itemNumber }),
+  //   enabled: !!safetyIdx && !!itemNumber && !item,
+  // });
+  // 목업 데이터 사용
   const resolvedItem =
     item || (safetyIdx && itemNumber ? getItem(safetyIdx, itemNumber) : undefined);
 
@@ -206,6 +249,8 @@ export function Risk_2200View({
                 ? 'four'
                 : 'default'
             }
+            onAddSignature={handleAddSignature}
+            riskId={riskId}
           />
 
           {(() => {

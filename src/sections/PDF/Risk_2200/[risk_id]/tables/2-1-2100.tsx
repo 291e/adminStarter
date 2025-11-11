@@ -1,6 +1,6 @@
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import type { Table2100Data } from '../types/table-data';
+import type { Table2100Data } from '../../types/table-data';
 
 // ----------------------------------------------------------------------
 
@@ -37,46 +37,46 @@ export default function RiskAssessmentTable_2_1_2100({ data }: Props) {
       },
     ],
     assessment: [
-    {
-      hazardFactor: '2m 이상 고소작업',
-      dangerousSituation: '작업발판에서 추락후 중상 발생',
-      currentSafetyMeasure: '안전난간 설치',
-      riskLevel: { value: 12, label: '매우높음' },
-      additionalMeasure: '안전대 부착설치 추가 설치',
-      responsiblePerson: '김안전',
-      plannedDate: '2025-10-30',
-      completedDate: '2025-10-30',
-    },
-    {
-      hazardFactor: '회전체 정비작업',
-      dangerousSituation: '회전부에 말려들어가 손가락 절단',
-      currentSafetyMeasure: '방호덮개 설치',
-      riskLevel: { value: 6, label: '중간' },
-      additionalMeasure: '인터록 장치 설치',
-      responsiblePerson: '이기술',
-      plannedDate: '2025-10-30',
-      completedDate: '2025-10-30',
-    },
-    {
-      hazardFactor: '부식성 화학물질 취급',
-      dangerousSituation: '피부접촉으로 화학 화상',
-      currentSafetyMeasure: '보호장갑 착용',
-      riskLevel: { value: 12, label: '매우높음' },
-      additionalMeasure: '국소배기장치 설치',
-      responsiblePerson: '김안전',
-      plannedDate: '2025-10-30',
-      completedDate: '2025-10-30',
-    },
-    {
-      hazardFactor: '전기패널 점검작업',
-      dangerousSituation: '충전부 접촉으로 감전',
-      currentSafetyMeasure: '절연장갑 작용',
-      riskLevel: { value: 6, label: '중간' },
-      additionalMeasure: '차단장치 설치',
-      responsiblePerson: '박전기',
-      plannedDate: '2025-10-30',
-      completedDate: '2025-10-30',
-    },
+      {
+        hazardFactor: '2m 이상 고소작업',
+        dangerousSituation: '작업발판에서 추락후 중상 발생',
+        currentSafetyMeasure: '안전난간 설치',
+        riskLevel: { value: 12, label: '매우높음' },
+        additionalMeasure: '안전대 부착설치 추가 설치',
+        responsiblePerson: '김안전',
+        plannedDate: '2025-10-30',
+        completedDate: '2025-10-30',
+      },
+      {
+        hazardFactor: '회전체 정비작업',
+        dangerousSituation: '회전부에 말려들어가 손가락 절단',
+        currentSafetyMeasure: '방호덮개 설치',
+        riskLevel: { value: 6, label: '중간' },
+        additionalMeasure: '인터록 장치 설치',
+        responsiblePerson: '이기술',
+        plannedDate: '2025-10-30',
+        completedDate: '2025-10-30',
+      },
+      {
+        hazardFactor: '부식성 화학물질 취급',
+        dangerousSituation: '피부접촉으로 화학 화상',
+        currentSafetyMeasure: '보호장갑 착용',
+        riskLevel: { value: 12, label: '매우높음' },
+        additionalMeasure: '국소배기장치 설치',
+        responsiblePerson: '김안전',
+        plannedDate: '2025-10-30',
+        completedDate: '2025-10-30',
+      },
+      {
+        hazardFactor: '전기패널 점검작업',
+        dangerousSituation: '충전부 접촉으로 감전',
+        currentSafetyMeasure: '절연장갑 작용',
+        riskLevel: { value: 6, label: '중간' },
+        additionalMeasure: '차단장치 설치',
+        responsiblePerson: '박전기',
+        plannedDate: '2025-10-30',
+        completedDate: '2025-10-30',
+      },
     ],
   };
 
@@ -231,4 +231,3 @@ export default function RiskAssessmentTable_2_1_2100({ data }: Props) {
     </Box>
   );
 }
-

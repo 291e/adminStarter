@@ -15,7 +15,7 @@ export default function OperationBreadcrumbs({ items, onCreate }: Props) {
     <Stack
       sx={{ pt: { xs: 1, md: 2 } }}
       direction="row"
-      alignItems="center"
+      alignItems="flex-start"
       justifyContent="space-between"
     >
       <Breadcrumbs>
@@ -33,7 +33,7 @@ export default function OperationBreadcrumbs({ items, onCreate }: Props) {
       </Breadcrumbs>
 
       <Button variant="contained" onClick={onCreate}>
-        위험 보고 등록
+        현장 위험 보고
       </Button>
     </Stack>
   );

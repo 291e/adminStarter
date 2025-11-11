@@ -16,10 +16,12 @@ import { usePathname } from '../hooks';
 
 const IndexPage = lazy(() => import('src/pages/dashboard/page'));
 const OrganizationPage = lazy(() => import('src/pages/dashboard/organization/page'));
-const OrganizationCreatePage = lazy(() => import('src/pages/dashboard/organization/create'));
-const OrganizationEditPage = lazy(() => import('src/pages/dashboard/organization/edit'));
-const OperationPage = lazy(() => import('src/pages/dashboard/operation/page'));
-const RiskReportPage = lazy(() => import('src/pages/dashboard/operation/page'));
+const OrganizationDetailPage = lazy(() => import('src/pages/dashboard/organization/detail/page'));
+const ChatPage = lazy(() => import('src/pages/dashboard/operation/chat/page'));
+const RiskReportPage = lazy(() => import('src/pages/dashboard/operation/riskReport/page'));
+const RiskReportCreatePage = lazy(
+  () => import('src/pages/dashboard/operation/riskReport/create/page')
+);
 const SafetyReportPage = lazy(() => import('src/pages/dashboard/operation/safetyReport/page'));
 const EducationReportPage = lazy(
   () => import('src/pages/dashboard/operation/educationReport/page')
@@ -36,6 +38,15 @@ const SafetySystemRisk2200DetailPage = lazy(
   () => import('src/pages/dashboard/safetySystem/[safety_id]/risk-2200/[risk_id]/page')
 );
 const SystemSettingPage = lazy(() => import('src/pages/dashboard/systemSetting/page'));
+
+const ServiceSettingPage = lazy(
+  () => import('src/pages/dashboard/systemSetting/serviceSetting/page')
+);
+const CodeSettingPage = lazy(() => import('src/pages/dashboard/systemSetting/codeSetting/page'));
+const ApiSettingPage = lazy(() => import('src/pages/dashboard/systemSetting/apiSetting/page'));
+const IndustryChecklistSettingPage = lazy(
+  () => import('src/pages/dashboard/systemSetting/industryChecklist/page')
+);
 // ----------------------------------------------------------------------
 
 function SuspenseOutlet() {
@@ -63,16 +74,16 @@ export const dashboardRoutes: RouteObject[] = [
         path: 'organization',
         children: [
           { element: <OrganizationPage />, index: true },
-          { path: 'create', element: <OrganizationCreatePage /> },
-          { path: ':id/edit', element: <OrganizationEditPage /> },
+          { path: 'detail/:id', element: <OrganizationDetailPage /> },
         ],
       },
       {
         path: 'operation',
         children: [
-          { element: <OperationPage />, index: true },
+          { element: <ChatPage />, index: true },
+          { path: 'chat', element: <ChatPage /> },
           { path: 'risk-report', element: <RiskReportPage /> },
-          { path: 'safety-report', element: <SafetyReportPage /> },
+          { path: 'risk-report/create', element: <RiskReportCreatePage /> },
           { path: 'education-report', element: <EducationReportPage /> },
           {
             path: 'library-report',
@@ -101,8 +112,13 @@ export const dashboardRoutes: RouteObject[] = [
       },
       {
         path: 'system-setting',
-        element: <SystemSettingPage />,
-        index: true,
+        children: [
+          { element: <SystemSettingPage />, index: true },
+          { path: 'service-setting', element: <ServiceSettingPage /> },
+          { path: 'code-setting', element: <CodeSettingPage /> },
+          { path: 'api-setting', element: <ApiSettingPage /> },
+          { path: 'industry-checklist-setting', element: <IndustryChecklistSettingPage /> },
+        ],
       },
     ],
   },

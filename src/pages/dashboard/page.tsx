@@ -1,6 +1,6 @@
 import { CONFIG } from 'src/global-config';
 
-import { BlankView } from 'src/sections/blank/view';
+import { DashBoardView } from 'src/sections/DashBoard/view';
 
 // ----------------------------------------------------------------------
 
@@ -8,9 +8,9 @@ const metadata = { title: `대시보드 | Dashboard - ${CONFIG.appName}` };
 
 export default function Page() {
   return (
-    <>
+    <div style={{ flex: 1, backgroundColor: '#F4F6F8' }}>
       <title>{metadata.title}</title>
-      <BlankView title="대시보드" />
-    </>
+      <DashBoardView title="대시보드" />
+    </div>
   );
 }

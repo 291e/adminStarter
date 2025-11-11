@@ -1,7 +1,5 @@
 import type { Theme, SxProps } from '@mui/material/styles';
 
-import { varAlpha } from 'minimal-shared/utils';
-
 import Divider from '@mui/material/Divider';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -26,41 +24,70 @@ type Props = {
 };
 
 export function OperationView({ title = 'Blank', description, sx }: Props) {
+  // TODO: TanStack Query Hook(useQuery)으로 위험 보고 목록 가져오기
+  // const { data: reports, isLoading } = useQuery({
+  //   queryKey: ['riskReports', logic.filters, logic.tab, logic.searchField],
+  //   queryFn: () => getRiskReports({ filters: logic.filters, tab: logic.tab, searchField: logic.searchField }),
+  // });
+  // 목업 데이터 사용
   const reports = mockRiskReports(20);
   const logic = useOperation(reports);
   const navigate = useNavigate();
 
   const renderContent = () => (
     <>
-      <OperationBreadcrumbs
-        items={[{ label: '대시보드', href: '/' }, { label: title }]}
-        onCreate={() => navigate('/dashboard/operation/risk-report/create')}
-      />
-
       <OperationFilters
         tab={logic.tab}
-        onChangeTab={logic.onChangeTab}
-        q1={logic.filters.q1}
-        q2={logic.filters.q2}
-        q3={logic.filters.q3}
-        onChangeFilters={logic.onChangeFilters}
+        onChangeTab={(tab) => {
+          logic.onChangeTab(tab);
+          // TODO: 탭 변경 시 TanStack Query로 위험 보고 목록 새로고침
+          // queryClient.invalidateQueries({ queryKey: ['riskReports'] });
+        }}
+        startDate={logic.startDate}
+        onChangeStartDate={logic.onChangeStartDate}
+        endDate={logic.endDate}
+        onChangeEndDate={logic.onChangeEndDate}
         countAll={logic.countAll}
         countActive={logic.countConfirmed}
         countInactive={logic.countUnconfirmed}
         searchField={logic.searchField}
         setSearchField={logic.setSearchField}
+        searchValue={logic.searchValue}
+        onChangeSearchValue={logic.onChangeSearchValue}
       />
 
       <OperationTable
         rows={logic.filtered}
-        onViewDetail={(row) => navigate(`/dashboard/organization/${row.id}`)}
-        onDeactivate={(row) => {
-          // 비활성화 로직 추가
-          console.log('비활성화:', row);
+        onEdit={(row) => {
+          // TODO: TanStack Query Hook(useQuery)으로 위험 보고 상세 정보 가져오기 (수정 모달용)
+          // const { data: detail } = useQuery({
+          //   queryKey: ['riskReport', row.id],
+          //   queryFn: () => getRiskReportDetail(row.id),
+          // });
+          // 수정 모달 열기 또는 수정 페이지로 이동
+          console.log('수정:', row);
         }}
-        onDelete={(row) => {
-          // 삭제 로직 추가
-          console.log('삭제:', row);
+        onRegisterNearMiss={(row) => {
+          // TODO: TanStack Query Hook(useMutation)으로 아차사고 등록
+          // const mutation = useMutation({
+          //   mutationFn: (riskReportId: string) => registerNearMiss(riskReportId),
+          //   onSuccess: () => {
+          //     queryClient.invalidateQueries({ queryKey: ['riskReports'] });
+          //   },
+          // });
+          // mutation.mutate(row.id);
+          console.log('아차사고 등록:', row);
+        }}
+        onRegisterAccident={(row) => {
+          // TODO: TanStack Query Hook(useMutation)으로 산업재해 등록
+          // const mutation = useMutation({
+          //   mutationFn: (riskReportId: string) => registerAccident(riskReportId),
+          //   onSuccess: () => {
+          //     queryClient.invalidateQueries({ queryKey: ['riskReports'] });
+          //   },
+          // });
+          // mutation.mutate(row.id);
+          console.log('산업재해 등록:', row);
         }}
       />
 
@@ -70,8 +97,16 @@ export function OperationView({ title = 'Blank', description, sx }: Props) {
         count={logic.total}
         page={logic.page}
         rowsPerPage={logic.rowsPerPage}
-        onChangePage={logic.onChangePage}
-        onChangeRowsPerPage={logic.onChangeRowsPerPage}
+        onChangePage={(page) => {
+          logic.onChangePage(page);
+          // TODO: 페이지 변경 시 TanStack Query로 위험 보고 목록 새로고침
+          // queryClient.invalidateQueries({ queryKey: ['riskReports'] });
+        }}
+        onChangeRowsPerPage={(rowsPerPage) => {
+          logic.onChangeRowsPerPage(rowsPerPage);
+          // TODO: 페이지 크기 변경 시 TanStack Query로 위험 보고 목록 새로고침
+          // queryClient.invalidateQueries({ queryKey: ['riskReports'] });
+        }}
       />
     </>
   );
@@ -80,6 +115,15 @@ export function OperationView({ title = 'Blank', description, sx }: Props) {
     <DashboardContent maxWidth="xl">
       <Typography variant="h4"> {title} </Typography>
       {description && <Typography sx={{ mt: 1 }}> {description} </Typography>}
+
+      <OperationBreadcrumbs
+        items={[
+          { label: '대시보드', href: '/dashboard' },
+          { label: '현장 운영 관리', href: '/dashboard/operation' },
+          { label: title },
+        ]}
+        onCreate={() => navigate('/dashboard/operation/risk-report/create')}
+      />
 
       <Box sx={[(theme) => ({ mt: 2, width: 1 }), ...(Array.isArray(sx) ? sx : [sx])]}>
         {renderContent()}

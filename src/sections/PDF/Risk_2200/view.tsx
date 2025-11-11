@@ -33,6 +33,20 @@ export function Risk_2200View({ safetyId, title = 'Blank', description, sx }: Pr
     | { system: SafetySystem; item?: SafetySystemItem; isGuide?: boolean }
     | undefined;
 
+  // TODO: TanStack Query Hook(useQuery)으로 문서 목록 가져오기
+  // const { data: documents, isLoading } = useQuery({
+  //   queryKey: ['risk2200Documents', state?.system?.safetyIdx, state?.item?.itemNumber, logic.filterType, logic.searchField, logic.searchValue],
+  //   queryFn: () => getRisk2200Documents({
+  //     safetyIdx: state?.system?.safetyIdx,
+  //     itemNumber: state?.item?.itemNumber,
+  //     filterType: logic.filterType,
+  //     searchField: logic.searchField,
+  //     searchValue: logic.searchValue,
+  //     page: logic.page,
+  //     pageSize: logic.rowsPerPage,
+  //   }),
+  // });
+  // 목업 데이터 사용
   const adapt = (docs: ReturnType<typeof getDocumentsByItem>) =>
     docs.map((d) => ({
       id: `${d.safetyIdx}-${d.itemNumber}-${String(d.documentNumber).padStart(3, '0')}`,
@@ -63,7 +77,10 @@ export function Risk_2200View({ safetyId, title = 'Blank', description, sx }: Pr
 
   const handleCreate = () => {
     if (safetyId) {
-      navigate(`/dashboard/safety-system/${safetyId}/risk-2200/create`);
+      // create 페이지로 이동 시 system과 item 정보를 함께 전달하여 문서 타입별 폼 표시
+      navigate(`/dashboard/safety-system/${safetyId}/risk-2200/create`, {
+        state: { system: state?.system, item: state?.item },
+      });
     }
   };
 
@@ -83,13 +100,26 @@ export function Risk_2200View({ safetyId, title = 'Blank', description, sx }: Pr
   };
 
   const handleDelete = (id: string) => {
+    // TODO: TanStack Query Hook(useMutation)으로 문서 삭제
+    // const mutation = useMutation({
+    //   mutationFn: (documentId: string) => deleteRisk2200Document(documentId),
+    //   onSuccess: () => {
+    //     queryClient.invalidateQueries({ queryKey: ['risk2200Documents'] });
+    //   },
+    // });
+    // mutation.mutate(id);
     console.log('삭제:', id);
-    // 삭제 로직 추가
   };
 
   const handleDownloadPDF = async (id: string) => {
     if (safetyId) {
       try {
+        // TODO: TanStack Query Hook(useQuery)으로 문서 상세 정보 가져오기 (PDF 다운로드용)
+        // const { data: documentDetail } = useQuery({
+        //   queryKey: ['risk2200DocumentDetail', id],
+        //   queryFn: () => getRisk2200DocumentDetail(id),
+        //   enabled: !!id,
+        // });
         await downloadDocumentPDF(id, safetyId);
       } catch (error) {
         console.error('PDF 다운로드 실패:', error);
@@ -98,14 +128,29 @@ export function Risk_2200View({ safetyId, title = 'Blank', description, sx }: Pr
   };
 
   const handleSendNotification = (id: string) => {
+    // TODO: TanStack Query Hook(useMutation)으로 알림 발송
+    // const mutation = useMutation({
+    //   mutationFn: (documentId: string) => sendRisk2200Notification(documentId),
+    //   onSuccess: () => {
+    //     // 알림 발송 성공 처리
+    //   },
+    // });
+    // mutation.mutate(id);
     console.log('알림발송:', id);
-    // 알림발송 로직 추가
-    // TODO: 알림 발송 API 호출
   };
 
   const handleAction = (action: string) => {
+    // TODO: TanStack Query Hook(useMutation)으로 액션 처리 (엑셀 내보내기, 인쇄 등)
+    // const mutation = useMutation({
+    //   mutationFn: ({ action, selectedIds }: { action: string; selectedIds: string[] }) => {
+    //     if (action === 'export') {
+    //       return exportRisk2200Documents(selectedIds);
+    //     }
+    //     // 기타 액션 처리
+    //   },
+    // });
+    // mutation.mutate({ action, selectedIds: logic.selectedIds });
     console.log('액션:', action);
-    // 엑셀 내보내기, 인쇄 등 로직 추가
   };
 
   return (
@@ -113,13 +158,13 @@ export function Risk_2200View({ safetyId, title = 'Blank', description, sx }: Pr
       <Typography variant="h4"> {computedTitle} </Typography>
       {description && <Typography sx={{ mt: 1 }}> {description} </Typography>}
 
-      <Box sx={[(theme) => ({ mt: 2, width: 1 }), ...(Array.isArray(sx) ? sx : [sx])]}>
-        <Risk_2200Breadcrumbs
-          items={breadcrumbItems}
-          onCreate={handleCreate}
-          onAction={handleAction}
-        />
+      <Risk_2200Breadcrumbs
+        items={breadcrumbItems}
+        onCreate={handleCreate}
+        onAction={handleAction}
+      />
 
+      <Box sx={[(theme) => ({ mt: 2, width: 1 }), ...(Array.isArray(sx) ? sx : [sx])]}>
         <Box
           sx={{
             bgcolor: 'background.paper',
@@ -133,9 +178,21 @@ export function Risk_2200View({ safetyId, title = 'Blank', description, sx }: Pr
             filterType={logic.filterType}
             searchField={logic.searchField}
             searchValue={logic.searchValue}
-            onChangeFilterType={logic.onChangeFilterType}
-            onChangeSearchField={logic.onChangeSearchField}
-            onChangeSearchValue={logic.onChangeSearchValue}
+            onChangeFilterType={(value) => {
+              logic.onChangeFilterType(value);
+              // TODO: 필터 타입 변경 시 TanStack Query로 문서 목록 새로고침
+              // queryClient.invalidateQueries({ queryKey: ['risk2200Documents'] });
+            }}
+            onChangeSearchField={(value) => {
+              logic.onChangeSearchField(value);
+              // TODO: 검색 필드 변경 시 TanStack Query로 문서 목록 새로고침
+              // queryClient.invalidateQueries({ queryKey: ['risk2200Documents'] });
+            }}
+            onChangeSearchValue={(value) => {
+              logic.onChangeSearchValue(value);
+              // TODO: 검색 값 변경 시 TanStack Query로 문서 목록 새로고침
+              // queryClient.invalidateQueries({ queryKey: ['risk2200Documents'] });
+            }}
           />
 
           <Risk_2200Table
@@ -156,8 +213,16 @@ export function Risk_2200View({ safetyId, title = 'Blank', description, sx }: Pr
             count={logic.total}
             page={logic.page}
             rowsPerPage={logic.rowsPerPage}
-            onChangePage={logic.onChangePage}
-            onChangeRowsPerPage={logic.onChangeRowsPerPage}
+            onChangePage={(page) => {
+              logic.onChangePage(page);
+              // TODO: 페이지 변경 시 TanStack Query로 문서 목록 새로고침
+              // queryClient.invalidateQueries({ queryKey: ['risk2200Documents'] });
+            }}
+            onChangeRowsPerPage={(rowsPerPage) => {
+              logic.onChangeRowsPerPage(rowsPerPage);
+              // TODO: 페이지 크기 변경 시 TanStack Query로 문서 목록 새로고침
+              // queryClient.invalidateQueries({ queryKey: ['risk2200Documents'] });
+            }}
           />
         </Box>
       </Box>

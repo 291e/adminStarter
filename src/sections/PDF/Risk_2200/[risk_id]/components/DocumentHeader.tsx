@@ -10,6 +10,7 @@ type Props = {
   onAddSignature?: () => void;
   title?: string; // 커스텀 제목
   approvalVariant?: 'default' | 'four'; // 결재 테이블 형태
+  riskId?: string; // 문서 ID
 };
 
 export default function DocumentHeader({
@@ -17,6 +18,7 @@ export default function DocumentHeader({
   onAddSignature,
   title,
   approvalVariant = 'default',
+  riskId,
 }: Props) {
   const displayTitle = title || '위험요인 제거·대체 및 통제 등록';
 
@@ -66,7 +68,11 @@ export default function DocumentHeader({
         </Typography>
       </Box>
 
-      <ApprovalSection onAddSignature={onAddSignature} is2100Series={approvalVariant === 'four'} />
+      <ApprovalSection
+        onAddSignature={onAddSignature}
+        is2100Series={approvalVariant === 'four'}
+        riskId={riskId}
+      />
     </Box>
   );
 }

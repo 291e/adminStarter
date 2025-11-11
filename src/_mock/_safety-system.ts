@@ -8,7 +8,7 @@ import type {
   Table2100Data,
   Table2200Row,
   Table2300Row,
-} from 'src/sections/PDF/Risk_2200/[risk_id]/types/table-data';
+} from 'src/sections/PDF/Risk_2200/types/table-data';
 
 // ----------------------------------------------------------------------
 

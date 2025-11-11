@@ -17,6 +17,12 @@ import { GuestGuard } from 'src/auth/guard';
 const Jwt = {
   SignInPage: lazy(() => import('src/pages/auth/jwt/sign-in')),
   SignUpPage: lazy(() => import('src/pages/auth/jwt/sign-up')),
+  FindIdPage: lazy(() => import('src/pages/auth/jwt/find-id')),
+  FindIdSuccessPage: lazy(() => import('src/pages/auth/jwt/find-id-success')),
+  FindIdFailPage: lazy(() => import('src/pages/auth/jwt/find-id-fail')),
+  ResetPasswordPage: lazy(() => import('src/pages/auth/jwt/reset-password')),
+  ResetPasswordNewPage: lazy(() => import('src/pages/auth/jwt/reset-password-new')),
+  VerifyCodePage: lazy(() => import('src/pages/auth/jwt/verify-code')),
 };
 
 const authJwt = {
@@ -42,6 +48,66 @@ const authJwt = {
         <GuestGuard>
           <AuthSplitLayout>
             <Jwt.SignUpPage />
+          </AuthSplitLayout>
+        </GuestGuard>
+      ),
+    },
+    {
+      path: 'find-id',
+      element: (
+        <GuestGuard>
+          <AuthSplitLayout>
+            <Jwt.FindIdPage />
+          </AuthSplitLayout>
+        </GuestGuard>
+      ),
+    },
+    {
+      path: 'find-id-success',
+      element: (
+        <GuestGuard>
+          <AuthSplitLayout>
+            <Jwt.FindIdSuccessPage />
+          </AuthSplitLayout>
+        </GuestGuard>
+      ),
+    },
+    {
+      path: 'find-id-fail',
+      element: (
+        <GuestGuard>
+          <AuthSplitLayout>
+            <Jwt.FindIdFailPage />
+          </AuthSplitLayout>
+        </GuestGuard>
+      ),
+    },
+    {
+      path: 'reset-password',
+      element: (
+        <GuestGuard>
+          <AuthSplitLayout>
+            <Jwt.ResetPasswordPage />
+          </AuthSplitLayout>
+        </GuestGuard>
+      ),
+    },
+    {
+      path: 'reset-password-new',
+      element: (
+        <GuestGuard>
+          <AuthSplitLayout>
+            <Jwt.ResetPasswordNewPage />
+          </AuthSplitLayout>
+        </GuestGuard>
+      ),
+    },
+    {
+      path: 'verify-code',
+      element: (
+        <GuestGuard>
+          <AuthSplitLayout>
+            <Jwt.VerifyCodePage />
           </AuthSplitLayout>
         </GuestGuard>
       ),

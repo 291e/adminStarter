@@ -1,16 +1,16 @@
 import { CONFIG } from 'src/global-config';
 
-import { BlankView } from 'src/sections/blank/view';
+import { EducationReportView } from 'src/sections/EducationReport/view';
 
 // ----------------------------------------------------------------------
 
-const metadata = { title: `교육이수 현황 | Dashboard - ${CONFIG.appName}` };
+const metadata = { title: `교육 이수 현황 | Dashboard - ${CONFIG.appName}` };
 
 export default function Page() {
   return (
     <>
       <title>{metadata.title}</title>
-      <BlankView title="교육이수 현황" />
+      <EducationReportView title="교육 이수 현황" />
     </>
   );
 }
