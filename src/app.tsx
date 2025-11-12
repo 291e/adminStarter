@@ -8,7 +8,7 @@ import { themeConfig, ThemeProvider } from 'src/theme';
 
 import { ProgressBar } from 'src/components/progress-bar';
 import { MotionLazy } from 'src/components/animate/motion-lazy';
-import { SettingsDrawer, defaultSettings, SettingsProvider } from 'src/components/settings';
+import { defaultSettings, SettingsProvider } from 'src/components/settings';
 
 import { AuthProvider } from 'src/auth/context/jwt';
 
@@ -30,7 +30,6 @@ export default function App({ children }: AppProps) {
         >
           <MotionLazy>
             <ProgressBar />
-            <SettingsDrawer defaultSettings={defaultSettings} />
             {children}
           </MotionLazy>
         </ThemeProvider>
