@@ -71,7 +71,7 @@ export default function LibraryReportFilters({
           slotProps={{
             textField: {
               size: 'small',
-              sx: { minWidth: 160 },
+              sx: { maxWidth: 160 },
             },
           }}
         />
@@ -84,7 +84,7 @@ export default function LibraryReportFilters({
           slotProps={{
             textField: {
               size: 'small',
-              sx: { minWidth: 160 },
+              sx: { maxWidth: 160 },
             },
           }}
         />
@@ -122,4 +122,3 @@ export default function LibraryReportFilters({
     </LocalizationProvider>
   );
 }
-

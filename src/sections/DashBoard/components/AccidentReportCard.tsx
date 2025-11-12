@@ -1,3 +1,5 @@
+import { useNavigate } from 'react-router';
+
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
@@ -6,6 +8,7 @@ import MenuItem from '@mui/material/MenuItem';
 import FormControl from '@mui/material/FormControl';
 
 import { Iconify } from 'src/components/iconify';
+import { paths } from 'src/routes/paths';
 
 // ----------------------------------------------------------------------
 
@@ -146,6 +149,7 @@ export default function AccidentReportCard({
   onAccidentNavigate,
   onRiskNavigate,
 }: Props) {
+  const navigate = useNavigate();
   // 현재 연도 및 주차 계산
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
@@ -301,15 +305,23 @@ export default function AccidentReportCard({
       >
         <StatCard
           icon="material-symbols:mobile-chat-rounded"
-          title="사고발생"
+          title="사고 발생"
           count={accidentCount}
-          onNavigate={onAccidentNavigate}
+          onNavigate={() => {
+            // 채팅 페이지의 "사고 발생 현황" 채팅방으로 이동
+            navigate(`${paths.dashboard.operation.chat}?roomId=emergency`);
+            onAccidentNavigate?.();
+          }}
         />
         <StatCard
           icon="solar:danger-triangle-bold"
-          title="위험보고"
+          title="위험 보고"
           count={riskCount}
-          onNavigate={onRiskNavigate}
+          onNavigate={() => {
+            // 현장 운영 관리 - 위험 보고 페이지로 이동
+            navigate(paths.dashboard.operation.riskReport);
+            onRiskNavigate?.();
+          }}
         />
       </Box>
     </Box>

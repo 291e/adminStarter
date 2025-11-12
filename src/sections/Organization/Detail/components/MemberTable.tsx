@@ -16,13 +16,18 @@ import { fDateTime } from 'src/utils/format-time';
 import { Iconify } from 'src/components/iconify';
 
 type Props = {
-  rows: (Member & { order?: number })[];
+  organizationId?: string | number;
+  rows?: (Member & { order?: number })[];
   onEdit?: (member: Member) => void;
 };
 
 // 역할 매핑 함수
 const getRoleLabel = (memberRole: string): string => {
   const roleMap: { [key: string]: string } = {
+    organization_admin: '조직 관리자',
+    supervisor: '관리 감독자',
+    safety_manager: '안전보건 담당자',
+    worker: '근로자',
     admin: '조직 관리자',
     member: '근로자',
     distributor: '총판',
@@ -60,9 +65,31 @@ const getDepartment = (member: Member): string => {
   return departments[member.memberIdx % departments.length];
 };
 
-export default function MemberTable({ rows, onEdit }: Props) {
+export default function MemberTable({ organizationId, rows: initialRows, onEdit }: Props) {
+  // TODO: TanStack Query Hook(useQuery)으로 조직원 초대로 초대받아 회원가입한 멤버 목록 조회
+  // const { data: invitedMembers, isLoading, isError } = useQuery({
+  //   queryKey: ['organization', organizationId, 'invited-members'],
+  //   queryFn: () => getInvitedMembers(organizationId),
+  //   enabled: !!organizationId,
+  //   select: (data) => {
+  //     // 초대받아 회원가입 완료한 멤버만 필터링 (초대 상태가 'accepted' 또는 'registered'인 경우)
+  //     return data.filter((member) =>
+  //       member.invitationStatus === 'accepted' ||
+  //       member.invitationStatus === 'registered' ||
+  //       member.invitedBy !== null // 초대받은 멤버만
+  //     );
+  //   },
+  // });
+
+  // 임시: 초기 rows가 있으면 사용, 없으면 빈 배열
+  // 실제로는 API에서 받아온 데이터 사용
+  const rows = initialRows || [];
+
   return (
-    <TableContainer component={Paper} sx={{ overflowX: 'auto', borderTopLeftRadius: 0, borderTopRightRadius: 0 }}>
+    <TableContainer
+      component={Paper}
+      sx={{ overflowX: 'auto', borderTopLeftRadius: 0, borderTopRightRadius: 0 }}
+    >
       <Table size="small" stickyHeader>
         <TableHead>
           <TableRow>
@@ -157,4 +184,3 @@ export default function MemberTable({ rows, onEdit }: Props) {
     </TableContainer>
   );
 }
-

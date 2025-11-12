@@ -68,21 +68,24 @@ export default function OrganizationTable({ rows, onViewDetail, onDeactivate, on
   };
 
   return (
-    <TableContainer component={Paper} sx={{ mt: 2, overflowX: 'auto' }}>
-      <Table size="small" stickyHeader sx={{ minWidth: 1600 }}>
+    <TableContainer
+      component={Paper}
+      sx={{ overflowX: 'auto', borderTopLeftRadius: 0, borderTopRightRadius: 0 }}
+    >
+      <Table size="small" stickyHeader>
         <TableHead>
           <TableRow>
-            <TableCell width={72}>순번</TableCell>
-            <TableCell width={220}>등록일 / 접속일</TableCell>
-            <TableCell width={100}>구분</TableCell>
-            <TableCell width={200}>조직명</TableCell>
-            <TableCell width={160}>이름</TableCell>
-            <TableCell width={260}>전화번호 / 이메일</TableCell>
-            <TableCell>주소</TableCell>
-            <TableCell width={120} align="center">
+            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 72 }}>순번</TableCell>
+            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 220 }}>등록일 / 접속일</TableCell>
+            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 100 }}>구분</TableCell>
+            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 200 }}>조직명</TableCell>
+            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 160 }}>이름</TableCell>
+            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 260 }}>전화번호 / 이메일</TableCell>
+            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 200 }}>주소</TableCell>
+            <TableCell align="center" sx={{ bgcolor: 'grey.100', minWidth: 120 }}>
               상태
             </TableCell>
-            <TableCell width={60} align="right">
+            <TableCell align="right" sx={{ bgcolor: 'grey.100', minWidth: 60 }}>
               {/* 액션바 여백 */}
             </TableCell>
           </TableRow>

@@ -1,12 +1,13 @@
 import type { Member } from 'src/sections/Organization/types/member';
 import { useMemo, useState, useCallback } from 'react';
+import type { Dayjs } from 'dayjs';
 
 // ----------------------------------------------------------------------
 
 export type OrganizationFilters = {
-  q1: string;
-  q2: string;
-  q3: string;
+  startDate: string | null;
+  endDate: string | null;
+  searchValue: string;
 };
 
 export type DivisionType =
@@ -24,12 +25,16 @@ export type UseOrganizationResult = {
   division: DivisionType;
   onChangeDivision: (value: DivisionType) => void;
   filters: OrganizationFilters;
-  onChangeFilters: (partial: Partial<OrganizationFilters>) => void;
-  countAll: number;
-  countActive: number;
-  countInactive: number;
+  onChangeStartDate: (value: Dayjs | null) => void;
+  onChangeEndDate: (value: Dayjs | null) => void;
+  onChangeSearchValue: (value: string) => void;
+  counts: {
+    all: number;
+    active: number;
+    inactive: number;
+  };
   searchField: 'all' | 'orgName' | 'manager';
-  setSearchField: (v: 'all' | 'orgName' | 'manager') => void;
+  onChangeSearchField: (value: 'all' | 'orgName' | 'manager') => void;
   page: number;
   rowsPerPage: number;
   onChangePage: (page: number) => void;
@@ -41,7 +46,11 @@ export type UseOrganizationResult = {
 export function useOrganization(members: Member[]): UseOrganizationResult {
   const [tab, setTab] = useState<string>('all');
   const [division, setDivision] = useState<DivisionType>('all');
-  const [filters, setFilters] = useState<OrganizationFilters>({ q1: '', q2: '', q3: '' });
+  const [filters, setFilters] = useState<OrganizationFilters>({
+    startDate: null,
+    endDate: null,
+    searchValue: '',
+  });
   const [searchField, setSearchField] = useState<'all' | 'orgName' | 'manager'>('all');
   const [page, setPage] = useState<number>(0);
   const [rowsPerPage, setRowsPerPage] = useState<number>(10);
@@ -56,8 +65,23 @@ export function useOrganization(members: Member[]): UseOrganizationResult {
     setPage(0);
   }, []);
 
-  const onChangeFilters = useCallback((partial: Partial<OrganizationFilters>) => {
-    setFilters((prev) => ({ ...prev, ...partial }));
+  const onChangeStartDate = useCallback((value: Dayjs | null) => {
+    setFilters((prev) => ({ ...prev, startDate: value ? value.format('YYYY-MM-DD') : null }));
+    setPage(0);
+  }, []);
+
+  const onChangeEndDate = useCallback((value: Dayjs | null) => {
+    setFilters((prev) => ({ ...prev, endDate: value ? value.format('YYYY-MM-DD') : null }));
+    setPage(0);
+  }, []);
+
+  const onChangeSearchValue = useCallback((value: string) => {
+    setFilters((prev) => ({ ...prev, searchValue: value }));
+    setPage(0);
+  }, []);
+
+  const onChangeSearchField = useCallback((value: 'all' | 'orgName' | 'manager') => {
+    setSearchField(value);
     setPage(0);
   }, []);
 
@@ -86,10 +110,12 @@ export function useOrganization(members: Member[]): UseOrganizationResult {
         // Tab 필터링에서 걸러진 항목만 다음 필터링 진행
         if (!byTab) return false;
 
+        // 검색 필터
         const query = (text: string) =>
-          text.toLowerCase().includes((filters.q2 || '').toLowerCase());
-        const fieldMatch =
-          searchField === 'all'
+          text.toLowerCase().includes((filters.searchValue || '').toLowerCase());
+        const fieldMatch = !filters.searchValue
+          ? true
+          : searchField === 'all'
             ? [m.memberName, m.memberNameOrg, m.memberPhone, m.memberEmail, m.memberAddress].some(
                 (s) => s && query(s)
               )
@@ -98,8 +124,6 @@ export function useOrganization(members: Member[]): UseOrganizationResult {
               : searchField === 'manager'
                 ? query(String(m.memberName ?? ''))
                 : true;
-        const t1 = filters.q1 ? `${m.memberStatus}`.includes(filters.q1) : true;
-        const t3 = filters.q3 ? `${m.memberStatus}`.includes(filters.q3) : true;
 
         // 구분 필터링: Tab 필터링 이후에 적용
         // division === 'all'이면 모든 구분 통과
@@ -121,7 +145,11 @@ export function useOrganization(members: Member[]): UseOrganizationResult {
                         ? m.memberStatus === 'inactive' || !m.memberRole
                         : true;
 
-        return fieldMatch && t1 && t3 && byDivision;
+        // 날짜 필터 (등록일 기준으로 필터링, 실제 필드명에 맞게 수정 필요)
+        // TODO: 실제 날짜 필드명에 맞게 수정
+        const byDate = true; // 임시로 항상 true
+
+        return fieldMatch && byDate && byDivision;
       }),
     [members, filters, searchField, tab, division]
   );
@@ -144,12 +172,16 @@ export function useOrganization(members: Member[]): UseOrganizationResult {
     division,
     onChangeDivision,
     filters,
-    onChangeFilters,
-    countAll,
-    countActive,
-    countInactive,
+    onChangeStartDate,
+    onChangeEndDate,
+    onChangeSearchValue,
+    counts: {
+      all: countAll,
+      active: countActive,
+      inactive: countInactive,
+    },
     searchField,
-    setSearchField,
+    onChangeSearchField,
     page,
     rowsPerPage,
     onChangePage,

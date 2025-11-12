@@ -12,6 +12,8 @@ import type { Member } from 'src/sections/Organization/types/member';
 import type { Company } from 'src/_mock/_company';
 
 import SubscriptionService from './SubscriptionService';
+import AccidentFreeWorkplace from './AccidentFreeWorkplace';
+import InviteMemberModal from './InviteMemberModal';
 
 // ----------------------------------------------------------------------
 
@@ -20,6 +22,7 @@ type Props = {
   organizationMembers: Member[];
   onInviteMember?: () => void;
   onEditOrganization?: () => void;
+  onTabChange?: (tabValue: number) => void;
 };
 
 export default function OrganizationInfo({
@@ -27,8 +30,15 @@ export default function OrganizationInfo({
   organizationMembers,
   onInviteMember,
   onEditOrganization,
+  onTabChange,
 }: Props) {
   const [tabValue, setTabValue] = useState(0);
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+
+  const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+    onTabChange?.(newValue);
+  };
 
   // 조직 정보가 없으면 기본값 사용
   const orgData = (organization || {
@@ -77,13 +87,14 @@ export default function OrganizationInfo({
         overflow: 'hidden',
       }}
     >
-      <Tabs value={tabValue} onChange={(_, newValue) => setTabValue(newValue)} sx={{ px: 3 }}>
+      <Tabs value={tabValue} onChange={handleTabChange} sx={{ px: 3 }}>
         <Tab label="조직 정보" />
+        <Tab label="무재해 사업장" />
         <Tab label="구독 서비스" />
       </Tabs>
 
       {tabValue === 0 && (
-        <Box sx={{ p: 3 }}>
+        <Box bgcolor="grey.100" sx={{ p: 3 }}>
           {/* 첫 번째 행 */}
           <Stack direction="row" spacing={4} sx={{ mb: 3 }}>
             <Stack spacing={2} sx={{ flex: 1 }}>
@@ -182,17 +193,45 @@ export default function OrganizationInfo({
 
           {/* 버튼 */}
           <Stack direction="row" spacing={1} justifyContent="flex-end">
-            <Button variant="contained" color="info" onClick={onInviteMember}>
+            <Button variant="outlined" onClick={() => setInviteModalOpen(true)}>
               조직원 초대
             </Button>
-            <Button variant="outlined" onClick={onEditOrganization}>
+            <Button variant="contained" onClick={onEditOrganization}>
               조직정보 수정
             </Button>
           </Stack>
         </Box>
       )}
 
+      {/* 조직원 초대 모달 */}
+      <InviteMemberModal
+        open={inviteModalOpen}
+        onClose={() => setInviteModalOpen(false)}
+        onSend={(data) => {
+          // TODO: TanStack Query Hook(useMutation)으로 조직원 초대 API 호출
+          // const mutation = useMutation({
+          //   mutationFn: (data: InviteMemberFormData) => inviteMember(organization?.companyIdx, data),
+          //   onSuccess: () => {
+          //     queryClient.invalidateQueries({ queryKey: ['organization', organization?.companyIdx, 'members'] });
+          //     // 성공 토스트 메시지 표시
+          //   },
+          //   onError: (error) => {
+          //     console.error('조직원 초대 실패:', error);
+          //     // 에러 토스트 메시지 표시
+          //   },
+          // });
+          // mutation.mutate(data);
+          console.log('조직원 초대:', data);
+          onInviteMember?.();
+        }}
+        organizationName={orgData.companyName}
+      />
+
       {tabValue === 1 && (
+        <AccidentFreeWorkplace organizationId={organization?.companyIdx?.toString()} />
+      )}
+
+      {tabValue === 2 && (
         <SubscriptionService
           onUpgrade={(planId) => {
             // TODO: TanStack Query Hook(useMutation)으로 서비스 업그레이드

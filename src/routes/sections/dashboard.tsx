@@ -15,6 +15,7 @@ import { usePathname } from '../hooks';
 // ----------------------------------------------------------------------
 
 const IndexPage = lazy(() => import('src/pages/dashboard/page'));
+const SharedDocumentPage = lazy(() => import('src/pages/dashboard/sharedDocument/page'));
 const OrganizationPage = lazy(() => import('src/pages/dashboard/organization/page'));
 const OrganizationDetailPage = lazy(() => import('src/pages/dashboard/organization/detail/page'));
 const ChatPage = lazy(() => import('src/pages/dashboard/operation/chat/page'));
@@ -70,6 +71,10 @@ export const dashboardRoutes: RouteObject[] = [
     element: CONFIG.auth.skip ? dashboardLayout() : <AuthGuard>{dashboardLayout()}</AuthGuard>,
     children: [
       { element: <IndexPage />, index: true },
+      {
+        path: 'shared-document',
+        element: <SharedDocumentPage />,
+      },
       {
         path: 'organization',
         children: [

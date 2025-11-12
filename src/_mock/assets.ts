@@ -446,8 +446,8 @@ export const _jobTitles = [
 // ----------------------------------------------------------------------
 
 export const _companyNames = [
-  `Lueilwitz and Sons`,
-  `Gleichner, Mueller and Tromp`,
+  `리디안`,
+  `리디안랩스`,
   `Nikolaus - Leuschke`,
   `Hegmann, Kreiger and Bayer`,
   `Grimes Inc`,

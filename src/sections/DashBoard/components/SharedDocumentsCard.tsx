@@ -5,6 +5,8 @@ import IconButton from '@mui/material/IconButton';
 import Chip from '@mui/material/Chip';
 
 import { Iconify } from 'src/components/iconify';
+import { useNavigate } from 'react-router';
+import { paths } from 'src/routes/paths';
 
 // ----------------------------------------------------------------------
 
@@ -52,6 +54,7 @@ export default function SharedDocumentsCard({
   onPageChange,
   onViewAll,
 }: Props) {
+  const navigate = useNavigate();
   return (
     <Box
       sx={{
@@ -86,20 +89,16 @@ export default function SharedDocumentsCard({
           공유된 문서
         </Typography>
         <Button
-          variant="contained"
+          variant="outlined"
           size="small"
-          onClick={onViewAll}
+          color="info"
+          onClick={() => navigate(paths.dashboard.sharedDocument.root)}
           sx={{
             minHeight: { xs: 32, sm: 36 },
             fontSize: { xs: 12, sm: 14 },
             fontWeight: 700,
             px: { xs: 1, sm: 1.5 },
             width: { xs: '100%', sm: 'auto' },
-            bgcolor: '#2563E9',
-            color: '#ffffff',
-            '&:hover': {
-              bgcolor: '#1d4ed8',
-            },
           }}
         >
           전체 보기

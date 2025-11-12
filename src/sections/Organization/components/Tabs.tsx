@@ -1,8 +1,10 @@
+import Box from '@mui/material/Box';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
-import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Chip from '@mui/material/Chip';
+
+// ----------------------------------------------------------------------
 
 type Props = {
   value: string;
@@ -14,14 +16,14 @@ type Props = {
   };
 };
 
-export default function LibraryReportTabs({ value, onChange, counts }: Props) {
+export default function OrganizationTabs({ value, onChange, counts }: Props) {
   const handleChange = (_: React.SyntheticEvent, newValue: string) => {
     onChange(newValue as 'all' | 'active' | 'inactive');
   };
 
   return (
     <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 3 }}>
-      <Tabs value={value} onChange={handleChange} aria-label="library tabs">
+      <Tabs value={value} onChange={handleChange} aria-label="organization tabs">
         <Tab
           value="all"
           label={
@@ -57,3 +59,4 @@ export default function LibraryReportTabs({ value, onChange, counts }: Props) {
     </Box>
   );
 }
+

@@ -1,6 +1,5 @@
 import type { Theme, SxProps } from '@mui/material/styles';
 
-import Divider from '@mui/material/Divider';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 
@@ -8,6 +7,7 @@ import { useState } from 'react';
 
 import { DashboardContent } from 'src/layouts/dashboard';
 import OrganizationBreadcrumbs from './components/Breadcrumbs';
+import OrganizationTabs from './components/Tabs';
 import OrganizationFilters from './components/Filters';
 import OrganizationTable from './components/Table';
 import OrganizationPagination from './components/Pagination';
@@ -19,6 +19,7 @@ import { useNavigate } from 'react-router';
 import React from 'react';
 import { mockMembers } from 'src/_mock';
 import { paths } from 'src/routes/paths';
+import dayjs from 'dayjs';
 
 // ----------------------------------------------------------------------
 
@@ -40,21 +41,48 @@ export function OrganizationView({ title = 'Blank', description, sx }: Props) {
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
   const renderContent = () => (
-    <>
+    <Box
+      sx={{
+        bgcolor: 'background.paper',
+        borderRadius: 2,
+        boxShadow: 3,
+        width: '100%',
+        overflow: 'hidden',
+      }}
+    >
+      <OrganizationTabs
+        value={logic.tab}
+        onChange={(tab) => {
+          logic.onChangeTab(tab);
+          // TODO: 탭 변경 시 TanStack Query로 조직 목록 새로고침
+          // queryClient.invalidateQueries({ queryKey: ['organizations'] });
+        }}
+        counts={logic.counts}
+      />
+
       <OrganizationFilters
-        tab={logic.tab}
-        onChangeTab={logic.onChangeTab}
         division={logic.division}
         onChangeDivision={logic.onChangeDivision}
-        q1={logic.filters.q1}
-        q2={logic.filters.q2}
-        q3={logic.filters.q3}
-        onChangeFilters={logic.onChangeFilters}
-        countAll={logic.countAll}
-        countActive={logic.countActive}
-        countInactive={logic.countInactive}
+        startDate={logic.filters.startDate ? dayjs(logic.filters.startDate) : null}
+        onChangeStartDate={(date) => {
+          logic.onChangeStartDate(date);
+          // TODO: 시작일 변경 시 TanStack Query로 조직 목록 새로고침
+          // queryClient.invalidateQueries({ queryKey: ['organizations'] });
+        }}
+        endDate={logic.filters.endDate ? dayjs(logic.filters.endDate) : null}
+        onChangeEndDate={(date) => {
+          logic.onChangeEndDate(date);
+          // TODO: 종료일 변경 시 TanStack Query로 조직 목록 새로고침
+          // queryClient.invalidateQueries({ queryKey: ['organizations'] });
+        }}
         searchField={logic.searchField}
-        setSearchField={logic.setSearchField}
+        onChangeSearchField={logic.onChangeSearchField}
+        searchValue={logic.filters.searchValue}
+        onChangeSearchValue={(value) => {
+          logic.onChangeSearchValue(value);
+          // TODO: 검색 값 변경 시 TanStack Query로 조직 목록 새로고침
+          // queryClient.invalidateQueries({ queryKey: ['organizations'] });
+        }}
       />
 
       <OrganizationTable
@@ -86,8 +114,6 @@ export function OrganizationView({ title = 'Blank', description, sx }: Props) {
         }}
       />
 
-      <Divider sx={{ mt: 2, mb: 1 }} />
-
       <OrganizationPagination
         count={logic.total}
         page={logic.page}
@@ -95,7 +121,7 @@ export function OrganizationView({ title = 'Blank', description, sx }: Props) {
         onChangePage={logic.onChangePage}
         onChangeRowsPerPage={logic.onChangeRowsPerPage}
       />
-    </>
+    </Box>
   );
 
   return (
@@ -104,7 +130,7 @@ export function OrganizationView({ title = 'Blank', description, sx }: Props) {
       {description && <Typography sx={{ mt: 1 }}> {description} </Typography>}
 
       <OrganizationBreadcrumbs
-        items={[{ label: 'Dashboard', href: '/' }, { label: title }]}
+        items={[{ label: '대시보드', href: '/' }, { label: title }]}
         onCreate={() => setCreateModalOpen(true)}
       />
 

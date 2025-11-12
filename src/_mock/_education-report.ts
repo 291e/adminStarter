@@ -64,7 +64,7 @@ export function mockEducationReports(count: number): EducationReport[] {
 
 export type EducationRecord = {
   id: string;
-  method: 'online' | 'offline'; // 온라인 | 집체
+  method: 'online' | 'offline' | '집체' | '온라인'; // 온라인 | 집체 (한글/영문 모두 지원)
   educationName: string;
   educationTime: number; // 분
   educationDate: string; // YYYY-MM-DD
@@ -99,7 +99,7 @@ const fileNames = [
 // ----------------------------------------------------------------------
 
 export function mockMandatoryEducationRecords(count: number = 10): EducationRecord[] {
-  const methods: ('online' | 'offline')[] = ['online', 'offline'];
+  const methods: ('집체' | '온라인')[] = ['집체', '온라인'];
   const dates = [
     '2025-10-31',
     '2025-10-30',
@@ -120,7 +120,7 @@ export function mockMandatoryEducationRecords(count: number = 10): EducationReco
     const educationTime = times[index % times.length];
     const educationDate = dates[index % dates.length];
     const hasFile = index % 3 !== 0; // 일부만 파일 있음
-    const fileName = hasFile ? fileNames[index % fileNames.length] : '파일명을 입력해주세요.';
+    const fileName = hasFile ? fileNames[index % fileNames.length] : undefined;
 
     return {
       id: `mandatory-${index + 1}`,
@@ -134,7 +134,7 @@ export function mockMandatoryEducationRecords(count: number = 10): EducationReco
 }
 
 export function mockRegularEducationRecords(count: number = 10): EducationRecord[] {
-  const methods: ('online' | 'offline')[] = ['online', 'offline'];
+  const methods: ('집체' | '온라인')[] = ['집체', '온라인'];
   const dates = [
     '2025-10-31',
     '2025-10-30',
@@ -155,7 +155,7 @@ export function mockRegularEducationRecords(count: number = 10): EducationRecord
     const educationTime = times[index % times.length];
     const educationDate = dates[index % dates.length];
     const hasFile = index % 2 === 0; // 일부만 파일 있음
-    const fileName = hasFile ? fileNames[index % fileNames.length] : '파일명을 입력해주세요.';
+    const fileName = hasFile ? fileNames[index % fileNames.length] : undefined;
 
     return {
       id: `regular-${index + 1}`,

@@ -12,6 +12,8 @@ import { Iconify } from 'src/components/iconify';
 import { mockMembers } from 'src/_mock';
 import { mockCompanies } from 'src/_mock/_company';
 
+import { useState } from 'react';
+
 import { useOrganizationDetail } from './hooks/use-organization-detail';
 import OrganizationInfo from './components/OrganizationInfo';
 import MemberTabs from './components/MemberTabs';
@@ -30,6 +32,7 @@ type Props = {
 export function OrganizationDetailView({ title = '조직 관리', description, sx }: Props) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState(0);
 
   // TODO: TanStack Query Hook(useQuery)으로 조직 정보 및 멤버 목록 가져오기
   // const { data: organization } = useQuery({
@@ -98,55 +101,61 @@ export function OrganizationDetailView({ title = '조직 관리', description, s
             // });
             console.log('조직정보 수정');
           }}
+          onTabChange={(tabValue) => {
+            setActiveTab(tabValue);
+          }}
         />
 
-        {/* 멤버 리스트 섹션 */}
-        <Box
-          sx={{
-            bgcolor: 'background.paper',
-            borderRadius: 2,
-            boxShadow: (theme) => theme.customShadows.card,
-            overflow: 'hidden',
-            mt: 3,
-          }}
-        >
-          <MemberTabs
-            value={logic.filters.tab}
-            onChange={logic.onChangeTab}
-            counts={logic.counts}
-          />
-
-          <MemberFilters
-            role={logic.filters.role}
-            onChangeRole={logic.onChangeRole}
-            searchFilter={logic.filters.searchFilter}
-            onChangeSearchFilter={logic.onChangeSearchFilter}
-            searchValue={logic.filters.searchValue}
-            onChangeSearchValue={logic.onChangeSearchValue}
-          />
-
-          <MemberTable
-            rows={logic.filtered}
-            onEdit={(member) => {
-              // TODO: 멤버 수정 모달 열기 또는 TanStack Query Hook(useMutation)으로 멤버 수정
-              // const mutation = useMutation({
-              //   mutationFn: (data: MemberFormData) => updateMember(member.memberIdx, data),
-              //   onSuccess: () => {
-              //     queryClient.invalidateQueries({ queryKey: ['organizationMembers', organizationId] });
-              //   },
-              // });
-              console.log('멤버 수정:', member);
+        {/* 멤버 리스트 섹션 - 조직 정보 탭일 때만 표시 */}
+        {activeTab === 0 && (
+          <Box
+            sx={{
+              bgcolor: 'background.paper',
+              borderRadius: 2,
+              boxShadow: (theme) => theme.customShadows.card,
+              overflow: 'hidden',
+              mt: 3,
             }}
-          />
+          >
+            <MemberTabs
+              value={logic.filters.tab}
+              onChange={logic.onChangeTab}
+              counts={logic.counts}
+            />
 
-          <MemberPagination
-            count={logic.total}
-            page={logic.page}
-            rowsPerPage={logic.rowsPerPage}
-            onChangePage={logic.onChangePage}
-            onChangeRowsPerPage={logic.onChangeRowsPerPage}
-          />
-        </Box>
+            <MemberFilters
+              role={logic.filters.role}
+              onChangeRole={logic.onChangeRole}
+              searchFilter={logic.filters.searchFilter}
+              onChangeSearchFilter={logic.onChangeSearchFilter}
+              searchValue={logic.filters.searchValue}
+              onChangeSearchValue={logic.onChangeSearchValue}
+            />
+
+            <MemberTable
+              organizationId={organizationId?.toString()}
+              rows={logic.filtered}
+              onEdit={(member) => {
+                // TODO: 멤버 수정 모달 열기 또는 TanStack Query Hook(useMutation)으로 멤버 수정
+                // const mutation = useMutation({
+                //   mutationFn: (data: MemberFormData) => updateMember(member.memberIdx, data),
+                //   onSuccess: () => {
+                //     queryClient.invalidateQueries({ queryKey: ['organization', organizationId, 'invited-members'] });
+                //   },
+                // });
+                console.log('멤버 수정:', member);
+              }}
+            />
+
+            <MemberPagination
+              count={logic.total}
+              page={logic.page}
+              rowsPerPage={logic.rowsPerPage}
+              onChangePage={logic.onChangePage}
+              onChangeRowsPerPage={logic.onChangeRowsPerPage}
+            />
+          </Box>
+        )}
       </Box>
     </DashboardContent>
   );

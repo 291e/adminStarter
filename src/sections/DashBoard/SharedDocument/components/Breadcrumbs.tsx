@@ -6,10 +6,11 @@ import Button from '@mui/material/Button';
 
 type Props = {
   items: { label: string; href?: string }[];
-  onCreate?: () => void;
+  onPrioritySettings?: () => void;
+  onUpload?: () => void;
 };
 
-export default function OrganizationBreadcrumbs({ items, onCreate }: Props) {
+export default function SharedDocumentBreadcrumbs({ items, onPrioritySettings, onUpload }: Props) {
   return (
     <Stack
       sx={{ pt: { xs: 1, md: 2 } }}
@@ -31,9 +32,18 @@ export default function OrganizationBreadcrumbs({ items, onCreate }: Props) {
         )}
       </Breadcrumbs>
 
-      <Button variant="contained" onClick={onCreate}>
-        조직 등록
-      </Button>
+      <Stack direction="row" spacing={1}>
+        {onPrioritySettings && (
+          <Button variant="contained" color="info" onClick={onPrioritySettings}>
+            중요도 설정
+          </Button>
+        )}
+        {onUpload && (
+          <Button variant="contained" onClick={onUpload}>
+            문서 업로드
+          </Button>
+        )}
+      </Stack>
     </Stack>
   );
 }

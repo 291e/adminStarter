@@ -11,8 +11,36 @@ import CardContent from '@mui/material/CardContent';
 import Divider from '@mui/material/Divider';
 
 import React from 'react';
+import { useNavigate } from 'react-router';
 
 import { Iconify } from 'src/components/iconify';
+
+// 페이플 SDK 타입 정의 (Payple3 문서 기준)
+declare global {
+  interface Window {
+    PaypleCpayAuthCheck?: (config: {
+      clientKey: string;
+      PCD_PAY_TYPE: string;
+      PCD_PAY_WORK: string;
+      PCD_CARD_VER?: string;
+      PCD_PAY_GOODS?: string;
+      PCD_PAY_TOTAL?: number;
+      PCD_RST_URL?: string;
+      callbackFunction?: (params: {
+        PCD_PAY_RESULT: string;
+        PCD_PAY_MSG?: string;
+        PCD_PAY_BILLKEY?: string;
+        PCD_PAY_OID?: string;
+        PCD_PAY_TOTAL?: string;
+        PCD_PAY_CARDNAME?: string;
+        PCD_PAY_CARDNUM?: string;
+        [key: string]: any;
+      }) => void;
+    }) => void;
+    $?: any; // jQuery
+    jQuery?: any; // jQuery
+  }
+}
 
 // ----------------------------------------------------------------------
 
@@ -87,7 +115,6 @@ const defaultPlans: SubscriptionPlan[] = [
     price: 150000,
     period: '1개월',
     icon: 'solar:skyscraper-bold',
-    isRecommended: true,
   },
 ];
 
@@ -132,9 +159,81 @@ export default function SubscriptionService({
   onAddCard,
   onCardMenuClick,
 }: Props) {
+  const navigate = useNavigate();
+  const [selectedPlanId, setSelectedPlanId] = React.useState<string | null>(null);
   const [cardMenuAnchor, setCardMenuAnchor] = React.useState<{
     [key: string]: HTMLElement | null;
   }>({});
+  const [paypleSdkLoaded, setPaypleSdkLoaded] = React.useState(false);
+
+  // 페이플 SDK 로드 (Payple3 문서 기준)
+  React.useEffect(() => {
+    // 페이플 SDK가 이미 로드되어 있는지 확인
+    if (window.PaypleCpayAuthCheck) {
+      setPaypleSdkLoaded(true);
+      return;
+    }
+
+    // jQuery가 필요한 경우 먼저 로드
+    const loadJQuery = (): Promise<void> =>
+      new Promise((resolve) => {
+        if (window.$ || window.jQuery) {
+          resolve();
+          return;
+        }
+
+        const jqueryScript = document.createElement('script');
+        jqueryScript.src = 'https://code.jquery.com/jquery-3.6.0.min.js';
+        jqueryScript.async = true;
+        jqueryScript.onload = () => resolve();
+        jqueryScript.onerror = () => {
+          console.warn('jQuery 로드 실패, 페이플 SDK는 jQuery 없이 시도');
+          resolve();
+        };
+        document.body.appendChild(jqueryScript);
+      });
+
+    // 페이플 SDK 스크립트 동적 로드
+    const loadPaypleSdk = async () => {
+      // jQuery 로드 대기
+      await loadJQuery();
+
+      // 중복 로드 방지
+      const existingScript = document.querySelector('script[src*="payple"]');
+      if (existingScript) {
+        // 이미 로드 중이면 완료 대기
+        const checkInterval = setInterval(() => {
+          if (window.PaypleCpayAuthCheck) {
+            setPaypleSdkLoaded(true);
+            clearInterval(checkInterval);
+          }
+        }, 100);
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = 'https://democpay.payple.kr/js/v1/payment.js'; // 테스트 환경
+      // 운영 환경: https://cpay.payple.kr/js/v1/payment.js
+      script.async = true;
+      script.onload = () => {
+        // SDK 로드 완료 후 약간의 지연을 두고 확인
+        setTimeout(() => {
+          if (window.PaypleCpayAuthCheck) {
+            console.log('페이플 SDK 로드 성공');
+            setPaypleSdkLoaded(true);
+          } else {
+            console.warn('페이플 SDK 객체를 찾을 수 없습니다.');
+          }
+        }, 500);
+      };
+      script.onerror = () => {
+        console.error('페이플 SDK 스크립트 로드 실패');
+      };
+      document.body.appendChild(script);
+    };
+
+    loadPaypleSdk();
+  }, []);
 
   const handleCardMenuOpen = (event: React.MouseEvent<HTMLElement>, cardId: string) => {
     setCardMenuAnchor((prev) => ({ ...prev, [cardId]: event.currentTarget }));
@@ -163,6 +262,132 @@ export default function SubscriptionService({
   };
 
   const formatPrice = (price: number) => String(price).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+  // 페이플 콜백 함수 (callbackFunction 방식)
+  const handlePaypleCallback = React.useCallback(
+    (params: {
+      PCD_PAY_RESULT: string;
+      PCD_PAY_MSG?: string;
+      PCD_PAY_BILLKEY?: string;
+      PCD_PAY_OID?: string;
+      PCD_PAY_TOTAL?: string;
+      PCD_PAY_CARDNAME?: string;
+      PCD_PAY_CARDNUM?: string;
+      [key: string]: any;
+    }) => {
+      // organizationId 추출
+      const organizationId = window.location.pathname.split('/').pop() || '1';
+
+      if (params.PCD_PAY_RESULT === 'success') {
+        // 성공 처리
+        console.log('페이플 카드 등록 성공:', {
+          billingKey: params.PCD_PAY_BILLKEY,
+          orderNo: params.PCD_PAY_OID,
+          amount: params.PCD_PAY_TOTAL,
+          cardName: params.PCD_PAY_CARDNAME,
+          cardNo: params.PCD_PAY_CARDNUM,
+          resultMsg: params.PCD_PAY_MSG,
+        });
+
+        // TODO: TanStack Query Hook(useMutation)으로 카드 등록 API 호출
+        // const mutation = useMutation({
+        //   mutationFn: (data: {
+        //     billingKey: string;
+        //     orderNo: string;
+        //     amount: string;
+        //     cardName: string;
+        //     cardNo: string;
+        //     organizationId: string;
+        //   }) => addBillingCard(data),
+        //   onSuccess: () => {
+        //     queryClient.invalidateQueries({ queryKey: ['billingCards', organizationId] });
+        //     // 성공 시 카드 목록 새로고침 또는 토스트 메시지
+        //   },
+        //   onError: (error) => {
+        //     console.error('카드 등록 실패:', error);
+        //     // 에러 토스트 메시지
+        //   },
+        // });
+
+        // TODO: API 호출
+        // mutation.mutate({
+        //   billingKey: params.PCD_PAY_BILLKEY || '',
+        //   orderNo: params.PCD_PAY_OID || '',
+        //   amount: params.PCD_PAY_TOTAL || '0',
+        //   cardName: params.PCD_PAY_CARDNAME || '',
+        //   cardNo: params.PCD_PAY_CARDNUM || '',
+        //   organizationId,
+        // });
+
+        // TODO: 성공 토스트 메시지 표시
+      } else {
+        // 실패/취소 처리
+        const isCancel = params.PCD_PAY_RESULT === 'cancel' || params.PCD_PAY_MSG?.includes('취소');
+        console.warn('페이플 카드 등록 실패/취소:', {
+          result: params.PCD_PAY_RESULT,
+          resultMsg: params.PCD_PAY_MSG,
+          isCancel,
+        });
+
+        // TODO: 에러 처리 (Toast 메시지 등)
+        if (isCancel) {
+          // 취소 시 이전 페이지로 이동
+          navigate(-1);
+        } else {
+          // 실패 시 에러 토스트 메시지 표시
+          // TODO: Toast 메시지 표시
+        }
+      }
+    },
+    [navigate]
+  );
+
+  // 페이플 창 열기 함수
+  const openPaypleWindow = React.useCallback(() => {
+    // TODO: 실제 페이플 카드 등록 설정값으로 변경 필요 (Payple3 문서 참고)
+    // - clientKey: 클라이언트 키 (백엔드에서 가져오기)
+    // - callbackFunction: 콜백 함수로 결과 받기 (URL 리다이렉트 없음)
+    const paypleConfig = {
+      clientKey: 'test_DF55F29DA654A8CBC0F0A9DD4B556486', // TODO: 테스트 클라이언트 키 (실제로는 백엔드 API에서 가져오기)
+      PCD_PAY_TYPE: 'card', // 카드 결제
+      PCD_PAY_WORK: 'AUTH', // 카드 등록만 (결제 없이)
+      PCD_CARD_VER: '01', // 정기 결제
+      PCD_PAY_GOODS: '카드 등록', // 상품명
+      PCD_PAY_TOTAL: 0, // 카드 등록만 하므로 금액 0
+      callbackFunction: handlePaypleCallback, // 콜백 함수로 결과 받기
+    };
+
+    try {
+      console.log('페이플 카드 등록창 열기:', paypleConfig);
+      window.PaypleCpayAuthCheck?.(paypleConfig);
+    } catch (error) {
+      console.error('페이플 카드 등록창 열기 실패:', error);
+    }
+  }, [handlePaypleCallback]);
+
+  const handleAddCard = React.useCallback(() => {
+    onAddCard?.();
+
+    // 페이플 SDK 로드 확인
+    if (!paypleSdkLoaded || !window.PaypleCpayAuthCheck) {
+      console.error('페이플 SDK가 로드되지 않았습니다. 잠시 후 다시 시도해주세요.');
+      // SDK 로드 재시도
+      const checkInterval = setInterval(() => {
+        if (window.PaypleCpayAuthCheck) {
+          clearInterval(checkInterval);
+          setPaypleSdkLoaded(true);
+          // SDK 로드 완료 후 페이플 창 열기
+          openPaypleWindow();
+        }
+      }, 500);
+      // 10초 후 타임아웃
+      setTimeout(() => clearInterval(checkInterval), 10000);
+      return;
+    }
+
+    openPaypleWindow();
+  }, [onAddCard, paypleSdkLoaded, openPaypleWindow]);
+
   return (
     <Box sx={{ p: 3 }}>
       <Box sx={{ mb: 4 }}>
@@ -175,25 +400,31 @@ export default function SubscriptionService({
                   // 구독 중인 경우 취소 또는 다운그레이드
                   onCancel?.();
                 } else {
-                  // 구독 중이 아닌 경우 업그레이드
+                  // 구독 중이 아닌 경우 선택 및 업그레이드
+                  setSelectedPlanId(plan.id);
                   onUpgrade?.(plan.id);
                 }
               }}
               sx={{
-                flex: '1 1 200px',
-                minWidth: 200,
-                maxWidth: 250,
+                flex: '1 1 auto',
+                maxWidth: 200,
                 position: 'relative',
-                border: plan.isRecommended
-                  ? '2px solid'
-                  : plan.isSubscribed
-                    ? '1px solid'
-                    : '1px solid',
-                borderColor: plan.isRecommended
-                  ? 'primary.main'
-                  : plan.isSubscribed
-                    ? 'primary.light'
-                    : 'divider',
+                border:
+                  selectedPlanId === plan.id
+                    ? '2px solid'
+                    : plan.isRecommended
+                      ? '2px solid'
+                      : plan.isSubscribed
+                        ? '1px solid'
+                        : '1px solid',
+                borderColor:
+                  selectedPlanId === plan.id
+                    ? 'primary.main'
+                    : plan.isRecommended
+                      ? 'primary.main'
+                      : plan.isSubscribed
+                        ? 'primary.light'
+                        : 'divider',
                 boxShadow: plan.isSubscribed ? (theme) => theme.customShadows.card : 'none',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
@@ -241,10 +472,10 @@ export default function SubscriptionService({
                   </Typography>
                   <Stack spacing={0.5}>
                     <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                      {formatPrice(plan.price)}원
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      / {plan.period}
+                      {formatPrice(plan.price)}원{' '}
+                      <span style={{ fontSize: 12, color: 'text.secondary', fontWeight: 400 }}>
+                        / {plan.period}
+                      </span>
                     </Typography>
                   </Stack>
                 </Stack>
@@ -298,10 +529,10 @@ export default function SubscriptionService({
 
         <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ mt: 3 }}>
           <Button variant="outlined" onClick={onCancel}>
-            서비스 취소
+            구독 취소
           </Button>
           <Button variant="contained" onClick={() => onUpgrade?.('premium')}>
-            서비스 업그레이드
+            구독 하기
           </Button>
         </Stack>
       </Box>
@@ -315,9 +546,9 @@ export default function SubscriptionService({
             등록된 카드
           </Typography>
           <Button
-            variant="outlined"
+            variant="text"
             size="small"
-            onClick={onAddCard}
+            onClick={handleAddCard}
             startIcon={<Iconify icon="solar:add-circle-bold" width={20} />}
           >
             카드 추가

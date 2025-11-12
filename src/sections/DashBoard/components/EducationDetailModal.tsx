@@ -21,25 +21,29 @@ import Pagination from '@mui/material/Pagination';
 import { Iconify } from 'src/components/iconify';
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
 
-import type { EducationReport, EducationRecord } from 'src/_mock/_education-report';
-
 // ----------------------------------------------------------------------
 
-export type EducationDetailData = {
-  report: EducationReport;
-  mandatoryEducationRecords: EducationRecord[];
-  regularEducationRecords: EducationRecord[];
-  joinDate?: string; // 입사일
+export type UserProfile = {
+  id: string;
+  name: string;
+  department: string;
+  joinDate: string; // YYYY-MM-DD
+  role: string;
 };
 
 type Props = {
   open: boolean;
   onClose: () => void;
   onSave?: () => void;
-  data?: EducationDetailData | null;
+  user: UserProfile | null;
 };
 
-export default function EducationDetailModal({ open, onClose, onSave, data }: Props) {
+import {
+  mockMandatoryEducationRecords,
+  mockRegularEducationRecords,
+} from 'src/_mock/_education-report';
+
+export default function EducationDetailModal({ open, onClose, onSave, user }: Props) {
   const [mandatoryPage, setMandatoryPage] = useState(1);
   const [regularPage, setRegularPage] = useState(1);
   const [fileNames, setFileNames] = useState<{ [key: string]: string }>({});
@@ -47,18 +51,18 @@ export default function EducationDetailModal({ open, onClose, onSave, data }: Pr
   const rowsPerPage = 5;
 
   useEffect(() => {
-    if (open && data) {
+    if (open) {
       // TODO: TanStack Query Hook(useQuery)으로 사용자 교육 상세 정보 가져오기
       // const { data: educationDetail } = useQuery({
-      //   queryKey: ['educationDetail', data.report.id],
-      //   queryFn: () => fetchEducationDetail(data.report.id),
+      //   queryKey: ['educationDetail', user?.id],
+      //   queryFn: () => fetchEducationDetail(user?.id),
       // });
 
       setMandatoryPage(1);
       setRegularPage(1);
       setFileNames({});
     }
-  }, [open, data]);
+  }, [open, user]);
 
   const handleFileNameChange = (recordId: string, value: string) => {
     setFileNames((prev) => ({ ...prev, [recordId]: value }));
@@ -69,7 +73,7 @@ export default function EducationDetailModal({ open, onClose, onSave, data }: Pr
     // const saveMutation = useMutation({
     //   mutationFn: (data: { recordId: string; fileName: string }[]) => saveEducationFileNames(data),
     //   onSuccess: () => {
-    //     queryClient.invalidateQueries({ queryKey: ['educationDetail', data?.report.id] });
+    //     queryClient.invalidateQueries({ queryKey: ['educationDetail', user?.id] });
     //   },
     // });
     // saveMutation.mutate(Object.entries(fileNames).map(([recordId, fileName]) => ({ recordId, fileName })));
@@ -79,26 +83,31 @@ export default function EducationDetailModal({ open, onClose, onSave, data }: Pr
     }
   };
 
-  if (!data) {
-    return null;
-  }
+  // 목업 데이터 가져오기
+  const MOCK_MANDATORY_EDUCATION = mockMandatoryEducationRecords(5);
+  const MOCK_REGULAR_EDUCATION = mockRegularEducationRecords(5);
 
-  const { report, mandatoryEducationRecords, regularEducationRecords, joinDate } = data;
-
-  const mandatoryTotalPages = Math.ceil(mandatoryEducationRecords.length / rowsPerPage);
-  const regularTotalPages = Math.ceil(regularEducationRecords.length / rowsPerPage);
-
-  const mandatoryPaginated = mandatoryEducationRecords.slice(
-    (mandatoryPage - 1) * rowsPerPage,
-    mandatoryPage * rowsPerPage
+  // 의무교육 계산
+  const mandatoryTotal = MOCK_MANDATORY_EDUCATION.reduce(
+    (sum, record) => sum + record.educationTime,
+    0
   );
-  const regularPaginated = regularEducationRecords.slice(
-    (regularPage - 1) * rowsPerPage,
-    regularPage * rowsPerPage
-  );
+  const mandatoryStartIndex = (mandatoryPage - 1) * rowsPerPage;
+  const mandatoryEndIndex = mandatoryStartIndex + rowsPerPage;
+  const mandatoryDisplayed = MOCK_MANDATORY_EDUCATION.slice(mandatoryStartIndex, mandatoryEndIndex);
+  const mandatoryTotalPages = Math.ceil(MOCK_MANDATORY_EDUCATION.length / rowsPerPage);
 
-  const mandatoryTotal = mandatoryEducationRecords.reduce((sum, r) => sum + r.educationTime, 0);
-  const regularTotal = regularEducationRecords.reduce((sum, r) => sum + r.educationTime, 0);
+  // 정기교육 계산
+  const regularTotal = MOCK_REGULAR_EDUCATION.reduce(
+    (sum, record) => sum + record.educationTime,
+    0
+  );
+  const regularStartIndex = (regularPage - 1) * rowsPerPage;
+  const regularEndIndex = regularStartIndex + rowsPerPage;
+  const regularDisplayed = MOCK_REGULAR_EDUCATION.slice(regularStartIndex, regularEndIndex);
+  const regularTotalPages = Math.ceil(MOCK_REGULAR_EDUCATION.length / rowsPerPage);
+
+  // 총 이수 시간
   const totalTime = mandatoryTotal + regularTotal;
 
   return (
@@ -128,7 +137,7 @@ export default function EducationDetailModal({ open, onClose, onSave, data }: Pr
                     이름
                   </Typography>
                   <Typography variant="body2" sx={{ fontSize: 14 }}>
-                    {report.name}
+                    {user?.name || '-'}
                   </Typography>
                 </Stack>
                 <Stack direction="row" spacing={4} alignItems="center" sx={{ minWidth: 200 }}>
@@ -139,7 +148,7 @@ export default function EducationDetailModal({ open, onClose, onSave, data }: Pr
                     입사일
                   </Typography>
                   <Typography variant="body2" sx={{ fontSize: 14 }}>
-                    {joinDate || '2025-10-31'}
+                    {user?.joinDate || '-'}
                   </Typography>
                 </Stack>
               </Stack>
@@ -152,7 +161,7 @@ export default function EducationDetailModal({ open, onClose, onSave, data }: Pr
                     소속
                   </Typography>
                   <Typography variant="body2" sx={{ fontSize: 14 }}>
-                    {report.department}
+                    {user?.department || '-'}
                   </Typography>
                 </Stack>
                 <Stack direction="row" spacing={4} alignItems="center" sx={{ minWidth: 200 }}>
@@ -163,7 +172,7 @@ export default function EducationDetailModal({ open, onClose, onSave, data }: Pr
                     역할
                   </Typography>
                   <Typography variant="body2" sx={{ fontSize: 14 }}>
-                    {report.role}
+                    {user?.role || '-'}
                   </Typography>
                 </Stack>
               </Stack>
@@ -260,7 +269,7 @@ export default function EducationDetailModal({ open, onClose, onSave, data }: Pr
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {mandatoryPaginated.map((record) => (
+                    {mandatoryDisplayed.map((record) => (
                       <TableRow
                         key={record.id}
                         sx={{ borderBottom: '1px dashed', borderColor: 'divider' }}
@@ -306,7 +315,7 @@ export default function EducationDetailModal({ open, onClose, onSave, data }: Pr
                     onChange={(_, page) => {
                       setMandatoryPage(page);
                       // TODO: 페이지 변경 시 TanStack Query로 의무교육 목록 새로고침
-                      // queryClient.invalidateQueries({ queryKey: ['mandatoryEducation', data?.report.id, page] });
+                      // queryClient.invalidateQueries({ queryKey: ['mandatoryEducation', user?.id, page] });
                     }}
                     color="primary"
                   />
@@ -397,7 +406,7 @@ export default function EducationDetailModal({ open, onClose, onSave, data }: Pr
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {regularPaginated.map((record) => (
+                    {regularDisplayed.map((record) => (
                       <TableRow
                         key={record.id}
                         sx={{ borderBottom: '1px dashed', borderColor: 'divider' }}
@@ -443,7 +452,7 @@ export default function EducationDetailModal({ open, onClose, onSave, data }: Pr
                     onChange={(_, page) => {
                       setRegularPage(page);
                       // TODO: 페이지 변경 시 TanStack Query로 정기교육 목록 새로고침
-                      // queryClient.invalidateQueries({ queryKey: ['regularEducation', data?.report.id, page] });
+                      // queryClient.invalidateQueries({ queryKey: ['regularEducation', user?.id, page] });
                     }}
                     color="primary"
                   />

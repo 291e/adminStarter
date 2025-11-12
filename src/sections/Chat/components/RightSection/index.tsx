@@ -2,6 +2,7 @@ import Box from '@mui/material/Box';
 
 import ParticipantList from './ParticipantList';
 import AttachmentList from './AttachmentList';
+import type { ChatRoom } from 'src/_mock/_chat';
 
 type Participant = {
   name: string;
@@ -15,6 +16,7 @@ type Attachment = {
 };
 
 type Props = {
+  room?: ChatRoom | null;
   participants: Participant[];
   attachments: Attachment[];
   onInvite?: () => void;
@@ -22,6 +24,7 @@ type Props = {
 };
 
 export default function RightSection({
+  room,
   participants,
   attachments,
   onInvite,
@@ -41,7 +44,7 @@ export default function RightSection({
         overflow: 'hidden',
       }}
     >
-      <ParticipantList participants={participants} onInvite={onInvite} onRemove={onRemove} />
+      <ParticipantList room={room} participants={participants} onInvite={onInvite} onRemove={onRemove} />
       <AttachmentList attachments={attachments} />
     </Box>
   );

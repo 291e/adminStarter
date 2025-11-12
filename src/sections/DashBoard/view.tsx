@@ -13,6 +13,7 @@ import ProfileCard from './components/ProfileCard';
 import AccidentReportCard from './components/AccidentReportCard';
 import PendingSignaturesCard, { type PendingSignature } from './components/PendingSignaturesCard';
 import SharedDocumentsCard, { type SharedDocument } from './components/SharedDocumentsCard';
+import EducationDetailModal from './components/EducationDetailModal';
 
 // ----------------------------------------------------------------------
 
@@ -71,6 +72,7 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
   const [periodValue, setPeriodValue] = useState<string>('');
   const [pendingPage, setPendingPage] = useState(1);
   const [sharedPage, setSharedPage] = useState(1);
+  const [educationDetailModalOpen, setEducationDetailModalOpen] = useState(false);
 
   // TODO: TanStack Query Hook(useQuery)으로 서명 대기 문서 목록 가져오기
   // const { data: pendingDocs, isLoading: pendingLoading } = useQuery({
@@ -137,9 +139,18 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
   const educationRate = 60;
 
   const handleViewDetail = () => {
-    // TODO: 교육 이수율 상세 페이지로 이동
-    // navigate('/dashboard/education-report');
-    console.log('상세보기 클릭');
+    setEducationDetailModalOpen(true);
+  };
+
+  const handleSaveEducationDetail = () => {
+    // TODO: TanStack Query Hook(useMutation)으로 교육 기록 파일명 저장
+    // const saveMutation = useMutation({
+    //   mutationFn: (data) => saveEducationFileNames(data),
+    //   onSuccess: () => {
+    //     queryClient.invalidateQueries({ queryKey: ['educationDetail', user?.id] });
+    //   },
+    // });
+    console.log('교육 상세 저장');
   };
 
   const handleAccidentNavigate = () => {
@@ -266,6 +277,23 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
           </Box>
         </Stack>
       </Stack>
+
+      <EducationDetailModal
+        open={educationDetailModalOpen}
+        onClose={() => setEducationDetailModalOpen(false)}
+        onSave={handleSaveEducationDetail}
+        user={
+          user
+            ? {
+                id: user.id || '',
+                name: user.displayName || profileName,
+                department: '경영관리팀', // TODO: 사용자 정보에서 가져오기
+                joinDate: '2025-10-31', // TODO: 사용자 정보에서 가져오기
+                role: profileRoles[0] || profileLabel,
+              }
+            : null
+        }
+      />
     </DashboardContent>
   );
 }
