@@ -4,7 +4,6 @@ import { paths } from 'src/routes/paths';
 
 import { CONFIG } from 'src/global-config';
 
-import { Label } from 'src/components/label';
 import { SvgColor } from 'src/components/svg-color';
 
 // ----------------------------------------------------------------------
@@ -41,6 +40,12 @@ const ICONS = {
   ecommerce: icon('ic-ecommerce'),
   analytics: icon('ic-analytics'),
   dashboard: icon('ic-dashboard'),
+  notice: icon('ic-notice'),
+  faq: icon('ic-faq'),
+  otherProgram: icon('ic-other-program'),
+  community: icon('ic-community'),
+  diagnosis: icon('ic-diagnosis'),
+  settlement: icon('ic-settlement'),
 };
 
 // ----------------------------------------------------------------------
@@ -53,13 +58,10 @@ export const navData: NavSectionProps['data'] = [
     subheader: 'Overview',
     items: [
       {
-        title: 'One',
+        title: '대시보드',
         path: paths.dashboard.root,
         icon: ICONS.dashboard,
-        info: <Label>v{CONFIG.appVersion}</Label>,
       },
-      { title: 'Two', path: paths.dashboard.two, icon: ICONS.ecommerce },
-      { title: 'Three', path: paths.dashboard.three, icon: ICONS.analytics },
     ],
   },
   /**
@@ -69,13 +71,42 @@ export const navData: NavSectionProps['data'] = [
     subheader: 'Management',
     items: [
       {
-        title: 'Group',
+        title: '회원 / 조직 관리',
         path: paths.dashboard.group.root,
         icon: ICONS.user,
+      },
+      {
+        title: '상품 관리',
+        path: paths.dashboard.product.root,
+        icon: ICONS.job,
+      },
+      {
+        title: '정산',
+        path: paths.dashboard.settlement.root,
+        icon: ICONS.invoice,
+      },
+      {
+        title: '결과 진단 관리',
+        path: paths.dashboard.diagnosis.root,
+        icon: ICONS.analytics,
+      },
+      {
+        title: '커뮤니티',
+        path: paths.dashboard.community.root,
+        icon: ICONS.blog,
         children: [
-          { title: 'Four', path: paths.dashboard.group.root },
-          { title: 'Five', path: paths.dashboard.group.five },
-          { title: 'Six', path: paths.dashboard.group.six },
+          {
+            title: '공지사항',
+            path: paths.dashboard.community.notice,
+          },
+          {
+            title: '자주 묻는 질문',
+            path: paths.dashboard.community.faq,
+          },
+          {
+            title: '다른 프로그램',
+            path: paths.dashboard.community.otherProgram,
+          },
         ],
       },
     ],

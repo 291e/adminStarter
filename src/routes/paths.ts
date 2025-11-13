@@ -47,8 +47,21 @@ export const paths = {
     three: `${ROOTS.DASHBOARD}/three`,
     group: {
       root: `${ROOTS.DASHBOARD}/group`,
-      five: `${ROOTS.DASHBOARD}/group/five`,
-      six: `${ROOTS.DASHBOARD}/group/six`,
+    },
+    product: {
+      root: `${ROOTS.DASHBOARD}/product`,
+    },
+    settlement: {
+      root: `${ROOTS.DASHBOARD}/settlement`,
+    },
+    diagnosis: {
+      root: `${ROOTS.DASHBOARD}/diagnosis`,
+    },
+    community: {
+      root: `${ROOTS.DASHBOARD}/community`,
+      notice: `${ROOTS.DASHBOARD}/community/notice`,
+      faq: `${ROOTS.DASHBOARD}/community/faq`,
+      otherProgram: `${ROOTS.DASHBOARD}/community/otherProgram`,
     },
   },
 };
