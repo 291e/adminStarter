@@ -6,36 +6,33 @@ import Box from '@mui/material/Box';
 
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
 import warningIcon from 'src/assets/icons/safeyoui/warning.svg';
+import type { Member } from 'src/sections/Organization/types/member';
 
 // ----------------------------------------------------------------------
-
-export type SharedDocument = {
-  id: string;
-  priority: 'urgent' | 'important' | 'reference';
-  documentName: string;
-  registeredDate: string;
-  status: 'public' | 'private';
-};
 
 type Props = {
   open: boolean;
   onClose: () => void;
   onConfirm: () => void;
-  document: SharedDocument | null;
+  member: Member | null;
 };
 
-export default function DeleteDocumentModal({ open, onClose, onConfirm, document }: Props) {
+export default function DeleteMemberModal({ open, onClose, onConfirm, member }: Props) {
   const handleConfirm = () => {
-    // TODO: TanStack Query Hook(useMutation)으로 문서 삭제
+    // TODO: TanStack Query Hook(useMutation)으로 조직원 삭제
     // const deleteMutation = useMutation({
-    //   mutationFn: () => deleteSharedDocument(document?.id),
+    //   mutationFn: () => deleteMember(member?.memberIdx),
     //   onSuccess: () => {
-    //     queryClient.invalidateQueries({ queryKey: ['sharedDocuments'] });
+    //     queryClient.invalidateQueries({ queryKey: ['members'] });
     //     onClose();
+    //     // 성공 토스트 메시지 표시
+    //   },
+    //   onError: (error) => {
+    //     console.error('조직원 삭제 실패:', error);
+    //     // 에러 토스트 메시지 표시
     //   },
     // });
     // deleteMutation.mutate();
-
     onConfirm();
   };
 
@@ -87,7 +84,7 @@ export default function DeleteDocumentModal({ open, onClose, onConfirm, document
               color: 'text.secondary',
             }}
           >
-            삭제 후 &quot;{document?.documentName || '문서'}&quot;문서는 공유 문서함에서 사라집니다.
+            조직 정보에 속한 사용자 및 데이터가 함께 삭제됩니다.
           </Typography>
         </Stack>
 
@@ -121,3 +118,4 @@ export default function DeleteDocumentModal({ open, onClose, onConfirm, document
     </Dialog>
   );
 }
+

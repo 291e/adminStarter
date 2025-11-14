@@ -29,4 +29,5 @@ export type Member = {
   lastLocationUpdateAt: string | null;
   loginAttempts: number;
   loginBlockedUntil: string | null;
+  accidentFreeYear: number | null;
 };

@@ -62,6 +62,20 @@ const koreanOrgNames = [
   'KT',
 ];
 
+// 무재해 사업장 연도 목록 (일부는 null로 설정)
+const accidentFreeYears: Array<number | null> = [
+  2024,
+  2023,
+  2024,
+  null,
+  2022,
+  2024,
+  null,
+  2023,
+  2024,
+  null,
+];
+
 // 역할 목록 (구분과 매핑)
 const roles: Array<'operator' | 'member' | 'distributor' | 'agency' | 'dealer'> = [
   'operator',
@@ -143,6 +157,7 @@ export function mockMembers(count: number = 10): Member[] {
       lastLocationUpdateAt: hasLocation ? fSub({ hours: Math.floor(Math.random() * 24) }) : null,
       loginAttempts: Math.floor(Math.random() * 3),
       loginBlockedUntil: null,
+      accidentFreeYear: accidentFreeYears[index],
     };
   });
 }

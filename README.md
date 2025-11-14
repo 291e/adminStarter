@@ -64,7 +64,7 @@ VITE_SUPABASE_ANON_KEY=
 
 새 페이지 추가 예시(대시보드 하위):
 
-1. 페이지 파일 생성: `src/pages/dashboard/seven.tsx`
+1. 페이지 파일 생성: `src/pages/dashboard/seven/page.tsx`
 2. 라우트 등록: `src/routes/sections/dashboard.tsx`
 
 ```tsx
@@ -72,7 +72,7 @@ VITE_SUPABASE_ANON_KEY=
 { path: 'seven', element: <PageSeven /> }
 ```
 
-3. 네비게이션 노출(선택): `src/layouts/nav-config-dashboard.tsx`에 항목 추가
+3. 사이드바에 경로 추가(선택): `src/layouts/nav-config-dashboard.tsx`에 항목 추가
 
 ## 인증(JWT) 토글/연동
 

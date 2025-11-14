@@ -14,12 +14,17 @@ import Menu from '@mui/material/Menu';
 import MenuList from '@mui/material/MenuList';
 import MenuItem from '@mui/material/MenuItem';
 import Divider from '@mui/material/Divider';
+import Button from '@mui/material/Button';
 
 import type { Member } from 'src/sections/Organization/types/member';
 import Chip from '@mui/material/Chip';
 import { fDateTime } from 'src/utils/format-time';
 import { Iconify } from 'src/components/iconify';
 import { mockCompanies } from 'src/_mock/_company';
+import AccidentFreeWorksiteModal from './AccidentFreeWorksiteModal';
+import DeleteMemberModal from './DeleteMemberModal';
+import DeactivateMemberModal from './DeactivateMemberModal';
+
 type Props = {
   rows: Member[];
   onViewDetail?: (row: Member) => void;
@@ -30,6 +35,12 @@ type Props = {
 export default function OrganizationTable({ rows, onViewDetail, onDeactivate, onDelete }: Props) {
   const [menuAnchorEl, setMenuAnchorEl] = useState<{ [key: string]: HTMLElement | null }>({});
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [memberToDelete, setMemberToDelete] = useState<Member | null>(null);
+  const [deactivateModalOpen, setDeactivateModalOpen] = useState(false);
+  const [memberToDeactivate, setMemberToDeactivate] = useState<Member | null>(null);
 
   const handleOpenMenu = (event: React.MouseEvent<HTMLElement>, rowId: string) => {
     event.stopPropagation();
@@ -40,6 +51,60 @@ export default function OrganizationTable({ rows, onViewDetail, onDeactivate, on
   const handleCloseMenu = (rowId: string) => {
     setMenuAnchorEl((prev) => ({ ...prev, [rowId]: null }));
     setOpenMenuId(null);
+  };
+
+  const handleOpenModal = (member: Member) => {
+    setSelectedMember(member);
+    setModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setModalOpen(false);
+    setSelectedMember(null);
+  };
+
+  const handleApprove = (member: Member) => {
+    // TODO: 승인 처리 로직
+    handleCloseModal();
+  };
+
+  const handleReject = (member: Member) => {
+    // TODO: 반려 처리 로직
+    handleCloseModal();
+  };
+
+  const handleOpenDeleteModal = (member: Member) => {
+    setMemberToDelete(member);
+    setDeleteModalOpen(true);
+  };
+
+  const handleCloseDeleteModal = () => {
+    setDeleteModalOpen(false);
+    setMemberToDelete(null);
+  };
+
+  const handleConfirmDelete = () => {
+    if (memberToDelete) {
+      onDelete?.(memberToDelete);
+      handleCloseDeleteModal();
+    }
+  };
+
+  const handleOpenDeactivateModal = (member: Member) => {
+    setMemberToDeactivate(member);
+    setDeactivateModalOpen(true);
+  };
+
+  const handleCloseDeactivateModal = () => {
+    setDeactivateModalOpen(false);
+    setMemberToDeactivate(null);
+  };
+
+  const handleConfirmDeactivate = () => {
+    if (memberToDeactivate) {
+      onDeactivate?.(memberToDeactivate);
+      handleCloseDeactivateModal();
+    }
   };
 
   const companies = mockCompanies();
@@ -79,9 +144,10 @@ export default function OrganizationTable({ rows, onViewDetail, onDeactivate, on
             <TableCell sx={{ bgcolor: 'grey.100', minWidth: 220 }}>등록일 / 접속일</TableCell>
             <TableCell sx={{ bgcolor: 'grey.100', minWidth: 100 }}>구분</TableCell>
             <TableCell sx={{ bgcolor: 'grey.100', minWidth: 200 }}>조직명</TableCell>
-            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 160 }}>이름</TableCell>
+            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 160 }}>담당자</TableCell>
             <TableCell sx={{ bgcolor: 'grey.100', minWidth: 260 }}>전화번호 / 이메일</TableCell>
             <TableCell sx={{ bgcolor: 'grey.100', minWidth: 200 }}>주소</TableCell>
+            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 160 }}>무재해 사업장</TableCell>
             <TableCell align="center" sx={{ bgcolor: 'grey.100', minWidth: 120 }}>
               상태
             </TableCell>
@@ -124,6 +190,56 @@ export default function OrganizationTable({ rows, onViewDetail, onDeactivate, on
               </TableCell>
               <TableCell>
                 <Typography variant="body2">{row.memberAddress}</Typography>
+              </TableCell>
+              <TableCell>
+                {row.accidentFreeYear ? (
+                  <Chip
+                    label={`${row.accidentFreeYear}년 무재해 사업장`}
+                    variant="outlined"
+                    color="info"
+                    size="small"
+                    sx={{
+                      height: 24,
+                      minHeight: 24,
+                      px: 0.75,
+                      py: 0,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      lineHeight: '20px',
+                      borderRadius: 0.75,
+                      borderWidth: 1,
+                      textTransform: 'none',
+                    }}
+                  />
+                ) : (
+                  <Button
+                    variant="outlined"
+                    color="inherit"
+                    size="small"
+                    endIcon={<Iconify icon="eva:arrow-forward-fill" width={16} />}
+                    onClick={() => handleOpenModal(row)}
+                    sx={{
+                      height: 24,
+                      minHeight: 24,
+                      px: 0.75,
+                      py: 0,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      lineHeight: '20px',
+                      borderRadius: 0.75,
+                      borderWidth: 1,
+                      borderColor: 'grey.900',
+                      color: 'grey.900',
+                      textTransform: 'none',
+                      '&:hover': {
+                        borderColor: 'grey.800',
+                        bgcolor: 'action.hover',
+                      },
+                    }}
+                  >
+                    검토 대기
+                  </Button>
+                )}
               </TableCell>
               <TableCell align="center">
                 {row.memberStatus === 'active' ? (
@@ -170,7 +286,7 @@ export default function OrganizationTable({ rows, onViewDetail, onDeactivate, on
                     <MenuItem
                       onClick={() => {
                         handleCloseMenu(row.memberIdx.toString());
-                        onDeactivate?.(row);
+                        handleOpenDeactivateModal(row);
                       }}
                     >
                       비활성화
@@ -179,7 +295,7 @@ export default function OrganizationTable({ rows, onViewDetail, onDeactivate, on
                     <MenuItem
                       onClick={() => {
                         handleCloseMenu(row.memberIdx.toString());
-                        onDelete?.(row);
+                        handleOpenDeleteModal(row);
                       }}
                       sx={{
                         color: 'error.main',
@@ -197,6 +313,28 @@ export default function OrganizationTable({ rows, onViewDetail, onDeactivate, on
           ))}
         </TableBody>
       </Table>
+
+      <AccidentFreeWorksiteModal
+        open={modalOpen}
+        onClose={handleCloseModal}
+        onApprove={handleApprove}
+        onReject={handleReject}
+        member={selectedMember}
+      />
+
+      <DeleteMemberModal
+        open={deleteModalOpen}
+        onClose={handleCloseDeleteModal}
+        onConfirm={handleConfirmDelete}
+        member={memberToDelete}
+      />
+
+      <DeactivateMemberModal
+        open={deactivateModalOpen}
+        onClose={handleCloseDeactivateModal}
+        onConfirm={handleConfirmDeactivate}
+        member={memberToDeactivate}
+      />
     </TableContainer>
   );
 }

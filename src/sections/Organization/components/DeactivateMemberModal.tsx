@@ -6,36 +6,33 @@ import Box from '@mui/material/Box';
 
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
 import warningIcon from 'src/assets/icons/safeyoui/warning.svg';
+import type { Member } from 'src/sections/Organization/types/member';
 
 // ----------------------------------------------------------------------
-
-export type SharedDocument = {
-  id: string;
-  priority: 'urgent' | 'important' | 'reference';
-  documentName: string;
-  registeredDate: string;
-  status: 'public' | 'private';
-};
 
 type Props = {
   open: boolean;
   onClose: () => void;
   onConfirm: () => void;
-  document: SharedDocument | null;
+  member: Member | null;
 };
 
-export default function DeleteDocumentModal({ open, onClose, onConfirm, document }: Props) {
+export default function DeactivateMemberModal({ open, onClose, onConfirm, member }: Props) {
   const handleConfirm = () => {
-    // TODO: TanStack Query Hook(useMutation)으로 문서 삭제
-    // const deleteMutation = useMutation({
-    //   mutationFn: () => deleteSharedDocument(document?.id),
+    // TODO: TanStack Query Hook(useMutation)으로 조직원 비활성화
+    // const deactivateMutation = useMutation({
+    //   mutationFn: () => deactivateMember(member?.memberIdx),
     //   onSuccess: () => {
-    //     queryClient.invalidateQueries({ queryKey: ['sharedDocuments'] });
+    //     queryClient.invalidateQueries({ queryKey: ['members'] });
     //     onClose();
+    //     // 성공 토스트 메시지 표시
+    //   },
+    //   onError: (error) => {
+    //     console.error('조직원 비활성화 실패:', error);
+    //     // 에러 토스트 메시지 표시
     //   },
     // });
-    // deleteMutation.mutate();
-
+    // deactivateMutation.mutate();
     onConfirm();
   };
 
@@ -76,7 +73,7 @@ export default function DeleteDocumentModal({ open, onClose, onConfirm, document
               color: 'text.primary',
             }}
           >
-            삭제하시겠습니까?
+            비활성화하시겠습니까?
           </Typography>
           <Typography
             variant="subtitle2"
@@ -87,7 +84,7 @@ export default function DeleteDocumentModal({ open, onClose, onConfirm, document
               color: 'text.secondary',
             }}
           >
-            삭제 후 &quot;{document?.documentName || '문서'}&quot;문서는 공유 문서함에서 사라집니다.
+            조직 정보가 사용자에게 표시되지 않습니다.
           </Typography>
         </Stack>
 
@@ -114,10 +111,11 @@ export default function DeleteDocumentModal({ open, onClose, onConfirm, document
               },
             }}
           >
-            삭제하기
+            확인
           </DialogBtn>
         </Stack>
       </DialogContent>
     </Dialog>
   );
 }
+
