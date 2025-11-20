@@ -86,6 +86,34 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     console.log('참가자 내보내기:', participantIds);
   };
 
+  // TODO: TanStack Query Hook(useMutation)으로 채팅방 이름 변경
+  // const renameRoomMutation = useMutation({
+  //   mutationFn: (data: { roomId: string; newName: string }) => renameChatRoom(data.roomId, data.newName),
+  //   onSuccess: () => {
+  //     queryClient.invalidateQueries({ queryKey: ['chatRooms'] });
+  //     queryClient.invalidateQueries({ queryKey: ['chatRoom', selectedRoom?.id] });
+  //   },
+  // });
+  const handleRoomNameChange = (newName: string) => {
+    // renameRoomMutation.mutate({ roomId: selectedRoom!.id, newName });
+    if (selectedRoom) {
+      setSelectedRoom({ ...selectedRoom, name: newName });
+    }
+  };
+
+  // TODO: TanStack Query Hook(useMutation)으로 채팅방 나가기
+  // const leaveRoomMutation = useMutation({
+  //   mutationFn: (roomId: string) => leaveChatRoom(roomId),
+  //   onSuccess: () => {
+  //     queryClient.invalidateQueries({ queryKey: ['chatRooms'] });
+  //     setSelectedRoom(null);
+  //   },
+  // });
+  const handleLeaveRoom = () => {
+    // leaveRoomMutation.mutate(selectedRoom!.id);
+    setSelectedRoom(null);
+  };
+
   const renderContent = () => (
     <Box
       sx={{
@@ -167,7 +195,52 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
                 flexDirection: 'column',
               }}
             >
-              <ChatHeader room={selectedRoom} />
+              <ChatHeader
+                room={selectedRoom}
+                participants={
+                  // ChatHeader에서 Avatar 표시를 위한 participants 전달
+                  (() => {
+                    if (selectedRoom.type === 'chatbot') {
+                      return mockChatbotParticipants;
+                    } else if (selectedRoom.type === 'emergency') {
+                      return mockEmergencyParticipants;
+                    } else if (selectedRoom.type === 'normal') {
+                      // 일반 채팅(1대1): 채팅방 이름과 일치하는 참가자만 표시
+                      const matchedParticipant = mockChatParticipants.find(
+                        (p) => p.name === selectedRoom.name
+                      );
+                      return matchedParticipant ? [matchedParticipant] : [];
+                    } else {
+                      // 그룹 채팅: 멤버 정보가 있으면 사용, 없으면 메시지 참여자 사용
+                      if (selectedRoom.members && selectedRoom.members.length > 0) {
+                        return selectedRoom.members
+                          .map((memberName) => {
+                            const existingParticipant = mockChatParticipants.find(
+                              (p) => p.name === memberName
+                            );
+                            return existingParticipant || { name: memberName, role: '사원' };
+                          })
+                          .filter((p) => p);
+                      }
+                      // 메시지 참여자 사용
+                      const roomMessages = mockChatMessagesByRoom[selectedRoom.id] || [];
+                      const messageSenders = Array.from(
+                        new Set(roomMessages.map((msg) => msg.sender))
+                      );
+                      return messageSenders
+                        .map((sender) => {
+                          const existingParticipant = mockChatParticipants.find(
+                            (p) => p.name === sender
+                          );
+                          return existingParticipant || { name: sender, role: '사원' };
+                        })
+                        .filter((p) => p);
+                    }
+                  })()
+                }
+                onRoomNameChange={handleRoomNameChange}
+                onLeaveRoom={handleLeaveRoom}
+              />
             </Box>
             <Box
               sx={{

@@ -8,7 +8,6 @@ type Props = {
   data?: Table2100Data;
 };
 
-// 2100번대 전용 테이블: 피그마 디자인에 맞춘 레이아웃
 export default function RiskAssessmentTable_2_1_2100({ data }: Props) {
   // 기본 데이터
   const defaultData: Table2100Data = {
@@ -41,7 +40,7 @@ export default function RiskAssessmentTable_2_1_2100({ data }: Props) {
         hazardFactor: '2m 이상 고소작업',
         dangerousSituation: '작업발판에서 추락후 중상 발생',
         currentSafetyMeasure: '안전난간 설치',
-        riskLevel: { value: 12, label: '매우높음' },
+        riskLevel: { value: 12, label: '12 (관리필요)' },
         additionalMeasure: '안전대 부착설치 추가 설치',
         responsiblePerson: '김안전',
         plannedDate: '2025-10-30',
@@ -51,7 +50,7 @@ export default function RiskAssessmentTable_2_1_2100({ data }: Props) {
         hazardFactor: '회전체 정비작업',
         dangerousSituation: '회전부에 말려들어가 손가락 절단',
         currentSafetyMeasure: '방호덮개 설치',
-        riskLevel: { value: 6, label: '중간' },
+        riskLevel: { value: 6, label: '6 (관리필요)' },
         additionalMeasure: '인터록 장치 설치',
         responsiblePerson: '이기술',
         plannedDate: '2025-10-30',
@@ -61,7 +60,7 @@ export default function RiskAssessmentTable_2_1_2100({ data }: Props) {
         hazardFactor: '부식성 화학물질 취급',
         dangerousSituation: '피부접촉으로 화학 화상',
         currentSafetyMeasure: '보호장갑 착용',
-        riskLevel: { value: 12, label: '매우높음' },
+        riskLevel: { value: 12, label: '12 (관리필요)' },
         additionalMeasure: '국소배기장치 설치',
         responsiblePerson: '김안전',
         plannedDate: '2025-10-30',
@@ -71,7 +70,7 @@ export default function RiskAssessmentTable_2_1_2100({ data }: Props) {
         hazardFactor: '전기패널 점검작업',
         dangerousSituation: '충전부 접촉으로 감전',
         currentSafetyMeasure: '절연장갑 작용',
-        riskLevel: { value: 6, label: '중간' },
+        riskLevel: { value: 6, label: '6 (관리필요)' },
         additionalMeasure: '차단장치 설치',
         responsiblePerson: '박전기',
         plannedDate: '2025-10-30',
@@ -81,148 +80,141 @@ export default function RiskAssessmentTable_2_1_2100({ data }: Props) {
   };
 
   const tableData = data || defaultData;
-  const classificationRows = tableData.classification;
-  const assessmentRows = tableData.assessment;
+
+  const tableStyle = {
+    width: '100%',
+    border: '2px solid',
+    borderColor: 'text.primary',
+    borderCollapse: 'collapse',
+    '& th, & td': {
+      border: '1px solid',
+      borderColor: 'text.primary',
+      padding: 0,
+      textAlign: 'center',
+      verticalAlign: 'middle',
+    },
+    '& th': {
+      backgroundColor: 'grey.100',
+      fontSize: 14,
+      fontWeight: 600,
+      lineHeight: '22px',
+      height: 60,
+    },
+    '& td': {
+      padding: '4px',
+      fontSize: 14,
+      fontWeight: 400,
+      lineHeight: '22px',
+      whiteSpace: 'pre-wrap',
+    },
+  };
 
   return (
-    <Box sx={{ width: '100%', maxWidth: 1240, display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {/* [유해.위험요인 분류 예시] 테이블 */}
-      <Box>
-        <Box sx={{ px: 1, py: 0, mb: 1 }}>
-          <Typography
-            sx={{
-              fontSize: 16,
-              fontWeight: 600,
-              lineHeight: '24px',
-            }}
-          >
-            [유해.위험요인 분류 예시]
-          </Typography>
-        </Box>
-
-        <Box
-          component="table"
-          sx={{
-            width: '100%',
-            border: '2px solid',
-            borderColor: 'text.primary',
-            borderCollapse: 'collapse',
-            '& th, & td': {
-              border: '1px solid',
-              borderColor: 'text.primary',
-              padding: 1,
-              textAlign: 'center',
-              verticalAlign: 'middle',
-            },
-            '& th': {
-              backgroundColor: 'transparent',
-              fontSize: 14,
-              fontWeight: 600,
-              lineHeight: '22px',
-              height: 60,
-            },
-            '& td': {
-              fontSize: 14,
-              fontWeight: 400,
-              lineHeight: '22px',
-              whiteSpace: 'pre-wrap',
-            },
-          }}
-        >
+    <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
+      {/* 첫 번째 테이블: 위험요인 분류 */}
+      <Box sx={{ width: '100%' }}>
+        <Typography sx={{ mb: 2, fontSize: 16, fontWeight: 600, px: 1 }}>
+          [유해·위험요인 분류 예시]
+        </Typography>
+        <Box component="table" sx={tableStyle}>
           <thead>
             <tr>
-              <th style={{ width: 90 }}>번호</th>
-              <th style={{ width: 200 }}>구분</th>
-              <th>해당 유해, 위험요인</th>
+              <th style={{ width: 94 }}>번호</th>
+              <th style={{ width: 164 }}>구분</th>
+              <th style={{ flex: 1 }}>해당 유해·위험요인</th>
             </tr>
           </thead>
           <tbody>
-            {classificationRows.map((row) => (
-              <tr key={row.number}>
-                <td>{row.number}</td>
-                <td>{row.category}</td>
-                <td>{row.hazardFactors}</td>
+            {tableData.classification.map((row, index) => (
+              <tr key={index} style={{ height: 48 }}>
+                <td>
+                  <Typography sx={{ fontSize: 14, fontWeight: 400, textAlign: 'center' }}>
+                    {row.number}
+                  </Typography>
+                </td>
+                <td>
+                  <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{row.category}</Typography>
+                </td>
+                <td>
+                  <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{row.hazardFactors}</Typography>
+                </td>
               </tr>
             ))}
           </tbody>
         </Box>
       </Box>
 
-      {/* [위험성 평가표] 테이블 */}
-      <Box>
-        <Box sx={{ px: 1, py: 0, mb: 1 }}>
-          <Typography
-            sx={{
-              fontSize: 16,
-              fontWeight: 600,
-              lineHeight: '24px',
-            }}
-          >
-            [위험성 평가표]
-          </Typography>
-        </Box>
-
-        <Box
-          component="table"
-          sx={{
-            width: '100%',
-            border: '2px solid',
-            borderColor: 'text.primary',
-            borderCollapse: 'collapse',
-            '& th, & td': {
-              border: '1px solid',
-              borderColor: 'text.primary',
-              padding: 1,
-              textAlign: 'center',
-              verticalAlign: 'middle',
-            },
-            '& th': {
-              backgroundColor: 'transparent',
-              fontSize: 14,
-              fontWeight: 600,
-              lineHeight: '22px',
-              height: 60,
-            },
-            '& td': {
-              fontSize: 14,
-              fontWeight: 400,
-              lineHeight: '22px',
-              whiteSpace: 'pre-wrap',
-            },
-          }}
-        >
+      {/* 두 번째 테이블: 위험성 평가 */}
+      <Box sx={{ width: '100%' }}>
+        <Typography sx={{ mb: 2, fontSize: 16, fontWeight: 600, px: 1 }}>[위험성 평가]</Typography>
+        <Box component="table" sx={tableStyle}>
           <thead>
             <tr>
-              <th style={{ width: 140 }}>유해/위험요인</th>
-              <th>위험한 상황과 결과</th>
-              <th style={{ width: 116 }}>현재 안전조치</th>
-              <th style={{ width: 80 }}>위험성</th>
-              <th style={{ width: 180 }}>추가조치사항{'\n'}(현재의 안전조사 미흡시)</th>
-              <th style={{ width: 68 }}>담당자</th>
-              <th style={{ width: 100 }}>예정일</th>
-              <th style={{ width: 100 }}>완료일</th>
+              <th style={{ width: 160 }}>유해/위험요인</th>
+              <th style={{ width: 199 }}>위험한 상황과 결과</th>
+              <th style={{ width: 160 }}>현재 안전조치</th>
+              <th style={{ width: 120 }}>위험성</th>
+              <th style={{ width: 220 }}>
+                추가조치사항
+                <br />
+                (현재의 안전조사 미흡시)
+              </th>
+              <th style={{ width: 120 }}>담당자</th>
+              <th style={{ width: 120 }}>예정일</th>
+              <th style={{ width: 120 }}>완료일</th>
             </tr>
           </thead>
           <tbody>
-            {assessmentRows.map((row, index) => (
-              <tr key={index}>
-                <td>{row.hazardFactor}</td>
-                <td>{row.dangerousSituation}</td>
-                <td>{row.currentSafetyMeasure}</td>
+            {tableData.assessment.map((row, index) => (
+              <tr key={index} style={{ height: index === 0 || index === 1 ? 72 : 48 }}>
                 <td>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
-                    <Typography component="span" sx={{ fontSize: 14 }}>
-                      {row.riskLevel.value}
+                  <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{row.hazardFactor}</Typography>
+                </td>
+                <td>
+                  <Typography sx={{ fontSize: 14, fontWeight: 400 }}>
+                    {row.dangerousSituation}
+                  </Typography>
+                </td>
+                <td>
+                  <Typography sx={{ fontSize: 14, fontWeight: 400 }}>
+                    {row.currentSafetyMeasure}
+                  </Typography>
+                </td>
+                <td>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    <Typography sx={{ fontSize: 14, fontWeight: 400 }}>
+                      {row.riskLevel?.value || ''}
                     </Typography>
-                    <Typography component="span" sx={{ fontSize: 14 }}>
-                      ({row.riskLevel.label})
-                    </Typography>
+                    {row.riskLevel?.label && (
+                      <Typography
+                        sx={{
+                          fontSize: 12,
+                          fontWeight: 400,
+                          color: 'text.secondary',
+                          textAlign: 'center',
+                        }}
+                      >
+                        ({row.riskLevel.label})
+                      </Typography>
+                    )}
                   </Box>
                 </td>
-                <td>{row.additionalMeasure}</td>
-                <td>{row.responsiblePerson}</td>
-                <td>{row.plannedDate}</td>
-                <td>{row.completedDate}</td>
+                <td>
+                  <Typography sx={{ fontSize: 14, fontWeight: 400 }}>
+                    {row.additionalMeasure}
+                  </Typography>
+                </td>
+                <td>
+                  <Typography sx={{ fontSize: 14, fontWeight: 400 }}>
+                    {row.responsiblePerson}
+                  </Typography>
+                </td>
+                <td>
+                  <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{row.plannedDate}</Typography>
+                </td>
+                <td>
+                  <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{row.completedDate}</Typography>
+                </td>
               </tr>
             ))}
           </tbody>

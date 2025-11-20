@@ -43,114 +43,156 @@ const defaultRows: Table2300Row[] = [
 
 export default function RiskTable_2_3_2300({ rows = defaultRows }: Props) {
   return (
-    <Box sx={{ width: '100%', maxWidth: 1240, mt: 4 }}>
-      <Box
-        component="table"
-        sx={{
-          width: '100%',
-          border: '2px solid',
-          borderColor: 'text.primary',
-          borderCollapse: 'collapse',
-          '& th, & td': {
-            border: '1px solid',
+    <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <Box sx={{ pb: 5, pt: 0, px: 0, width: '100%' }}>
+        <Box
+          component="table"
+          sx={{
+            width: '100%',
+            border: '2px solid',
             borderColor: 'text.primary',
-            padding: 1,
-            textAlign: 'center',
-            verticalAlign: 'middle',
-          },
-          '& th': {
-            backgroundColor: 'transparent',
-            fontSize: 14,
-            fontWeight: 600,
-            lineHeight: '22px',
-          },
-          '& td': {
-            fontSize: 14,
-            fontWeight: 400,
-            lineHeight: '22px',
-            whiteSpace: 'pre-wrap',
-            height: 48,
-          },
-        }}
-      >
-        <thead>
-          <tr>
-            <th rowSpan={2} style={{ width: 50 }}>
-              구분
-            </th>
-            <th colSpan={3} style={{ width: 224 }}>
-              유해위험요인 파악
-            </th>
-            <th colSpan={2} style={{ width: 171 }}>
-              관련근거
-            </th>
-            <th rowSpan={2} style={{ width: 70 }}>
-              현재 위험성
-            </th>
-            <th colSpan={2} style={{ width: 175 }}>
-              감소 대책
-            </th>
-            <th rowSpan={2} style={{ width: 78 }}>
-              개선후 위험성
-            </th>
-            <th rowSpan={2} style={{ width: 51 }}>
-              담당자
-            </th>
-            <th rowSpan={2} style={{ width: 124 }}>
-              조치요구일
-            </th>
-            <th rowSpan={2} style={{ width: 118 }}>
-              조치 완료일
-            </th>
-            <th rowSpan={2} style={{ width: 91 }}>
-              완료 확인
-            </th>
-          </tr>
-          <tr>
-            <th style={{ width: 69 }}>분류</th>
-            <th style={{ width: 69 }}>원인</th>
-            <th style={{ width: 86 }}>유해위험요인</th>
-            <th style={{ width: 171 }}>법규/노출기준 등</th>
-            <th style={{ width: 0, padding: 0, border: 'none' }} />
-            <th style={{ width: 42 }}>NO</th>
-            <th style={{ width: 133 }}>세부내용</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, idx) => (
-            <tr key={idx}>
-              <td>{r.division}</td>
-              <td>{r.category}</td>
-              <td>{r.cause}</td>
-              <td>{r.hazard}</td>
-              <td colSpan={2}>{r.reference}</td>
-              <td>
-                <Typography component="span" sx={{ fontSize: 14 }}>
-                  {r.currentRisk.value}
-                </Typography>
-                <br />
-                <Typography component="span" sx={{ fontSize: 12 }}>
-                  ({r.currentRisk.label})
-                </Typography>
-              </td>
-              <td>{r.reductionNo}</td>
-              <td>{r.reductionDetail}</td>
-              <td>
-                <Typography component="span" sx={{ fontSize: 14 }}>
-                  {r.postRisk.value}
-                </Typography>
-                <br />
-                <Typography component="span" sx={{ fontSize: 12 }}>
-                  ({r.postRisk.label})
-                </Typography>
-              </td>
-              <td>{r.owner}</td>
-              <td>{r.dueDate}</td>
-              <td>{r.completedAt}</td>
-              <td>{r.done ? '●' : '○'}</td>
+            borderCollapse: 'collapse',
+            '& th, & td': {
+              border: '1px solid',
+              borderColor: 'text.primary',
+              padding: '4px',
+              textAlign: 'center',
+              verticalAlign: 'middle',
+            },
+            '& th': {
+              backgroundColor: 'grey.100',
+              fontSize: 14,
+              fontWeight: 600,
+              lineHeight: '22px',
+            },
+            '& td': {
+              fontSize: 14,
+              fontWeight: 400,
+              lineHeight: '22px',
+              whiteSpace: 'pre-wrap',
+            },
+          }}
+        >
+          <thead>
+            <tr style={{ height: 60 }}>
+              <th rowSpan={2} style={{ width: 126 }}>
+                구분
+              </th>
+              <th colSpan={2} style={{ width: 164 }}>
+                유해·위험요인 파악
+              </th>
+              <th colSpan={1} style={{ width: 200 }}>
+                관련근거
+              </th>
+              <th rowSpan={2} style={{ width: 92 }}>
+                현재 위험성
+              </th>
+              <th colSpan={2} style={{ width: 182 }}>
+                감소대책
+              </th>
+              <th rowSpan={2} style={{ width: 80 }}>
+                개선후 위험성
+              </th>
+              <th rowSpan={2} style={{ width: 73 }}>
+                담당자
+              </th>
+              <th rowSpan={2} style={{ width: 113 }}>
+                조치요구일
+              </th>
+              <th rowSpan={2} style={{ width: 117 }}>
+                조치 완료일
+              </th>
+              <th rowSpan={2} style={{ width: 50 }}>
+                완료
+              </th>
             </tr>
-          ))}
-        </tbody>
+            <tr style={{ height: 60 }}>
+              <th style={{ width: 80 }}>원인</th>
+              <th style={{ width: 120 }}>유해·위험요인</th>
+              <th style={{ width: 120 }}>법규/노출기준 등</th>
+              <th style={{ width: 80 }}>NO</th>
+              <th style={{ width: 73 }}>세부내용</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, idx) => (
+              <tr key={idx} style={{ height: 96 }}>
+                <td>
+                  <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{r.division}</Typography>
+                </td>
+                <td>
+                  <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{r.cause}</Typography>
+                </td>
+                <td>
+                  <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{r.hazard}</Typography>
+                </td>
+                <td>
+                  <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{r.reference}</Typography>
+                </td>
+                <td>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    <Typography sx={{ fontSize: 14, fontWeight: 400 }}>
+                      {r.currentRisk?.value || ''}
+                    </Typography>
+                    {r.currentRisk?.label && (
+                      <Typography
+                        sx={{
+                          fontSize: 12,
+                          fontWeight: 400,
+                          color: 'text.secondary',
+                          textAlign: 'center',
+                        }}
+                      >
+                        ({r.currentRisk.label})
+                      </Typography>
+                    )}
+                  </Box>
+                </td>
+                <td>
+                  <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{r.reductionNo}</Typography>
+                </td>
+                <td>
+                  <Typography sx={{ fontSize: 14, fontWeight: 400 }}>
+                    {r.reductionDetail}
+                  </Typography>
+                </td>
+                <td>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    <Typography sx={{ fontSize: 14, fontWeight: 400 }}>
+                      {r.postRisk?.value || ''}
+                    </Typography>
+                    {r.postRisk?.label && (
+                      <Typography
+                        sx={{
+                          fontSize: 12,
+                          fontWeight: 400,
+                          color: 'text.secondary',
+                          textAlign: 'center',
+                        }}
+                      >
+                        ({r.postRisk.label})
+                      </Typography>
+                    )}
+                  </Box>
+                </td>
+                <td>
+                  <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{r.owner}</Typography>
+                </td>
+                <td>
+                  <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{r.dueDate}</Typography>
+                </td>
+                <td>
+                  <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{r.completedAt}</Typography>
+                </td>
+                <td>
+                  <Typography sx={{ fontSize: 14, fontWeight: 400 }}>
+                    {r.done ? '●' : '○'}
+                  </Typography>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </Box>
       </Box>
     </Box>
   );

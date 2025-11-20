@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 
 import { useSearchParams } from 'src/routes/hooks';
+import { buildAppPath } from 'src/routes/utils';
 
 import { CONFIG } from 'src/global-config';
 
@@ -32,7 +33,7 @@ export function GuestGuard({ children }: GuestGuardProps) {
       // Redirect authenticated users to the returnTo path
       // Using `window.location.href` instead of `router.replace` to avoid unnecessary re-rendering
       // that might be caused by the AuthGuard component
-      window.location.href = returnTo;
+      window.location.href = buildAppPath(returnTo);
       return;
     }
 

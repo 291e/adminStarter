@@ -163,16 +163,26 @@ export function Risk_2200View({
 
   // 2100번대 문서 여부 확인 (safetyIdx=2, itemNumber=1)
   const is2100Series = safetyIdx === 2 && itemNumber === 1;
+  // 1200번대 문서 여부 확인 (safetyIdx=1, itemNumber=2)
+  const is1200Series = safetyIdx === 1 && itemNumber === 2;
   // 1500번대 문서 여부 확인 (safetyIdx=1, itemNumber=5)
   const is1500Series = safetyIdx === 1 && itemNumber === 5;
   // 1400번대 문서 여부 확인 (safetyIdx=1, itemNumber=4)
   const is1400Series = safetyIdx === 1 && itemNumber === 4;
+  // 1100번대 문서 여부 확인 (safetyIdx=1, itemNumber=1)
+  const is1100Series = safetyIdx === 1 && itemNumber === 1;
   // 1300번대 문서 여부 확인 (safetyIdx=1, itemNumber=3)
   const is1300Series = safetyIdx === 1 && itemNumber === 3;
   // 2300번대 문서 여부 확인 (safetyIdx=2, itemNumber=3)
   const is2300Series = safetyIdx === 2 && itemNumber === 3;
   // 2200번대 문서 여부 확인 (safetyIdx=2, itemNumber=2)
   const is2200Series = safetyIdx === 2 && itemNumber === 2;
+  // 2400번대 문서 여부 확인 (safetyIdx=2, itemNumber=4)
+  const is2400Series = safetyIdx === 2 && itemNumber === 4;
+  // 2400번대 TBM 일지 여부 확인
+  const is2400TBM = is2400Series && documentTableData?.type === '2400-tbm';
+  // 2400번대 연간 교육 계획 여부 확인
+  const is2400Education = is2400Series && documentTableData?.type === '2400-education';
 
   // TODO: TanStack Query Hook(useQuery)으로 item 정보 가져오기
   // const { data: itemInfo } = useQuery({
@@ -225,27 +235,41 @@ export function Risk_2200View({
           <DocumentHeader
             formattedDate={formattedDate}
             title={
-              is2100Series
-                ? '위험요인별 위험성 평가'
-                : is1500Series
-                  ? '위험장소 및 작업형태별 위험요인'
-                  : is1400Series
-                    ? '유해인자'
-                    : is1300Series
-                      ? '위험 기계·기구·설비'
-                      : is2300Series
-                        ? '감소 대책 수립·이행'
-                        : is2200Series
-                          ? '위험요인 제거·대체 및 통제 계획'
-                          : undefined
+              is1100Series
+                ? '위험요인 파악'
+                : is1200Series && documentTableData?.type === '1200-industrial'
+                  ? '사고조사 보고서'
+                  : is1200Series
+                    ? '아차 사고 조사표'
+                    : is2100Series
+                      ? '위험요인별 위험성 평가'
+                      : is1500Series
+                        ? '위험장소 및 작업형태별 위험요인'
+                        : is1400Series
+                          ? '유해인자'
+                          : is1300Series
+                            ? '위험 기계·기구·설비'
+                            : is2300Series
+                              ? '종합대책 수립·이행'
+                              : is2200Series
+                                ? '위험요인 제거·대체 및 통제 계획'
+                                : is2400TBM
+                                  ? 'TBM 일지'
+                                  : is2400Education
+                                    ? '연간 교육 계획'
+                                    : undefined
             }
             approvalVariant={
+              is1100Series ||
+              is1200Series ||
               is2100Series ||
               is1500Series ||
               is1400Series ||
               is1300Series ||
               is2300Series ||
-              is2200Series
+              is2200Series ||
+              is2400TBM ||
+              is2400Education
                 ? 'four'
                 : 'default'
             }
@@ -255,9 +279,21 @@ export function Risk_2200View({
 
           {(() => {
             // 문서 테이블 데이터가 있으면 사용, 없으면 기본값
+            if (is1100Series && documentTableData?.type === '1100') {
+              const TableComp = tableRegistry['1-1-1100'] as any;
+              return <TableComp rows={documentTableData.rows} />;
+            }
             if (is2100Series && documentTableData?.type === '2100') {
               const TableComp = tableRegistry['2-1-2100'] as any;
               return <TableComp data={documentTableData.data} />;
+            }
+            if (is1200Series && documentTableData?.type === '1200-industrial') {
+              const TableComp = tableRegistry['1-2-1200-industrial'] as any;
+              return <TableComp row={documentTableData.rows[0]} />;
+            }
+            if (is1200Series && documentTableData?.type === '1200-near-miss') {
+              const TableComp = tableRegistry['1-2-1200'] as any;
+              return <TableComp row={documentTableData.row} />;
             }
             if (is1500Series && documentTableData?.type === '1500') {
               const TableComp = tableRegistry['1-5-1500'] as any;
@@ -279,8 +315,29 @@ export function Risk_2200View({
               const TableComp = tableRegistry['2-2'] as any;
               return <TableComp data={documentTableData.rows} />;
             }
+            if (is2400TBM && documentTableData?.type === '2400-tbm') {
+              const TableComp = tableRegistry['2-4-2400-tbm'] as any;
+              return <TableComp data={documentTableData.data} />;
+            }
+            if (is2400Education && documentTableData?.type === '2400-education') {
+              const TableComp = tableRegistry['2-4-2400-education'] as any;
+              return (
+                <TableComp
+                  rows={documentTableData.rows}
+                  minimumEducationRows={documentTableData.minimumEducationRows}
+                />
+              );
+            }
 
             // 기본값: 문서 데이터가 없거나 매칭되지 않는 경우
+            if (is1100Series) {
+              const TableComp = tableRegistry['1-1-1100'] as any;
+              return <TableComp />;
+            }
+            if (is1200Series) {
+              const TableComp = tableRegistry['1-2-1200'] as any;
+              return <TableComp />;
+            }
             if (is2100Series) {
               const TableComp = tableRegistry['2-1-2100'] as any;
               return <TableComp />;
@@ -304,6 +361,14 @@ export function Risk_2200View({
             if (is2200Series) {
               const TableComp = tableRegistry['2-2'] as TableComponent;
               return <TableComp data={tableData as DefaultTableRow[]} />;
+            }
+            if (is2400TBM) {
+              const TableComp = tableRegistry['2-4-2400-tbm'] as any;
+              return <TableComp />;
+            }
+            if (is2400Education) {
+              const TableComp = tableRegistry['2-4-2400-education'] as any;
+              return <TableComp />;
             }
 
             const key = item ? `${item.safetyIdx}-${item.itemNumber}` : 'Default';

@@ -38,6 +38,9 @@ const SafetySystemRisk2200CreatePage = lazy(
 const SafetySystemRisk2200DetailPage = lazy(
   () => import('src/pages/dashboard/safetySystem/[safety_id]/risk-2200/[risk_id]/page')
 );
+const SafetySystemRisk2200EditPage = lazy(
+  () => import('src/pages/dashboard/safetySystem/[safety_id]/risk-2200/[risk_id]/edit/page')
+);
 const SystemSettingPage = lazy(() => import('src/pages/dashboard/systemSetting/page'));
 
 const ServiceSettingPage = lazy(
@@ -108,6 +111,7 @@ export const dashboardRoutes: RouteObject[] = [
                 children: [
                   { element: <SafetySystemRisk2200ListPage />, index: true },
                   { path: 'create', element: <SafetySystemRisk2200CreatePage /> },
+                  { path: ':risk_id/edit', element: <SafetySystemRisk2200EditPage /> },
                   { path: ':risk_id', element: <SafetySystemRisk2200DetailPage /> },
                 ],
               },

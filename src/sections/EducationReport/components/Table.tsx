@@ -1,5 +1,3 @@
-import { useState } from 'react';
-
 import Box from '@mui/material/Box';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
@@ -32,8 +30,17 @@ export default function EducationReportTable({
   onSelectRow,
   onViewDetail,
 }: Props) {
-  const allSelected = rows.length > 0 && selectedIds.length === rows.length;
-  const someSelected = selectedIds.length > 0 && selectedIds.length < rows.length;
+  // rows의 모든 ID가 selectedIds에 포함되어 있는지 확인
+  const rowIds = rows.map((row) => row.id);
+  const allSelected = rows.length > 0 && rowIds.every((id) => selectedIds.includes(id));
+  const someSelected =
+    rows.length > 0 && rowIds.some((id) => selectedIds.includes(id)) && !allSelected;
+
+  const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
+    // 현재 상태를 기반으로 토글: 모두 선택되어 있으면 모두 해제, 그렇지 않으면 모두 선택
+    const shouldSelectAll = !allSelected;
+    onSelectAll(shouldSelectAll);
+  };
 
   return (
     <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
@@ -44,7 +51,7 @@ export default function EducationReportTable({
               <Checkbox
                 checked={allSelected}
                 indeterminate={someSelected}
-                onChange={(e) => onSelectAll(e.target.checked)}
+                onChange={handleSelectAll}
               />
             </TableCell>
             <TableCell sx={{ bgcolor: 'grey.100', minWidth: 144 }}>조직명</TableCell>

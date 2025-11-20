@@ -8,8 +8,8 @@ import Chip from '@mui/material/Chip';
 import Avatar from '@mui/material/Avatar';
 
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
-import { Iconify } from 'src/components/iconify';
 import type { ChatRoom } from 'src/_mock/_chat';
+import warningIcon from 'src/assets/icons/safeyoui/warning.svg';
 
 // ----------------------------------------------------------------------
 
@@ -107,11 +107,9 @@ export default function RemoveParticipantModal({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            borderRadius: '50%',
-            bgcolor: 'warning.lighter',
           }}
         >
-          <Iconify icon="solar:danger-triangle-bold" width={40} sx={{ color: 'warning.main' }} />
+          <img src={warningIcon} alt="warning" width={64} height={64} />
         </Box>
 
         {/* 텍스트 영역 */}

@@ -11,11 +11,19 @@ type Props = {
 };
 
 export default function CreateHeader({ onBack, onSampleView, title }: Props) {
+  const buttons = [];
+  if (onSampleView) {
+    buttons.push({
+      label: '샘플 보기',
+      variant: 'primary' as const,
+      onClick: onSampleView,
+    });
+  }
+
   return (
     <Box
       sx={{
         width: '100%',
-        maxWidth: 1320,
       }}
     >
       <SubHeader
@@ -34,17 +42,7 @@ export default function CreateHeader({ onBack, onSampleView, title }: Props) {
             {title || '문서 등록'}
           </Box>
         }
-        buttons={
-          onSampleView
-            ? [
-                {
-                  label: '샘플 보기',
-                  variant: 'primary',
-                  onClick: onSampleView,
-                },
-              ]
-            : []
-        }
+        buttons={buttons}
       />
     </Box>
   );

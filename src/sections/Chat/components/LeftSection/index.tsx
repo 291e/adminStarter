@@ -7,6 +7,7 @@ import Avatar from '@mui/material/Avatar';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import TextField from '@mui/material/TextField';
+import Tooltip from '@mui/material/Tooltip';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemButton from '@mui/material/ListItemButton';
@@ -15,6 +16,8 @@ import ListItemText from '@mui/material/ListItemText';
 
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
+import { useAuthContext } from 'src/auth/hooks/use-auth-context';
+import CreateChatRoomModal from './CreateChatRoomModal';
 
 type ChatRoom = {
   id: string;
@@ -35,21 +38,227 @@ type Props = {
 };
 
 export default function LeftSection({ rooms, selectedRoomId, onSelectRoom }: Props) {
+  const { user } = useAuthContext();
   const [searchQuery, setSearchQuery] = useState('');
+  const [createModalOpen, setCreateModalOpen] = useState(false);
   const normalChatExpanded = useBoolean(true);
   const groupChatExpanded = useBoolean(true);
+
+  // 현재 사용자 이름 (displayName 또는 name 사용)
+  const currentUserName = user?.displayName || user?.name || '';
 
   const filteredRooms = rooms.filter((room) =>
     room.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // 일반 채팅 목록: 본인과의 채팅방 제외
   const normalRooms = filteredRooms.filter(
-    (room) => !room.isGroup && room.type !== 'chatbot' && room.type !== 'emergency'
+    (room) =>
+      !room.isGroup &&
+      room.type !== 'chatbot' &&
+      room.type !== 'emergency' &&
+      room.name !== currentUserName
   );
-  const groupRooms = filteredRooms.filter((room) => room.isGroup);
+
+  // 그룹 채팅 목록: members 배열에 본인이 포함된 경우 제외
+  const groupRooms = filteredRooms.filter(
+    (room) =>
+      room.isGroup && (!room.members || !room.members.some((member) => member === currentUserName))
+  );
+
+  // 그룹 채팅 멤버 목록에서 본인과 "외 N명" 같은 텍스트를 제외하는 함수
+  const getFilteredMembers = (members?: string[]): string[] => {
+    if (!members) return [];
+    return members.filter(
+      (member) =>
+        member !== currentUserName &&
+        !member.includes('외') &&
+        !member.includes('명') &&
+        member.trim() !== ''
+    );
+  };
 
   const chatbotRoom = filteredRooms.find((r) => r.type === 'chatbot');
   const emergencyRoom = filteredRooms.find((r) => r.type === 'emergency');
+
+  // 그룹 채팅 Avatar 렌더링 함수 (Figma 디자인에 맞춰 멤버 수에 따라 다르게 표시)
+  const renderGroupAvatar = (members?: string[]) => {
+    const filteredMembers = getFilteredMembers(members);
+    const memberCount = filteredMembers.length;
+
+    // 1명일 때: 단일 Avatar
+    if (memberCount <= 1) {
+      const member = filteredMembers[0];
+      return <Avatar sx={{ width: 40, height: 40 }}>{member?.[0] || '?'}</Avatar>;
+    }
+
+    // 2명일 때: 2개 Avatar 겹쳐서 (왼쪽/오른쪽)
+    if (memberCount === 2) {
+      return (
+        <Box
+          sx={{
+            position: 'relative',
+            width: 40,
+            height: 40,
+          }}
+        >
+          <Avatar
+            sx={{
+              width: 25,
+              height: 25,
+              border: '1px solid',
+              borderColor: 'background.paper',
+              position: 'absolute',
+              left: 0,
+              top: '15%',
+              bottom: '15%',
+            }}
+          >
+            {filteredMembers[0]?.[0] || ''}
+          </Avatar>
+          <Avatar
+            sx={{
+              width: 25,
+              height: 25,
+              border: '1px solid',
+              borderColor: 'background.paper',
+              position: 'absolute',
+              right: 0,
+              top: '15%',
+              bottom: '15%',
+            }}
+          >
+            {filteredMembers[1]?.[0] || ''}
+          </Avatar>
+        </Box>
+      );
+    }
+
+    // 3명일 때: 3개 Avatar 겹쳐서 (왼쪽/중앙/오른쪽)
+    if (memberCount === 3) {
+      return (
+        <Box
+          sx={{
+            position: 'relative',
+            width: 40,
+            height: 40,
+          }}
+        >
+          <Avatar
+            sx={{
+              width: 20,
+              height: 20,
+              border: '1px solid',
+              borderColor: 'background.paper',
+              position: 'absolute',
+              left: 0,
+              top: '20%',
+              bottom: '20%',
+            }}
+          >
+            {filteredMembers[0]?.[0] || ''}
+          </Avatar>
+          <Avatar
+            sx={{
+              width: 20,
+              height: 20,
+              border: '1px solid',
+              borderColor: 'background.paper',
+              position: 'absolute',
+              left: '50%',
+              top: '20%',
+              bottom: '20%',
+              transform: 'translateX(-50%)',
+            }}
+          >
+            {filteredMembers[1]?.[0] || ''}
+          </Avatar>
+          <Avatar
+            sx={{
+              width: 20,
+              height: 20,
+              border: '1px solid',
+              borderColor: 'background.paper',
+              position: 'absolute',
+              right: 0,
+              top: '20%',
+              bottom: '20%',
+            }}
+          >
+            {filteredMembers[2]?.[0] || ''}
+          </Avatar>
+        </Box>
+      );
+    }
+
+    // 4명 이상일 때: 4개 Avatar를 2x2 그리드로
+    return (
+      <Box
+        sx={{
+          position: 'relative',
+          width: 40,
+          height: 40,
+        }}
+      >
+        {/* 왼쪽 위 */}
+        <Avatar
+          sx={{
+            width: 20,
+            height: 20,
+            border: '1px solid',
+            borderColor: 'background.paper',
+            position: 'absolute',
+            left: 0,
+            top: 0,
+          }}
+        >
+          {filteredMembers[0]?.[0] || ''}
+        </Avatar>
+        {/* 오른쪽 위 */}
+        <Avatar
+          sx={{
+            width: 20,
+            height: 20,
+            border: '1px solid',
+            borderColor: 'background.paper',
+            position: 'absolute',
+            right: 0,
+            top: 0,
+          }}
+        >
+          {filteredMembers[1]?.[0] || ''}
+        </Avatar>
+        {/* 왼쪽 아래 */}
+        <Avatar
+          sx={{
+            width: 20,
+            height: 20,
+            border: '1px solid',
+            borderColor: 'background.paper',
+            position: 'absolute',
+            left: 0,
+            bottom: 0,
+          }}
+        >
+          {filteredMembers[2]?.[0] || ''}
+        </Avatar>
+        {/* 오른쪽 아래 */}
+        <Avatar
+          sx={{
+            width: 20,
+            height: 20,
+            border: '1px solid',
+            borderColor: 'background.paper',
+            position: 'absolute',
+            right: 0,
+            bottom: 0,
+          }}
+        >
+          {filteredMembers[3]?.[0] || ''}
+        </Avatar>
+      </Box>
+    );
+  };
 
   const UnreadBadge = ({ count }: { count: number }) => (
     <Box
@@ -86,9 +295,11 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom }: Pro
       {/* 헤더 */}
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ p: 2.5 }}>
         <Avatar sx={{ width: 48, height: 48 }} />
-        <IconButton size="small">
-          <Iconify icon="solar:add-circle-bold" width={24} />
-        </IconButton>
+        <Tooltip title="채팅방 만들기" arrow>
+          <IconButton size="small" onClick={() => setCreateModalOpen(true)}>
+            <Iconify icon="solar:add-circle-bold" width={24} />
+          </IconButton>
+        </Tooltip>
       </Stack>
 
       {/* 검색 */}
@@ -318,16 +529,21 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom }: Pro
                         onClick={() => onSelectRoom(room)}
                         sx={{ px: 2.5, py: 1.5 }}
                       >
-                        <ListItemAvatar>
-                          <Avatar sx={{ width: 40, height: 40 }} />
-                        </ListItemAvatar>
+                        <ListItemAvatar>{renderGroupAvatar(room.members)}</ListItemAvatar>
                         <ListItemText
                           primary={
                             <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: 14 }}>
-                              {room.members?.slice(0, 3).join(', ')}
-                              {room.members &&
-                                room.members.length > 3 &&
-                                ` 외 ${room.members.length - 3}명`}
+                              {(() => {
+                                const filteredMembers = getFilteredMembers(room.members);
+                                const displayMembers = filteredMembers.slice(0, 3);
+                                const remainingCount = filteredMembers.length - 3;
+                                return (
+                                  <>
+                                    {displayMembers.join(', ')}
+                                    {remainingCount > 0 && ` 외 ${remainingCount}명`}
+                                  </>
+                                );
+                              })()}
                             </Typography>
                           }
                           secondary={room.lastMessage}
@@ -356,6 +572,18 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom }: Pro
           )}
         </Box>
       </Scrollbar>
+
+      {/* 채팅방 만들기 모달 */}
+      <CreateChatRoomModal
+        open={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        onConfirm={(roomName, userIds) => {
+          // TODO: TanStack Query Hook(useMutation)으로 채팅방 생성 API 호출
+          // 생성 성공 후 채팅방 목록 갱신 및 새 채팅방 선택
+          console.log('채팅방 생성:', roomName, userIds);
+          setCreateModalOpen(false);
+        }}
+      />
     </Box>
   );
 }

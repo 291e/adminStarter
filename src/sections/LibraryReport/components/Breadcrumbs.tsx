@@ -38,7 +38,7 @@ export default function LibraryReportBreadcrumbs({
 
       <Stack direction="row" spacing={1}>
         {onCategorySettings && (
-          <Button variant="contained" color="primary" onClick={onCategorySettings}>
+          <Button variant="contained" color="info" onClick={onCategorySettings}>
             카테고리 설정
           </Button>
         )}

@@ -1,6 +1,16 @@
 // ----------------------------------------------------------------------
 // 각 문서 타입별 테이블 데이터 타입 정의
 
+// 1100번대: 위험요인 파악
+export type Table1100Row = {
+  highRiskWork: string; // 고위험작업 및 상황
+  disasterFactor: string; // 재해유발요인
+  workplace: string; // 작업장소
+  machineHazard: string; // 기계·기구·설비 유해인자
+  improvementNeeded: string; // 개선필요
+  remark: string; // 비고
+};
+
 // 1300번대: 위험 기계·기구·설비
 export type Table1300Row = {
   number: number; // 순번
@@ -140,11 +150,126 @@ export type Table2300Row = {
   done?: boolean; // 완료 확인
 };
 
+// 2400번대: 교육훈련 - TBM 일지
+export type Table2400TBMInspectionRow = {
+  inspectionContent: string; // 점검내용
+  result: string; // 결과
+};
+
+export type Table2400TBMEducationVideoRow = {
+  participant: InvestigationTeamMember | null; // 대상자
+  educationVideo: string; // 교육영상
+  signature: string; // 서명 (이미지 URL 또는 파일)
+};
+
+export type Table2400TBMData = {
+  inspectionRows: Table2400TBMInspectionRow[]; // 점검내용 테이블
+  educationContent: string; // 교육내용
+  educationVideoRows: Table2400TBMEducationVideoRow[]; // 교육영상 테이블
+};
+
+// 2400번대: 교육훈련 - 연간 교육 계획
+export type Table2400EducationRow = {
+  number: number; // 순번
+  educationType: '법정' | '자율'; // 교육구분
+  educationCourse: string; // 교육과정
+  scheduleMonths: boolean[]; // 일정 (1월~12월 체크박스, 12개)
+  targetCount: string; // 대상 인원(명)
+  educationMethod: string; // 교육방법 (내·외부)
+  remark: string; // 비고
+};
+
+// 2400번대: 교육훈련 - 최저 교육시간
+export type Table2400MinimumEducationRow = {
+  category: string; // 구분 (카테고리)
+  subCategory1: string; // 구분 (세부 - 위)
+  subCategory2: string; // 구분 (세부 - 아래)
+  subCategory3?: string; // 구분 (세부 - 위)
+  newEmployeeEducation1: string; // 신규교육 (위)
+  newEmployeeEducation2: string; // 신규교육 (아래)
+  newEmployeeEducation3?: string; // 신규교육 (위)
+  regularEducation1: string; // 정기교육/보수교육 (위)
+  regularEducation2: string; // 정기교육/보수교육 (아래)
+  regularEducation3?: string; // 정기교육/보수교육 (위)
+  workContentChange1: string; // 작업내용변경시(1회) (위)
+  workContentChange2: string; // 작업내용변경시(1회) (아래)
+  workContentChange3?: string; // 작업내용변경시(1회) (위)
+  specialEducation1: string; // 특별교육(채용시1회) (아래)
+  specialEducation2: string; // 특별교육(채용시1회) (아래)
+  specialEducation3?: string; // 특별교육(채용시1회) (위)
+};
+
+// 1200번대: 산업재해 및 아차사고 - 산업재해 작성
+export type InvestigationTeamMember = {
+  department: string; // 소속
+  name: string; // 성명
+};
+
+export type HumanDamage = {
+  department: string; // 소속
+  name: string; // 성명
+  position: string; // 직급
+  injury: string; // 상해부위/부상
+};
+
+export type Table1200IndustrialAccidentRow = {
+  accidentName: string; // 사고명
+  accidentDate: string; // 사고 일시 - 날짜
+  accidentTime: string; // 사고 일시 - 시간
+  accidentLocation: string; // 사고장소
+  accidentType: string; // 사고 형태
+  investigationTeam: InvestigationTeamMember[]; // 사고조사반
+  humanDamage: HumanDamage[]; // 인적피해
+  materialDamage: string; // 물적피해
+  accidentContent: string; // 사고내용
+  riskAssessmentBefore: {
+    possibility: string; // 가능성
+    severity: string; // 중대성
+    risk: string; // 위험성
+  };
+  accidentCause: string; // 사고원인
+  doctorOpinion: string; // 의사/외부 전문가 소견
+  preventionMeasure: string; // 재발방지 대책
+  riskAssessmentAfter: {
+    possibility: string; // 가능성
+    severity: string; // 중대성
+    risk: string; // 위험성
+  };
+  otherContent: string; // 기타내용 사고조사 내용
+  investigationImages: File[]; // 기타내용 사고조사 사진
+};
+
+export type Table1200RiskGrade = 'A' | 'B' | 'C';
+
+export type Table1200NearMissRow = {
+  workName: string; // 작업명
+  grade: Table1200RiskGrade; // 등급
+  reporter: string; // 신고자
+  reporterDepartment: string; // 소속
+  workContent: string; // 작업내용
+  accidentContent: string; // 사고내용
+  accidentRiskLevel: Table1200RiskGrade; // 사고내용 위험정도
+  accidentCause: string; // 발생원인
+  preventionMeasure: string; // 예방대책
+  preventionRiskLevel: Table1200RiskGrade; // 예방대책 위험정도
+  siteSituation: string; // 작업현장 상황 설명
+  siteImages: File[]; // 현장 이미지
+};
+
 // 통합 타입 (Union)
 export type DocumentTableData =
+  | { type: '1100'; rows: Table1100Row[] }
+  | { type: '1200-industrial'; rows: Table1200IndustrialAccidentRow[] }
+  | { type: '1200-near-miss'; row: Table1200NearMissRow }
   | { type: '1300'; rows: Table1300Row[] }
   | { type: '1400'; data: Table1400Data }
   | { type: '1500'; rows: Table1500Row[] }
   | { type: '2100'; data: Table2100Data }
   | { type: '2200'; rows: Table2200Row[] }
-  | { type: '2300'; rows: Table2300Row[] };
+  | { type: '2300'; rows: Table2300Row[] }
+  | { type: '2400-tbm'; data: Table2400TBMData }
+  | {
+      type: '2400-education';
+      rows: Table2400EducationRow[];
+      minimumEducationRows: Table2400MinimumEducationRow[];
+    };

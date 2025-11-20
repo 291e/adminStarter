@@ -13,8 +13,8 @@ import Button from '@mui/material/Button';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 import RemoveParticipantModal from './RemoveParticipantModal';
-// TODO: API 연동 시 현재 사용자 정보로 필터링하기 위해 사용
-// import { useAuthContext } from 'src/auth/hooks/use-auth-context';
+import InviteParticipantModal from './InviteParticipantModal';
+import { useAuthContext } from 'src/auth/hooks/use-auth-context';
 import type { ChatRoom } from 'src/_mock/_chat';
 
 type Participant = {
@@ -31,11 +31,22 @@ type Props = {
 };
 
 export default function ParticipantList({ room, participants, onInvite, onRemove }: Props) {
-  // TODO: API 연동 시 현재 사용자 정보로 필터링하기 위해 사용
-  // const { user } = useAuthContext();
+  const { user } = useAuthContext();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [removeModalOpen, setRemoveModalOpen] = useState(false);
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
+
+  // 현재 사용자 이름 (displayName 또는 name 사용)
+  const currentUserName = user?.displayName || user?.name || '';
+
+  // 실제 사람 이름인지 확인하는 함수 ("외", "명" 같은 텍스트 제외)
+  const isValidParticipantName = (name: string): boolean => {
+    if (!name || name.trim() === '') return false;
+    // "외", "명" 같은 단어가 포함된 경우 제외
+    if (name.includes('외') || name.includes('명')) return false;
+    return true;
+  };
 
   // 채팅방 타입에 따라 필터링된 참가자 목록
   // TODO: TanStack Query Hook(useQuery)으로 채팅방 타입별 참가자 목록 조회
@@ -77,42 +88,50 @@ export default function ParticipantList({ room, participants, onInvite, onRemove
 
   // 임시: 채팅방 타입에 따라 필터링 (실제로는 API에서 받아온 데이터 사용)
   const filteredParticipants = (() => {
-    if (!room) return participants;
+    // 본인 제외 및 유효한 참가자 이름만 필터링하는 함수
+    const excludeCurrentUser = (list: Participant[]) =>
+      list.filter(
+        (p) => isValidParticipantName(p.name) && p.name !== currentUserName && p.id !== user?.id
+      );
+
+    if (!room) return excludeCurrentUser(participants);
     if (room.type === 'chatbot') {
-      // 챗봇 채팅: 챗봇만 표시
-      return participants.filter((p) => p.name === '챗봇' || p.role === 'chatbot');
+      // 챗봇 채팅: 챗봇만 표시 (본인 제외)
+      return excludeCurrentUser(
+        participants.filter((p) => p.name === '챗봇' || p.role === 'chatbot')
+      );
     } else if (room.type === 'emergency') {
-      // 사고 발생 현황 채팅: 응급 담당자들만 표시 (조직 관리자, 관리 감독자, 안전보건 담당자)
-      return participants.filter(
-        (p) =>
-          p.role === '안전보건 담당자' ||
-          p.role === '관리 감독자' ||
-          p.role === '조직 관리자' ||
-          p.role === 'CEO' ||
-          p.role === 'CTO'
+      // 사고 발생 현황 채팅: 응급 담당자들만 표시 (조직 관리자, 관리 감독자, 안전보건 담당자) (본인 제외)
+      return excludeCurrentUser(
+        participants.filter(
+          (p) =>
+            p.role === '안전보건 담당자' ||
+            p.role === '관리 감독자' ||
+            p.role === '조직 관리자' ||
+            p.role === 'CEO' ||
+            p.role === 'CTO'
+        )
       );
     } else if (room.type === 'normal') {
-      // 일반 채팅(1대1): 채팅방 이름과 일치하는 참가자만 표시
-      // TODO: API에서 받아온 데이터에는 현재 사용자 정보가 포함되어 있으므로,
-      // user.id 또는 user.displayName과 비교하여 필터링
-      // const currentUserName = user?.displayName || user?.name || '';
-      // return participants.filter((p) => p.name !== currentUserName).slice(0, 1);
-
-      // 임시: 채팅방 이름(room.name)과 일치하는 참가자만 표시
-      // 예: room.name이 "홍길동"이면 "홍길동" 참가자만 표시
-      const matchedParticipant = participants.find((p) => p.name === room.name);
-      return matchedParticipant ? [matchedParticipant] : participants.slice(0, 1);
+      // 일반 채팅(1대1): 채팅방 이름과 일치하는 참가자만 표시 (본인 제외)
+      const matchedParticipant = participants.find(
+        (p) => p.name === room.name && p.name !== currentUserName && p.id !== user?.id
+      );
+      return matchedParticipant
+        ? [matchedParticipant]
+        : excludeCurrentUser(participants).slice(0, 1);
     } else {
-      // 그룹 채팅: 모든 참가자 표시
-      return participants;
+      // 그룹 채팅: 모든 참가자 표시 (본인 제외)
+      return excludeCurrentUser(participants);
     }
   })();
 
   // 사고 발생 현황 또는 챗봇 채팅인지 확인 (체크박스, 내보내기, 초대하기 버튼 숨김)
   const isEmergencyOrChatbot = room?.type === 'emergency' || room?.type === 'chatbot';
 
-  // 대화 상대가 1명일 때 프로필 형태로 표시 (일반 채팅 1대1)
-  const isSingleParticipant = filteredParticipants.length === 1 && room?.type === 'normal';
+  // 대화 상대가 1명일 때 프로필 형태로 표시 (일반 채팅 1대1 또는 챗봇)
+  const isSingleParticipant =
+    filteredParticipants.length === 1 && (room?.type === 'normal' || room?.type === 'chatbot');
 
   const handleToggleSelect = (participantId: string) => {
     setSelectedIds((prev) =>
@@ -134,6 +153,23 @@ export default function ParticipantList({ room, participants, onInvite, onRemove
       setSelectedIds([]);
     }
     setRemoveModalOpen(false);
+  };
+
+  const handleOpenInviteModal = () => {
+    setInviteModalOpen(true);
+  };
+
+  const handleCloseInviteModal = () => {
+    setInviteModalOpen(false);
+  };
+
+  const handleConfirmInvite = (userIds: string[]) => {
+    // TODO: TanStack Query Hook(useMutation)으로 채팅방에 참가자 초대 API 호출
+    // 초대 성공 후 onInvite 콜백 호출하여 참가자 목록 갱신
+    if (onInvite) {
+      onInvite();
+    }
+    handleCloseInviteModal();
   };
 
   const getParticipantId = (participant: Participant, idx: number) =>
@@ -171,7 +207,7 @@ export default function ParticipantList({ room, participants, onInvite, onRemove
             <Button
               variant="outlined"
               size="small"
-              onClick={onInvite}
+              onClick={handleOpenInviteModal}
               startIcon={<Iconify icon="solar:add-circle-bold" width={18} />}
               sx={{
                 minHeight: 30,
@@ -365,6 +401,14 @@ export default function ParticipantList({ room, participants, onInvite, onRemove
         room={room}
         participants={filteredParticipants}
         selectedParticipantIds={selectedIds}
+      />
+
+      {/* 초대하기 모달 */}
+      <InviteParticipantModal
+        open={inviteModalOpen}
+        onClose={handleCloseInviteModal}
+        onConfirm={handleConfirmInvite}
+        room={room}
       />
     </Box>
   );

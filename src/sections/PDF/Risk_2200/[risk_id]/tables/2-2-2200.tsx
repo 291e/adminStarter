@@ -47,7 +47,7 @@ export default function RiskAssessmentTable_2_2_2200({ data = [] }: Props) {
         <thead>
           <tr>
             <th style={{ width: '12%' }}>번호</th>
-            <th style={{ width: '22%' }}>위험 요인</th>
+            <th style={{ width: '22%' }}>유해·위험 요인</th>
             <th style={{ width: '22%' }}>제거·대체</th>
             <th style={{ width: '22%' }}>공학적 통제</th>
             <th style={{ width: '22%' }}>행정적 통제 / PPE</th>

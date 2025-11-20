@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useTheme } from '@mui/material/styles';
 import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
 import TextField from '@mui/material/TextField';
 import IconButton from '@mui/material/IconButton';
 import Button from '@mui/material/Button';
@@ -89,13 +88,10 @@ export default function Table2200Form({
   return (
     <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <Box sx={{ pb: 5, pt: 0, px: 0, width: '100%' }}>
-        <Box
-          component="table"
-          sx={tableStyle}
-        >
+        <Box component="table" sx={tableStyle}>
           <thead>
             <tr>
-              <th style={{ flex: 1 }}>위험요인</th>
+              <th style={{ flex: 1 }}>유해·위험요인</th>
               <th style={{ flex: 1 }}>제거·대체</th>
               <th style={{ flex: 1 }}>공학적 통제</th>
               <th style={{ flex: 1 }}>행정적 통제</th>
@@ -254,5 +250,3 @@ export default function Table2200Form({
     </Box>
   );
 }
-
-

@@ -88,11 +88,17 @@ export function EducationReportView({ title = '교육 이수 현황', descriptio
           const mandatoryRecords = mockMandatoryEducationRecords(10);
           const regularRecords = mockRegularEducationRecords(10);
 
+          // TODO: API에서 무재해 사업장 인증 여부 가져오기
+          // const isAccidentFreeWorkplace = await checkAccidentFreeWorkplace(row.organizationName);
+          // 목업: 일부 조직만 무재해 사업장으로 설정
+          const isAccidentFreeWorkplace = row.id.includes('1') || row.id.includes('3') || row.id.includes('5');
+
           setSelectedDetailData({
             report: row,
             mandatoryEducationRecords: mandatoryRecords,
             regularEducationRecords: regularRecords,
             joinDate: '2025-10-31',
+            isAccidentFreeWorkplace,
           });
           setDetailModalOpen(true);
         }}

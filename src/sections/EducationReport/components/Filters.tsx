@@ -35,11 +35,10 @@ export default function EducationReportFilters({
           onChange={(e) => onChangeRole(e.target.value)}
         >
           <MenuItem value="all">전체</MenuItem>
+          <MenuItem value="조직관리자">조직관리자</MenuItem>
+          <MenuItem value="관리감독자">관리감독자</MenuItem>
           <MenuItem value="안전보건 담당자">안전보건 담당자</MenuItem>
           <MenuItem value="근로자">근로자</MenuItem>
-          <MenuItem value="관리감독자">관리감독자</MenuItem>
-          <MenuItem value="조직관리자">조직관리자</MenuItem>
-          <MenuItem value="안전관리자">안전관리자</MenuItem>
         </Select>
       </FormControl>
 
@@ -52,10 +51,8 @@ export default function EducationReportFilters({
           onChange={(e) => onChangeSearchFilter(e.target.value)}
         >
           <MenuItem value="all">전체</MenuItem>
-          <MenuItem value="organizationName">조직명</MenuItem>
           <MenuItem value="name">이름</MenuItem>
           <MenuItem value="department">소속</MenuItem>
-          <MenuItem value="role">역할</MenuItem>
         </Select>
       </FormControl>
 
@@ -76,4 +73,3 @@ export default function EducationReportFilters({
     </Stack>
   );
 }
-

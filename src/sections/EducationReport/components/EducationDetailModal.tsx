@@ -30,6 +30,7 @@ export type EducationDetailData = {
   mandatoryEducationRecords: EducationRecord[];
   regularEducationRecords: EducationRecord[];
   joinDate?: string; // 입사일
+  isAccidentFreeWorkplace?: boolean; // 무재해 사업장 인증 여부
 };
 
 type Props = {
@@ -83,7 +84,13 @@ export default function EducationDetailModal({ open, onClose, onSave, data }: Pr
     return null;
   }
 
-  const { report, mandatoryEducationRecords, regularEducationRecords, joinDate } = data;
+  const {
+    report,
+    mandatoryEducationRecords,
+    regularEducationRecords,
+    joinDate,
+    isAccidentFreeWorkplace,
+  } = data;
 
   const mandatoryTotalPages = Math.ceil(mandatoryEducationRecords.length / rowsPerPage);
   const regularTotalPages = Math.ceil(regularEducationRecords.length / rowsPerPage);
@@ -308,7 +315,8 @@ export default function EducationDetailModal({ open, onClose, onSave, data }: Pr
                       // TODO: 페이지 변경 시 TanStack Query로 의무교육 목록 새로고침
                       // queryClient.invalidateQueries({ queryKey: ['mandatoryEducation', data?.report.id, page] });
                     }}
-                    color="primary"
+                    color="standard"
+                    size="small"
                   />
                 </Box>
               )}
@@ -445,7 +453,8 @@ export default function EducationDetailModal({ open, onClose, onSave, data }: Pr
                       // TODO: 페이지 변경 시 TanStack Query로 정기교육 목록 새로고침
                       // queryClient.invalidateQueries({ queryKey: ['regularEducation', data?.report.id, page] });
                     }}
-                    color="primary"
+                    color="standard"
+                    size="small"
                   />
                 </Box>
               )}
@@ -454,22 +463,78 @@ export default function EducationDetailModal({ open, onClose, onSave, data }: Pr
             {/* 이수 시간 요약 */}
             <Box
               sx={{
-                bgcolor: 'grey.50',
-                border: '1px solid',
-                borderColor: 'grey.200',
-                borderRadius: 1,
-                p: 1.5,
                 display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
+                alignItems: 'flex-end',
+                gap: 3,
+                pb: 2,
               }}
             >
-              <Typography variant="subtitle2" sx={{ fontSize: 14, fontWeight: 600 }}>
-                이수 시간
-              </Typography>
-              <Typography variant="body1" sx={{ fontSize: 16, fontWeight: 600 }}>
-                총 {totalTime}분
-              </Typography>
+              <Stack spacing={3} sx={{ minWidth: 300 }}>
+                <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                  <TextField
+                    label="현재 이수시간"
+                    value={totalTime}
+                    disabled
+                    size="small"
+                    sx={{
+                      flex: 1,
+                      '& .MuiInputBase-input': {
+                        fontSize: 15,
+                        fontWeight: 400,
+                      },
+                    }}
+                  />
+                  <Typography variant="subtitle2" sx={{ fontSize: 14, fontWeight: 600, mb: 0.5 }}>
+                    분
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                  <TextField
+                    label="이수 기준시간"
+                    value={report.standardEducation}
+                    disabled
+                    size="small"
+                    sx={{
+                      flex: 1,
+                      '& .MuiInputBase-input': {
+                        fontSize: 15,
+                        fontWeight: 400,
+                      },
+                    }}
+                  />
+                  <Typography variant="subtitle2" sx={{ fontSize: 14, fontWeight: 600, mb: 0.5 }}>
+                    분
+                  </Typography>
+                </Box>
+              </Stack>
+              {isAccidentFreeWorkplace && (
+                <Box
+                  sx={{
+                    display: 'flex',
+                    gap: 0.5,
+                    alignItems: 'center',
+                    pb: 2,
+                    pt: 3,
+                    px: 2.5,
+                  }}
+                >
+                  <Iconify
+                    icon="solar:info-circle-bold"
+                    width={16}
+                    sx={{ color: 'text.secondary' }}
+                  />
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      fontSize: 12,
+                      color: 'text.secondary',
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    무재해 사업장 감면 혜택이 적용되었습니다.
+                  </Typography>
+                </Box>
+              )}
             </Box>
           </Stack>
         </Stack>

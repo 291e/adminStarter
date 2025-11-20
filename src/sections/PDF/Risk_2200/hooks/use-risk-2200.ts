@@ -1,15 +1,18 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
+import type { Dayjs } from 'dayjs';
 import type { Risk_2200Row } from '../components/Table';
 
 // ----------------------------------------------------------------------
 
 export type UseRisk_2200Result = {
   // Filter state
-  filterType: string;
-  searchField: string;
+  dateFilterType: string; // 'registered' | 'written'
+  startDate: string | null;
+  endDate: string | null;
   searchValue: string;
-  onChangeFilterType: (value: string) => void;
-  onChangeSearchField: (value: string) => void;
+  onChangeDateFilterType: (value: string) => void;
+  onChangeStartDate: (value: Dayjs | null) => void;
+  onChangeEndDate: (value: Dayjs | null) => void;
   onChangeSearchValue: (value: string) => void;
 
   // Selection state
@@ -30,8 +33,9 @@ export type UseRisk_2200Result = {
 
 export function useRisk_2200(rows: Risk_2200Row[]): UseRisk_2200Result {
   // Filter state
-  const [filterType, setFilterType] = useState('all');
-  const [searchField, setSearchField] = useState('title');
+  const [dateFilterType, setDateFilterType] = useState('registered');
+  const [startDate, setStartDate] = useState<string | null>(null);
+  const [endDate, setEndDate] = useState<string | null>(null);
   const [searchValue, setSearchValue] = useState('');
 
   // Selection state
@@ -41,33 +45,50 @@ export function useRisk_2200(rows: Risk_2200Row[]): UseRisk_2200Result {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
+  const onChangeStartDate = useCallback((value: Dayjs | null) => {
+    setStartDate(value ? value.format('YYYY-MM-DD') : null);
+    setPage(0);
+  }, []);
+
+  const onChangeEndDate = useCallback((value: Dayjs | null) => {
+    setEndDate(value ? value.format('YYYY-MM-DD') : null);
+    setPage(0);
+  }, []);
+
   // Filtered data
   const filtered = useMemo(() => {
     let result = [...rows];
 
-    // Filter by type
-    if (filterType !== 'all') {
-      // 필터 타입에 따른 필터링 로직 추가 가능
-    }
-
-    // Search
-    if (searchValue) {
+    // 날짜 필터
+    if (startDate || endDate) {
       result = result.filter((row) => {
-        if (searchField === 'title') {
-          return row.documentName.toLowerCase().includes(searchValue.toLowerCase());
+        const dateToCompare =
+          dateFilterType === 'registered' ? row.registeredAt : row.writtenAt;
+        const dateStr = dateToCompare.split(' ')[0]; // YYYY-MM-DD 부분만 추출
+
+        if (startDate && dateStr < startDate) {
+          return false;
         }
-        if (searchField === 'organization') {
-          return row.organizationName.toLowerCase().includes(searchValue.toLowerCase());
-        }
-        if (searchField === 'documentNumber') {
-          return row.id.toLowerCase().includes(searchValue.toLowerCase());
+        if (endDate && dateStr > endDate) {
+          return false;
         }
         return true;
       });
     }
 
+    // 검색어 필터
+    if (searchValue) {
+      const searchLower = searchValue.toLowerCase();
+      result = result.filter(
+        (row) =>
+          row.documentName.toLowerCase().includes(searchLower) ||
+          row.organizationName.toLowerCase().includes(searchLower) ||
+          row.id.toLowerCase().includes(searchLower)
+      );
+    }
+
     return result;
-  }, [rows, filterType, searchField, searchValue]);
+  }, [rows, dateFilterType, startDate, endDate, searchValue]);
 
   // Paginated data
   const paginated = useMemo(() => {
@@ -75,34 +96,45 @@ export function useRisk_2200(rows: Risk_2200Row[]): UseRisk_2200Result {
     return filtered.slice(start, start + rowsPerPage);
   }, [filtered, page, rowsPerPage]);
 
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedIds(paginated.map((row) => row.id));
-    } else {
-      setSelectedIds([]);
-    }
-  };
+  const handleSelectAll = useCallback(
+    (checked: boolean) => {
+      if (checked) {
+        setSelectedIds(paginated.map((row) => row.id));
+      } else {
+        setSelectedIds([]);
+      }
+    },
+    [paginated]
+  );
 
-  const handleSelectRow = (id: string) => {
+  const handleSelectRow = useCallback((id: string) => {
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
-  };
+  }, []);
 
   return {
-    filterType,
-    searchField,
+    dateFilterType,
+    startDate,
+    endDate,
     searchValue,
-    onChangeFilterType: setFilterType,
-    onChangeSearchField: setSearchField,
-    onChangeSearchValue: setSearchValue,
+    onChangeDateFilterType: (value: string) => {
+      setDateFilterType(value);
+      setPage(0);
+    },
+    onChangeStartDate,
+    onChangeEndDate,
+    onChangeSearchValue: (value: string) => {
+      setSearchValue(value);
+      setPage(0);
+    },
     selectedIds,
     onSelectAll: handleSelectAll,
     onSelectRow: handleSelectRow,
     page,
     rowsPerPage,
     onChangePage: setPage,
-    onChangeRowsPerPage: (newRowsPerPage) => {
+    onChangeRowsPerPage: (newRowsPerPage: number) => {
       setRowsPerPage(newRowsPerPage);
       setPage(0);
     },

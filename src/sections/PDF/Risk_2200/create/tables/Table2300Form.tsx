@@ -9,18 +9,29 @@ import FormControl from '@mui/material/FormControl';
 import IconButton from '@mui/material/IconButton';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
+import InputAdornment from '@mui/material/InputAdornment';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs, { type Dayjs } from 'dayjs';
 
 import { Iconify } from 'src/components/iconify';
-import type { Table2300Row } from '../../types/table-data';
+import type { Table2300Row, InvestigationTeamMember } from '../../types/table-data';
+import InvestigationTeamSelectModal from './modal/InvestigationTeamSelectModal';
+import type { RiskAssessmentData } from '../../components/RiskAssessmentSettingModal';
 
 // ----------------------------------------------------------------------
 
 // 구분 옵션
-const DIVISION_OPTIONS = ['물리적', '화학적', '생물학적', '인간공학적'] as const;
+const DIVISION_OPTIONS = [
+  '기계적 요인',
+  '전기적 요인',
+  '화학적 요인',
+  '물리적 요인',
+  '생물학적 요인',
+  '인간공학적 요인',
+  '작업환경 요인',
+] as const;
 
 // 위험성 옵션
 const RISK_LEVEL_OPTIONS = [
@@ -48,6 +59,7 @@ type Props = {
   onRowDelete: (index: number) => void;
   onRowMove: (fromIndex: number, toIndex: number) => void;
   onAddRow: () => void;
+  riskAssessmentData: RiskAssessmentData;
 };
 
 export default function Table2300Form({
@@ -56,6 +68,7 @@ export default function Table2300Form({
   onRowDelete,
   onRowMove,
   onAddRow,
+  riskAssessmentData,
 }: Props) {
   const theme = useTheme();
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -64,6 +77,7 @@ export default function Table2300Form({
   const [openCompletedDatePicker, setOpenCompletedDatePicker] = useState<{
     [key: number]: boolean;
   }>({});
+  const [ownerModalIndex, setOwnerModalIndex] = useState<number | null>(null);
 
   const handleDragStart = (index: number) => {
     setDraggedIndex(index);
@@ -94,6 +108,15 @@ export default function Table2300Form({
     setDragOverIndex(null);
   };
 
+  // 위험도 값에 따라 해당하는 label 찾기
+  const getRiskLabel = (riskValue: number): string => {
+    const enabledRanges = riskAssessmentData.riskRanges.filter((range) => range.enabled);
+    const matchingRange = enabledRanges.find(
+      (range) => riskValue >= range.min && riskValue <= range.max
+    );
+    return matchingRange ? matchingRange.label : '';
+  };
+
   const handleRiskChange = (
     index: number,
     field: 'currentRisk' | 'postRisk',
@@ -107,15 +130,31 @@ export default function Table2300Form({
       [subField]: subField === 'value' ? (value as number) : (value as string),
     };
 
-    // value가 변경되면 label도 자동 업데이트
+    // value가 변경되면 위험도 설정 데이터를 사용하여 label 자동 업데이트
     if (subField === 'value') {
-      const riskOption = RISK_LEVEL_OPTIONS.find((opt) => opt.value === value);
-      if (riskOption) {
-        newRiskData.label = riskOption.label;
-      }
+      const riskLabel = getRiskLabel(value as number);
+      newRiskData.label = riskLabel;
     }
 
     onRowChange(index, field, newRiskData);
+  };
+
+  const handleOpenOwnerModal = (index: number) => {
+    setOwnerModalIndex(index);
+  };
+
+  const handleCloseOwnerModal = () => {
+    setOwnerModalIndex(null);
+  };
+
+  const handleOwnerSearchConfirm = (members: InvestigationTeamMember[]) => {
+    if (ownerModalIndex !== null) {
+      const selected = members[0];
+      if (selected) {
+        onRowChange(ownerModalIndex, 'owner', selected.name);
+      }
+    }
+    handleCloseOwnerModal();
   };
 
   const tableStyle = {
@@ -135,13 +174,9 @@ export default function Table2300Form({
       fontSize: 14,
       fontWeight: 600,
       lineHeight: '22px',
-      height: 60,
     },
     '& td': {
       padding: '4px',
-    },
-    '& tbody tr': {
-      height: 96,
     },
   };
 
@@ -152,34 +187,28 @@ export default function Table2300Form({
           <Box component="table" sx={tableStyle}>
             <thead>
               <tr style={{ height: 60 }}>
-                <th rowSpan={2} style={{ width: 46 }}>
-                  번호
+                <th rowSpan={2} style={{ width: 126 }}>
+                  구분
                 </th>
-                <th colSpan={3} style={{ width: 260 }}>
-                  유해위험요인 파악
+                <th colSpan={2} style={{ width: 164 }}>
+                  유해·위험요인 파악
                 </th>
-                <th rowSpan={2} style={{ width: 94 }}>
+                <th colSpan={1} style={{ width: 200 }}>
                   관련근거
                 </th>
-                <th rowSpan={2} style={{ width: 182 }}>
-                  법규/노출기준 등
-                </th>
-                <th colSpan={2} style={{ width: 94 }}>
+                <th rowSpan={2} style={{ width: 92 }}>
                   현재 위험성
                 </th>
                 <th colSpan={2} style={{ width: 182 }}>
                   감소대책
                 </th>
-                <th rowSpan={2} style={{ width: 83 }}>
-                  감소 대책 세부내용
-                </th>
-                <th colSpan={2} style={{ width: 73 }}>
+                <th rowSpan={2} style={{ width: 80 }}>
                   개선후 위험성
                 </th>
-                <th rowSpan={2} style={{ width: 113 }}>
+                <th rowSpan={2} style={{ width: 73 }}>
                   담당자
                 </th>
-                <th rowSpan={2} style={{ width: 117 }}>
+                <th rowSpan={2} style={{ width: 113 }}>
                   조치요구일
                 </th>
                 <th rowSpan={2} style={{ width: 117 }}>
@@ -196,15 +225,11 @@ export default function Table2300Form({
                 </th>
               </tr>
               <tr style={{ height: 60 }}>
-                <th style={{ width: 80 }}>분류</th>
                 <th style={{ width: 80 }}>원인</th>
-                <th style={{ width: 100 }}>유해위험요인</th>
-                <th style={{ width: 44 }}>값</th>
-                <th style={{ width: 138 }}>라벨</th>
-                <th style={{ width: 44 }}>NO</th>
-                <th style={{ width: 138 }}>세부내용</th>
-                <th style={{ width: 44 }}>값</th>
-                <th style={{ width: 73 }}>라벨</th>
+                <th style={{ width: 120 }}>유해·위험요인</th>
+                <th style={{ width: 120 }}>법규/노출기준 등</th>
+                <th style={{ width: 80 }}>NO</th>
+                <th style={{ width: 73 }}>세부내용</th>
               </tr>
             </thead>
             <tbody>
@@ -226,20 +251,29 @@ export default function Table2300Form({
                     cursor: 'move',
                   }}
                 >
-                  <td>{index + 1}</td>
                   <td>
-                    <TextField
-                      size="small"
-                      value={row.category}
-                      onChange={(e) => onRowChange(index, 'category', e.target.value)}
-                      fullWidth
-                      sx={{
-                        '& .MuiOutlinedInput-root': {
+                    <FormControl size="small" fullWidth>
+                      <Select
+                        value={row.division || ''}
+                        onChange={(e) => onRowChange(index, 'division', e.target.value)}
+                        displayEmpty
+                        sx={{
                           fontSize: 14,
-                          height: 'auto',
-                        },
-                      }}
-                    />
+                          '& .MuiSelect-select': {
+                            py: 1,
+                          },
+                        }}
+                      >
+                        <MenuItem value="" sx={{ fontSize: 14 }}>
+                          <em />
+                        </MenuItem>
+                        {DIVISION_OPTIONS.map((option) => (
+                          <MenuItem key={option} value={option} sx={{ fontSize: 14 }}>
+                            {option}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
                   </td>
                   <td>
                     <TextField
@@ -272,26 +306,6 @@ export default function Table2300Form({
                     />
                   </td>
                   <td>
-                    <FormControl size="small" fullWidth>
-                      <Select
-                        value={row.division}
-                        onChange={(e) => onRowChange(index, 'division', e.target.value)}
-                        sx={{
-                          fontSize: 14,
-                          '& .MuiSelect-select': {
-                            py: 1,
-                          },
-                        }}
-                      >
-                        {DIVISION_OPTIONS.map((option) => (
-                          <MenuItem key={option} value={option}>
-                            {option}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </td>
-                  <td>
                     <TextField
                       size="small"
                       value={row.reference}
@@ -306,56 +320,45 @@ export default function Table2300Form({
                     />
                   </td>
                   <td>
-                    <TextField
-                      size="small"
-                      value={row.law}
-                      onChange={(e) => onRowChange(index, 'law', e.target.value)}
-                      fullWidth
-                      sx={{
-                        '& .MuiOutlinedInput-root': {
-                          fontSize: 14,
-                          height: 'auto',
-                        },
-                      }}
-                    />
-                  </td>
-                  <td>
-                    <FormControl size="small" fullWidth>
-                      <Select
-                        value={row.currentRisk.value || ''}
-                        onChange={(e) =>
-                          handleRiskChange(index, 'currentRisk', 'value', Number(e.target.value))
-                        }
-                        sx={{
-                          fontSize: 14,
-                          '& .MuiSelect-select': {
-                            py: 1,
-                          },
-                        }}
-                      >
-                        {RISK_LEVEL_OPTIONS.map((option) => (
-                          <MenuItem key={option.value} value={option.value}>
-                            {option.value}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </td>
-                  <td>
-                    <TextField
-                      size="small"
-                      value={row.currentRisk.label || ''}
-                      onChange={(e) =>
-                        handleRiskChange(index, 'currentRisk', 'label', e.target.value)
-                      }
-                      fullWidth
-                      sx={{
-                        '& .MuiOutlinedInput-root': {
-                          fontSize: 14,
-                          height: 'auto',
-                        },
-                      }}
-                    />
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                      <FormControl fullWidth size="small">
+                        <Select
+                          value={row.currentRisk.value || RISK_LEVEL_OPTIONS[0].value}
+                          onChange={(e) => {
+                            const riskValue = Number(e.target.value);
+                            if (riskValue) {
+                              handleRiskChange(index, 'currentRisk', 'value', riskValue);
+                            }
+                          }}
+                          sx={{
+                            fontSize: 14,
+                            height: 'auto',
+                            '& .MuiSelect-select': {
+                              py: 1,
+                            },
+                          }}
+                        >
+                          {RISK_LEVEL_OPTIONS.map((option) => (
+                            <MenuItem key={option.value} value={option.value} sx={{ fontSize: 14 }}>
+                              {option.value}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                      {(row.currentRisk.value || RISK_LEVEL_OPTIONS[0].value) &&
+                        (row.currentRisk.label || getRiskLabel(RISK_LEVEL_OPTIONS[0].value)) && (
+                          <Typography
+                            sx={{
+                              fontSize: 12,
+                              fontWeight: 400,
+                              color: 'text.secondary',
+                              textAlign: 'center',
+                            }}
+                          >
+                            ({row.currentRisk.label || getRiskLabel(RISK_LEVEL_OPTIONS[0].value)})
+                          </Typography>
+                        )}
+                    </Box>
                   </td>
                   <td>
                     <TextField
@@ -386,56 +389,45 @@ export default function Table2300Form({
                     />
                   </td>
                   <td>
-                    <TextField
-                      size="small"
-                      value={row.reductionDetail}
-                      onChange={(e) => onRowChange(index, 'reductionDetail', e.target.value)}
-                      fullWidth
-                      multiline
-                      maxRows={3}
-                      sx={{
-                        '& .MuiOutlinedInput-root': {
-                          fontSize: 14,
-                          height: 'auto',
-                        },
-                      }}
-                    />
-                  </td>
-                  <td>
-                    <FormControl size="small" fullWidth>
-                      <Select
-                        value={row.postRisk.value || ''}
-                        onChange={(e) =>
-                          handleRiskChange(index, 'postRisk', 'value', Number(e.target.value))
-                        }
-                        sx={{
-                          fontSize: 14,
-                          '& .MuiSelect-select': {
-                            py: 1,
-                          },
-                        }}
-                      >
-                        {RISK_LEVEL_OPTIONS.map((option) => (
-                          <MenuItem key={option.value} value={option.value}>
-                            {option.value}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </td>
-                  <td>
-                    <TextField
-                      size="small"
-                      value={row.postRisk.label || ''}
-                      onChange={(e) => handleRiskChange(index, 'postRisk', 'label', e.target.value)}
-                      fullWidth
-                      sx={{
-                        '& .MuiOutlinedInput-root': {
-                          fontSize: 14,
-                          height: 'auto',
-                        },
-                      }}
-                    />
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                      <FormControl fullWidth size="small">
+                        <Select
+                          value={row.postRisk.value || RISK_LEVEL_OPTIONS[0].value}
+                          onChange={(e) => {
+                            const riskValue = Number(e.target.value);
+                            if (riskValue) {
+                              handleRiskChange(index, 'postRisk', 'value', riskValue);
+                            }
+                          }}
+                          sx={{
+                            fontSize: 14,
+                            height: 'auto',
+                            '& .MuiSelect-select': {
+                              py: 1,
+                            },
+                          }}
+                        >
+                          {RISK_LEVEL_OPTIONS.map((option) => (
+                            <MenuItem key={option.value} value={option.value} sx={{ fontSize: 14 }}>
+                              {option.value}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                      {(row.postRisk.value || RISK_LEVEL_OPTIONS[0].value) &&
+                        (row.postRisk.label || getRiskLabel(RISK_LEVEL_OPTIONS[0].value)) && (
+                          <Typography
+                            sx={{
+                              fontSize: 12,
+                              fontWeight: 400,
+                              color: 'text.secondary',
+                              textAlign: 'center',
+                            }}
+                          >
+                            ({row.postRisk.label || getRiskLabel(RISK_LEVEL_OPTIONS[0].value)})
+                          </Typography>
+                        )}
+                    </Box>
                   </td>
                   <td>
                     <TextField
@@ -447,7 +439,17 @@ export default function Table2300Form({
                         '& .MuiOutlinedInput-root': {
                           fontSize: 14,
                           height: 'auto',
+                          p: 0,
                         },
+                      }}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton color="inherit" onClick={() => handleOpenOwnerModal(index)}>
+                              <Iconify icon="eva:search-fill" />
+                            </IconButton>
+                          </InputAdornment>
+                        ),
                       }}
                     />
                   </td>
@@ -603,6 +605,15 @@ export default function Table2300Form({
             항목추가
           </Button>
         </Box>
+
+        {rows.map((row, index) => (
+          <InvestigationTeamSelectModal
+            key={`owner-${index}`}
+            open={ownerModalIndex === index}
+            onClose={handleCloseOwnerModal}
+            onConfirm={handleOwnerSearchConfirm}
+          />
+        ))}
       </Box>
     </LocalizationProvider>
   );

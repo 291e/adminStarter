@@ -1,8 +1,7 @@
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import TextField from '@mui/material/TextField';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import dayjs, { type Dayjs } from 'dayjs';
+import { type Dayjs } from 'dayjs';
 
 // ----------------------------------------------------------------------
 
@@ -38,6 +37,9 @@ export default function DocumentInfo({
         display: 'flex',
         flexDirection: 'column',
         gap: 3,
+        borderRadius: 2,
+        borderBottomLeftRadius: 0,
+        borderBottomRightRadius: 0,
       }}
     >
       {/* 문서번호, 작성 IP */}
@@ -142,4 +144,3 @@ export default function DocumentInfo({
     </Box>
   );
 }
-

@@ -8,9 +8,11 @@ import MenuItem from '@mui/material/MenuItem';
 import FormControl from '@mui/material/FormControl';
 import IconButton from '@mui/material/IconButton';
 import Button from '@mui/material/Button';
+import InputAdornment from '@mui/material/InputAdornment';
 
 import { Iconify } from 'src/components/iconify';
 import type { Table1300Row } from '../../types/table-data';
+import MachineEquipmentSelectModal from './modal/MachineEquipmentSelectModal';
 
 // ----------------------------------------------------------------------
 
@@ -49,6 +51,7 @@ export default function Table1300Form({
   const theme = useTheme();
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [modalOpenIndex, setModalOpenIndex] = useState<number | null>(null);
 
   const handleDragStart = (index: number) => {
     setDraggedIndex(index);
@@ -78,6 +81,50 @@ export default function Table1300Form({
     setDraggedIndex(null);
     setDragOverIndex(null);
   };
+
+  const handleOpenModal = (index: number) => {
+    setModalOpenIndex(index);
+  };
+
+  const handleCloseModal = () => {
+    setModalOpenIndex(null);
+  };
+
+  const handleModalConfirm = (
+    index: number,
+    data: {
+      name: string;
+      id: string;
+      capacity: string;
+      location: string;
+      quantity: string;
+      inspectionTarget: string;
+      safetyDevice: string;
+      inspectionCycle: string;
+      accidentForm: string;
+      remark: string;
+    }
+  ) => {
+    onRowChange(index, 'name', data.name);
+    onRowChange(index, 'id', data.id);
+    onRowChange(index, 'capacity', data.capacity);
+    onRowChange(index, 'location', data.location);
+    // quantity는 number 또는 string이 될 수 있으므로 변환
+    const quantityValue =
+      data.quantity === ''
+        ? ''
+        : Number.isNaN(Number(data.quantity))
+          ? data.quantity
+          : Number(data.quantity);
+    onRowChange(index, 'quantity', quantityValue);
+    onRowChange(index, 'inspectionTarget', data.inspectionTarget || '산업안전보건법');
+    onRowChange(index, 'safetyDevice', data.safetyDevice);
+    onRowChange(index, 'inspectionCycle', data.inspectionCycle);
+    onRowChange(index, 'accidentForm', data.accidentForm);
+    onRowChange(index, 'remark', data.remark);
+    handleCloseModal();
+  };
+
   return (
     <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <Box sx={{ pb: 5, pt: 0, px: 0, width: '100%' }}>
@@ -110,11 +157,7 @@ export default function Table1300Form({
           <thead>
             <tr>
               <th style={{ width: 48 }}>순번</th>
-              <th style={{ width: 110 }}>
-                기계.기구.
-                <br />
-                설비명
-              </th>
+              <th style={{ width: 160 }}>기계.기구. 설비명</th>
               <th style={{ width: 96 }}>관리번호</th>
               <th style={{ width: 88 }}>용량</th>
               <th style={{ width: 96 }}>
@@ -173,6 +216,19 @@ export default function Table1300Form({
                     value={row.name}
                     onChange={(e) => onRowChange(index, 'name', e.target.value)}
                     fullWidth
+                    InputProps={{
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleOpenModal(index)}
+                            sx={{ p: 0.5 }}
+                          >
+                            <Iconify icon="eva:search-fill" width={18} />
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    }}
                     sx={{
                       '& .MuiOutlinedInput-root': {
                         fontSize: 14,
@@ -275,7 +331,7 @@ export default function Table1300Form({
                   ) : (
                     <FormControl fullWidth size="small">
                       <Select
-                        value={row.inspectionTarget || ''}
+                        value={row.inspectionTarget || '산업안전보건법'}
                         onChange={(e) => onRowChange(index, 'inspectionTarget', e.target.value)}
                         displayEmpty
                         sx={{
@@ -380,14 +436,8 @@ export default function Table1300Form({
                     sx={{
                       bgcolor: 'error.main',
                       color: 'error.contrastText',
-                      minHeight: 30,
                       fontSize: 13,
                       fontWeight: 700,
-                      px: 1,
-                      py: 0.5,
-                      '&:hover': {
-                        bgcolor: 'error.dark',
-                      },
                     }}
                   >
                     삭제
@@ -416,6 +466,28 @@ export default function Table1300Form({
           항목추가
         </Button>
       </Box>
+
+      {/* 기계·설비 검색 모달 */}
+      {rows.map((row, index) => (
+        <MachineEquipmentSelectModal
+          key={row.number}
+          open={modalOpenIndex === index}
+          onClose={handleCloseModal}
+          onConfirm={(data) => handleModalConfirm(index, data)}
+          initialData={{
+            name: row.name,
+            id: row.id,
+            capacity: row.capacity,
+            location: row.location,
+            quantity: typeof row.quantity === 'number' ? String(row.quantity) : row.quantity,
+            inspectionTarget: row.inspectionTarget || '산업안전보건법',
+            safetyDevice: row.safetyDevice,
+            inspectionCycle: row.inspectionCycle,
+            accidentForm: row.accidentForm,
+            remark: row.remark,
+          }}
+        />
+      ))}
     </Box>
   );
 }

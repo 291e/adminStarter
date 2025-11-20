@@ -5,6 +5,17 @@ import html2canvas from 'html2canvas';
 
 export async function generatePDF(element: HTMLElement, filename: string): Promise<void> {
   try {
+    // PDF 생성 시 "서명 추가" 버튼 숨기기
+    const signatureButtons = element.querySelectorAll('button');
+    const hiddenButtons: HTMLElement[] = [];
+    signatureButtons.forEach((button) => {
+      const buttonText = button.textContent?.trim();
+      if (buttonText === '서명 추가') {
+        button.style.display = 'none';
+        hiddenButtons.push(button);
+      }
+    });
+
     // PNG signature 오류 방지를 위한 추가 옵션 (더 높은 해상도)
     const canvas = await html2canvas(element, {
       scale: 3, // 해상도 향상 (2 → 3)
@@ -93,8 +104,21 @@ export async function generatePDF(element: HTMLElement, filename: string): Promi
     }
 
     pdf.save(filename);
+
+    // PDF 생성 후 버튼 다시 표시
+    hiddenButtons.forEach((button) => {
+      button.style.display = '';
+    });
   } catch (error) {
     console.error('PDF 생성 중 오류가 발생했습니다:', error);
+    // 에러 발생 시에도 버튼 다시 표시
+    const signatureButtons = element.querySelectorAll('button');
+    signatureButtons.forEach((button) => {
+      const buttonText = button.textContent?.trim();
+      if (buttonText === '서명 추가') {
+        button.style.display = '';
+      }
+    });
     throw error;
   }
 }

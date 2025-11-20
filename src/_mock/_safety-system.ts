@@ -2,12 +2,11 @@ import { fSub } from 'src/utils/format-time';
 
 import type {
   DocumentTableData,
-  Table1300Row,
-  Table1400Data,
-  Table1500Row,
-  Table2100Data,
-  Table2200Row,
-  Table2300Row,
+  Table1200IndustrialAccidentRow,
+  Table1200NearMissRow,
+  Table2400TBMData,
+  Table2400EducationRow,
+  Table2400MinimumEducationRow,
 } from 'src/sections/PDF/Risk_2200/types/table-data';
 
 // ----------------------------------------------------------------------
@@ -410,9 +409,335 @@ export type DocumentTableDataRecord = {
   tableData: DocumentTableData;
 };
 
+// 고정된 최저 교육시간 데이터
+export const FIXED_MINIMUM_EDUCATION_ROWS: Table2400MinimumEducationRow[] = [
+  {
+    category: '근로자',
+    subCategory1: '일반',
+    subCategory2: '일용',
+    newEmployeeEducation1: '8시간',
+    newEmployeeEducation2: '',
+    regularEducation1: '(일반) 분기별 6시간 \n(사무직) 분기별 3시간 \n(관리감독자) 연 16시간',
+    regularEducation2: '-',
+    workContentChange1: '2시간',
+    workContentChange2: '1시간',
+    specialEducation1: '16시간',
+    specialEducation2: '2시간',
+  },
+
+  {
+    category: '특수고용',
+    subCategory1: '일반',
+    subCategory2: '단기·간헐',
+    newEmployeeEducation1: '2시간',
+    newEmployeeEducation2: '1시간',
+    regularEducation1: '-',
+    regularEducation2: '-',
+    workContentChange1: '-',
+    workContentChange2: '-',
+    specialEducation1: '16시간',
+    specialEducation2: '2시간',
+  },
+
+  {
+    category: '안전보건 \n업무 담당자',
+    subCategory1: '안전보건관리 \n책임자',
+    subCategory2: '안전관리자/ \n보건관리자',
+    subCategory3: '안전보건 \n관리담당자',
+    newEmployeeEducation1: '6시간 이상',
+    newEmployeeEducation2: '34시간 이상',
+    newEmployeeEducation3: '-',
+    regularEducation1: '6시간 이상(2년 주기)',
+    regularEducation2: '24시간 이상(2년 주기)',
+    regularEducation3: '8시간 이상(2년 주기)',
+    workContentChange1: '-',
+    workContentChange2: '-',
+    workContentChange3: '-',
+    specialEducation1: '-',
+    specialEducation2: '-',
+    specialEducation3: '-',
+  },
+];
+
 // 각 문서 타입별로 5개씩 다른 테이블 데이터 생성
 function generateDocumentTableData(): DocumentTableDataRecord[] {
   const records: DocumentTableDataRecord[] = [];
+
+  // 1100번대: 위험요인 파악 (safetyIdx=1, itemNumber=1)
+  // 문서 1
+  records.push({
+    documentId: '1-1-1',
+    tableData: {
+      type: '1100',
+      rows: [
+        {
+          highRiskWork: '기계⋅설비 정비, 수리, 교체, 청소 등 비정형 작업',
+          disasterFactor:
+            '작업 중 기계⋅기구에 안전장치(방호장치 등) 미설치·미흡·무효화 8대 위험요인\n정비, 수리, 교체 및 청소 등의 작업 시 설비⋅기계의 운전 정지 미실시',
+          workplace: '1공장',
+          machineHazard: '프레스',
+          improvementNeeded: '안전장치 설치',
+          remark: '긴급 조치 필요',
+        },
+        {
+          highRiskWork: '크레인 취급 작업 (이동식크레인 포함)',
+          disasterFactor:
+            '중량물, 시설 등에 의한 크레인 조작자 시야 미확보 8대 위험요인\n작업자(작업지휘자와 크레인 조작자 등) 간 신호방법 지정·실시 미흡 8대 위험요인',
+          workplace: '2공장',
+          machineHazard: '크레인',
+          improvementNeeded: '신호 방법 표준화',
+          remark: '교육 실시',
+        },
+      ],
+    },
+  });
+
+  // 문서 2
+  records.push({
+    documentId: '1-1-2',
+    tableData: {
+      type: '1100',
+      rows: [
+        {
+          highRiskWork: '용접, 절단 작업',
+          disasterFactor:
+            '용접·절단 작업 시 화재·폭발 위험 예방조치 미실시\n유해가스·분진 발생 작업 시 국소배기장치 미설치·미흡',
+          workplace: '2공장',
+          machineHazard: '용접기',
+          improvementNeeded: '배기장치 설치',
+          remark: '환기 개선 필요',
+        },
+        {
+          highRiskWork: '밀폐공간 작업',
+          disasterFactor:
+            '밀폐공간 내 작업 시 산소결핍 또는 유해 가스에 의한 질식·중독 위험 예방조치 미실시 (적정공기: 산소농도 18~23.5%, 탄산가스농도 1.5%미만, 황화수소 10ppm미만 등)',
+          workplace: '지하 저장소',
+          machineHazard: '저장탱크',
+          improvementNeeded: '가스 검지기 설치',
+          remark: '작업 허가제 도입',
+        },
+      ],
+    },
+  });
+
+  // 문서 3
+  records.push({
+    documentId: '1-1-3',
+    tableData: {
+      type: '1100',
+      rows: [
+        {
+          highRiskWork: '재료가공기계 작업(프레스, 절단기, 전단기, 분쇄⋅파쇄기, 공작기계 등)',
+          disasterFactor:
+            '작업 중 기계⋅기구에 안전장치(방호장치 등) 미설치·미흡·무효화 8대 위험요인\n가동 중인 설비 인근에서 작업 시 끼임, 부딪힘 등 위험 예방조치를 위한 충분한 작업 공간 확보 미실시',
+          workplace: '1공장',
+          machineHazard: '프레스, 절단기',
+          improvementNeeded: '방호덮개 설치',
+          remark: '안전교육 실시',
+        },
+      ],
+    },
+  });
+
+  // 문서 4
+  records.push({
+    documentId: '1-1-4',
+    tableData: {
+      type: '1100',
+      rows: [
+        {
+          highRiskWork: '사다리 이용 통행 및 작업',
+          disasterFactor:
+            '추락의 위험이 있는 장소에서 정비·수리 등의 작업 시 추락위험 방지조치 미실시',
+          workplace: '본관 외벽',
+          machineHazard: '사다리',
+          improvementNeeded: '안전난간 설치',
+          remark: '작업 허가 필요',
+        },
+        {
+          highRiskWork: '중량물 적재⋅이동 등 인력취급 작업 (크레인, 지게차 등 동력기계 미사용)',
+          disasterFactor:
+            '중량물, 설비 하부에서 작업 시 중량물 등의 미고정 등 깔림 위험 예방조치 미흡',
+          workplace: '물류센터',
+          machineHazard: '없음',
+          improvementNeeded: '기계화 도입',
+          remark: '인력 작업 최소화',
+        },
+      ],
+    },
+  });
+
+  // 문서 5
+  records.push({
+    documentId: '1-1-5',
+    tableData: {
+      type: '1100',
+      rows: [
+        {
+          highRiskWork: '전기점검, 정비, 조작관련 작업',
+          disasterFactor:
+            '정비, 수리, 교체 및 청소 등의 작업 시 설비 가동 정지 후 불시가동을 방지하기 위한 조치(기동장치에 잠금장치, 표지판) 미실시 8대 위험요인',
+          workplace: '전기실',
+          machineHazard: '전기설비',
+          improvementNeeded: 'Lock Out, Tag Out',
+          remark: '작업 절차서 준수',
+        },
+        {
+          highRiskWork: '고열설비 취급 작업',
+          disasterFactor:
+            '가동 중인 설비 인근에서 작업 시 끼임, 부딪힘 등 위험 예방조치를 위한 충분한 작업 공간 확보 미실시',
+          workplace: '보일러실',
+          machineHazard: '보일러',
+          improvementNeeded: '작업 공간 확보',
+          remark: '열 보호 장비 착용',
+        },
+      ],
+    },
+  });
+
+  // 1200번대: 산업재해 및 아차사고 (아차사고 조사표, safetyIdx=1, itemNumber=2)
+  const nearMissDocuments: Table1200NearMissRow[] = [
+    {
+      workName: '포장 라인 설비 점검',
+      grade: 'A',
+      reporter: '김안전',
+      reporterDepartment: '안전보건팀',
+      workContent: '포장 라인 설비 상태 점검 및 케이블 정리',
+      accidentContent: '바닥 케이블에 발이 걸려 넘어질 뻔한 아차사고 발생',
+      accidentRiskLevel: 'B',
+      accidentCause: '케이블 정리 미흡 및 동선 확보 부족',
+      preventionMeasure: '케이블 덕트 설치, 작업 전 위험요인 점검',
+      preventionRiskLevel: 'A',
+      siteSituation: '라인 중앙에 케이블이 다수 노출되어 있으며 통행 동선이 협소함.',
+      siteImages: [] as File[],
+    },
+    {
+      workName: '원자재 창고 적재 작업',
+      grade: 'B',
+      reporter: '이현수',
+      reporterDepartment: '물류팀',
+      workContent: '원자재 팔레트 이동 및 적재',
+      accidentContent: '적재된 팔레트가 한쪽으로 기울어져 낙하 직전 발견',
+      accidentRiskLevel: 'B',
+      accidentCause: '팔레트 적재 높이 초과 및 고정 미흡',
+      preventionMeasure: '적재 높이 기준 재교육, 고정 장치 설치',
+      preventionRiskLevel: 'B',
+      siteSituation: '통로 폭이 좁아 지게차 진입 시 가시성 확보 어려움.',
+      siteImages: [] as File[],
+    },
+    {
+      workName: '도장 부스 청소',
+      grade: 'C',
+      reporter: '박아름',
+      reporterDepartment: '시설팀',
+      workContent: '도장 부스 내 잔여 도료 제거 작업',
+      accidentContent: '바닥에 남아 있던 도료에 미끄러져 넘어질 뻔함',
+      accidentRiskLevel: 'C',
+      accidentCause: '청소 후 건조 시간 미확보 및 표시 미흡',
+      preventionMeasure: '건조 시간 준수, 작업 중 미끄럼 주의 표지 설치',
+      preventionRiskLevel: 'B',
+      siteSituation: '부스 내부 조도가 낮아 바닥 상태 식별이 어려움.',
+      siteImages: [] as File[],
+    },
+  ];
+
+  nearMissDocuments.forEach((doc, index) => {
+    records.push({
+      documentId: `1-2-${index + 1}`,
+      tableData: {
+        type: '1200-near-miss',
+        row: doc,
+      },
+    });
+  });
+
+  // 1200번대: 산업재해 및 아차사고 (산업재해 조사표, safetyIdx=1, itemNumber=2)
+  const industrialDocuments: Table1200IndustrialAccidentRow[] = [
+    {
+      accidentName: '프레스 작업 중 손가락 절단 사고',
+      accidentDate: '2025-01-15',
+      accidentTime: '14:30',
+      accidentLocation: '1공장 프레스 라인',
+      accidentType: '절단',
+      investigationTeam: [
+        { department: '안전보건팀', name: '김안전' },
+        { department: '생산팀', name: '이현수' },
+        { department: '인사팀', name: '박관리' },
+      ],
+      humanDamage: [
+        { department: '생산 1팀', name: '박근로', position: '작업자', injury: '왼손 검지 절단' },
+      ],
+      materialDamage: '프레스 방호장치 일부 손상, 작업대 표면 긁힘',
+      accidentContent:
+        '프레스 작업 중 방호장치를 우회하여 작업하다가 손가락이 절단됨. 즉시 응급조치 후 병원 이송.',
+      riskAssessmentBefore: {
+        possibility: '높음',
+        severity: '중대',
+        risk: '높음',
+      },
+      accidentCause: '방호장치 우회 작업, 안전교육 미흡, 작업 절차서 미준수, 정기 안전점검 부재',
+      doctorOpinion:
+        '수술 후 재활 치료 필요, 작업 복귀 불가. 장기간 치료 및 재활이 필요하며, 향후 작업 제한이 필요함.',
+      preventionMeasure:
+        '방호장치 개선 및 인터록 장치 추가 설치, 작업 절차서 재교육 및 준수 점검 강화, 정기 안전점검 실시, 작업자 안전교육 의무화',
+      riskAssessmentAfter: {
+        possibility: '낮음',
+        severity: '낮음',
+        risk: '낮음',
+      },
+      otherContent:
+        '사고 발생 즉시 응급조치 실시, 병원 이송 완료. 사고조사반 구성하여 원인 분석 및 재발방지 대책 수립.',
+      investigationImages: [] as File[],
+    },
+    {
+      accidentName: '크레인 작업 중 추락 사고',
+      accidentDate: '2025-02-20',
+      accidentTime: '10:15',
+      accidentLocation: '2공장 적재장',
+      accidentType: '추락',
+      investigationTeam: [
+        { department: '안전보건팀', name: '김안전' },
+        { department: '설비팀', name: '최기술' },
+      ],
+      humanDamage: [
+        {
+          department: '물류팀',
+          name: '정운전',
+          position: '크레인 운전기능사',
+          injury: '다리 골절',
+        },
+      ],
+      materialDamage: '크레인 호이스트 일부 손상',
+      accidentContent:
+        '크레인 작업 중 작업대에서 미끄러져 추락. 안전대는 착용했으나 고정 지점 불안정으로 인한 사고.',
+      riskAssessmentBefore: {
+        possibility: '보통',
+        severity: '중대',
+        risk: '높음',
+      },
+      accidentCause: '안전대 고정 지점 불안정, 작업 전 안전점검 미흡, 작업대 미끄럼 방지 조치 부재',
+      doctorOpinion: '다리 골절 수술 완료, 3개월 이상 재활 치료 필요, 경증 작업 복귀 가능',
+      preventionMeasure:
+        '안전대 고정 지점 강화 및 정기 점검, 작업대 미끄럼 방지 패드 설치, 작업 전 안전점검 의무화',
+      riskAssessmentAfter: {
+        possibility: '낮음',
+        severity: '낮음',
+        risk: '낮음',
+      },
+      otherContent: '사고 발생 즉시 응급조치 및 병원 이송. 크레인 작업 일시 중단 후 안전점검 실시.',
+      investigationImages: [] as File[],
+    },
+  ];
+
+  industrialDocuments.forEach((doc, index) => {
+    records.push({
+      documentId: `1-2-${nearMissDocuments.length + index + 1}`,
+      tableData: {
+        type: '1200-industrial',
+        rows: [doc],
+      },
+    });
+  });
 
   // 1300번대: 위험 기계·기구·설비 (safetyIdx=1, itemNumber=3)
   // 문서 1
@@ -1463,6 +1788,287 @@ function generateDocumentTableData(): DocumentTableDataRecord[] {
         },
       ],
     },
+  });
+
+  // 2400번대: 교육훈련 - TBM 일지 (safetyIdx=2, itemNumber=4)
+  const tbmDocuments: Table2400TBMData[] = [
+    {
+      inspectionRows: [
+        { inspectionContent: '기계·가구·설비 이상 유무', result: '정상' },
+        { inspectionContent: '기계·가구·설비 방호장치', result: '정상' },
+        { inspectionContent: '근로자 건강 상태', result: '정상' },
+        { inspectionContent: '개인보호구 착용 여부', result: '착용' },
+        { inspectionContent: '작업절차 및 방법 숙지', result: '숙지' },
+        { inspectionContent: '작업장 정리/정돈, 통보 확보', result: '완료' },
+        { inspectionContent: '점검결과 조치사항', result: '조치 완료' },
+      ],
+      educationContent:
+        '아크릴로니트릴의 특성과 위험성, 작업 시 주의사항, 개인보호구 착용법, 비상대응 절차 등에 대한 안전 교육 내용입니다.',
+      educationVideoRows: [
+        {
+          participant: { name: '김안전', department: '생산 1팀' },
+          educationVideo: '아크릴로니트릴_10분작업안전',
+          signature: 'signature-placeholder',
+        },
+        {
+          participant: { name: '이영희', department: '생산 1팀' },
+          educationVideo: '화학물질 안전관리',
+          signature: 'signature-placeholder',
+        },
+      ],
+    },
+    {
+      inspectionRows: [
+        { inspectionContent: '기계·가구·설비 이상 유무', result: '이상 없음' },
+        { inspectionContent: '기계·가구·설비 방호장치', result: '정상 작동' },
+        { inspectionContent: '근로자 건강 상태', result: '양호' },
+        { inspectionContent: '개인보호구 착용 여부', result: '전원 착용' },
+        { inspectionContent: '작업절차 및 방법 숙지', result: '숙지 완료' },
+        { inspectionContent: '작업장 정리/정돈, 통보 확보', result: '정상' },
+        { inspectionContent: '점검결과 조치사항', result: '추가 조치 불필요' },
+      ],
+      educationContent:
+        '개인보호구의 올바른 착용 방법과 점검 사항, 작업 안전수칙 준수, 비상상황 대응 절차에 대한 교육을 실시했습니다.',
+      educationVideoRows: [
+        {
+          participant: { name: '박지민', department: '생산 2팀' },
+          educationVideo: '개인보호구 착용법',
+          signature: 'signature-placeholder',
+        },
+      ],
+    },
+    {
+      inspectionRows: [
+        { inspectionContent: '기계·가구·설비 이상 유무', result: '정상' },
+        { inspectionContent: '기계·가구·설비 방호장치', result: '점검 완료' },
+        { inspectionContent: '근로자 건강 상태', result: '양호' },
+        { inspectionContent: '개인보호구 착용 여부', result: '착용 확인' },
+        { inspectionContent: '작업절차 및 방법 숙지', result: '교육 완료' },
+        { inspectionContent: '작업장 정리/정돈, 통보 확보', result: '완료' },
+        { inspectionContent: '점검결과 조치사항', result: '모든 항목 정상' },
+      ],
+      educationContent:
+        '비상상황 발생 시 대응 절차, 신고 방법, 대피 경로, 소화기 사용법 등에 대한 실전 교육을 진행했습니다.',
+      educationVideoRows: [
+        {
+          participant: { name: '최은주', department: '생산 3팀' },
+          educationVideo: '비상대응 절차',
+          signature: 'signature-placeholder',
+        },
+        {
+          participant: { name: '정민수', department: '생산 3팀' },
+          educationVideo: '비상대응 절차',
+          signature: 'signature-placeholder',
+        },
+      ],
+    },
+  ];
+
+  tbmDocuments.forEach((doc, index) => {
+    records.push({
+      documentId: `2-4-${index + 1}`,
+      tableData: {
+        type: '2400-tbm',
+        data: doc,
+      },
+    });
+  });
+
+  // 2400번대: 교육훈련 - 연간 교육 계획 (safetyIdx=2, itemNumber=4)
+  const educationDocuments: Table2400EducationRow[][] = [
+    [
+      {
+        number: 1,
+        educationType: '법정',
+        educationCourse: '신규 입사자 안전교육',
+        scheduleMonths: [
+          true,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+        ],
+        targetCount: '10',
+        educationMethod: '내부',
+        remark: '신규 입사자 10명 대상',
+      },
+      {
+        number: 2,
+        educationType: '법정',
+        educationCourse: '화학물질 안전관리 교육',
+        scheduleMonths: [
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+        ],
+        targetCount: '15',
+        educationMethod: '내부',
+        remark: '화학물질 취급자 15명 대상',
+      },
+      {
+        number: 3,
+        educationType: '자율',
+        educationCourse: '개인보호구 착용법 교육',
+        scheduleMonths: [
+          false,
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+        ],
+        targetCount: '50',
+        educationMethod: '내부',
+        remark: '전체 근로자 대상',
+      },
+    ],
+    [
+      {
+        number: 1,
+        educationType: '법정',
+        educationCourse: '비상대응 절차 교육',
+        scheduleMonths: [
+          false,
+          false,
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+        ],
+        targetCount: '50',
+        educationMethod: '내부',
+        remark: '비상대응 훈련 포함',
+      },
+      {
+        number: 2,
+        educationType: '자율',
+        educationCourse: '작업안전수칙 교육',
+        scheduleMonths: [
+          false,
+          false,
+          false,
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+        ],
+        targetCount: '20',
+        educationMethod: '내부',
+        remark: '작업자 20명 대상',
+      },
+      {
+        number: 3,
+        educationType: '자율',
+        educationCourse: '소화기 사용법 교육',
+        scheduleMonths: [
+          false,
+          false,
+          false,
+          false,
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+        ],
+        targetCount: '50',
+        educationMethod: '외부',
+        remark: '실습 포함',
+      },
+    ],
+    [
+      {
+        number: 1,
+        educationType: '법정',
+        educationCourse: '고온작업 안전교육',
+        scheduleMonths: [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false,
+        ],
+        targetCount: '8',
+        educationMethod: '내부',
+        remark: '고온작업자 8명 대상',
+      },
+      {
+        number: 2,
+        educationType: '법정',
+        educationCourse: '전기안전 교육',
+        scheduleMonths: [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+        ],
+        targetCount: '5',
+        educationMethod: '외부',
+        remark: '전기작업자 5명 대상',
+      },
+    ],
+  ];
+
+  educationDocuments.forEach((doc, index) => {
+    records.push({
+      documentId: `2-4-${tbmDocuments.length + index + 1}`,
+      tableData: {
+        type: '2400-education',
+        rows: doc,
+        minimumEducationRows: FIXED_MINIMUM_EDUCATION_ROWS,
+      },
+    });
   });
 
   return records;

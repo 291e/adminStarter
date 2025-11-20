@@ -8,7 +8,6 @@ import MenuItem from '@mui/material/MenuItem';
 import FormControl from '@mui/material/FormControl';
 import IconButton from '@mui/material/IconButton';
 import Button from '@mui/material/Button';
-import InputAdornment from '@mui/material/InputAdornment';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -19,7 +18,11 @@ import type {
   Table2100Data,
   Table2100ClassificationRow,
   Table2100AssessmentRow,
+  InvestigationTeamMember,
 } from '../../types/table-data';
+import InputAdornment from '@mui/material/InputAdornment';
+import InvestigationTeamSelectModal from './modal/InvestigationTeamSelectModal';
+import type { RiskAssessmentData } from '../../components/RiskAssessmentSettingModal';
 
 // ----------------------------------------------------------------------
 
@@ -46,9 +49,10 @@ const RISK_LEVEL_OPTIONS = [
 type Props = {
   data: Table2100Data;
   onDataChange: (data: Table2100Data) => void;
+  riskAssessmentData: RiskAssessmentData;
 };
 
-export default function Table2100Form({ data, onDataChange }: Props) {
+export default function Table2100Form({ data, onDataChange, riskAssessmentData }: Props) {
   const theme = useTheme();
   const [draggedClassificationIndex, setDraggedClassificationIndex] = useState<number | null>(null);
   const [dragOverClassificationIndex, setDragOverClassificationIndex] = useState<number | null>(
@@ -62,6 +66,9 @@ export default function Table2100Form({ data, onDataChange }: Props) {
   const [openCompletedDatePicker, setOpenCompletedDatePicker] = useState<{
     [key: number]: boolean;
   }>({});
+  const [responsiblePersonModalIndex, setResponsiblePersonModalIndex] = useState<number | null>(
+    null
+  );
 
   // 위험요인 분류 테이블 핸들러
   const handleClassificationDragStart = (index: number) => {
@@ -167,6 +174,15 @@ export default function Table2100Form({ data, onDataChange }: Props) {
     setDragOverAssessmentIndex(null);
   };
 
+  // 위험도 값에 따라 해당하는 label 찾기
+  const getRiskLabel = (riskValue: number): string => {
+    const enabledRanges = riskAssessmentData.riskRanges.filter((range) => range.enabled);
+    const matchingRange = enabledRanges.find(
+      (range) => riskValue >= range.min && riskValue <= range.max
+    );
+    return matchingRange ? matchingRange.label : '';
+  };
+
   const handleAssessmentChange = (
     index: number,
     field: keyof Table2100AssessmentRow,
@@ -174,6 +190,13 @@ export default function Table2100Form({ data, onDataChange }: Props) {
   ) => {
     const newRows = [...data.assessment];
     newRows[index] = { ...newRows[index], [field]: value };
+
+    // 위험도 값이 변경되면 해당하는 label 찾아서 업데이트
+    if (field === 'riskLevel' && typeof value === 'object' && 'value' in value) {
+      const riskLabel = getRiskLabel(value.value);
+      newRows[index].riskLevel = { value: value.value, label: riskLabel };
+    }
+
     onDataChange({ ...data, assessment: newRows });
   };
 
@@ -194,6 +217,24 @@ export default function Table2100Form({ data, onDataChange }: Props) {
       completedDate: '',
     };
     onDataChange({ ...data, assessment: [...data.assessment, newRow] });
+  };
+
+  const handleOpenResponsiblePersonModal = (index: number) => {
+    setResponsiblePersonModalIndex(index);
+  };
+
+  const handleCloseResponsiblePersonModal = () => {
+    setResponsiblePersonModalIndex(null);
+  };
+
+  const handleAssessmentResponsiblePersonSearchConfirm = (members: InvestigationTeamMember[]) => {
+    if (responsiblePersonModalIndex !== null) {
+      const selected = members[0];
+      if (selected) {
+        handleAssessmentChange(responsiblePersonModalIndex, 'responsiblePerson', selected.name);
+      }
+    }
+    handleCloseResponsiblePersonModal();
   };
 
   const tableStyle = {
@@ -226,23 +267,15 @@ export default function Table2100Form({ data, onDataChange }: Props) {
     >
       {/* 첫 번째 테이블: 위험요인 분류 */}
       <Box sx={{ width: '100%' }}>
-        <Typography
-          variant="h6"
-          sx={{
-            fontSize: 18,
-            fontWeight: 700,
-            mb: 2,
-            textAlign: 'left',
-          }}
-        >
-          위험요인 분류
+        <Typography sx={{ mb: 2, fontSize: 16, fontWeight: 600, px: 1 }}>
+          [유해·위험요인 분류 예시]
         </Typography>
         <Box component="table" sx={tableStyle}>
           <thead>
             <tr>
               <th style={{ width: 94 }}>번호</th>
               <th style={{ width: 164 }}>구분</th>
-              <th style={{ flex: 1 }}>해당 유해, 위험요인</th>
+              <th style={{ flex: 1 }}>해당 유해·위험요인</th>
               <th style={{ width: 46 }}>이동</th>
               <th style={{ width: 55 }}>삭제</th>
             </tr>
@@ -372,17 +405,7 @@ export default function Table2100Form({ data, onDataChange }: Props) {
 
       {/* 두 번째 테이블: 위험성 평가 */}
       <Box sx={{ width: '100%' }}>
-        <Typography
-          variant="h6"
-          sx={{
-            fontSize: 18,
-            fontWeight: 700,
-            mb: 2,
-            textAlign: 'left',
-          }}
-        >
-          위험성 평가
-        </Typography>
+        <Typography sx={{ mb: 2, fontSize: 16, fontWeight: 600, px: 1 }}>[위험성 평가]</Typography>
         <Box component="table" sx={tableStyle}>
           <thead>
             <tr>
@@ -390,7 +413,11 @@ export default function Table2100Form({ data, onDataChange }: Props) {
               <th style={{ width: 199 }}>위험한 상황과 결과</th>
               <th style={{ width: 160 }}>현재 안전조치</th>
               <th style={{ width: 120 }}>위험성</th>
-              <th style={{ width: 220 }}>추가조치사항</th>
+              <th style={{ width: 220 }}>
+                추가조치사항
+                <br />
+                (현재의 안전조사 미흡시)
+              </th>
               <th style={{ width: 120 }}>담당자</th>
               <th style={{ width: 120 }}>예정일</th>
               <th style={{ width: 120 }}>완료일</th>
@@ -467,36 +494,49 @@ export default function Table2100Form({ data, onDataChange }: Props) {
                   />
                 </td>
                 <td>
-                  <FormControl fullWidth size="small">
-                    <Select
-                      value={row.riskLevel?.value || ''}
-                      onChange={(e) => {
-                        const selectedOption = RISK_LEVEL_OPTIONS.find(
-                          (opt) => opt.value === Number(e.target.value)
-                        );
-                        if (selectedOption) {
-                          handleAssessmentChange(index, 'riskLevel', selectedOption);
-                        }
-                      }}
-                      displayEmpty
-                      sx={{
-                        fontSize: 14,
-                        height: 'auto',
-                        '& .MuiSelect-select': {
-                          py: 1,
-                        },
-                      }}
-                    >
-                      <MenuItem value="" sx={{ fontSize: 14 }}>
-                        <em />
-                      </MenuItem>
-                      {RISK_LEVEL_OPTIONS.map((option) => (
-                        <MenuItem key={option.value} value={option.value} sx={{ fontSize: 14 }}>
-                          {option.label}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    <FormControl fullWidth size="small">
+                      <Select
+                        value={row.riskLevel?.value || RISK_LEVEL_OPTIONS[0].value}
+                        onChange={(e) => {
+                          const riskValue = Number(e.target.value);
+                          if (riskValue) {
+                            const riskLabel = getRiskLabel(riskValue);
+                            handleAssessmentChange(index, 'riskLevel', {
+                              value: riskValue,
+                              label: riskLabel,
+                            });
+                          }
+                        }}
+                        sx={{
+                          fontSize: 14,
+                          height: 'auto',
+                          '& .MuiSelect-select': {
+                            py: 1,
+                          },
+                        }}
+                      >
+                        {RISK_LEVEL_OPTIONS.map((option) => (
+                          <MenuItem key={option.value} value={option.value} sx={{ fontSize: 14 }}>
+                            {option.value}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                    {(row.riskLevel?.value || RISK_LEVEL_OPTIONS[0].value) &&
+                      (row.riskLevel?.label || getRiskLabel(RISK_LEVEL_OPTIONS[0].value)) && (
+                        <Typography
+                          sx={{
+                            fontSize: 12,
+                            fontWeight: 400,
+                            color: 'text.secondary',
+                            textAlign: 'center',
+                          }}
+                        >
+                          ({row.riskLevel?.label || getRiskLabel(RISK_LEVEL_OPTIONS[0].value)})
+                        </Typography>
+                      )}
+                  </Box>
                 </td>
                 <td>
                   <TextField
@@ -526,7 +566,20 @@ export default function Table2100Form({ data, onDataChange }: Props) {
                       '& .MuiOutlinedInput-root': {
                         fontSize: 14,
                         height: 'auto',
+                        p: 0,
                       },
+                    }}
+                    InputProps={{
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton
+                            color="inherit"
+                            onClick={() => handleOpenResponsiblePersonModal(index)}
+                          >
+                            <Iconify icon="eva:search-fill" />
+                          </IconButton>
+                        </InputAdornment>
+                      ),
                     }}
                   />
                 </td>
@@ -680,6 +733,14 @@ export default function Table2100Form({ data, onDataChange }: Props) {
           </Button>
         </Box>
       </Box>
+      {data.assessment.map((row, index) => (
+        <InvestigationTeamSelectModal
+          key={`responsible-${index}`}
+          open={responsiblePersonModalIndex === index}
+          onClose={handleCloseResponsiblePersonModal}
+          onConfirm={handleAssessmentResponsiblePersonSearchConfirm}
+        />
+      ))}
     </Box>
   );
 }

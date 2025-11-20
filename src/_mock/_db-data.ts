@@ -8,11 +8,13 @@ import { fSub } from 'src/utils/format-time';
 import { _mock } from './_mock';
 
 import type {
+  SuperAdmin,
   Company,
   CompanyBranch,
   Member,
   EducationReport,
   EducationRecord,
+  EducationStandard,
   SafetySystem,
   SafetySystemItem,
   SafetySystemDocument,
@@ -30,6 +32,12 @@ import type {
   SharedDocument,
   PrioritySetting,
   LibraryCategory,
+  CompanySubscription,
+  CompanyInvitation,
+  DocumentApproval,
+  DocumentSignature,
+  DocumentNotification,
+  ChatRoomSharedDocument,
 } from './_db';
 
 // ============================================================================
@@ -50,7 +58,11 @@ export function generateCompanies(members: Member[], count: number = 5): Company
     email: `company${index + 1}@example.com`,
     description: index % 3 === 0 ? '회사 설명' : null,
     memo: index % 5 === 0 ? '메모 내용' : null,
-    isActive: true,
+    isActive: 1,
+    isAccidentFreeWorksite: index % 3 === 0 ? 1 : 0,
+    accidentFreeStatus: index % 3 === 0 ? 'approved' : 'pending',
+    accidentFreeCertifiedAt: index % 3 === 0 ? fSub({ days: (count - index) * 10 }) : null,
+    accidentFreeExpiresAt: index % 3 === 0 ? fSub({ days: 365 }) : null,
     createAt: fSub({ days: (count - index) * 30 }),
     updateAt: fSub({ days: Math.floor(Math.random() * (count - index) * 30) }),
     deletedAt: null,
@@ -93,7 +105,7 @@ export function generateCompanyBranches(
       email: `branch${index + 1}@example.com`,
       description: index % 3 === 0 ? '지점 설명' : null,
       memo: index % 5 === 0 ? '메모 내용' : null,
-      isActive: true,
+      isActive: 1,
       createAt: fSub({ days: (count - index) * 15 }),
       updateAt: fSub({ days: Math.floor(Math.random() * (count - index) * 15) }),
       deletedAt: null,
@@ -144,6 +156,7 @@ export function generateMembers(
       password: 'hashed_password_here',
       duplicateSigninKey: index % 4 === 0 ? `key_${index}` : null,
       lastSigninAt: hasLastSignin ? fSub({ days: Math.floor(Math.random() * 7) }) : null,
+      joinedAt: fSub({ days: (count - index) * 30 }), // 입사일 (이수율 계산용)
       deviceToken: index % 2 === 0 ? `device_token_${index}` : null,
       deviceGubun: (['web', 'ios', 'android', null] as const)[index % 4],
       memberlat: hasLocation ? 37.5665 + index * 0.01 : null,
@@ -245,6 +258,7 @@ export function generateEducationRecords(
       method,
       educationName,
       educationTime,
+      educationType: index % 2 === 0 ? 'mandatory' : 'regular',
       educationDate: fSub({ days: count - index }).split('T')[0],
       fileName: hasFile ? `교육자료_${index + 1}.pdf` : null,
       fileUrl: hasFile ? `/files/education/${index + 1}.pdf` : null,
@@ -279,7 +293,7 @@ export function generateSafetySystems(members: Member[]): SafetySystem[] {
     updatedBy: creator?.memberIdx || null,
     description: `${system.systemName}에 대한 설명`,
     order: index + 1,
-    isActive: true,
+    isActive: 1,
     createAt: fSub({ days: (systems.length - index) * 30 }),
     updateAt: fSub({ days: Math.floor(Math.random() * (systems.length - index) * 30) }),
     deletedAt: null,
@@ -363,6 +377,8 @@ export function generateSafetySystemDocuments(
           removal: Math.floor(Math.random() * 50) + 10,
           engineering: Math.floor(Math.random() * 50) + 10,
         },
+        isPublished: docNum % 3 === 0 ? 1 : 0,
+        publishedAt: docNum % 3 === 0 ? fSub({ days: docNum - 1 }) : null,
         fileName: `document-${item.safetyIdx}-${item.itemNumber}-${docNum}.pdf`,
         fileUrl: `/files/documents/${item.safetyIdx}-${item.itemNumber}-${docNum}.pdf`,
         fileSize: Math.floor(Math.random() * 1000000) + 100000,
@@ -393,16 +409,17 @@ export function generateChatRooms(
       id: 'chatbot',
       name: '챗봇',
       type: 'chatbot',
-      isGroup: false,
+      isGroup: 0,
       createdBy: creator?.memberIdx || null,
       organizationIdx: companies[0]?.companyIdx || null,
+      emergencyRoomCompanyIdx: null,
       organizationName: null,
       lastMessage: null,
       lastMessageAt: null,
       unreadCount: null,
       avatar: null,
       description: null,
-      isActive: true,
+      isActive: 1,
       createAt: fSub({ days: 100 }),
       updateAt: fSub({ days: 100 }),
       deletedAt: null,
@@ -411,16 +428,17 @@ export function generateChatRooms(
       id: 'emergency',
       name: '사고 발생 현황',
       type: 'emergency',
-      isGroup: false,
+      isGroup: 0,
       createdBy: creator?.memberIdx || null,
       organizationIdx: companies[0]?.companyIdx || null,
+      emergencyRoomCompanyIdx: companies[0]?.companyIdx || null,
       organizationName: '이편한자동화기술 물류팀',
       lastMessage: '응급신고',
       lastMessageAt: fSub({ hours: 2 }),
       unreadCount: 2,
       avatar: null,
       description: '응급 상황 보고 채팅방',
-      isActive: true,
+      isActive: 1,
       createAt: fSub({ days: 50 }),
       updateAt: fSub({ hours: 2 }),
       deletedAt: null,
@@ -433,16 +451,17 @@ export function generateChatRooms(
       id: `chat-room-${i}`,
       name: isGroup ? `그룹 채팅 ${i}` : _mock.fullName(i),
       type: isGroup ? 'group' : 'normal',
-      isGroup,
+      isGroup: isGroup ? 1 : 0,
       createdBy: members[i % members.length]?.memberIdx || null,
       organizationIdx: isGroup ? companies[0]?.companyIdx || null : null,
+      emergencyRoomCompanyIdx: null,
       organizationName: isGroup ? '이편한자동화기술' : null,
       lastMessage: `메시지 ${i}`,
       lastMessageAt: fSub({ hours: i }),
       unreadCount: i % 2 === 0 ? Math.floor(Math.random() * 5) : null,
       avatar: null,
       description: isGroup ? `그룹 채팅 ${i} 설명` : null,
-      isActive: true,
+      isActive: 1,
       createAt: fSub({ days: count - i }),
       updateAt: fSub({ hours: i }),
       deletedAt: null,
@@ -472,13 +491,18 @@ export function generateChatMessages(
         id: `chat-message-${messageIndex + 1}`,
         chatRoomId: room.id,
         senderMemberIdx: sender.memberIdx,
+        sharedDocumentId: null,
         sender: sender.memberName,
         senderAvatar: sender.memberThumbnail || null,
         message: `메시지 내용 ${messageIndex + 1}`,
         messageType: 'text',
+        signalType:
+          room.type === 'emergency' && Math.random() > 0.7
+            ? (['risk', 'rescue', 'evacuation'] as const)[Math.floor(Math.random() * 3)]
+            : null,
         attachments: null,
-        isRead: Math.random() > 0.3,
-        isOwn: Math.random() > 0.5,
+        isRead: Math.random() > 0.3 ? 1 : 0,
+        isOwn: Math.random() > 0.5 ? 1 : 0,
         createAt: fSub({ hours: messageIndex }),
         updateAt: fSub({ hours: messageIndex }),
         deletedAt: null,
@@ -510,7 +534,9 @@ export function generateChatParticipants(rooms: ChatRoom[], members: Member[]): 
         role: memberIndex === 0 ? 'admin' : 'member',
         joinedAt: fSub({ days: Math.floor(Math.random() * 30) }),
         leftAt: null,
-        isActive: true,
+        isRead: Math.random() > 0.3 ? 1 : 0,
+        lastReadAt: Math.random() > 0.3 ? fSub({ hours: Math.floor(Math.random() * 24) }) : null,
+        isActive: 1,
         createAt: fSub({ days: Math.floor(Math.random() * 30) }),
         updateAt: fSub({ days: Math.floor(Math.random() * 30) }),
         deletedAt: null,
@@ -577,7 +603,7 @@ export function generateDisasterFactors(
         factorName: factorNames[Math.floor(Math.random() * factorNames.length)],
         description: null,
         order: i + 1,
-        isActive: true,
+        isActive: 1,
         createAt: fSub({ days: checklistIndex }),
         updateAt: fSub({ days: checklistIndex }),
         deletedAt: null,
@@ -740,6 +766,7 @@ export function generateLibraryReports(
 
   return Array.from({ length: count }, (_, index) => {
     const creator = members[index % members.length];
+    const companyIdx = creator.companyIdx;
     return {
       id: `library-report-${index + 1}`,
       categoryId: categories[index % categories.length]?.id || null,
@@ -748,11 +775,15 @@ export function generateLibraryReports(
       organizationName: '이편한자동화기술',
       category: categories[index % categories.length]?.name || '기타',
       playbackTime: playbackTimes[index % playbackTimes.length],
-      hasSubtitles: index % 3 !== 0,
+      hasSubtitles: index % 3 !== 0 ? 1 : 0,
+      visibilityType: index % 2 === 0 ? 'public' : 'organization',
+      hiddenByCompanyIdx: index % 5 === 0 ? JSON.stringify([companyIdx + 1]) : null,
       status: index % 10 < 8 ? 'active' : 'inactive',
+      isActive: 1,
       createdBy: creator.memberIdx,
       updatedBy: creator.memberIdx,
       uploadedBy: creator.memberIdx,
+      createdByCompanyIdx: companyIdx,
       fileUrl: `/files/library/${index + 1}.mp4`,
       thumbnailUrl: `/files/library/thumbnails/${index + 1}.jpg`,
       viewCount: Math.floor(Math.random() * 100),
@@ -782,10 +813,11 @@ export function generateLibraryCategories(members: Member[]): LibraryCategory[] 
   return names.map((name, index) => ({
     id: `library-category-${index + 1}`,
     name,
-    isActive: true,
+    isActive: 1,
     order: index + 1,
     createdBy: creator?.memberIdx || null,
     updatedBy: creator?.memberIdx || null,
+    createdByCompanyIdx: index === 0 ? null : creator?.companyIdx || null, // 첫 번째는 슈퍼어드민이 생성
     description: `${name} 카테고리 설명`,
     createAt: fSub({ days: (names.length - index) * 10 }),
     updateAt: fSub({ days: Math.floor(Math.random() * (names.length - index) * 10) }),
@@ -828,6 +860,9 @@ export function generateRiskReports(
       reporterMemberIdx: reporter.memberIdx,
       authorMemberIdx: author.memberIdx,
       companyIdx: reporter.companyIdx,
+      chatRoomId: index % 3 === 0 ? 'emergency' : null,
+      sourceType: index % 3 === 0 ? 'chat' : 'direct',
+      signalType: index % 3 === 0 ? (['risk', 'rescue', 'evacuation'] as const)[index % 3] : null,
       confirmedBy: confirmer?.memberIdx || null,
       title: titles[index % titles.length],
       location: locations[index % locations.length],
@@ -877,7 +912,7 @@ export function generateSafetyReports(members: Member[], count: number = 20): Sa
       fileUrl: `/files/safety-reports/${index + 1}.pdf`,
       description: index % 5 === 0 ? '안전 리포트 설명' : null,
       memo: index % 10 === 0 ? '메모 내용' : null,
-      isActive: true,
+      isActive: 1,
       createAt: fSub({ days: count - index + 90 }),
       updateAt: fSub({ days: count - index }),
       deletedAt: null,
@@ -916,10 +951,11 @@ export function generateSharedDocuments(
       createdBy: creator.memberIdx,
       updatedBy: creator.memberIdx,
       priorityId: prioritySetting?.id || null,
+      sharedByCompanyIdx: member.companyIdx,
       priority,
       documentName: doc.documentName,
       documentWrittenAt: doc.writtenAt,
-      status: index % 2 === 0 ? 'public' : 'private',
+      isPublic: index % 2 === 0 ? 1 : 0,
       fileName: `document-${index + 1}.pdf`,
       fileUrl: `/files/documents/${index + 1}.pdf`,
       fileSize: Math.floor(Math.random() * 1000000) + 100000,
@@ -929,6 +965,323 @@ export function generateSharedDocuments(
       memo: index % 10 === 0 ? '메모 내용' : null,
       createAt: fSub({ days: count - index }),
       updateAt: fSub({ days: Math.floor(Math.random() * (count - index)) }),
+      deletedAt: null,
+    };
+  });
+}
+
+// ============================================================================
+// 22. PrioritySetting (중요도 설정) 데이터 생성
+// ============================================================================
+
+// ============================================================================
+// 0. SuperAdmin (슈퍼어드민) 데이터 생성
+// ============================================================================
+
+export function generateSuperAdmins(members: Member[], count: number = 2): SuperAdmin[] {
+  const creator = members[0];
+  return Array.from({ length: count }, (_, index) => ({
+    superAdminIdx: index + 1,
+    memberIdx: members[index]?.memberIdx || index + 1,
+    createdBy: creator?.memberIdx || null,
+    updatedBy: creator?.memberIdx || null,
+    isActive: 1,
+    description: index === 0 ? '슈퍼어드민 계정' : null,
+    createAt: fSub({ days: 365 }),
+    updateAt: fSub({ days: 365 }),
+    deletedAt: null,
+  }));
+}
+
+// ============================================================================
+// 5-1. EducationStandard (교육 이수 기준 시간) 데이터 생성
+// ============================================================================
+
+export function generateEducationStandards(members: Member[]): EducationStandard[] {
+  const creator = members[0];
+  const standards: Array<{
+    role: string;
+    workType: 'production' | 'office' | null;
+    standardHours: number;
+    period: 'year' | 'quarter';
+    isAccidentFreeReduction: 0 | 1;
+    reductionRate: number;
+  }> = [
+    {
+      role: '조직관리자',
+      workType: null,
+      standardHours: 480,
+      period: 'year',
+      isAccidentFreeReduction: 1,
+      reductionRate: 10,
+    },
+    {
+      role: '관리감독자',
+      workType: null,
+      standardHours: 960,
+      period: 'year',
+      isAccidentFreeReduction: 1,
+      reductionRate: 10,
+    },
+    {
+      role: '안전보건 담당자',
+      workType: null,
+      standardHours: 1440,
+      period: 'year',
+      isAccidentFreeReduction: 1,
+      reductionRate: 10,
+    },
+    {
+      role: '근로자',
+      workType: 'production',
+      standardHours: 360,
+      period: 'quarter',
+      isAccidentFreeReduction: 1,
+      reductionRate: 10,
+    },
+    {
+      role: '근로자',
+      workType: 'office',
+      standardHours: 180,
+      period: 'quarter',
+      isAccidentFreeReduction: 1,
+      reductionRate: 10,
+    },
+  ];
+
+  return standards.map((std, index) => ({
+    id: `education-standard-${index + 1}`,
+    role: std.role,
+    workType: std.workType,
+    standardHours: std.standardHours,
+    period: std.period,
+    isAccidentFreeReduction: std.isAccidentFreeReduction,
+    reductionRate: std.reductionRate,
+    isActive: 1,
+    order: index + 1,
+    createdBy: creator?.memberIdx || null,
+    updatedBy: creator?.memberIdx || null,
+    description: `${std.role} ${std.workType || ''} 교육 기준 시간`,
+    createAt: fSub({ days: 365 }),
+    updateAt: fSub({ days: 365 }),
+    deletedAt: null,
+  }));
+}
+
+// ============================================================================
+// 23. CompanySubscription (조직 구독 서비스) 데이터 생성
+// ============================================================================
+
+export function generateCompanySubscriptions(
+  companies: Company[],
+  serviceSettings: ServiceSetting[],
+  members: Member[],
+  count: number = 10
+): CompanySubscription[] {
+  const creator = members[0];
+  return Array.from({ length: count }, (_, index) => {
+    const company = companies[index % companies.length];
+    const service = serviceSettings[index % serviceSettings.length];
+    const isActive = index % 3 !== 0;
+
+    return {
+      id: `company-subscription-${index + 1}`,
+      companyIdx: company.companyIdx,
+      serviceSettingId: service.id,
+      billingKey: isActive ? `billing_key_${index + 1}` : null,
+      isDefaultCard: index % 2 === 0 ? 1 : 0,
+      subscriptionStatus: isActive ? 'active' : 'cancelled',
+      subscribedAt: fSub({ days: (count - index) * 30 }),
+      cancelledAt: isActive ? null : fSub({ days: (count - index) * 15 }),
+      createdBy: creator?.memberIdx || null,
+      updatedBy: creator?.memberIdx || null,
+      description: index % 5 === 0 ? '구독 서비스 설명' : null,
+      createAt: fSub({ days: (count - index) * 30 }),
+      updateAt: fSub({ days: Math.floor(Math.random() * (count - index) * 30) }),
+      deletedAt: null,
+    };
+  });
+}
+
+// ============================================================================
+// 24. CompanyInvitation (조직원 초대) 데이터 생성
+// ============================================================================
+
+export function generateCompanyInvitations(
+  companies: Company[],
+  members: Member[],
+  count: number = 10
+): CompanyInvitation[] {
+  const creator = members[0];
+  return Array.from({ length: count }, (_, index) => {
+    const company = companies[index % companies.length];
+    const inviter = members[index % members.length];
+    const isUsed = index % 3 === 0;
+
+    return {
+      id: `company-invitation-${index + 1}`,
+      companyIdx: company.companyIdx,
+      invitedBy: inviter.memberIdx,
+      inviteToken: `invite_token_${index + 1}_${Date.now()}`,
+      invitedEmail: `invite${index + 1}@example.com`,
+      expiresAt: fSub({ days: 7 }),
+      acceptedAt: isUsed ? fSub({ days: (count - index) * 2 }) : null,
+      isUsed: isUsed ? 1 : 0,
+      createdBy: creator?.memberIdx || null,
+      updatedBy: creator?.memberIdx || null,
+      description: index % 5 === 0 ? '초대 설명' : null,
+      createAt: fSub({ days: (count - index) * 5 }),
+      updateAt: fSub({ days: Math.floor(Math.random() * (count - index) * 5) }),
+      deletedAt: null,
+    };
+  });
+}
+
+// ============================================================================
+// 25. DocumentApproval (문서 결재 정보) 데이터 생성
+// ============================================================================
+
+export function generateDocumentApprovals(
+  safetySystemDocuments: SafetySystemDocument[],
+  members: Member[],
+  count: number = 30
+): DocumentApproval[] {
+  const creator = members[0];
+  const approvals: DocumentApproval[] = [];
+
+  safetySystemDocuments.forEach((doc, docIndex) => {
+    const approvalCount = Math.floor(Math.random() * 3) + 1;
+    for (let i = 0; i < approvalCount; i++) {
+      const targetMember = members[Math.floor(Math.random() * members.length)];
+      const approvalStatus = i === 0 && docIndex % 2 === 0 ? 'approved' : 'pending';
+      approvals.push({
+        id: `document-approval-${approvals.length + 1}`,
+        documentId: `${doc.safetyIdx}-${doc.itemNumber}-${doc.documentNumber}`,
+        targetMemberIdx: targetMember.memberIdx,
+        approvalType: i % 2 === 0 ? 'sequential' : 'parallel',
+        approvalOrder: i + 1,
+        approvalStatus,
+        approvedAt: approvalStatus === 'approved' ? fSub({ days: docIndex }) : null,
+        signatureData:
+          approvalStatus === 'approved' ? `signature_data_${approvals.length + 1}` : null,
+        createdBy: creator?.memberIdx || null,
+        updatedBy: creator?.memberIdx || null,
+        description: docIndex % 5 === 0 ? '결재 정보 설명' : null,
+        createAt: fSub({ days: docIndex }),
+        updateAt: fSub({ days: docIndex }),
+        deletedAt: null,
+      });
+    }
+  });
+
+  return approvals.slice(0, count);
+}
+
+// ============================================================================
+// 26. DocumentSignature (문서 서명 정보) 데이터 생성
+// ============================================================================
+
+export function generateDocumentSignatures(
+  safetySystemDocuments: SafetySystemDocument[],
+  members: Member[],
+  count: number = 30
+): DocumentSignature[] {
+  const creator = members[0];
+  const signatures: DocumentSignature[] = [];
+
+  safetySystemDocuments.forEach((doc, docIndex) => {
+    const signatureCount = Math.floor(Math.random() * 3) + 1;
+    for (let i = 0; i < signatureCount; i++) {
+      const targetMember = members[Math.floor(Math.random() * members.length)];
+      const signatureStatus = i === 0 && docIndex % 3 === 0 ? 'signed' : 'pending';
+      signatures.push({
+        id: `document-signature-${signatures.length + 1}`,
+        documentId: `${doc.safetyIdx}-${doc.itemNumber}-${doc.documentNumber}`,
+        targetMemberIdx: targetMember.memberIdx,
+        signatureType: i % 2 === 0 ? 'approval' : 'signature',
+        signatureStatus,
+        requestedAt: fSub({ days: docIndex }),
+        signedAt: signatureStatus === 'signed' ? fSub({ days: docIndex - 1 }) : null,
+        signatureData:
+          signatureStatus === 'signed' ? `signature_data_${signatures.length + 1}` : null,
+        createdBy: creator?.memberIdx || null,
+        updatedBy: creator?.memberIdx || null,
+        description: docIndex % 5 === 0 ? '서명 정보 설명' : null,
+        createAt: fSub({ days: docIndex }),
+        updateAt: fSub({ days: docIndex }),
+        deletedAt: null,
+      });
+    }
+  });
+
+  return signatures.slice(0, count);
+}
+
+// ============================================================================
+// 27. DocumentNotification (문서 알림 발송 이력) 데이터 생성
+// ============================================================================
+
+export function generateDocumentNotifications(
+  safetySystemDocuments: SafetySystemDocument[],
+  members: Member[],
+  count: number = 50
+): DocumentNotification[] {
+  const creator = members[0];
+  const notifications: DocumentNotification[] = [];
+
+  safetySystemDocuments.forEach((doc, docIndex) => {
+    const notificationCount = Math.floor(Math.random() * 3) + 1;
+    for (let i = 0; i < notificationCount; i++) {
+      const targetMember = members[Math.floor(Math.random() * members.length)];
+      const notificationTypes: Array<
+        'approval_request' | 'signature_request' | 'deadline_reminder'
+      > = ['approval_request', 'signature_request', 'deadline_reminder'];
+      const notificationType = notificationTypes[i % notificationTypes.length];
+      const isSent = docIndex % 2 === 0;
+      notifications.push({
+        id: `document-notification-${notifications.length + 1}`,
+        documentId: `${doc.safetyIdx}-${doc.itemNumber}-${doc.documentNumber}`,
+        targetMemberIdx: targetMember.memberIdx,
+        notificationType,
+        scheduledAt: fSub({ days: docIndex }),
+        sentAt: isSent ? fSub({ days: docIndex - 1 }) : null,
+        reminderDays:
+          notificationType === 'deadline_reminder' ? ([15, 7, 1] as const)[i % 3] : null,
+        createdBy: creator?.memberIdx || null,
+        description: docIndex % 5 === 0 ? '알림 설명' : null,
+        createAt: fSub({ days: docIndex }),
+        deletedAt: null,
+      });
+    }
+  });
+
+  return notifications.slice(0, count);
+}
+
+// ============================================================================
+// 28. ChatRoomSharedDocument (채팅방 공유 문서) 데이터 생성
+// ============================================================================
+
+export function generateChatRoomSharedDocuments(
+  chatRooms: ChatRoom[],
+  sharedDocuments: SharedDocument[],
+  members: Member[],
+  count: number = 20
+): ChatRoomSharedDocument[] {
+  const creator = members[0];
+  return Array.from({ length: count }, (_, index) => {
+    const room = chatRooms[index % chatRooms.length];
+    const doc = sharedDocuments[index % sharedDocuments.length];
+    const sharer = members[index % members.length];
+
+    return {
+      id: `chat-room-shared-document-${index + 1}`,
+      chatRoomId: room.id,
+      sharedDocumentId: doc.id,
+      sharedByMemberIdx: sharer.memberIdx,
+      createdBy: creator?.memberIdx || null,
+      description: index % 5 === 0 ? '공유 문서 설명' : null,
+      createAt: fSub({ days: count - index }),
       deletedAt: null,
     };
   });
@@ -948,7 +1301,7 @@ export function generatePrioritySettings(members: Member[]): PrioritySetting[] {
       color: '#b71d18',
       labelType: 'urgent',
       customLabel: null,
-      isActive: true,
+      isActive: 1,
       order: 1,
       createdBy: creator?.memberIdx || null,
       updatedBy: creator?.memberIdx || null,
@@ -962,7 +1315,7 @@ export function generatePrioritySettings(members: Member[]): PrioritySetting[] {
       color: '#b76e00',
       labelType: 'important',
       customLabel: null,
-      isActive: true,
+      isActive: 1,
       order: 2,
       createdBy: creator?.memberIdx || null,
       updatedBy: creator?.memberIdx || null,
@@ -976,7 +1329,7 @@ export function generatePrioritySettings(members: Member[]): PrioritySetting[] {
       color: '#1d7bf5',
       labelType: 'reference',
       customLabel: null,
-      isActive: true,
+      isActive: 1,
       order: 3,
       createdBy: creator?.memberIdx || null,
       updatedBy: creator?.memberIdx || null,
@@ -990,7 +1343,7 @@ export function generatePrioritySettings(members: Member[]): PrioritySetting[] {
       color: '#007867',
       labelType: 'normal',
       customLabel: null,
-      isActive: true,
+      isActive: 1,
       order: 4,
       createdBy: creator?.memberIdx || null,
       updatedBy: creator?.memberIdx || null,
@@ -1004,7 +1357,7 @@ export function generatePrioritySettings(members: Member[]): PrioritySetting[] {
       color: '#9c27b0',
       labelType: 'custom',
       customLabel: '직접 작성',
-      isActive: true,
+      isActive: 1,
       order: 5,
       createdBy: creator?.memberIdx || null,
       updatedBy: creator?.memberIdx || null,
@@ -1043,6 +1396,7 @@ export function generateDatabaseData() {
     password: 'hashed',
     duplicateSigninKey: null,
     lastSigninAt: null,
+    joinedAt: new Date().toISOString(),
     deviceToken: null,
     deviceGubun: null,
     memberlat: null,
@@ -1064,6 +1418,7 @@ export function generateDatabaseData() {
   // 2. 교육 관련 엔티티 생성
   const educationReports = generateEducationReports(members, companies, 20);
   const educationRecords = generateEducationRecords(members, educationReports, 50);
+  const educationStandards = generateEducationStandards(members);
 
   // 3. 안전 시스템 관련 엔티티 생성
   const safetySystems = generateSafetySystems(members);
@@ -1101,12 +1456,41 @@ export function generateDatabaseData() {
     20
   );
 
+  // 10. 슈퍼어드민 생성
+  const superAdmins = generateSuperAdmins(members, 2);
+
+  // 11. 조직 구독 서비스 생성
+  const companySubscriptions = generateCompanySubscriptions(
+    companies,
+    serviceSettings,
+    members,
+    10
+  );
+
+  // 12. 조직원 초대 생성
+  const companyInvitations = generateCompanyInvitations(companies, members, 10);
+
+  // 13. 문서 결재/서명/알림 생성
+  const documentApprovals = generateDocumentApprovals(safetySystemDocuments, members, 30);
+  const documentSignatures = generateDocumentSignatures(safetySystemDocuments, members, 30);
+  const documentNotifications = generateDocumentNotifications(safetySystemDocuments, members, 50);
+
+  // 14. 채팅방 공유 문서 생성
+  const chatRoomSharedDocuments = generateChatRoomSharedDocuments(
+    chatRooms,
+    sharedDocuments,
+    members,
+    20
+  );
+
   return {
+    SuperAdmin: superAdmins,
     Company: companies,
     CompanyBranch: branches,
     Member: members,
     EducationReport: educationReports,
     EducationRecord: educationRecords,
+    EducationStandard: educationStandards,
     SafetySystem: safetySystems,
     SafetySystemItem: safetySystemItems,
     SafetySystemDocument: safetySystemDocuments,
@@ -1124,5 +1508,11 @@ export function generateDatabaseData() {
     SafetyReport: safetyReports,
     SharedDocument: sharedDocuments,
     PrioritySetting: prioritySettings,
+    CompanySubscription: companySubscriptions,
+    CompanyInvitation: companyInvitations,
+    DocumentApproval: documentApprovals,
+    DocumentSignature: documentSignatures,
+    DocumentNotification: documentNotifications,
+    ChatRoomSharedDocument: chatRoomSharedDocuments,
   };
 }

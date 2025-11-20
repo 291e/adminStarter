@@ -1,4 +1,5 @@
 import { paths } from 'src/routes/paths';
+import { buildAppPath } from 'src/routes/utils';
 
 import axios from 'src/lib/axios';
 
@@ -59,7 +60,7 @@ export function tokenExpired(exp: number) {
     try {
       alert('Token expired!');
       sessionStorage.removeItem(JWT_STORAGE_KEY);
-      window.location.href = paths.auth.jwt.signIn;
+      window.location.href = buildAppPath(paths.auth.jwt.signIn);
     } catch (error) {
       console.error('Error during token expiration:', error);
       throw error;

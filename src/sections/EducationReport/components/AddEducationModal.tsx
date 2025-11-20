@@ -8,7 +8,6 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
-import FormControl from '@mui/material/FormControl';
 import FormLabel from '@mui/material/FormLabel';
 import RadioGroup from '@mui/material/RadioGroup';
 import FormControlLabel from '@mui/material/FormControlLabel';
@@ -17,14 +16,11 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
-import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
-
-import { Iconify } from 'src/components/iconify';
 
 type Props = {
   open: boolean;
@@ -178,12 +174,6 @@ export default function AddEducationModal({ open, onClose, onSave }: Props) {
                 }}
               />
             </RadioGroup>
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1, px: 1.5 }}>
-              <Iconify icon="solar:info-circle-bold" width={16} sx={{ color: 'text.secondary' }} />
-              <Typography variant="caption" color="text.secondary">
-                교육 구분 선택은 필수입니다.
-              </Typography>
-            </Stack>
           </Box>
 
           {/* 교육 방식 */}
@@ -229,12 +219,6 @@ export default function AddEducationModal({ open, onClose, onSave }: Props) {
                 }}
               />
             </RadioGroup>
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1, px: 1.5 }}>
-              <Iconify icon="solar:info-circle-bold" width={16} sx={{ color: 'text.secondary' }} />
-              <Typography variant="caption" color="text.secondary">
-                교육 방식 선택은 필수입니다.
-              </Typography>
-            </Stack>
           </Box>
 
           {/* 교육 내용 */}
@@ -382,7 +366,7 @@ export default function AddEducationModal({ open, onClose, onSave }: Props) {
         </Stack>
       </DialogContent>
 
-      <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+      <DialogActions sx={{ px: 3, py: 2 }}>
         <Button onClick={handleClose} variant="outlined">
           취소
         </Button>

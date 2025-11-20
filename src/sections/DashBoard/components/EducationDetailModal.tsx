@@ -113,7 +113,7 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+        <Typography variant="h6" component="span" sx={{ fontWeight: 600 }}>
           교육 상세 현황
         </Typography>
       </DialogTitle>

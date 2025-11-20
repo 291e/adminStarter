@@ -24,6 +24,19 @@ export default function ChatbotView({
   onMessageInputChange,
   onSendMessage,
 }: Props) {
+  // TODO: 챗봇 API 연동
+  // - Firebase Realtime Database는 사용하지 않음
+  // - 챗봇 API로 HTTP 통신하여 질문/답변 처리
+  // - onSendMessage에서 챗봇 API 호출 후 응답을 메시지로 추가
+  // 예시:
+  // const handleSendMessage = async () => {
+  //   if (!messageInput?.trim()) return;
+  //   // 사용자 메시지 추가
+  //   // 챗봇 API 호출
+  //   // const response = await axios.post('/api/chatbot', { message: messageInput });
+  //   // 챗봇 응답 메시지 추가
+  // };
+
   return (
     <Box
       sx={{
@@ -37,11 +50,7 @@ export default function ChatbotView({
       }}
     >
       <MessageList messages={messages} />
-      <ChatInput
-        value={messageInput}
-        onChange={onMessageInputChange}
-        onSend={onSendMessage}
-      />
+      <ChatInput value={messageInput} onChange={onMessageInputChange} onSend={onSendMessage} />
     </Box>
   );
 }

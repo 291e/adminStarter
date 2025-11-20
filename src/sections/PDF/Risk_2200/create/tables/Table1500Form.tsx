@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useTheme } from '@mui/material/styles';
 import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
 import TextField from '@mui/material/TextField';
 import Autocomplete from '@mui/material/Autocomplete';
 import Select from '@mui/material/Select';
@@ -13,6 +12,8 @@ import InputAdornment from '@mui/material/InputAdornment';
 
 import { Iconify } from 'src/components/iconify';
 import type { Table1500Row } from '../../types/table-data';
+import ChemicalNameSearchModal from './modal/ChemicalNameSearchModal';
+import MachineEquipment1500Modal from './modal/MachineEquipment1500Modal';
 
 // ----------------------------------------------------------------------
 
@@ -60,6 +61,8 @@ export default function Table1500Form({
   const theme = useTheme();
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [chemicalModalOpenIndex, setChemicalModalOpenIndex] = useState<number | null>(null);
+  const [machineModalOpenIndex, setMachineModalOpenIndex] = useState<number | null>(null);
 
   const handleDragStart = (index: number) => {
     setDraggedIndex(index);
@@ -88,6 +91,49 @@ export default function Table1500Form({
   const handleDragEnd = () => {
     setDraggedIndex(null);
     setDragOverIndex(null);
+  };
+
+  const handleOpenChemicalModal = (index: number) => {
+    setChemicalModalOpenIndex(index);
+  };
+
+  const handleCloseChemicalModal = () => {
+    setChemicalModalOpenIndex(null);
+  };
+
+  const handleChemicalModalConfirm = (index: number, chemicalName: string) => {
+    onRowChange(index, 'chemical', chemicalName);
+    handleCloseChemicalModal();
+  };
+
+  const handleOpenMachineModal = (index: number) => {
+    setMachineModalOpenIndex(index);
+  };
+
+  const handleCloseMachineModal = () => {
+    setMachineModalOpenIndex(null);
+  };
+
+  const handleMachineModalConfirm = (
+    index: number,
+    data: {
+      machine: string;
+      machineId: string;
+      accidentForm: string;
+      freq: number | string;
+      sev: number | string;
+      evalLabel: string;
+      remark: string;
+    }
+  ) => {
+    onRowChange(index, 'machine', data.machine);
+    onRowChange(index, 'machineId', data.machineId);
+    onRowChange(index, 'accidentForm', data.accidentForm);
+    onRowChange(index, 'freq', data.freq);
+    onRowChange(index, 'sev', data.sev);
+    onRowChange(index, 'evalLabel', data.evalLabel);
+    onRowChange(index, 'remark', data.remark);
+    handleCloseMachineModal();
   };
 
   // 빈도와 심각도가 변경되면 평가 계산
@@ -155,13 +201,15 @@ export default function Table1500Form({
                 위험코드
               </th>
               <th colSpan={2} style={{ width: 203 }}>
-                관련기계·기구·설비
+                기계·기구·설비
               </th>
               <th colSpan={2} style={{ width: 200 }}>
                 화학물질
               </th>
               <th rowSpan={2} style={{ width: 99 }}>
-                발생가능 재해형태
+                발생가능
+                <br />
+                재해형태
               </th>
               <th rowSpan={2} style={{ width: 92 }}>
                 관련 협력업체
@@ -180,7 +228,11 @@ export default function Table1500Form({
               </th>
             </tr>
             <tr style={{ height: 60 }}>
-              <th style={{ width: 99 }}>관련기계·기구·설비명</th>
+              <th style={{ width: 119 }}>
+                기계·
+                <br />
+                기구·설비명
+              </th>
               <th style={{ width: 104 }}>관리번호</th>
               <th style={{ width: 100 }}>화학물질명</th>
               <th style={{ width: 100 }}>CAS No</th>
@@ -254,17 +306,43 @@ export default function Table1500Form({
                   />
                 </td>
                 <td>
-                  <TextField
+                  <Autocomplete
+                    freeSolo
                     size="small"
-                    value={row.machine}
-                    onChange={(e) => onRowChange(index, 'machine', e.target.value)}
-                    fullWidth
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        fontSize: 14,
-                        height: 'auto',
-                      },
+                    options={[]}
+                    value={row.machine || ''}
+                    onInputChange={(_, newValue) => {
+                      onRowChange(index, 'machine', newValue);
                     }}
+                    disableClearable
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        fullWidth
+                        slotProps={{
+                          input: {
+                            ...params.InputProps,
+                            endAdornment: (
+                              <InputAdornment position="end">
+                                <IconButton
+                                  size="small"
+                                  edge="end"
+                                  onClick={() => handleOpenMachineModal(index)}
+                                >
+                                  <Iconify icon="eva:search-fill" width={20} />
+                                </IconButton>
+                              </InputAdornment>
+                            ),
+                          },
+                        }}
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            fontSize: 14,
+                            height: 'auto',
+                          },
+                        }}
+                      />
+                    )}
                   />
                 </td>
                 <td>
@@ -305,7 +383,11 @@ export default function Table1500Form({
                             ...params.InputProps,
                             endAdornment: (
                               <InputAdornment position="end">
-                                <IconButton size="small" edge="end">
+                                <IconButton
+                                  size="small"
+                                  edge="end"
+                                  onClick={() => handleOpenChemicalModal(index)}
+                                >
                                   <Iconify icon="eva:search-fill" width={20} />
                                 </IconButton>
                               </InputAdornment>
@@ -323,44 +405,17 @@ export default function Table1500Form({
                   />
                 </td>
                 <td>
-                  <Autocomplete
-                    freeSolo
+                  <TextField
                     size="small"
-                    options={[]} // TODO: TanStack Query Hook(useQuery)으로 CAS No 목록 가져오기
-                    // const { data: casNumbers } = useQuery({
-                    //   queryKey: ['casNumbers'],
-                    //   queryFn: () => getCasNumbers(),
-                    // });
-                    // options={casNumbers?.body?.casNumbers || []}
                     value={row.casNo}
-                    onInputChange={(_, newValue) => {
-                      onRowChange(index, 'casNo', newValue);
+                    onChange={(e) => onRowChange(index, 'casNo', e.target.value)}
+                    fullWidth
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        fontSize: 14,
+                        height: 'auto',
+                      },
                     }}
-                    disableClearable
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        fullWidth
-                        slotProps={{
-                          input: {
-                            ...params.InputProps,
-                            endAdornment: (
-                              <InputAdornment position="end">
-                                <IconButton size="small" edge="end">
-                                  <Iconify icon="eva:search-fill" width={20} />
-                                </IconButton>
-                              </InputAdornment>
-                            ),
-                          },
-                        }}
-                        sx={{
-                          '& .MuiOutlinedInput-root': {
-                            fontSize: 14,
-                            height: 'auto',
-                          },
-                        }}
-                      />
-                    )}
                   />
                 </td>
                 <td>
@@ -538,6 +593,34 @@ export default function Table1500Form({
           항목추가
         </Button>
       </Box>
+
+      {rows.map((row, index) => (
+        <ChemicalNameSearchModal
+          key={`chemical-${index}`}
+          open={chemicalModalOpenIndex === index}
+          onClose={handleCloseChemicalModal}
+          onConfirm={(chemicalName) => handleChemicalModalConfirm(index, chemicalName)}
+          initialValue={row.chemical || ''}
+        />
+      ))}
+
+      {rows.map((row, index) => (
+        <MachineEquipment1500Modal
+          key={`machine-${index}`}
+          open={machineModalOpenIndex === index}
+          onClose={handleCloseMachineModal}
+          onConfirm={(data) => handleMachineModalConfirm(index, data)}
+          initialData={{
+            machine: row.machine || '',
+            machineId: row.machineId || '',
+            accidentForm: row.accidentForm || '',
+            freq: row.freq || '',
+            sev: row.sev || '',
+            evalLabel: row.evalLabel || '',
+            remark: row.remark || '',
+          }}
+        />
+      ))}
     </Box>
   );
 }
