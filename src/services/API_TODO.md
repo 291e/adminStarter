@@ -4,17 +4,82 @@
 
 ## 목차
 
-1. [Organization (조직 관리)](#organization-조직-관리)
-2. [Chat (채팅)](#chat-채팅)
-3. [Operation (현장 운영 관리)](#operation-현장-운영-관리)
-4. [EducationReport (교육 이수 현황)](#educationreport-교육-이수-현황)
-5. [LibraryReport (라이브러리 리포트)](#libraryreport-라이브러리-리포트)
-6. [ServiceSetting (서비스 관리)](#servicesetting-서비스-관리)
-7. [CodeSetting (코드 관리)](#codesetting-코드-관리)
-8. [ApiSetting (API 관리)](#apisetting-api-관리)
-9. [Checklist (업종별 체크리스트)](#checklist-업종별-체크리스트)
-10. [DashBoard (대시보드)](#dashboard-대시보드)
-11. [Risk_2200 (위험요인 제거·대체 및 통제 등록)](#risk_2200-위험요인-제거대체-및-통제-등록)
+1. [Auth (인증)](#auth-인증)
+2. [Organization (조직 관리)](#organization-조직-관리)
+3. [Chat (채팅)](#chat-채팅)
+4. [Operation (현장 운영 관리)](#operation-현장-운영-관리)
+5. [EducationReport (교육 이수 현황)](#educationreport-교육-이수-현황)
+6. [LibraryReport (라이브러리 리포트)](#libraryreport-라이브러리-리포트)
+7. [ServiceSetting (서비스 관리)](#servicesetting-서비스-관리)
+8. [CodeSetting (코드 관리)](#codesetting-코드-관리)
+9. [ApiSetting (API 관리)](#apisetting-api-관리)
+10. [Checklist (업종별 체크리스트)](#checklist-업종별-체크리스트)
+11. [DashBoard (대시보드)](#dashboard-대시보드)
+12. [Risk_2200 (위험요인 제거·대체 및 통제 등록)](#risk_2200-위험요인-제거대체-및-통제-등록)
+13. [Push Notification (푸시 알림)](#push-notification-푸시-알림)
+
+---
+
+## Auth (인증)
+
+### 기능 설명
+
+사용자 로그인, 토큰 갱신, 로그아웃 기능을 제공하는 섹션입니다. Firebase Realtime Database (RTDB) 접속을 위한 Custom Token도 함께 발급합니다.
+
+### API 목록
+
+#### 1. 로그인
+
+- **위치**: `src/sections/Auth/JwtLogin/view.tsx` 또는 로그인 페이지
+- **기능**: 사용자 로그인을 처리하고, NestJS JWT 토큰과 Firebase Custom Token을 발급합니다.
+- **타입**: `useMutation`
+- **파라미터**: 로그인 정보 (이메일 또는 아이디, 비밀번호)
+- **응답 구조**:
+  ```typescript
+  {
+    resultCode: 200,
+    data: {
+      accessToken: string;      // NestJS API 호출용 JWT 토큰
+      refreshToken: string;      // 토큰 갱신용 JWT 토큰
+      firebaseToken: string;     // Firebase RTDB 접속용 커스텀 토큰
+      member: MemberDto;         // 사용자 정보
+    }
+  }
+  ```
+- **참고**:
+  - Firebase Custom Token은 `memberIdx`를 `uid`로 사용하여 생성합니다.
+  - `memberIdx`는 number 타입이지만 Firebase `uid`는 string이어야 하므로 형변환이 필요합니다.
+  - Custom Token에는 추가 정보(claim)로 `role`, `companyIdx` 등을 포함할 수 있습니다.
+
+#### 2. 토큰 갱신
+
+- **위치**: `src/auth/context/jwt/utils.ts` 또는 토큰 만료 처리
+- **기능**: Refresh Token을 사용하여 새로운 Access Token을 발급합니다.
+- **타입**: `useMutation`
+- **파라미터**: refreshToken
+- **응답 구조**: 새로운 accessToken, refreshToken 반환
+
+#### 3. 로그아웃
+
+- **위치**: 로그아웃 버튼 또는 메뉴
+- **기능**: 사용자 로그아웃을 처리합니다. Firebase RTDB 연결도 해제합니다.
+- **타입**: `useMutation`
+- **파라미터**: 없음 (토큰은 헤더에서 추출)
+
+#### 4. Firebase RTDB 연결 초기화
+
+- **위치**: 앱 초기화 또는 로그인 후
+- **기능**: Firebase Custom Token을 사용하여 Firebase RTDB에 연결합니다.
+- **타입**: Firebase SDK 사용
+- **파라미터**: firebaseToken (로그인 응답에서 받은 토큰)
+- **참고**:
+
+  ```typescript
+  import { getAuth, signInWithCustomToken } from 'firebase/auth';
+
+  const auth = getAuth();
+  await signInWithCustomToken(auth, firebaseToken);
+  ```
 
 ---
 
@@ -138,43 +203,75 @@
 - **타입**: `useMutation`
 - **파라미터**: 구독 ID, 빌링키
 
+#### 17. FCM 토큰 등록/갱신
+
+- **위치**: `src/sections/Organization/Detail/view.tsx` (멤버 관리) 또는 앱 초기화 시
+- **기능**: 사용자의 FCM 토큰을 등록하거나 갱신합니다. `Member.fcmToken` 필드를 업데이트합니다.
+- **타입**: `useMutation`
+- **파라미터**: 사용자 ID, FCM 토큰
+- **참고**: FCM 토큰은 UNIQUE 제약조건이 있으므로, 기존 토큰이 있으면 업데이트합니다.
+
+#### 18. 푸시 알림 설정 (허용/비허용)
+
+- **위치**: `src/sections/Organization/Detail/view.tsx` (멤버 관리) 또는 설정 페이지
+- **기능**: 사용자의 푸시 알림 허용 여부를 설정합니다. `Member.isPushEnabled` 필드를 업데이트합니다.
+- **타입**: `useMutation`
+- **파라미터**: 사용자 ID, isPushEnabled (0 | 1)
+
+#### 19. 회사/지점별 역할별 멤버 조회
+
+- **위치**: `src/sections/Organization/Detail/view.tsx` (멤버 관리)
+- **기능**: 회사 또는 지점별로 특정 역할을 가진 멤버를 조회합니다. 복합 인덱스 `(companyIdx, memberRole)` 또는 `(companyBranchIdx, memberRole)`를 활용합니다.
+- **타입**: `useQuery`
+- **파라미터**: companyIdx (또는 companyBranchIdx), memberRole
+- **참고**: 안전 관리 담당자, 최고 관리자 등 특정 역할의 멤버를 빠르게 조회하기 위한 API입니다.
+
 ---
 
 ## Chat (채팅)
 
 ### 기능 설명
 
-일반 채팅, 그룹 채팅, 챗봇, 응급 채팅 기능을 제공하는 섹션입니다.
+일반 채팅, 그룹 채팅, 챗봇, 응급 채팅 기능을 제공하는 섹션입니다. **Firebase Realtime Database (RTDB)**와 연동하여 실시간 메시지 전송/수신을 처리합니다.
+
+**아키텍처**:
+
+- **RDBMS**: 채팅방 메타 정보(ChatRoom), 참여자 정보(ChatParticipant) 관리
+- **Firebase RTDB**: 실시간 메시지 데이터 저장 및 동기화 (`/messages/{chatRoomId}/{messageId}`)
+- **RDBMS ChatMessage**: 선택적 사용 (백업, 검색/인덱싱, 장기 보관)
 
 ### API 목록
 
 #### 1. 채팅방 목록 조회
 
 - **위치**: `src/sections/Chat/view.tsx:45`
-- **기능**: 사용자가 참여한 채팅방 목록을 조회합니다.
+- **기능**: 사용자가 참여한 채팅방 목록을 조회합니다. RDBMS의 `ChatParticipant` 테이블을 조회합니다.
 - **타입**: `useQuery`
 - **파라미터**: 사용자 ID
+- **참고**: 조회된 `chatRoomId`로 Firebase RTDB 리스너를 연결합니다.
 
-#### 2. 메시지 목록 조회
+#### 2. 메시지 목록 조회 (Firebase RTDB)
 
 - **위치**: `src/sections/Chat/view.tsx:116`
-- **기능**: 특정 채팅방의 메시지 목록을 조회합니다.
-- **타입**: `useQuery`
-- **파라미터**: 채팅방 ID, 페이지 정보
+- **기능**: 특정 채팅방의 메시지 목록을 조회합니다. **Firebase RTDB의 `/messages/{chatRoomId}` 노드에 리스너를 붙여 실시간으로 수신**합니다.
+- **타입**: Firebase RTDB 리스너 (onValue 또는 onChildAdded)
+- **파라미터**: 채팅방 ID (ChatRoom.id)
+- **참고**: RDBMS의 `ChatMessage` 테이블은 백업/검색용으로만 사용됩니다.
 
 #### 3. 참가자 목록 조회
 
 - **위치**: `src/sections/Chat/view.tsx:145`
-- **기능**: 특정 채팅방의 참가자 목록을 조회합니다.
+- **기능**: 특정 채팅방의 참가자 목록을 조회합니다. RDBMS의 `ChatParticipant` 테이블을 조회합니다.
 - **타입**: `useQuery`
 - **파라미터**: 채팅방 ID
 
-#### 4. 메시지 전송
+#### 4. 메시지 전송 (Firebase RTDB)
 
 - **위치**: `src/sections/Chat/view.tsx:167`
-- **기능**: 채팅방에 메시지를 전송합니다.
-- **타입**: `useMutation`
-- **파라미터**: 채팅방 ID, 메시지 내용, 첨부 파일
+- **기능**: 채팅방에 메시지를 전송합니다. **Firebase RTDB의 `/messages/{chatRoomId}` 노드에 데이터를 Push**합니다.
+- **타입**: Firebase RTDB Push (ref().push())
+- **파라미터**: 채팅방 ID, 메시지 내용, 첨부 파일, sharedDocumentId (선택적), signalType (선택적, 'risk' | 'rescue' | 'evacuation')
+- **참고**: Firebase RTDB가 실시간으로 모든 참여자에게 동기화합니다. 필요시 RDBMS에 백업합니다. 메시지 전송 시 Firebase Cloud Functions가 자동으로 푸시 알림을 발송합니다.
 
 #### 5. 참가자 초대
 
@@ -235,16 +332,32 @@
 #### 13. 공유 문서 채팅방 공유
 
 - **위치**: `src/sections/Chat/view.tsx` (공유 문서 공유)
-- **기능**: 공유 문서를 채팅방에 공유합니다 (푸시 알림 발송).
+- **기능**: 공유 문서를 채팅방에 공유합니다. Firebase RTDB 메시지에 `sharedDocumentId`를 포함하고, RDBMS의 `ChatRoomSharedDocument` 테이블에 기록합니다 (푸시 알림 발송).
 - **타입**: `useMutation`
-- **파라미터**: 문서 ID, 채팅방 ID
+- **파라미터**: 문서 ID (SharedDocument.id), 채팅방 ID
+- **참고**: Firebase RTDB 메시지에는 `sharedDocumentId`만 저장하고, 실제 문서 정보는 RDBMS에서 조회합니다.
 
 #### 14. 사고 발생 현황 채팅방 자동 생성/참가
 
 - **위치**: `src/sections/Chat/view.tsx` (조직원 초대 시)
-- **기능**: 조직원 초대로 회원가입 시 자동으로 사고 발생 현황 채팅방에 참가합니다.
+- **기능**: 조직원 초대로 회원가입 시 자동으로 사고 발생 현황 채팅방에 참가합니다. RDBMS의 `ChatParticipant` 테이블에 레코드를 추가합니다.
 - **타입**: `useMutation` (자동 호출)
 - **파라미터**: 조직 ID, 멤버 ID
+
+#### 15. 안 읽은 메시지 수 계산
+
+- **위치**: `src/sections/Chat/view.tsx` (채팅방 목록)
+- **기능**: 안 읽은 메시지 수를 계산합니다. RDBMS의 `ChatParticipant.lastReadAt`과 Firebase RTDB 메시지 `timestamp`를 비교하여 계산합니다.
+- **타입**: `useQuery` 또는 계산 로직
+- **파라미터**: 채팅방 ID, 사용자 ID
+- **참고**: `ChatRoom.unreadCount`는 계산된 값을 캐시합니다.
+
+#### 16. 마지막 읽은 시간 업데이트
+
+- **위치**: `src/sections/Chat/view.tsx` (메시지 읽음 처리)
+- **기능**: 사용자가 메시지를 읽으면 RDBMS의 `ChatParticipant.lastReadAt`을 현재 시점으로 업데이트합니다.
+- **타입**: `useMutation`
+- **파라미터**: 채팅방 ID, 사용자 ID, 현재 시점 (Timestamp)
 
 ---
 
@@ -287,9 +400,10 @@
 #### 5. 채팅방에서 위험 보고 생성
 
 - **위치**: `src/sections/Chat/view.tsx` (사고 발생 현황 채팅방)
-- **기능**: 채팅방에서 위험 보고를 생성합니다 (대시보드 카운트 증가).
+- **기능**: 채팅방에서 위험 보고를 생성합니다 (대시보드 카운트 증가). `RiskReport` 테이블에 레코드를 생성하고, `chatRoomId`, `sourceType: 'chat'`, `signalType`을 설정합니다.
 - **타입**: `useMutation`
-- **파라미터**: 채팅방 ID, 위험 보고 정보
+- **파라미터**: 채팅방 ID, 위험 보고 정보 (제목, 내용, 위치, 첨부 이미지, signalType)
+- **참고**: 위험 보고 생성 시 푸시 알림이 발송됩니다 (notificationType: 'risk_report_new').
 
 ---
 
@@ -353,9 +467,17 @@
 #### 8. 역할별 교육 이수 기준 시간 수정
 
 - **위치**: `src/sections/EducationReport/view.tsx` (교육 기준 설정)
-- **기능**: 역할별 교육 이수 기준 시간을 수정합니다.
+- **기능**: 역할별 교육 이수 기준 시간을 수정합니다. `EducationStandard` 테이블의 레코드를 업데이트합니다.
 - **타입**: `useMutation`
-- **파라미터**: 기준 시간 정보 (역할, 직종, 기준 시간, 기간, 무재해 감면 여부 등)
+- **파라미터**: 기준 시간 정보 (역할, workType: 'production' | 'office' | null, 기준 시간, 기간: 'year' | 'quarter', 무재해 감면 여부: 0 | 1, 감면율 등)
+
+#### 9. 교육 이수 독려 알림 발송 (스케줄러)
+
+- **위치**: 백엔드 스케줄러 (Cron Job, 매주 실행)
+- **기능**: 교육 이수율이 낮고 `EducationStandard`를 충족하지 못한 멤버에게 푸시 알림을 발송합니다. `DocumentNotification` 테이블에 레코드를 생성합니다 (notificationType: 'education_reminder').
+- **타입**: 백엔드 스케줄러
+- **파라미터**: 없음 (자동 실행)
+- **참고**: `EducationReport.completionRate`와 `EducationStandard`를 비교하여 대상자를 결정합니다.
 
 ---
 
@@ -440,9 +562,16 @@ VOD 컨텐츠를 관리하고, 카테고리를 설정하며, 컨텐츠를 업로
 #### 11. VOD 숨김 해제
 
 - **위치**: `src/sections/LibraryReport/view.tsx` (VOD 숨김 해제)
-- **기능**: 숨김 처리된 VOD를 다시 표시합니다.
+- **기능**: 숨김 처리된 VOD를 다시 표시합니다. `LibraryReport.hiddenByCompanyIdx` JSON 배열에서 해당 조직 ID를 제거합니다.
 - **타입**: `useMutation`
 - **파라미터**: VOD ID, 조직 ID
+
+#### 12. VOD를 공유 문서로 등록
+
+- **위치**: `src/sections/LibraryReport/view.tsx` (VOD 공유)
+- **기능**: VOD를 공유 문서함에 등록합니다. `SharedDocument` 테이블에 레코드를 생성합니다 (referenceType: 'library_report', referenceId: LibraryReport.id).
+- **타입**: `useMutation`
+- **파라미터**: VOD ID (LibraryReport.id), 중요도, 공개 여부
 
 ---
 
@@ -742,9 +871,12 @@ VOD 컨텐츠를 관리하고, 카테고리를 설정하며, 컨텐츠를 업로
 #### 6. 공유 문서 업로드
 
 - **위치**: `src/sections/DashBoard/view.tsx` (공유 문서 섹션)
-- **기능**: 공유 문서를 업로드합니다 (중요도 설정 포함).
+- **기능**: 공유 문서를 업로드합니다 (중요도 설정 포함). Soft Reference 패턴을 사용하여 다양한 문서 타입을 참조할 수 있습니다.
 - **타입**: `useMutation`
-- **파라미터**: 문서 정보 (문서명, 파일, 중요도, 공개 여부)
+- **파라미터**: 문서 정보 (문서명, 파일, 중요도, 공개 여부, referenceType, referenceId)
+  - `referenceType`: 'safety_system_document' | 'library_report' | 'safety_report' | 'custom'
+  - `referenceId`: 참조 문서 ID (SafetySystemDocument.id, LibraryReport.id, SafetyReport.id 등)
+- **참고**: 기존 `safetySystemDocumentId`는 레거시 호환성을 위해 유지되지만, `referenceType`과 `referenceId`를 우선 사용합니다.
 
 #### 7. 공유 문서 수정
 
@@ -780,6 +912,69 @@ VOD 컨텐츠를 관리하고, 카테고리를 설정하며, 컨텐츠를 업로
 - **기능**: 중요도 설정을 등록/수정/삭제합니다.
 - **타입**: `useMutation`
 - **파라미터**: 중요도 설정 정보
+
+---
+
+## Auth (인증)
+
+### 기능 설명
+
+사용자 로그인, 토큰 갱신, 로그아웃 기능을 제공하는 섹션입니다. Firebase Realtime Database (RTDB) 접속을 위한 Custom Token도 함께 발급합니다.
+
+### API 목록
+
+#### 1. 로그인
+
+- **위치**: `src/sections/Auth/JwtLogin/view.tsx` 또는 로그인 페이지
+- **기능**: 사용자 로그인을 처리하고, NestJS JWT 토큰과 Firebase Custom Token을 발급합니다.
+- **타입**: `useMutation`
+- **파라미터**: 로그인 정보 (이메일 또는 아이디, 비밀번호)
+- **응답 구조**:
+  ```typescript
+  {
+    resultCode: 200,
+    data: {
+      accessToken: string;      // NestJS API 호출용 JWT 토큰
+      refreshToken: string;      // 토큰 갱신용 JWT 토큰
+      firebaseToken: string;     // Firebase RTDB 접속용 커스텀 토큰
+      member: MemberDto;         // 사용자 정보
+    }
+  }
+  ```
+- **참고**:
+  - Firebase Custom Token은 `memberIdx`를 `uid`로 사용하여 생성합니다.
+  - `memberIdx`는 number 타입이지만 Firebase `uid`는 string이어야 하므로 형변환이 필요합니다.
+  - Custom Token에는 추가 정보(claim)로 `role`, `companyIdx` 등을 포함할 수 있습니다.
+
+#### 2. 토큰 갱신
+
+- **위치**: `src/auth/context/jwt/utils.ts` 또는 토큰 만료 처리
+- **기능**: Refresh Token을 사용하여 새로운 Access Token을 발급합니다.
+- **타입**: `useMutation`
+- **파라미터**: refreshToken
+- **응답 구조**: 새로운 accessToken, refreshToken 반환
+
+#### 3. 로그아웃
+
+- **위치**: 로그아웃 버튼 또는 메뉴
+- **기능**: 사용자 로그아웃을 처리합니다. Firebase RTDB 연결도 해제합니다.
+- **타입**: `useMutation`
+- **파라미터**: 없음 (토큰은 헤더에서 추출)
+
+#### 4. Firebase RTDB 연결 초기화
+
+- **위치**: 앱 초기화 또는 로그인 후
+- **기능**: Firebase Custom Token을 사용하여 Firebase RTDB에 연결합니다.
+- **타입**: Firebase SDK 사용
+- **파라미터**: firebaseToken (로그인 응답에서 받은 토큰)
+- **참고**:
+
+  ```typescript
+  import { getAuth, signInWithCustomToken } from 'firebase/auth';
+
+  const auth = getAuth();
+  await signInWithCustomToken(auth, firebaseToken);
+  ```
 
 ---
 
@@ -820,6 +1015,138 @@ const mutation = useMutation({
 
 필터, 검색, 페이지 변경 시 `queryClient.invalidateQueries`를 사용하여 자동으로 데이터를 새로고침합니다.
 
+### 5. 개발 규칙에 따른 자동 변환 가이드
+
+API_TODO.md에 적힌 용어를 **개발 규칙(네이밍, 응답 구조)**대로 코딩할 때 다음과 같이 자동 변환해서 작성해야 합니다.
+
+#### A. URL 및 파라미터 네이밍 (id → Idx 변환)
+
+**규칙**: API_TODO에는 편의상 `id`라고 적혀 있는 경우가 많지만, 코드는 무조건 `Idx` 규칙을 따라야 합니다.
+
+**예시**:
+
+| API_TODO 작성             | 실제 코드                                                            |
+| ------------------------- | -------------------------------------------------------------------- |
+| `GET /organizations/{id}` | `GET /companies/{companyIdx}` (URL 파라미터도 변수명도 `companyIdx`) |
+| `파라미터: 문서 ID`       | `파라미터: documentIdx` 또는 `safetySystemDocumentIdx`               |
+| `파라미터: 사용자 ID`     | `파라미터: memberIdx`                                                |
+
+**이유**: 규칙 2.3 변수명(카멜케이스+Idx) 준수
+
+**주의사항**:
+
+- UUID 타입의 경우: `SafetySystemDocument.id`, `SharedDocument.id` 등은 그대로 `id` 사용 (UUID는 `*Idx` 패턴이 아님)
+- AUTO_INCREMENT 타입: `Member.memberIdx`, `Company.companyIdx` 등은 `*Idx` 사용
+
+#### B. 응답 데이터 구조 (List 규칙)
+
+**규칙**: API_TODO는 "목록 조회"라고만 되어 있지만, 실제 응답 JSON은 1:N 네이밍 규칙을 따라야 합니다.
+
+**예시**:
+
+| API_TODO 작성      | 실제 코드 응답                                             |
+| ------------------ | ---------------------------------------------------------- |
+| "조직 목록 반환"   | `{ "resultCode": 200, "data": { "companyList": [...] } }`  |
+| "멤버 목록 반환"   | `{ "resultCode": 200, "data": { "memberList": [...] } }`   |
+| "채팅방 목록 반환" | `{ "resultCode": 200, "data": { "chatRoomList": [...] } }` |
+
+**이유**: 규칙 4.3 1:N 관계 네이밍 규칙 준수 (단순히 배열만 주지 말고 `{Entity}List`로 감싸기)
+
+#### C. 상세 조회 네이밍 (Information 규칙)
+
+**규칙**: N:1 관계 데이터는 `Information` 접미사를 사용해야 합니다.
+
+**예시**:
+
+| API_TODO 작성         | 실제 코드 응답                                                                                                                      |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| "조직 상세 정보 반환" | `{ "resultCode": 200, "data": { "companyIdx": 1, "companyName": "...", "companyOwnerInformation": { ... } } }`                      |
+| "멤버 상세 정보 반환" | `{ "resultCode": 200, "data": { "memberIdx": 1, "memberCompanyInformation": { ... }, "memberCompanyBranchInformation": { ... } } }` |
+| "문서 상세 정보 반환" | `{ "resultCode": 200, "data": { "documentIdx": 1, "safetySystemDocumentItemInformation": { ... } } }`                               |
+
+**이유**: 규칙 4.3 1:N 관계 네이밍 규칙 준수 (N 측은 `{Entity}Information` 접미사)
+
+#### D. 등록/수정의 트랜잭션 처리
+
+**규칙**: API_TODO에는 "등록한다"라고 간단히 적혀 있지만, 규칙에 따라 반드시 QueryRunner를 사용해야 합니다.
+
+**예시**:
+
+| API_TODO 작성    | 실제 코드                                                                                                                                                                        |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "위험 보고 등록" | `typescript<br>queryRunner.startTransaction()<br>RiskReport Insert<br>ChatRoom Insert (필요시)<br>ChatParticipant Insert (필요시)<br>commit or rollback<br>`                     |
+| "조직 등록"      | `typescript<br>queryRunner.startTransaction()<br>Company Insert<br>CompanyBranch Insert (필요시)<br>Member Insert (필요시)<br>commit or rollback<br>`                            |
+| "문서 등록"      | `typescript<br>queryRunner.startTransaction()<br>SafetySystemDocument Insert<br>DocumentApproval Insert (필요시)<br>DocumentSignature Insert (필요시)<br>commit or rollback<br>` |
+
+**이유**: 규칙 3.3 트랜잭션 패턴 준수 (여러 테이블에 동시에 데이터를 삽입/수정하는 경우 반드시 트랜잭션 사용)
+
+**주의사항**:
+
+- 단일 테이블만 수정하는 경우에도, 외래키 관계가 있는 경우 트랜잭션 사용 권장
+- 에러 발생 시 반드시 `rollback` 처리
+
+#### E. 로그인 응답 DTO 구조 (Firebase Custom Token)
+
+**규칙**: 로그인 응답에는 NestJS JWT 토큰뿐만 아니라 Firebase RTDB 접속용 Custom Token도 포함해야 합니다.
+
+**예시**:
+
+| API_TODO 작성      | 실제 코드 응답                                                                                                                                                                                                                                                      |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "로그인 응답 반환" | `typescript<br>{<br>  "resultCode": 200,<br>  "data": {<br>    "accessToken": "...",      // NestJS API 호출용<br>    "refreshToken": "...",     // 토큰 갱신용<br>    "firebaseToken": "...",    // Firebase RTDB 접속용<br>    "member": { ... }<br>  }<br>}<br>` |
+
+**백엔드 구현 예시** (auth.service.ts):
+
+```typescript
+import * as admin from 'firebase-admin'; // firebase-admin 설치 필요
+
+async login(loginDto: LoginDto): Promise<LoginResponseDto> {
+  // 1. MySQL에서 유저 검증
+  const member = await this.validateUser(loginDto);
+
+  // 2. NestJS용 JWT 생성
+  const accessToken = this.jwtService.sign({ sub: member.memberIdx });
+  const refreshToken = this.jwtService.sign({ sub: member.memberIdx }, { expiresIn: '7d' });
+
+  // 3. [핵심] Firebase Custom Token 생성 (memberIdx를 uid로 사용)
+  // 주의: memberIdx는 number지만 Firebase uid는 string이어야 함 -> 형변환 필수
+  const firebaseToken = await admin.auth().createCustomToken(String(member.memberIdx), {
+    role: member.memberRole,     // 필요하다면 추가 정보(claim)도 넣을 수 있음
+    companyIdx: member.companyIdx
+  });
+
+  return {
+    accessToken,
+    refreshToken,
+    firebaseToken,  // 클라이언트로 전달
+    member,
+  };
+}
+```
+
+**DTO 정의 예시** (auth.dto.ts):
+
+```typescript
+export class LoginResponseDto {
+  accessToken: string; // NestJS API 호출용
+  refreshToken: string; // 토큰 갱신용
+  firebaseToken: string; // Firebase RTDB 접속용 커스텀 토큰
+  member: MemberDto;
+}
+```
+
+**이유**:
+
+- Firebase RTDB 접속을 위해서는 Firebase Authentication이 필요합니다.
+- Custom Token을 사용하면 백엔드에서 사용자 인증을 검증한 후 Firebase RTDB 접근 권한을 부여할 수 있습니다.
+- `memberIdx`를 `uid`로 사용하여 RDBMS와 Firebase RTDB의 사용자 식별을 일치시킵니다.
+
+**주의사항**:
+
+- Firebase Custom Token은 1시간 후 만료됩니다. 필요시 갱신 로직을 구현해야 합니다.
+- `memberIdx`는 number 타입이지만 Firebase `uid`는 string이어야 하므로 반드시 `String(member.memberIdx)`로 형변환해야 합니다.
+- Custom Token의 claim에는 민감한 정보를 포함하지 않도록 주의합니다.
+
 ---
 
 ## Risk_2200 (위험요인 제거·대체 및 통제 등록)
@@ -840,9 +1167,9 @@ const mutation = useMutation({
 #### 2. 문서 상세 정보 조회
 
 - **위치**: `src/sections/PDF/Risk_2200/[risk_id]/view.tsx:112`
-- **기능**: 특정 문서의 상세 정보를 조회합니다.
+- **기능**: 특정 문서의 상세 정보를 조회합니다. `SafetySystemDocument` 테이블에서 `id` (UUID)로 조회합니다.
 - **타입**: `useQuery`
-- **파라미터**: 문서 ID (riskId)
+- **파라미터**: 문서 ID (SafetySystemDocument.id, UUID)
 
 #### 3. 문서 등록
 
@@ -851,19 +1178,7 @@ const mutation = useMutation({
 - **타입**: `useMutation`
 - **파라미터**: 문서 정보 (documentDate, approvalDeadline, 테이블 데이터, safetyIdx, itemNumber)
 
-#### 4. 문서 임시 저장
-
-- **위치**: `src/sections/PDF/Risk_2200/create/view.tsx:459`
-- **기능**: 문서를 임시 저장합니다.
-- **타입**: `useMutation`
-- **파라미터**: 문서 정보 (documentDate, approvalDeadline, 테이블 데이터, safetyIdx, itemNumber)
-
-#### 5. 임시 저장된 문서 불러오기
-
-- **위치**: `src/sections/PDF/Risk_2200/create/view.tsx:130`
-- **기능**: 임시 저장된 문서를 불러옵니다 (수정 모드 또는 임시 저장 불러오기).
-- **타입**: `useQuery`
-- **파라미터**: 문서 ID (documentId)
+- NOTE: 임시 저장 기능은 프런트엔드(LocalStorage 혹은 SessionStorage)에 위임하여 별도 API 없이 처리합니다.
 
 #### 6. 문서 삭제
 
@@ -889,9 +1204,9 @@ const mutation = useMutation({
 #### 9. PDF 다운로드용 문서 정보 조회
 
 - **위치**: `src/sections/PDF/Risk_2200/view.tsx:114`, `src/sections/PDF/Risk_2200/[risk_id]/view.tsx:54`, `src/sections/PDF/Risk_2200/utils/download-pdf.tsx:27`
-- **기능**: PDF 다운로드를 위한 문서 정보를 조회합니다.
+- **기능**: PDF 다운로드를 위한 문서 정보를 조회합니다. `SafetySystemDocument` 테이블에서 `id` (UUID)로 조회합니다.
 - **타입**: `useQuery`
-- **파라미터**: 문서 ID
+- **파라미터**: 문서 ID (SafetySystemDocument.id, UUID)
 
 #### 10. 샘플 문서 조회
 
@@ -917,9 +1232,10 @@ const mutation = useMutation({
 #### 13. 결재 정보 조회
 
 - **위치**: `src/sections/PDF/Risk_2200/[risk_id]/components/ApprovalSection.tsx:18`
-- **기능**: 문서의 결재 정보를 조회합니다 (작성자, 검토자, 승인자 정보 포함).
+- **기능**: 문서의 결재 정보를 조회합니다 (작성자, 검토자, 승인자 정보 포함). `DocumentApproval` 테이블에서 `documentId` (SafetySystemDocument.id, UUID)로 조회합니다.
 - **타입**: `useQuery`
-- **파라미터**: 문서 ID (riskId)
+- **파라미터**: 문서 ID (SafetySystemDocument.id, UUID)
+- **참고**: SafetySystemDocument는 대리키 `id` (UUID)를 PK로 사용하며, 복합키 `(safetyIdx, itemNumber, documentNumber)`는 UNIQUE 제약조건으로 유지됩니다.
 
 #### 14. 서명 추가
 
@@ -928,19 +1244,7 @@ const mutation = useMutation({
 - **타입**: `useMutation`
 - **파라미터**: 문서 ID, 서명 타입 (writer, reviewer, approver), 서명 정보
 
-#### 15. 화학물질 목록 조회
-
-- **위치**: `src/sections/PDF/Risk_2200/create/tables/Table1400Form.tsx:368`, `src/sections/PDF/Risk_2200/create/tables/Table1500Form.tsx:288`
-- **기능**: 화학물질 목록을 조회합니다 (Autocomplete 옵션용).
-- **타입**: `useQuery`
-- **파라미터**: 없음 (또는 검색어)
-
-#### 16. CAS No 목록 조회
-
-- **위치**: `src/sections/PDF/Risk_2200/create/tables/Table1500Form.tsx:329`
-- **기능**: CAS 번호 목록을 조회합니다 (Autocomplete 옵션용).
-- **타입**: `useQuery`
-- **파라미터**: 없음 (또는 검색어)
+- NOTE: 화학물질 목록, CAS No 목록 등 외부 API 연동 데이터는 별도 서버 연동 없이 프런트엔드에서 직접 호출하거나 정적 데이터로 처리합니다.
 
 #### 17. 필터/검색/페이지 변경 시 자동 새로고침
 
@@ -952,51 +1256,53 @@ const mutation = useMutation({
 #### 18. 문서 결재 대상자 등록
 
 - **위치**: `src/sections/PDF/Risk_2200/[risk_id]/view.tsx` (문서 수정 - 결재란)
-- **기능**: 문서의 결재 대상자를 등록합니다 (순차/동시 결재 타입 설정).
+- **기능**: 문서의 결재 대상자를 등록합니다 (순차/동시 결재 타입 설정). `DocumentApproval` 테이블에 레코드를 생성합니다.
 - **타입**: `useMutation`
-- **파라미터**: 문서 ID, 결재 타입, 대상자 목록, 결재 순서
+- **파라미터**: 문서 ID (SafetySystemDocument.id, UUID), 결재 타입, 대상자 목록, 결재 순서
 
 #### 19. 문서 서명 대상자 등록 (TBM 일지)
 
 - **위치**: `src/sections/PDF/Risk_2200/[risk_id]/view.tsx` (TBM 일지 등록)
-- **기능**: TBM 일지의 서명 대상자를 등록합니다 (대시보드 서명 대기 문서에 추가).
+- **기능**: TBM 일지의 서명 대상자를 등록합니다 (대시보드 서명 대기 문서에 추가). `DocumentSignature` 테이블에 레코드를 생성합니다.
 - **타입**: `useMutation`
-- **파라미터**: 문서 ID, 대상자 목록
+- **파라미터**: 문서 ID (SafetySystemDocument.id, UUID), 대상자 목록
 
 #### 20. 결재/서명 진행률 조회
 
 - **위치**: `src/sections/PDF/Risk_2200/[risk_id]/view.tsx` (진행률 표시)
-- **기능**: 문서의 결재/서명 진행률을 조회합니다.
+- **기능**: 문서의 결재/서명 진행률을 조회합니다. `DocumentApproval`과 `DocumentSignature` 테이블에서 `documentId` (SafetySystemDocument.id, UUID)로 조회합니다.
 - **타입**: `useQuery`
-- **파라미터**: 문서 ID
+- **파라미터**: 문서 ID (SafetySystemDocument.id, UUID)
 
 #### 21. 서명 상태 조회
 
 - **위치**: `src/sections/PDF/Risk_2200/[risk_id]/components/ProgressModal.tsx`
-- **기능**: 문서의 서명 상태를 조회합니다 (서명 완료일, 서명 데이터 포함).
+- **기능**: 문서의 서명 상태를 조회합니다 (서명 완료일, 서명 데이터 포함). `DocumentSignature` 테이블에서 `documentId` (SafetySystemDocument.id, UUID)로 조회합니다.
 - **타입**: `useQuery`
-- **파라미터**: 문서 ID
+- **파라미터**: 문서 ID (SafetySystemDocument.id, UUID)
 
 #### 22. 서명 추가
 
 - **위치**: `src/sections/PDF/Risk_2200/[risk_id]/view.tsx` (서명 추가)
-- **기능**: 문서에 서명을 추가합니다 (PDF에 반영, 푸시 알림 발송).
+- **기능**: 문서에 서명을 추가합니다 (PDF에 반영, 푸시 알림 발송). `DocumentSignature` 테이블의 레코드를 업데이트합니다.
 - **타입**: `useMutation`
-- **파라미터**: 문서 ID, 서명 타입, 서명 데이터
+- **파라미터**: 문서 ID (SafetySystemDocument.id, UUID), 서명 타입 ('approval' | 'signature'), 서명 데이터
 
 #### 23. 알림 발송 (수동/자동)
 
 - **위치**: `src/sections/PDF/Risk_2200/[risk_id]/view.tsx` (알림 발송)
-- **기능**: 문서에 대한 알림을 발송합니다 (결재 요청, 서명 요청, 마감일 알림).
+- **기능**: 문서에 대한 알림을 발송합니다 (결재 요청, 서명 요청, 마감일 알림). `DocumentNotification` 테이블에 레코드를 생성하고, FCM을 통해 푸시 알림을 전송합니다.
 - **타입**: `useMutation`
-- **파라미터**: 문서 ID, 알림 타입, 대상자 ID 목록
+- **파라미터**: 문서 ID (SafetySystemDocument.id, UUID), 알림 타입 ('approval_request' | 'signature_request' | 'deadline_reminder'), 대상자 ID 목록
+- **참고**: 대상자의 `Member.fcmToken`과 `Member.isPushEnabled = 1`을 확인하여 알림을 전송합니다.
 
 #### 24. 문서 게시 (공유 문서함 연동)
 
 - **위치**: `src/sections/PDF/Risk_2200/[risk_id]/view.tsx` (게시 버튼)
-- **기능**: 문서를 게시하여 공유 문서함에 추가합니다.
+- **기능**: 문서를 게시하여 공유 문서함에 추가합니다. `SafetySystemDocument.isPublished = 1`로 설정하고, `SharedDocument` 테이블에 레코드를 생성합니다 (referenceType: 'safety_system_document', referenceId: SafetySystemDocument.id).
 - **타입**: `useMutation`
-- **파라미터**: 문서 ID
+- **파라미터**: 문서 ID (SafetySystemDocument.id, UUID), 중요도, 공개 여부
+- **참고**: Soft Reference 패턴을 사용하여 다양한 문서 타입을 참조할 수 있습니다.
 
 #### 25. 문서 목록 조회 (권한별 필터링)
 
@@ -1007,9 +1313,78 @@ const mutation = useMutation({
 
 ---
 
+## Push Notification (푸시 알림)
+
+### 기능 설명
+
+실시간 커뮤니케이션 및 안전 관리 시스템에서 핵심적인 기능입니다. Firebase Cloud Messaging (FCM)을 사용하여 다양한 상황에 대한 알림을 전송합니다.
+
+**아키텍처**:
+
+- **RDBMS**: 알림 대상 및 상태 관리 (Member.fcmToken, Member.isPushEnabled, DocumentNotification)
+- **Firebase Cloud Messaging (FCM)**: 실제 알림 메시지 전송
+- **Firebase Cloud Functions**: Firebase RTDB 이벤트 감지 및 알림 트리거 (메시지 알림)
+
+### API 목록
+
+#### 1. 알림 이력 조회
+
+- **위치**: 알림 설정 페이지 또는 알림 목록 페이지
+- **기능**: 사용자가 수신한 알림 이력을 조회합니다. `DocumentNotification` 테이블을 조회합니다.
+- **타입**: `useQuery`
+- **파라미터**: 사용자 ID, 알림 유형 (선택적), 페이지 정보
+
+#### 2. 알림 읽음 처리
+
+- **위치**: 알림 목록 페이지
+- **기능**: 알림을 읽음 처리합니다. `DocumentNotification` 테이블의 레코드를 업데이트합니다.
+- **타입**: `useMutation`
+- **파라미터**: 알림 ID
+
+#### 3. 문서 승인 마감일 알림 발송 (스케줄러)
+
+- **위치**: 백엔드 스케줄러 (Cron Job, 매일 실행)
+- **기능**: 문서 승인 마감일이 임박한 멤버에게 푸시 알림을 발송합니다. `SafetySystemDocument.approvalDeadline`과 `DocumentApproval`을 비교하여 대상자를 결정합니다.
+- **타입**: 백엔드 스케줄러
+- **파라미터**: 없음 (자동 실행)
+- **참고**: `DocumentNotification.scheduledAt`과 비교하여 전송 시점을 결정합니다 (15일 전, 7일 전, 1일 전).
+
+#### 4. 위험 보고서 알림 발송
+
+- **위치**: `src/sections/Operation/create/view.tsx` (위험 보고 등록 시)
+- **기능**: 새로운 위험 보고서가 등록되면 관련 담당자에게 푸시 알림을 발송합니다. `DocumentNotification` 테이블에 레코드를 생성합니다 (notificationType: 'risk_report_new').
+- **타입**: `useMutation` (자동 호출)
+- **파라미터**: 위험 보고서 ID
+- **참고**: `RiskReport`와 연결된 `Company`의 안전 관리 담당자 또는 `SuperAdmin`에게 알림을 전송합니다.
+
+#### 5. 메시지 알림 발송 (Firebase Cloud Functions)
+
+- **위치**: Firebase Cloud Functions (Firebase RTDB 이벤트 트리거)
+- **기능**: Firebase RTDB에 새 메시지가 추가될 때 자동으로 푸시 알림을 발송합니다. `ChatParticipant` 테이블을 조회하여 대상자를 결정합니다.
+- **타입**: Firebase Cloud Functions (onCreate)
+- **파라미터**: Firebase RTDB 이벤트 데이터 (chatRoomId, messageId, messageData)
+- **참고**:
+  - `ChatParticipant.lastReadAt`이 새 메시지 `timestamp`보다 이전인 경우만 대상
+  - `Member.isPushEnabled = 1`인 사용자만 대상
+  - `DocumentNotification` 테이블에 전송 이력을 기록합니다 (notificationType: 'chat_message').
+
+---
+
 ## 참고사항
+
+### 데이터베이스 설계 변경사항 반영
+
+1. **SafetySystemDocument**: 대리키 `id` (UUID)를 PK로 사용하며, 복합키는 UNIQUE 제약조건으로 유지됩니다.
+2. **SharedDocument**: Soft Reference 패턴을 사용하여 다양한 문서 타입을 참조합니다 (`referenceType`, `referenceId`).
+3. **Member**: FCM 토큰 관리 필드 추가 (`fcmToken`, `isPushEnabled`).
+4. **DocumentNotification**: 알림 유형 확장 및 `documentId` nullable 처리.
+5. **Chat 시스템**: Firebase RTDB와 하이브리드 아키텍처로 설계됨.
+
+### API 호출 규칙
 
 - 모든 API는 `src/lib/axios.ts`의 `axiosInstance`를 사용합니다.
 - 엔드포인트는 `src/lib/axios.ts`의 `endpoints` 객체에 정의합니다.
 - 응답 타입은 백엔드의 `BaseResponseDto` 구조를 따릅니다.
 - 에러 처리는 React Query의 `isError`와 `error`를 사용합니다.
+- Firebase RTDB 관련 작업은 Firebase SDK를 직접 사용합니다.
+- 푸시 알림 전송은 백엔드에서 FCM API를 호출합니다.

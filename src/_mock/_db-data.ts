@@ -159,6 +159,8 @@ export function generateMembers(
       joinedAt: fSub({ days: (count - index) * 30 }), // 입사일 (이수율 계산용)
       deviceToken: index % 2 === 0 ? `device_token_${index}` : null,
       deviceGubun: (['web', 'ios', 'android', null] as const)[index % 4],
+      fcmToken: index % 3 !== 0 ? `fcm_token_${index}_${Date.now()}` : null, // FCM 토큰 (UNIQUE)
+      isPushEnabled: index % 5 !== 0 ? 1 : 0, // 푸시 알림 허용 여부
       memberlat: hasLocation ? 37.5665 + index * 0.01 : null,
       memberlng: hasLocation ? 126.978 + index * 0.01 : null,
       lastLocationUpdateAt: hasLocation ? fSub({ hours: Math.floor(Math.random() * 24) }) : null,
@@ -361,6 +363,7 @@ export function generateSafetySystemDocuments(
       const d = String(date.getDate()).padStart(2, '0');
 
       documents.push({
+        id: `safety-system-document-${item.safetyIdx}-${item.itemNumber}-${docNum}`,
         safetyIdx: item.safetyIdx,
         itemNumber: item.itemNumber,
         documentNumber: docNum,
@@ -944,9 +947,16 @@ export function generateSharedDocuments(
     const prioritySetting =
       prioritySettings.find((p) => p.labelType === priority) || prioritySettings[0];
 
+    const referenceTypes: Array<
+      'safety_system_document' | 'library_report' | 'safety_report' | 'custom'
+    > = ['safety_system_document', 'library_report', 'safety_report', 'custom'];
+    const referenceType = referenceTypes[index % referenceTypes.length];
+
     return {
       id: `shared-document-${index + 1}`,
-      safetySystemDocumentId: `${doc.safetyIdx}-${doc.itemNumber}-${doc.documentNumber}`,
+      referenceType,
+      referenceId: doc.id, // SafetySystemDocument.id (다른 타입의 경우 해당 문서 ID)
+      safetySystemDocumentId: referenceType === 'safety_system_document' ? doc.id : null, // 레거시 호환성
       memberIdx: member.memberIdx,
       createdBy: creator.memberIdx,
       updatedBy: creator.memberIdx,
@@ -1156,7 +1166,7 @@ export function generateDocumentApprovals(
       const approvalStatus = i === 0 && docIndex % 2 === 0 ? 'approved' : 'pending';
       approvals.push({
         id: `document-approval-${approvals.length + 1}`,
-        documentId: `${doc.safetyIdx}-${doc.itemNumber}-${doc.documentNumber}`,
+        documentId: doc.id,
         targetMemberIdx: targetMember.memberIdx,
         approvalType: i % 2 === 0 ? 'sequential' : 'parallel',
         approvalOrder: i + 1,
@@ -1196,7 +1206,7 @@ export function generateDocumentSignatures(
       const signatureStatus = i === 0 && docIndex % 3 === 0 ? 'signed' : 'pending';
       signatures.push({
         id: `document-signature-${signatures.length + 1}`,
-        documentId: `${doc.safetyIdx}-${doc.itemNumber}-${doc.documentNumber}`,
+        documentId: doc.id,
         targetMemberIdx: targetMember.memberIdx,
         signatureType: i % 2 === 0 ? 'approval' : 'signature',
         signatureStatus,
@@ -1234,13 +1244,30 @@ export function generateDocumentNotifications(
     for (let i = 0; i < notificationCount; i++) {
       const targetMember = members[Math.floor(Math.random() * members.length)];
       const notificationTypes: Array<
-        'approval_request' | 'signature_request' | 'deadline_reminder'
-      > = ['approval_request', 'signature_request', 'deadline_reminder'];
+        | 'approval_request'
+        | 'signature_request'
+        | 'deadline_reminder'
+        | 'risk_report_new'
+        | 'chat_message'
+        | 'education_reminder'
+      > = [
+        'approval_request',
+        'signature_request',
+        'deadline_reminder',
+        'risk_report_new',
+        'chat_message',
+        'education_reminder',
+      ];
       const notificationType = notificationTypes[i % notificationTypes.length];
       const isSent = docIndex % 2 === 0;
       notifications.push({
         id: `document-notification-${notifications.length + 1}`,
-        documentId: `${doc.safetyIdx}-${doc.itemNumber}-${doc.documentNumber}`,
+        documentId:
+          notificationType.includes('approval') ||
+          notificationType.includes('signature') ||
+          notificationType.includes('deadline')
+            ? doc.id
+            : null,
         targetMemberIdx: targetMember.memberIdx,
         notificationType,
         scheduledAt: fSub({ days: docIndex }),
@@ -1399,6 +1426,8 @@ export function generateDatabaseData() {
     joinedAt: new Date().toISOString(),
     deviceToken: null,
     deviceGubun: null,
+    fcmToken: null,
+    isPushEnabled: 1,
     memberlat: null,
     memberlng: null,
     lastLocationUpdateAt: null,

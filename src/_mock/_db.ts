@@ -129,8 +129,10 @@ export interface Member {
   duplicateSigninKey: string | null;
   lastSigninAt: Timestamp | null; // 마지막 로그인 시간
   joinedAt: Timestamp; // 입사일 (이수율 계산용)
-  deviceToken: string | null;
+  deviceToken: string | null; // 기존 디바이스 토큰 (레거시)
   deviceGubun: 'web' | 'ios' | 'android' | null;
+  fcmToken: string | null; // Firebase Cloud Messaging 토큰 (UNIQUE, 푸시 알림 전송용)
+  isPushEnabled: 0 | 1; // 푸시 알림 허용 여부 (0: 비활성, 1: 활성)
   memberlat: number | null;
   memberlng: number | null;
   lastLocationUpdateAt: Timestamp | null;
@@ -285,10 +287,13 @@ export interface SafetySystemItem {
 // ============================================================================
 
 export interface SafetySystemDocument {
-  // 복합 기본 키
-  safetyIdx: number; // PK (복합키)
-  itemNumber: number; // PK (복합키)
-  documentNumber: number; // PK (복합키)
+  // 기본 키
+  id: UUID; // PK (대리키)
+
+  // 복합 고유 키 (UNIQUE 제약조건)
+  safetyIdx: number; // UNIQUE (복합키)
+  itemNumber: number; // UNIQUE (복합키)
+  documentNumber: number; // UNIQUE (복합키)
 
   // 외래 키
   // (safetyIdx, itemNumber) → SafetySystemItem(safetyIdx, itemNumber) (onDelete: CASCADE)
@@ -322,10 +327,14 @@ export interface SafetySystemDocument {
 // ============================================================================
 // 9. ChatRoom (채팅방)
 // ============================================================================
+// Firebase Realtime Database 연동:
+// - 이 테이블의 id(PK)는 Firebase RTDB의 /messages/{chatRoomId} 노드 키로 사용됩니다.
+// - 채팅방의 메타 정보(이름, 유형, 생성 회사 등)는 RDBMS에서 관리합니다.
+// - 실시간 메시지 데이터는 Firebase RTDB에 저장되며, 이 테이블은 참조용으로만 사용됩니다.
 
 export interface ChatRoom {
   // 기본 키
-  id: UUID; // PK
+  id: UUID; // PK, Firebase RTDB 노드 키로 사용 (/messages/{id})
 
   // 외래 키
   createdBy: ForeignKey<number>; // FK → Member.memberIdx (생성자, onDelete: SET NULL)
@@ -337,9 +346,9 @@ export interface ChatRoom {
   type: 'chatbot' | 'emergency' | 'normal' | 'group';
   isGroup: 0 | 1; // 그룹 채팅 여부 (0: 아니오, 1: 예)
   organizationName: string | null;
-  lastMessage: string | null;
-  lastMessageAt: Timestamp | null; // 마지막 메시지 시간
-  unreadCount: number | null;
+  lastMessage: string | null; // Firebase RTDB에서 동기화 (캐시용)
+  lastMessageAt: Timestamp | null; // 마지막 메시지 시간 (Firebase RTDB에서 동기화, 캐시용)
+  unreadCount: number | null; // ChatParticipant.lastReadAt 기반 계산 (캐시용)
   avatar: string | null;
   description: string | null;
   isActive: 0 | 1; // 활성화 여부 (0: 비활성, 1: 활성)
@@ -351,13 +360,20 @@ export interface ChatRoom {
 // ============================================================================
 // 10. ChatMessage (채팅 메시지)
 // ============================================================================
+// Firebase Realtime Database 연동:
+// - 실시간 메시지는 주로 Firebase RTDB의 /messages/{chatRoomId}/{messageId}에 저장됩니다.
+// - 이 테이블은 선택적으로 사용되며, 다음 용도로 활용 가능합니다:
+//   1. 메시지 백업 (Firebase RTDB → RDBMS 동기화)
+//   2. 메시지 검색/인덱싱 (RDBMS의 강력한 검색 기능 활용)
+//   3. 장기 보관 및 분석
+// - 실시간 채팅은 Firebase RTDB를 우선 사용하고, 필요시 RDBMS에 백업합니다.
 
 export interface ChatMessage {
   // 기본 키
-  id: UUID; // PK
+  id: UUID; // PK, Firebase RTDB의 messageId와 동일하게 사용
 
   // 외래 키
-  chatRoomId: UUID; // FK → ChatRoom.id (onDelete: CASCADE)
+  chatRoomId: UUID; // FK → ChatRoom.id (onDelete: CASCADE), Firebase RTDB 노드 키와 동일
   senderMemberIdx: number; // FK → Member.memberIdx (onDelete: SET NULL)
   sharedDocumentId: ForeignKey<UUID>; // FK → SharedDocument.id (공유된 문서 ID, nullable, onDelete: SET NULL)
 
@@ -368,9 +384,9 @@ export interface ChatMessage {
   messageType: 'text' | 'image' | 'file' | 'system';
   signalType: 'risk' | 'rescue' | 'evacuation' | null; // 신호 타입 (사고 발생 현황 채팅방용)
   attachments: string[] | null; // 파일 URL 배열
-  isRead: 0 | 1; // 읽음 여부 (0: 안읽음, 1: 읽음)
-  isOwn: 0 | 1; // 본인 메시지 여부 (0: 아니오, 1: 예)
-  createAt: Timestamp; // 메시지 전송 시간
+  isRead: 0 | 1; // 읽음 여부 (0: 안읽음, 1: 읽음) - Firebase RTDB에서 동기화
+  isOwn: 0 | 1; // 본인 메시지 여부 (0: 아니오, 1: 예) - 클라이언트에서 계산
+  createAt: Timestamp; // 메시지 전송 시간 (Firebase RTDB timestamp와 동기화)
   updateAt: Timestamp;
   deletedAt: Timestamp | null; // Soft Delete
 }
@@ -378,13 +394,18 @@ export interface ChatMessage {
 // ============================================================================
 // 11. ChatParticipant (채팅 참가자)
 // ============================================================================
+// Firebase Realtime Database 연동:
+// - 채팅방 참여자 정보는 RDBMS에서 관리합니다.
+// - 채팅방 진입 시: ChatParticipant 테이블 조회 → chatRoomId로 Firebase RTDB 리스너 연결
+// - 안 읽은 메시지 계산: lastReadAt과 Firebase RTDB 메시지 timestamp 비교
+// - 사용자 상태(온라인/오프라인)는 Firebase RTDB의 /user_status/{memberIdx}에서 관리
 
 export interface ChatParticipant {
   // 기본 키
   id: UUID; // PK
 
   // 외래 키
-  chatRoomId: UUID; // FK → ChatRoom.id (onDelete: CASCADE)
+  chatRoomId: UUID; // FK → ChatRoom.id (onDelete: CASCADE), Firebase RTDB 노드 키와 동일
   memberIdx: number; // FK → Member.memberIdx (onDelete: CASCADE)
   invitedBy: ForeignKey<number>; // FK → Member.memberIdx (초대한 사람, onDelete: SET NULL)
 
@@ -392,8 +413,8 @@ export interface ChatParticipant {
   role: string; // 'admin' | 'member' | 'viewer' 등
   joinedAt: Timestamp; // 참가 시간
   leftAt: Timestamp | null; // 나간 시간
-  isRead: 0 | 1; // 메시지 읽음 여부 (0: 안읽음, 1: 읽음)
-  lastReadAt: Timestamp | null; // 마지막 읽은 시간
+  isRead: 0 | 1; // 메시지 읽음 여부 (0: 안읽음, 1: 읽음) - Firebase RTDB 메시지와 비교하여 계산
+  lastReadAt: Timestamp | null; // 마지막 읽은 시간 (Firebase RTDB 메시지 timestamp와 비교하여 안 읽은 메시지 수 계산)
   isActive: 0 | 1; // 활성화 여부 (0: 비활성, 1: 활성)
   createAt: Timestamp;
   updateAt: Timestamp;
@@ -641,18 +662,26 @@ export interface SafetyReport {
 // ============================================================================
 // 20. SharedDocument (공유 문서) - Dashboard에서 사용
 // ============================================================================
+// Soft Reference 패턴:
+// - 공유 가능한 모든 문서 타입(SafetySystemDocument, LibraryReport, SafetyReport 등)을 통합 관리
+// - referenceType과 referenceId를 사용하여 다양한 문서 타입을 참조
+// - 기존 safetySystemDocumentId는 레거시 호환성을 위해 유지 (deprecated)
 
 export interface SharedDocument {
   // 기본 키
   id: UUID; // PK
 
   // 외래 키
-  safetySystemDocumentId: string | null; // FK → SafetySystemDocument (복합키 참조, onDelete: SET NULL)
   memberIdx: number; // FK → Member.memberIdx (업로드자, onDelete: SET NULL)
   createdBy: ForeignKey<number>; // FK → Member.memberIdx (생성자, onDelete: SET NULL)
   updatedBy: ForeignKey<number>; // FK → Member.memberIdx (수정자, onDelete: SET NULL)
   priorityId: ForeignKey<UUID>; // FK → PrioritySetting.id (onDelete: SET NULL)
   sharedByCompanyIdx: ForeignKey<number>; // FK → Company.companyIdx (공유한 조직 ID, 슈퍼어드민은 null, onDelete: SET NULL)
+
+  // Soft Reference (다양한 문서 타입 참조)
+  referenceType: 'safety_system_document' | 'library_report' | 'safety_report' | 'custom'; // 참조 문서 타입
+  referenceId: string; // 참조 문서 ID (SafetySystemDocument.id, LibraryReport.id, SafetyReport.id 등)
+  safetySystemDocumentId: ForeignKey<UUID> | null; // 레거시 호환성 (deprecated, referenceType이 'safety_system_document'인 경우에만 사용)
 
   // 속성
   priority: 'urgent' | 'important' | 'reference';
@@ -779,7 +808,7 @@ export interface DocumentApproval {
   id: UUID; // PK
 
   // 외래 키
-  documentId: string; // 문서 ID (SafetySystemDocument 복합키 참조, onDelete: CASCADE)
+  documentId: UUID; // FK → SafetySystemDocument.id (onDelete: CASCADE)
   targetMemberIdx: number; // FK → Member.memberIdx (대상자 ID, onDelete: SET NULL)
   createdBy: ForeignKey<number>; // FK → Member.memberIdx (생성자, onDelete: SET NULL)
   updatedBy: ForeignKey<number>; // FK → Member.memberIdx (수정자, onDelete: SET NULL)
@@ -805,7 +834,7 @@ export interface DocumentSignature {
   id: UUID; // PK
 
   // 외래 키
-  documentId: string; // 문서 ID (SafetySystemDocument 복합키 참조, onDelete: CASCADE)
+  documentId: UUID; // FK → SafetySystemDocument.id (onDelete: CASCADE)
   targetMemberIdx: number; // FK → Member.memberIdx (대상자 ID, onDelete: SET NULL)
   createdBy: ForeignKey<number>; // FK → Member.memberIdx (생성자, onDelete: SET NULL)
   updatedBy: ForeignKey<number>; // FK → Member.memberIdx (수정자, onDelete: SET NULL)
@@ -825,20 +854,30 @@ export interface DocumentSignature {
 // ============================================================================
 // 27. DocumentNotification (문서 알림 발송 이력)
 // ============================================================================
+// 푸시 알림 시스템:
+// - 이 엔티티는 문서 관련 알림의 예약 및 전송 이력을 관리합니다.
+// - 구조를 확장하여 모든 유형의 알림 이력을 관리할 수 있습니다.
+// - notificationType을 확장하여 다양한 알림 유형을 지원할 수 있습니다.
 
 export interface DocumentNotification {
   // 기본 키
   id: UUID; // PK
 
   // 외래 키
-  documentId: string; // 문서 ID (SafetySystemDocument 복합키 참조, onDelete: CASCADE)
+  documentId: UUID | null; // FK → SafetySystemDocument.id (문서 알림의 경우, nullable, onDelete: CASCADE)
   targetMemberIdx: number; // FK → Member.memberIdx (대상자 ID, onDelete: SET NULL)
   createdBy: ForeignKey<number>; // FK → Member.memberIdx (생성자, onDelete: SET NULL)
 
   // 속성
-  notificationType: 'approval_request' | 'signature_request' | 'deadline_reminder'; // 알림 타입
+  notificationType:
+    | 'approval_request'
+    | 'signature_request'
+    | 'deadline_reminder'
+    | 'risk_report_new'
+    | 'chat_message'
+    | 'education_reminder'; // 알림 타입
   scheduledAt: Timestamp; // 발송 예정일
-  sentAt: Timestamp | null; // 발송일
+  sentAt: Timestamp | null; // 발송일 (FCM 전송 완료 시점)
   reminderDays: number | null; // 마감일 D-day (15일 전, 7일 전, 1일 전)
   description: string | null;
   createAt: Timestamp;
@@ -948,6 +987,7 @@ export interface DatabaseRelations {
     safetySystemDocumentSignatureList: DocumentSignature[]; // 1 측: 여러 개의 DocumentSignature를 가짐
     safetySystemDocumentNotificationList: DocumentNotification[]; // 1 측: 여러 개의 DocumentNotification을 가짐
     safetySystemDocumentSharedDocumentList: SharedDocument[]; // 1 측: 여러 개의 SharedDocument를 가짐
+    // 참고: (safetyIdx, itemNumber, documentNumber)는 UNIQUE 제약조건으로 유지되어 계층 구조를 보장합니다.
   };
 
   // ChatRoom 관계 (1 측: 여러 개의 N을 가짐)
@@ -1009,10 +1049,13 @@ export interface DatabaseRelations {
   // SharedDocument 관계
   SharedDocument: {
     sharedDocumentMemberInformation: Member; // N 측: 하나의 Member를 가짐
-    sharedDocumentSafetySystemDocumentInformation?: SafetySystemDocument; // N 측: 하나의 SafetySystemDocument를 가짐
+    sharedDocumentSafetySystemDocumentInformation?: SafetySystemDocument; // N 측: 하나의 SafetySystemDocument를 가짐 (referenceType이 'safety_system_document'인 경우)
+    sharedDocumentLibraryReportInformation?: LibraryReport; // N 측: 하나의 LibraryReport를 가짐 (referenceType이 'library_report'인 경우)
+    sharedDocumentSafetyReportInformation?: SafetyReport; // N 측: 하나의 SafetyReport를 가짐 (referenceType이 'safety_report'인 경우)
     sharedDocumentPriorityInformation?: PrioritySetting; // N 측: 하나의 PrioritySetting을 가짐
     sharedDocumentCompanyInformation?: Company; // N 측: 하나의 Company를 가짐 (공유한 조직)
     sharedDocumentChatRoomList: ChatRoomSharedDocument[]; // 1 측: 여러 개의 ChatRoomSharedDocument를 가짐
+    // 참고: Soft Reference 패턴으로 다양한 문서 타입을 참조할 수 있습니다.
   };
 
   // PrioritySetting 관계 (1 측: 여러 개의 N을 가짐)
@@ -1075,6 +1118,10 @@ export interface DatabaseIndexes {
     companyBranchIdx: 'INDEX';
     memberEmail: 'UNIQUE';
     joinedAt: 'INDEX'; // 입사일 (이수율 계산용)
+    fcmToken: 'UNIQUE'; // FCM 토큰 (UNIQUE 제약조건 필수)
+    isPushEnabled: 'INDEX'; // 푸시 알림 허용 여부
+    'companyIdx,memberRole': 'COMPOSITE_INDEX'; // 회사별 역할 조회용
+    'companyBranchIdx,memberRole': 'COMPOSITE_INDEX'; // 지점별 역할 조회용
   };
 
   // EducationReport 인덱스
@@ -1092,7 +1139,9 @@ export interface DatabaseIndexes {
 
   // SafetySystemDocument 인덱스
   SafetySystemDocument: {
-    'safetyIdx,itemNumber': 'COMPOSITE_INDEX';
+    id: 'PRIMARY_KEY'; // 대리키 (PK)
+    'safetyIdx,itemNumber,documentNumber': 'UNIQUE_COMPOSITE'; // 복합 고유 키
+    'safetyIdx,itemNumber': 'COMPOSITE_INDEX'; // 계층 구조 조회용
     registeredAt: 'INDEX';
     isPublished: 'INDEX'; // 게시 여부
   };
@@ -1125,7 +1174,7 @@ export interface DatabaseIndexes {
 
   // DocumentApproval 인덱스
   DocumentApproval: {
-    documentId: 'INDEX';
+    documentId: 'INDEX'; // FK → SafetySystemDocument.id
     targetMemberIdx: 'INDEX';
     approvalStatus: 'INDEX'; // 결재 상태
     approvalOrder: 'INDEX'; // 결재 순서
@@ -1133,7 +1182,7 @@ export interface DatabaseIndexes {
 
   // DocumentSignature 인덱스
   DocumentSignature: {
-    documentId: 'INDEX';
+    documentId: 'INDEX'; // FK → SafetySystemDocument.id
     targetMemberIdx: 'INDEX';
     signatureStatus: 'INDEX'; // 서명 상태
     signatureType: 'INDEX'; // 서명 타입
@@ -1165,6 +1214,14 @@ export interface DatabaseIndexes {
     memberIdx: 'INDEX';
     sharedByCompanyIdx: 'INDEX';
     isPublic: 'INDEX'; // 공개 여부
+    'referenceType,referenceId': 'COMPOSITE_INDEX'; // 문서 타입별 참조 조회용
+  };
+
+  // DocumentNotification 인덱스
+  DocumentNotification: {
+    targetMemberIdx: 'INDEX'; // 푸시 알림 대상 조회용
+    notificationType: 'INDEX'; // 알림 유형별 조회용
+    sentAt: 'INDEX'; // 전송 이력 조회용
   };
 }
 

@@ -370,3 +370,5 @@ export default function MachineEquipment1500Modal({
     </Dialog>
   );
 }
+
+
