@@ -6,7 +6,7 @@ import Box from '@mui/material/Box';
 
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
 import warningIcon from 'src/assets/icons/safeyoui/warning.svg';
-import type { Member } from 'src/sections/Organization/types/member';
+import type { Organization } from 'src/services/organization/organization.types';
 
 // ----------------------------------------------------------------------
 
@@ -14,10 +14,15 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onConfirm: () => void;
-  member: Member | null;
+  organization: Organization | null;
 };
 
-export default function DeactivateMemberModal({ open, onClose, onConfirm, member }: Props) {
+export default function DeactivateMemberModal({
+  open,
+  onClose,
+  onConfirm,
+  organization,
+}: Props) {
   const handleConfirm = () => {
     // TODO: TanStack Query Hook(useMutation)으로 조직원 비활성화
     // const deactivateMutation = useMutation({

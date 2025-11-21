@@ -43,8 +43,10 @@ declare global {
 
 // ----------------------------------------------------------------------
 
+import type { CompanyType } from 'src/services/organization/organization.types';
+
 export type OrganizationFormData = {
-  division: string; // 구분
+  companyType: CompanyType; // 조직 구분 (필수)
   organizationName: string; // 조직명
   businessType: string; // 사업자 유형
   businessNumber: string; // 사업자 번호
@@ -66,13 +68,21 @@ type Props = {
   onSave: (data: OrganizationFormData) => void;
 };
 
-const DIVISION_OPTIONS = ['운영사', '회원사', '총판', '대리점', '딜러', '비회원'];
+// 조직 구분 옵션 (한글 표시 -> API enum 값 매핑)
+const COMPANY_TYPE_OPTIONS: Array<{ label: string; value: CompanyType }> = [
+  { label: '운영사', value: 'OPERATOR' },
+  { label: '회원사', value: 'MEMBER' },
+  { label: '총판', value: 'DISTRIBUTOR' },
+  { label: '대리점', value: 'AGENCY' },
+  { label: '딜러', value: 'DEALER' },
+  { label: '비회원', value: 'NON_MEMBER' },
+];
 const BUSINESS_TYPE_OPTIONS = ['개인사업자', '법인사업자'];
 const SUBSCRIPTION_SERVICE_OPTIONS = ['기본', '프리미엄', '엔터프라이즈'];
 
 export default function CreateOrganizationModal({ open, onClose, onSave }: Props) {
   const [formData, setFormData] = useState<OrganizationFormData>({
-    division: '',
+    companyType: 'MEMBER' as CompanyType,
     organizationName: '',
     businessType: '',
     businessNumber: '',
@@ -108,7 +118,7 @@ export default function CreateOrganizationModal({ open, onClose, onSave }: Props
   useEffect(() => {
     if (open) {
       setFormData({
-        division: '',
+        companyType: 'MEMBER' as CompanyType,
         organizationName: '',
         businessType: '',
         businessNumber: '',
@@ -158,7 +168,7 @@ export default function CreateOrganizationModal({ open, onClose, onSave }: Props
   const handleSubmit = () => {
     // 필수 필드 검증
     if (
-      !formData.division ||
+      !formData.companyType ||
       !formData.organizationName ||
       !formData.representativeName ||
       !formData.representativePhone ||
@@ -174,7 +184,7 @@ export default function CreateOrganizationModal({ open, onClose, onSave }: Props
 
   const handleClose = () => {
     setFormData({
-      division: '',
+      companyType: 'MEMBER' as CompanyType,
       organizationName: '',
       businessType: '',
       businessNumber: '',
@@ -218,21 +228,21 @@ export default function CreateOrganizationModal({ open, onClose, onSave }: Props
             {/* 첫 번째 행: 구분, 조직명 */}
             <Stack direction="row" spacing={2}>
               <FormControl fullWidth>
-                <InputLabel id="division-label">
+                <InputLabel id="company-type-label">
                   구분
                   <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
                     *
                   </Typography>
                 </InputLabel>
                 <Select
-                  labelId="division-label"
+                  labelId="company-type-label"
                   label="구분 *"
-                  value={formData.division}
-                  onChange={(e) => handleChange('division', e.target.value)}
+                  value={formData.companyType}
+                  onChange={(e) => handleChange('companyType', e.target.value as CompanyType)}
                 >
-                  {DIVISION_OPTIONS.map((option) => (
-                    <MenuItem key={option} value={option}>
-                      {option}
+                  {COMPANY_TYPE_OPTIONS.map((option) => (
+                    <MenuItem key={option.value} value={option.value}>
+                      {option.label}
                     </MenuItem>
                   ))}
                 </Select>

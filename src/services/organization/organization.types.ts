@@ -7,48 +7,74 @@ import type { BaseResponseDto } from '../common';
 // 조직 상태
 export type OrganizationStatus = 'active' | 'inactive';
 
+// 조직 구분 (companyType)
+export type CompanyType =
+  | 'OPERATOR'
+  | 'MEMBER'
+  | 'DISTRIBUTOR'
+  | 'AGENCY'
+  | 'DEALER'
+  | 'NON_MEMBER';
+
+// 담당자 정보
+export type ManagerInfo = {
+  memberIdx: number;
+  memberName: string;
+  memberEmail: string;
+  memberPhone: string;
+};
+
 // 조직 조회 요청 파라미터
 export type GetOrganizationsParams = {
   status?: OrganizationStatus;
+  companyType?: CompanyType; // 조직 구분 필터
   searchKey?: string;
   searchValue?: string;
+  startDate?: string; // 시작일 필터 (YYYY-MM-DD)
+  endDate?: string; // 종료일 필터 (YYYY-MM-DD)
   page: number;
   pageSize: number;
 };
 
 // 조직 정보
 export type Organization = {
-  id: string;
+  id?: string;
   companyIdx: number;
   companyName: string;
-  companyType?: string;
+  companyType?: CompanyType; // enum: OPERATOR, MEMBER, DISTRIBUTOR, AGENCY, DEALER, NON_MEMBER
+  companyCode?: string;
   businessNumber?: string;
   representativeName?: string;
-  representativePhone?: string;
-  representativeEmail?: string;
+  phone?: string; // 전화번호
+  email?: string; // 이메일
   businessType?: string;
   businessCategory?: string;
   address?: string;
   addressDetail?: string;
-  manager?: string;
+  manager?: ManagerInfo | null; // 담당자 정보 객체 (ADMIN 역할 멤버)
   status: OrganizationStatus;
-  registrationDate: string;
-  // ... 기타 필드
+  createAt?: string; // 등록일
+  endedAt?: string | null; // 종료일 (비활성화 시 설정)
+  isActive?: number; // API 응답의 isActive 필드 (1: active, 0: inactive)
+  isAccidentFreeWorksite?: number; // 무재해 사업장 여부
+  accidentFreeStatus?: string; // 무재해 사업장 상태
+  accidentFreeCertifiedAt?: string; // 무재해 사업장 인증일
+  accidentFreeExpiresAt?: string; // 무재해 사업장 만료일
+  accidentFreeFileUrl?: string | null; // 무재해 인증 파일 URL
+  // description, memo, deletedAt 필드 제거됨
 };
 
 // 조직 조회 응답
 export type GetOrganizationsResponse = BaseResponseDto<{
-  organizations: Organization[];
-  total: number;
-  page: number;
-  pageSize: number;
+  companyList: Organization[];
+  totalCount: number;
+  totalPage: number;
 }>;
 
 // 조직 등록 요청 파라미터
 export type CreateOrganizationParams = {
-  division: string; // 구분
   companyName: string; // 조직명
-  companyType?: string; // 사업자 유형
+  companyType: CompanyType; // 조직 구분 (필수): OPERATOR, MEMBER, DISTRIBUTOR, AGENCY, DEALER, NON_MEMBER
   businessNumber?: string; // 사업자 번호
   representativeName: string; // 대표자명
   representativePhone: string; // 대표 전화번호
@@ -57,9 +83,10 @@ export type CreateOrganizationParams = {
   businessCategory?: string; // 종목
   address?: string; // 사업장 주소
   addressDetail?: string; // 상세주소
-  manager: string; // 담당자
+  manager?: string; // 담당자 (문자열, 초대 이메일 발송 시 사용)
   subscriptionService?: string; // 구독 서비스
   sendInviteEmail?: boolean; // 초대 이메일 발송
+  // description, memo 필드 제거됨
 };
 
 // 조직 등록 응답
@@ -210,6 +237,7 @@ export type UpdateAccidentFreeParams = {
   accidentFreeDays?: number;
   certificationDate?: string;
   certificationNumber?: string;
+  accidentFreeFileUrl?: string | null; // 무재해 인증 파일 URL (파일 업로드 API로 업로드 후 받은 파일 URL)
 };
 
 // 조직원 초대 요청

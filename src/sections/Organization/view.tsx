@@ -14,12 +14,17 @@ import OrganizationPagination from './components/Pagination';
 import CreateOrganizationModal, {
   type OrganizationFormData,
 } from './components/CreateOrganizationModal';
-import { useOrganization } from './hooks/use-organization';
 import { useNavigate } from 'react-router';
 import React from 'react';
-import { mockMembers } from 'src/_mock';
 import { paths } from 'src/routes/paths';
 import dayjs from 'dayjs';
+import {
+  useCreateOrganization,
+  useDeactivateOrganization,
+  useDeleteOrganization,
+} from './hooks/use-organization-api';
+import { useOrganization } from './hooks/use-organization';
+import type { Organization } from 'src/services/organization/organization.types';
 
 // ----------------------------------------------------------------------
 
@@ -30,15 +35,91 @@ type Props = {
 };
 
 export function OrganizationView({ title = 'Blank', description, sx }: Props) {
-  // TODO: TanStack Query Hook(useQuery)으로 조직 목록 가져오기
-  // const { data: organizations, isLoading } = useQuery({
-  //   queryKey: ['organizations', logic.filters, logic.tab, logic.division],
-  //   queryFn: () => getOrganizations({ filters: logic.filters, tab: logic.tab, division: logic.division }),
-  // });
-  // 목업 데이터 사용
-  const logic = useOrganization(mockMembers());
   const navigate = useNavigate();
   const [createModalOpen, setCreateModalOpen] = useState(false);
+
+  // 필터, 페이지네이션, API 호출을 모두 포함한 hook 사용
+  const {
+    tab,
+    onChangeTab,
+    division,
+    onChangeDivision,
+    filters,
+    onChangeStartDate,
+    onChangeEndDate,
+    searchField,
+    onChangeSearchField,
+    onChangeSearchValue,
+    page,
+    rowsPerPage,
+    onChangePage,
+    onChangeRowsPerPage,
+    organizations,
+    counts,
+    total,
+    isLoading,
+    error: organizationsError,
+  } = useOrganization();
+
+  // Mutations
+  const createOrganizationMutation = useCreateOrganization();
+  const deactivateOrganizationMutation = useDeactivateOrganization();
+  const deleteOrganizationMutation = useDeleteOrganization();
+
+  const handleViewDetail = (row: Organization) => {
+    navigate(paths.dashboard.organization.detail(row.companyIdx.toString()));
+  };
+
+  const handleDeactivate = async (row: Organization) => {
+    try {
+      await deactivateOrganizationMutation.mutateAsync(row.companyIdx);
+      if (import.meta.env.DEV) {
+        console.log('✅ 조직 비활성화 완료:', row.companyIdx);
+      }
+    } catch (error) {
+      console.error('❌ 조직 비활성화 실패:', error);
+    }
+  };
+
+  const handleDelete = async (row: Organization) => {
+    try {
+      await deleteOrganizationMutation.mutateAsync(row.companyIdx);
+      if (import.meta.env.DEV) {
+        console.log('✅ 조직 삭제 완료:', row.companyIdx);
+      }
+    } catch (error) {
+      console.error('❌ 조직 삭제 실패:', error);
+    }
+  };
+
+  const handleSaveCreate = async (data: OrganizationFormData) => {
+    try {
+      // OrganizationFormData를 CreateOrganizationParams로 변환
+      const params = {
+        companyName: data.organizationName,
+        companyType: data.companyType, // 필수 필드
+        businessNumber: data.businessNumber,
+        representativeName: data.representativeName,
+        representativePhone: data.representativePhone,
+        representativeEmail: data.representativeEmail,
+        businessType: data.businessCategory,
+        businessCategory: data.businessItem,
+        address: data.address,
+        addressDetail: data.detailAddress,
+        manager: data.manager,
+        subscriptionService: data.subscriptionService,
+        sendInviteEmail: data.sendInvitationEmail,
+      };
+
+      await createOrganizationMutation.mutateAsync(params);
+      setCreateModalOpen(false);
+      if (import.meta.env.DEV) {
+        console.log('✅ 조직 등록 완료');
+      }
+    } catch (error) {
+      console.error('❌ 조직 등록 실패:', error);
+    }
+  };
 
   const renderContent = () => (
     <Box
@@ -50,77 +131,55 @@ export function OrganizationView({ title = 'Blank', description, sx }: Props) {
         overflow: 'hidden',
       }}
     >
-      <OrganizationTabs
-        value={logic.tab}
-        onChange={(tab) => {
-          logic.onChangeTab(tab);
-          // TODO: 탭 변경 시 TanStack Query로 조직 목록 새로고침
-          // queryClient.invalidateQueries({ queryKey: ['organizations'] });
-        }}
-        counts={logic.counts}
-      />
+      <OrganizationTabs value={tab} onChange={onChangeTab} counts={counts} />
 
       <OrganizationFilters
-        division={logic.division}
-        onChangeDivision={logic.onChangeDivision}
-        startDate={logic.filters.startDate ? dayjs(logic.filters.startDate) : null}
-        onChangeStartDate={(date) => {
-          logic.onChangeStartDate(date);
-          // TODO: 시작일 변경 시 TanStack Query로 조직 목록 새로고침
-          // queryClient.invalidateQueries({ queryKey: ['organizations'] });
-        }}
-        endDate={logic.filters.endDate ? dayjs(logic.filters.endDate) : null}
-        onChangeEndDate={(date) => {
-          logic.onChangeEndDate(date);
-          // TODO: 종료일 변경 시 TanStack Query로 조직 목록 새로고침
-          // queryClient.invalidateQueries({ queryKey: ['organizations'] });
-        }}
-        searchField={logic.searchField}
-        onChangeSearchField={logic.onChangeSearchField}
-        searchValue={logic.filters.searchValue}
-        onChangeSearchValue={(value) => {
-          logic.onChangeSearchValue(value);
-          // TODO: 검색 값 변경 시 TanStack Query로 조직 목록 새로고침
-          // queryClient.invalidateQueries({ queryKey: ['organizations'] });
-        }}
+        division={division}
+        onChangeDivision={onChangeDivision}
+        startDate={filters.startDate ? dayjs(filters.startDate) : null}
+        onChangeStartDate={onChangeStartDate}
+        endDate={filters.endDate ? dayjs(filters.endDate) : null}
+        onChangeEndDate={onChangeEndDate}
+        searchField={searchField}
+        onChangeSearchField={onChangeSearchField}
+        searchValue={filters.searchValue}
+        onChangeSearchValue={onChangeSearchValue}
       />
 
-      <OrganizationTable
-        rows={logic.filtered}
-        onViewDetail={(row) =>
-          navigate(paths.dashboard.organization.detail(row.companyIdx.toString()))
-        }
-        onDeactivate={(row) => {
-          // TODO: TanStack Query Hook(useMutation)으로 조직 비활성화
-          // const mutation = useMutation({
-          //   mutationFn: () => deactivateOrganization(row.companyIdx),
-          //   onSuccess: () => {
-          //     queryClient.invalidateQueries({ queryKey: ['organizations'] });
-          //   },
-          // });
-          // mutation.mutate();
-          console.log('비활성화:', row);
-        }}
-        onDelete={(row) => {
-          // TODO: TanStack Query Hook(useMutation)으로 조직 삭제
-          // const mutation = useMutation({
-          //   mutationFn: () => deleteOrganization(row.companyIdx),
-          //   onSuccess: () => {
-          //     queryClient.invalidateQueries({ queryKey: ['organizations'] });
-          //   },
-          // });
-          // mutation.mutate();
-          console.log('삭제:', row);
-        }}
-      />
+      {isLoading && (
+        <Box sx={{ p: 3, textAlign: 'center' }}>
+          <Typography variant="body2" color="text.secondary">
+            데이터를 불러오는 중...
+          </Typography>
+        </Box>
+      )}
 
-      <OrganizationPagination
-        count={logic.total}
-        page={logic.page}
-        rowsPerPage={logic.rowsPerPage}
-        onChangePage={logic.onChangePage}
-        onChangeRowsPerPage={logic.onChangeRowsPerPage}
-      />
+      {organizationsError && (
+        <Box sx={{ p: 3, textAlign: 'center' }}>
+          <Typography variant="body2" color="error">
+            데이터를 불러오는 중 오류가 발생했습니다.
+          </Typography>
+        </Box>
+      )}
+
+      {!isLoading && !organizationsError && (
+        <>
+          <OrganizationTable
+            rows={organizations}
+            onViewDetail={handleViewDetail}
+            onDeactivate={handleDeactivate}
+            onDelete={handleDelete}
+          />
+
+          <OrganizationPagination
+            count={total}
+            page={page - 1}
+            rowsPerPage={rowsPerPage}
+            onChangePage={(newPage) => onChangePage(newPage + 1)}
+            onChangeRowsPerPage={onChangeRowsPerPage}
+          />
+        </>
+      )}
     </Box>
   );
 
@@ -141,18 +200,7 @@ export function OrganizationView({ title = 'Blank', description, sx }: Props) {
       <CreateOrganizationModal
         open={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
-        onSave={(data: OrganizationFormData) => {
-          // TODO: TanStack Query Hook(useMutation)으로 조직 등록
-          // const mutation = useMutation({
-          //   mutationFn: (formData: OrganizationFormData) => createOrganization(formData),
-          //   onSuccess: () => {
-          //     queryClient.invalidateQueries({ queryKey: ['organizations'] });
-          //     setCreateModalOpen(false);
-          //   },
-          // });
-          // mutation.mutate(data);
-          console.log('조직 등록:', data);
-        }}
+        onSave={handleSaveCreate}
       />
     </DashboardContent>
   );

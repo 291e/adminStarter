@@ -1,6 +1,8 @@
-import type { Member } from 'src/sections/Organization/types/member';
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import type { Dayjs } from 'dayjs';
+
+import { useOrganizations } from './use-organization-api';
+import type { Organization } from 'src/services/organization/organization.types';
 
 // ----------------------------------------------------------------------
 
@@ -20,31 +22,37 @@ export type DivisionType =
   | 'nonmember';
 
 export type UseOrganizationResult = {
-  tab: string;
-  onChangeTab: (value: string) => void;
+  // 필터 상태
+  tab: 'all' | 'active' | 'inactive';
+  onChangeTab: (value: 'all' | 'active' | 'inactive') => void;
   division: DivisionType;
   onChangeDivision: (value: DivisionType) => void;
   filters: OrganizationFilters;
   onChangeStartDate: (value: Dayjs | null) => void;
   onChangeEndDate: (value: Dayjs | null) => void;
   onChangeSearchValue: (value: string) => void;
+  searchField: 'all' | 'orgName' | 'manager';
+  onChangeSearchField: (value: 'all' | 'orgName' | 'manager') => void;
+  // 페이지네이션
+  page: number;
+  rowsPerPage: number;
+  onChangePage: (page: number) => void;
+  onChangeRowsPerPage: (rows: number) => void;
+  // 데이터
+  organizations: Organization[];
   counts: {
     all: number;
     active: number;
     inactive: number;
   };
-  searchField: 'all' | 'orgName' | 'manager';
-  onChangeSearchField: (value: 'all' | 'orgName' | 'manager') => void;
-  page: number;
-  rowsPerPage: number;
-  onChangePage: (page: number) => void;
-  onChangeRowsPerPage: (rows: number) => void;
-  filtered: Member[];
   total: number;
+  isLoading: boolean;
+  error: Error | null;
 };
 
-export function useOrganization(members: Member[]): UseOrganizationResult {
-  const [tab, setTab] = useState<string>('all');
+export function useOrganization(): UseOrganizationResult {
+  // 필터 상태
+  const [tab, setTab] = useState<'all' | 'active' | 'inactive'>('all');
   const [division, setDivision] = useState<DivisionType>('all');
   const [filters, setFilters] = useState<OrganizationFilters>({
     startDate: null,
@@ -52,119 +60,170 @@ export function useOrganization(members: Member[]): UseOrganizationResult {
     searchValue: '',
   });
   const [searchField, setSearchField] = useState<'all' | 'orgName' | 'manager'>('all');
-  const [page, setPage] = useState<number>(0);
+  // 페이지네이션 (API는 1-based)
+  const [page, setPage] = useState<number>(1);
   const [rowsPerPage, setRowsPerPage] = useState<number>(10);
 
-  const onChangeTab = useCallback((value: string) => {
-    setTab(value);
-    setPage(0);
+  // API 파라미터 구성
+  const apiParams = useMemo(() => {
+    const params: any = {
+      page,
+      pageSize: rowsPerPage,
+    };
+
+    // 상태 필터
+    if (tab === 'active') {
+      params.status = 'active';
+    } else if (tab === 'inactive') {
+      params.status = 'inactive';
+    }
+
+    // 조직 구분 필터 (division을 companyType으로 변환)
+    if (division !== 'all') {
+      const divisionToCompanyType: Record<DivisionType, string> = {
+        all: '',
+        operator: 'OPERATOR',
+        member: 'MEMBER',
+        distributor: 'DISTRIBUTOR',
+        agency: 'AGENCY',
+        dealer: 'DEALER',
+        nonmember: 'NON_MEMBER',
+      };
+      params.companyType = divisionToCompanyType[division];
+    }
+
+    // 날짜 필터
+    if (filters.startDate) {
+      params.startDate = filters.startDate;
+    }
+    if (filters.endDate) {
+      params.endDate = filters.endDate;
+    }
+
+    // 검색 필터
+    if (filters.searchValue) {
+      if (searchField === 'orgName') {
+        params.searchKey = 'companyName';
+        params.searchValue = filters.searchValue;
+      } else if (searchField === 'manager') {
+        params.searchKey = 'manager';
+        params.searchValue = filters.searchValue;
+      } else {
+        // 전체 검색은 API에서 지원하지 않을 수 있으므로 companyName으로 처리
+        params.searchKey = 'companyName';
+        params.searchValue = filters.searchValue;
+      }
+    }
+
+    return params;
+  }, [tab, division, filters, searchField, page, rowsPerPage]);
+
+  // API 호출
+  const {
+    data: organizationsData,
+    isLoading,
+    error: organizationsError,
+  } = useOrganizations(apiParams);
+
+  // 데이터 변환 (axios interceptor가 body를 flatten하므로 직접 접근)
+  const organizations = useMemo(() => {
+    if (!organizationsData?.header?.isSuccess) {
+      if (import.meta.env.DEV && organizationsData) {
+        console.warn('⚠️ Organizations: Invalid response structure', organizationsData);
+      }
+      return [];
+    }
+    // axios interceptor가 body를 flatten하므로 companyList는 최상위에 있음
+    const orgs = (organizationsData as any).companyList;
+    if (!Array.isArray(orgs)) {
+      if (import.meta.env.DEV) {
+        console.warn('⚠️ Organizations: companyList is not an array', organizationsData);
+      }
+      return [];
+    }
+    // isActive를 status로 변환만 수행 (필드명 매핑 제거)
+    return orgs.map((org: any) => ({
+      ...org,
+      status: org.isActive === 1 ? 'active' : 'inactive',
+    }));
+  }, [organizationsData]);
+
+  // 카운트 계산
+  const counts = useMemo(() => {
+    // axios interceptor가 body를 flatten하므로 totalCount는 최상위에 있음
+    const total = (organizationsData as any)?.totalCount || organizations.length;
+    const active = organizations.filter((org: Organization) => org.status === 'active').length;
+    const inactive = organizations.filter((org: Organization) => org.status === 'inactive').length;
+    return {
+      all: total || active + inactive,
+      active,
+      inactive,
+    };
+  }, [organizations, organizationsData]);
+
+  const total = (organizationsData as any)?.totalCount || organizations.length;
+
+  // 디버깅
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.log('📊 Organizations Data:', organizationsData);
+      console.log('📊 Organizations:', organizations);
+      console.log('📊 Total:', total);
+    }
+  }, [organizationsData, organizations, total]);
+
+  // 에러 처리
+  useEffect(() => {
+    if (organizationsError) {
+      console.error('❌ Organizations API Error:', organizationsError);
+    }
+  }, [organizationsError]);
+
+  // 핸들러들
+  const onChangeTab = useCallback((newTab: 'all' | 'active' | 'inactive') => {
+    setTab(newTab);
+    setPage(1);
   }, []);
 
-  const onChangeDivision = useCallback((value: DivisionType) => {
-    setDivision(value);
-    setPage(0);
+  const onChangeDivision = useCallback((newDivision: DivisionType) => {
+    setDivision(newDivision);
+    setPage(1);
   }, []);
 
-  const onChangeStartDate = useCallback((value: Dayjs | null) => {
-    setFilters((prev) => ({ ...prev, startDate: value ? value.format('YYYY-MM-DD') : null }));
-    setPage(0);
+  const onChangeStartDate = useCallback((date: Dayjs | null) => {
+    setFilters((prev) => ({
+      ...prev,
+      startDate: date ? date.format('YYYY-MM-DD') : null,
+    }));
+    setPage(1);
   }, []);
 
-  const onChangeEndDate = useCallback((value: Dayjs | null) => {
-    setFilters((prev) => ({ ...prev, endDate: value ? value.format('YYYY-MM-DD') : null }));
-    setPage(0);
+  const onChangeEndDate = useCallback((date: Dayjs | null) => {
+    setFilters((prev) => ({
+      ...prev,
+      endDate: date ? date.format('YYYY-MM-DD') : null,
+    }));
+    setPage(1);
+  }, []);
+
+  const onChangeSearchField = useCallback((field: 'all' | 'orgName' | 'manager') => {
+    setSearchField(field);
+    setPage(1);
   }, []);
 
   const onChangeSearchValue = useCallback((value: string) => {
     setFilters((prev) => ({ ...prev, searchValue: value }));
-    setPage(0);
+    setPage(1);
   }, []);
 
-  const onChangeSearchField = useCallback((value: 'all' | 'orgName' | 'manager') => {
-    setSearchField(value);
-    setPage(0);
+  const onChangePage = useCallback((newPage: number) => {
+    setPage(newPage);
   }, []);
 
-  const onChangePage = useCallback((next: number) => {
-    setPage(next);
+  const onChangeRowsPerPage = useCallback((newRowsPerPage: number) => {
+    setRowsPerPage(newRowsPerPage);
+    setPage(1);
   }, []);
-
-  const onChangeRowsPerPage = useCallback((rows: number) => {
-    setRowsPerPage(rows);
-    setPage(0);
-  }, []);
-
-  const filteredAll = useMemo(
-    () =>
-      members.filter((m) => {
-        // Tab 필터링: 전체, 활성, 비활성만 필터링 (pending, blocked 제외)
-        const byTab =
-          tab === 'all'
-            ? m.memberStatus === 'active' || m.memberStatus === 'inactive'
-            : tab === 'active'
-              ? m.memberStatus === 'active'
-              : tab === 'inactive'
-                ? m.memberStatus === 'inactive'
-                : false;
-
-        // Tab 필터링에서 걸러진 항목만 다음 필터링 진행
-        if (!byTab) return false;
-
-        // 검색 필터
-        const query = (text: string) =>
-          text.toLowerCase().includes((filters.searchValue || '').toLowerCase());
-        const fieldMatch = !filters.searchValue
-          ? true
-          : searchField === 'all'
-            ? [m.memberName, m.memberNameOrg, m.memberPhone, m.memberEmail, m.memberAddress].some(
-                (s) => s && query(s)
-              )
-            : searchField === 'orgName'
-              ? query(String(m.memberNameOrg ?? ''))
-              : searchField === 'manager'
-                ? query(String(m.memberName ?? ''))
-                : true;
-
-        // 구분 필터링: Tab 필터링 이후에 적용
-        // division === 'all'이면 모든 구분 통과
-        // division이 특정 값이면 해당 구분만 통과
-        const byDivision =
-          division === 'all'
-            ? true
-            : division === 'operator'
-              ? m.memberRole === 'operator' || m.memberRole === 'admin'
-              : division === 'member'
-                ? m.memberRole === 'member'
-                : division === 'distributor'
-                  ? m.memberRole === 'distributor'
-                  : division === 'agency'
-                    ? m.memberRole === 'agency'
-                    : division === 'dealer'
-                      ? m.memberRole === 'dealer'
-                      : division === 'nonmember'
-                        ? m.memberStatus === 'inactive' || !m.memberRole
-                        : true;
-
-        // 날짜 필터 (등록일 기준으로 필터링, 실제 필드명에 맞게 수정 필요)
-        // TODO: 실제 날짜 필드명에 맞게 수정
-        const byDate = true; // 임시로 항상 true
-
-        return fieldMatch && byDate && byDivision;
-      }),
-    [members, filters, searchField, tab, division]
-  );
-
-  const total = filteredAll.length;
-
-  // 전체 카운트는 활성 + 비활성만 카운트 (pending, blocked 제외)
-  const countActive = members.filter((m) => m.memberStatus === 'active').length;
-  const countInactive = members.filter((m) => m.memberStatus === 'inactive').length;
-  const countAll = countActive + countInactive;
-
-  const filtered = useMemo(() => {
-    const start = page * rowsPerPage;
-    return filteredAll.slice(start, start + rowsPerPage);
-  }, [filteredAll, page, rowsPerPage]);
 
   return {
     tab,
@@ -175,18 +234,16 @@ export function useOrganization(members: Member[]): UseOrganizationResult {
     onChangeStartDate,
     onChangeEndDate,
     onChangeSearchValue,
-    counts: {
-      all: countAll,
-      active: countActive,
-      inactive: countInactive,
-    },
     searchField,
     onChangeSearchField,
     page,
     rowsPerPage,
     onChangePage,
     onChangeRowsPerPage,
-    filtered,
+    organizations,
+    counts,
     total,
+    isLoading,
+    error: organizationsError as Error | null,
   };
 }

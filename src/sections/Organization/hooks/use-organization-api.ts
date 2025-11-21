@@ -10,6 +10,7 @@ import {
   upgradeService,
   cancelSubscription,
   cardAction,
+  updateAccidentFree,
 } from 'src/services/organization/organization.service';
 import type {
   GetOrganizationsParams,
@@ -19,6 +20,7 @@ import type {
   UpgradeServiceParams,
   CancelSubscriptionParams,
   CardActionParams,
+  UpdateAccidentFreeParams,
 } from 'src/services/organization/organization.types';
 
 // ----------------------------------------------------------------------
@@ -110,10 +112,8 @@ export function useUpgradeService() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
-      companyIdx,
-      ...params
-    }: UpgradeServiceParams & { companyIdx: number }) => upgradeService(companyIdx, params),
+    mutationFn: ({ companyIdx, ...params }: UpgradeServiceParams & { companyIdx: number }) =>
+      upgradeService(companyIdx, params),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['organizationDetail', variables.companyIdx] });
     },
@@ -141,11 +141,25 @@ export function useCardAction() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
-      companyIdx,
-      ...params
-    }: CardActionParams & { companyIdx: number }) => cardAction(companyIdx, params),
+    mutationFn: ({ companyIdx, ...params }: CardActionParams & { companyIdx: number }) =>
+      cardAction(companyIdx, params),
     onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['organizationDetail', variables.companyIdx] });
+    },
+  });
+}
+
+/**
+ * 무재해 인증 정보 수정 Mutation Hook
+ */
+export function useUpdateAccidentFree() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ companyIdx, ...params }: UpdateAccidentFreeParams & { companyIdx: number }) =>
+      updateAccidentFree(companyIdx, params),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['organizations'] });
       queryClient.invalidateQueries({ queryKey: ['organizationDetail', variables.companyIdx] });
     },
   });
