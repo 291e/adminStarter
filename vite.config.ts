@@ -32,6 +32,18 @@ export default defineConfig({
       },
     ],
   },
-  server: { port: PORT, host: true },
+  server: {
+    port: PORT,
+    host: true,
+    proxy: {
+      // API 프록시 설정 (CORS 우회)
+      '/safeyoui': {
+        target: 'http://localhost:9000',
+        changeOrigin: true,
+        secure: false,
+        // rewrite는 필요 없음 (경로 그대로 전달)
+      },
+    },
+  },
   preview: { port: PORT, host: true },
 });

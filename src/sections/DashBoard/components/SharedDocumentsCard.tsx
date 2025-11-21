@@ -7,16 +7,9 @@ import Chip from '@mui/material/Chip';
 import { Iconify } from 'src/components/iconify';
 import { useNavigate } from 'react-router';
 import { paths } from 'src/routes/paths';
+import type { SharedDocument } from 'src/services/dashboard/dashboard.types';
 
 // ----------------------------------------------------------------------
-
-export type SharedDocument = {
-  id: string;
-  priority: 'urgent' | 'important' | 'reference';
-  documentName: string;
-  writtenDate: string;
-  registeredDate: string;
-};
 
 type Props = {
   rows: SharedDocument[];
@@ -26,20 +19,30 @@ type Props = {
   onViewAll?: () => void;
 };
 
-const PRIORITY_CONFIG = {
-  urgent: {
+const PRIORITY_CONFIG: Record<
+  string,
+  { label: string; color: string; bgColor: string; variant: 'soft' }
+> = {
+  URGENT: {
     label: '긴급',
     color: 'error.main',
     bgColor: 'rgba(255, 86, 48, 0.16)',
     variant: 'soft',
   },
-  important: {
+  IMPORTANT: {
     label: '중요',
     color: 'warning.main',
     bgColor: 'rgba(255, 171, 0, 0.16)',
     variant: 'soft',
   },
-  reference: {
+  REFERENCE: {
+    label: '참고',
+    color: '#2563E9',
+    bgColor: 'rgba(37, 99, 233, 0.1)',
+    variant: 'soft',
+  },
+  // 기본값 (null 또는 알 수 없는 priority)
+  DEFAULT: {
     label: '참고',
     color: '#2563E9',
     bgColor: 'rgba(37, 99, 233, 0.1)',
@@ -193,8 +196,8 @@ export default function SharedDocumentsCard({
         </Box>
 
         {/* 테이블 바디 */}
-        {rows.map((row, index) => {
-          const priorityConfig = PRIORITY_CONFIG[row.priority];
+        {rows.map((row) => {
+          const priorityConfig = PRIORITY_CONFIG[row.priority || ''] || PRIORITY_CONFIG.DEFAULT;
           return (
             <Box
               key={row.id}
@@ -265,7 +268,9 @@ export default function SharedDocumentsCard({
                 }}
               >
                 <Typography variant="body2" sx={{ fontSize: { xs: 13, sm: 14 } }}>
-                  {row.writtenDate}
+                  {row.documentWrittenAt
+                    ? new Date(row.documentWrittenAt).toLocaleDateString('ko-KR')
+                    : ''}
                 </Typography>
               </Box>
               <Box
@@ -280,7 +285,7 @@ export default function SharedDocumentsCard({
                 }}
               >
                 <Typography variant="body2" sx={{ fontSize: { xs: 13, sm: 14 } }}>
-                  {row.registeredDate}
+                  {row.createAt ? new Date(row.createAt).toLocaleDateString('ko-KR') : ''}
                 </Typography>
               </Box>
             </Box>

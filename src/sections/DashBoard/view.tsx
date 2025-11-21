@@ -7,13 +7,23 @@ import Stack from '@mui/material/Stack';
 
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useAuthContext } from 'src/auth/hooks';
-import { mockSafetySystemDocuments } from 'src/_mock/_safety-system';
+import { useQueryClient } from '@tanstack/react-query';
 
 import ProfileCard from './components/ProfileCard';
 import AccidentReportCard from './components/AccidentReportCard';
-import PendingSignaturesCard, { type PendingSignature } from './components/PendingSignaturesCard';
-import SharedDocumentsCard, { type SharedDocument } from './components/SharedDocumentsCard';
+import PendingSignaturesCard from './components/PendingSignaturesCard';
+import SharedDocumentsCard from './components/SharedDocumentsCard';
 import EducationDetailModal from './components/EducationDetailModal';
+
+import {
+  usePendingSignatures,
+  useSharedDocuments,
+  useAccidentRiskStats,
+  useUserProfile,
+  useEducationCompletionRate,
+} from './hooks/use-dashboard-api';
+import { useNavigate } from 'react-router';
+import { paths } from 'src/routes/paths';
 
 // ----------------------------------------------------------------------
 
@@ -23,82 +33,127 @@ type Props = {
   sx?: SxProps<Theme>;
 };
 
-// 서명 대기 문서 변환 함수
-function convertToPendingSignature(
-  doc: (typeof mockSafetySystemDocuments)[0],
-  index: number
-): PendingSignature {
-  // registeredTime을 "5:00 PM" 형식으로 변환
-  const [hours, minutes] = doc.registeredTime.split(':');
-  const hour24 = parseInt(hours, 10);
-  const hour12 = hour24 > 12 ? hour24 - 12 : hour24 === 0 ? 12 : hour24;
-  const ampm = hour24 >= 12 ? 'PM' : 'AM';
-  const time = `${hour12}:${minutes} ${ampm}`;
-
-  return {
-    id: `${doc.safetyIdx}-${doc.itemNumber}-${doc.documentNumber}`,
-    documentName: doc.documentName,
-    author: doc.organizationName,
-    date: doc.registeredAt,
-    time,
-  };
-}
-
-// 공유된 문서 변환 함수 (priority는 랜덤 생성)
-function convertToSharedDocument(
-  doc: (typeof mockSafetySystemDocuments)[0],
-  index: number
-): SharedDocument {
-  const priorities: Array<'urgent' | 'important' | 'reference'> = [
-    'urgent',
-    'important',
-    'reference',
-  ];
-  // 문서 번호에 따라 일관된 priority 할당
-  const priority = priorities[index % priorities.length];
-
-  return {
-    id: `${doc.safetyIdx}-${doc.itemNumber}-${doc.documentNumber}`,
-    priority,
-    documentName: doc.documentName,
-    writtenDate: doc.writtenAt,
-    registeredDate: doc.registeredAt,
-  };
-}
-
 export function DashBoardView({ title = '대시보드', description, sx }: Props) {
   const { user } = useAuthContext();
+  const queryClient = useQueryClient();
+
   const [periodType, setPeriodType] = useState<'year' | 'month' | 'week'>('month');
   const [periodValue, setPeriodValue] = useState<string>('');
   const [pendingPage, setPendingPage] = useState(1);
   const [sharedPage, setSharedPage] = useState(1);
   const [educationDetailModalOpen, setEducationDetailModalOpen] = useState(false);
 
-  // TODO: TanStack Query Hook(useQuery)으로 서명 대기 문서 목록 가져오기
-  // const { data: pendingDocs, isLoading: pendingLoading } = useQuery({
-  //   queryKey: ['pendingSignatures', pendingPage],
-  //   queryFn: () => fetchPendingSignatures({ page: pendingPage, pageSize: 2 }),
-  // });
-  // 서명 대기 문서: 처음 4개 문서 사용 (페이지당 2개)
+  const navigate = useNavigate();
+  // 기간 계산 (periodType과 periodValue에 따라 startDate, endDate 계산)
+  const getDateRange = () => {
+    const now = new Date();
+    let startDate: Date;
+    let endDate: Date = now;
+
+    if (periodType === 'year') {
+      const year = periodValue ? parseInt(periodValue.replace('년', '')) : now.getFullYear();
+      startDate = new Date(year, 0, 1);
+      endDate = new Date(year, 11, 31, 23, 59, 59);
+    } else if (periodType === 'month') {
+      const month = periodValue ? parseInt(periodValue.replace('월', '')) - 1 : now.getMonth();
+      const year = now.getFullYear();
+      startDate = new Date(year, month, 1);
+      endDate = new Date(year, month + 1, 0, 23, 59, 59);
+    } else {
+      // week
+      const week = periodValue ? parseInt(periodValue.replace('주차', '')) : 1;
+      const year = now.getFullYear();
+      const firstDay = new Date(year, 0, 1);
+      const days = (week - 1) * 7;
+      startDate = new Date(firstDay);
+      startDate.setDate(firstDay.getDate() + days);
+      endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 6);
+      endDate.setHours(23, 59, 59);
+    }
+
+    return {
+      startDate: startDate.toISOString().split('T')[0],
+      endDate: endDate.toISOString().split('T')[0],
+    };
+  };
+
+  const dateRange = getDateRange();
+
+  // API 호출
+  const {
+    data: pendingSignaturesData,
+    isLoading: pendingLoading,
+    error: pendingError,
+  } = usePendingSignatures();
+  const {
+    data: sharedDocumentsData,
+    isLoading: sharedLoading,
+    error: sharedError,
+  } = useSharedDocuments(); // 클라이언트 사이드 페이지네이션을 위해 파라미터 제거
+  const {
+    data: riskStatsData,
+    isLoading: riskStatsLoading,
+    error: riskStatsError,
+  } = useAccidentRiskStats({
+    startDate: dateRange.startDate,
+    endDate: dateRange.endDate,
+  });
+  const { data: profileData, isLoading: profileLoading, error: profileError } = useUserProfile();
+  const {
+    data: educationData,
+    isLoading: educationLoading,
+    error: educationError,
+  } = useEducationCompletionRate({ role: user?.role });
+
+  // 에러 처리
+  if (pendingError || sharedError || riskStatsError || profileError || educationError) {
+    console.error('❌ Dashboard API Errors:', {
+      pendingError,
+      sharedError,
+      riskStatsError,
+      profileError,
+      educationError,
+    });
+  }
+
+  // 데이터 변환 (에러 처리 포함)
+  // axios 인터셉터에서 data.body.data를 평탄화했으므로 직접 접근 가능
   const pendingSignatures = useMemo(() => {
-    const docs = mockSafetySystemDocuments.slice(0, 4);
-    return docs.map(convertToPendingSignature);
-  }, []);
+    // isSuccess가 false이거나 데이터가 없으면 빈 배열 반환
+    if (
+      !pendingSignaturesData?.header?.isSuccess ||
+      !pendingSignaturesData?.documentSignatureList ||
+      !Array.isArray(pendingSignaturesData.documentSignatureList)
+    ) {
+      if (import.meta.env.DEV && pendingSignaturesData) {
+        console.warn('⚠️ PendingSignatures: Invalid response structure', pendingSignaturesData);
+      }
+      return [];
+    }
+    return pendingSignaturesData.documentSignatureList;
+  }, [pendingSignaturesData]);
 
-  // TODO: TanStack Query Hook(useQuery)으로 공유된 문서 목록 가져오기
-  // const { data: sharedDocs, isLoading: sharedLoading } = useQuery({
-  //   queryKey: ['sharedDocuments', sharedPage],
-  //   queryFn: () => fetchSharedDocuments({ page: sharedPage, pageSize: 7 }),
-  // });
-  // 공유된 문서: 처음 7개 문서 사용
   const sharedDocuments = useMemo(() => {
-    const docs = mockSafetySystemDocuments.slice(0, 7);
-    return docs.map(convertToSharedDocument);
-  }, []);
+    // isSuccess가 false이거나 데이터가 없으면 빈 배열 반환
+    if (
+      !sharedDocumentsData?.header?.isSuccess ||
+      !sharedDocumentsData?.sharedDocumentList ||
+      !Array.isArray(sharedDocumentsData.sharedDocumentList)
+    ) {
+      if (import.meta.env.DEV && sharedDocumentsData) {
+        console.warn('⚠️ SharedDocuments: Invalid response structure', sharedDocumentsData);
+      }
+      return [];
+    }
+    return sharedDocumentsData.sharedDocumentList;
+  }, [sharedDocumentsData]);
 
-  // 페이지네이션 계산
+  // 클라이언트 사이드 페이지네이션 계산
   const pendingPageSize = 2;
   const sharedPageSize = 7;
+
+  // 전체 데이터에서 페이지네이션 계산
   const pendingTotalPages = Math.ceil(pendingSignatures.length / pendingPageSize);
   const sharedTotalPages = Math.ceil(sharedDocuments.length / sharedPageSize);
 
@@ -112,71 +167,108 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
     return sharedDocuments.slice(start, start + sharedPageSize);
   }, [sharedDocuments, sharedPage]);
 
-  // TODO: TanStack Query Hook(useQuery)으로 사고·위험 보고 현황 통계 가져오기
-  // const { data: statistics } = useQuery({
-  //   queryKey: ['accidentRiskStatistics', periodType, periodValue],
-  //   queryFn: () => fetchAccidentRiskStatistics({ periodType, periodValue }),
-  // });
-  // 사고·위험 보고 현황 (월별 통계 - 목업)
-  const accidentCount = 2;
-  const riskCount = 2;
+  // 사고·위험 보고 현황 통계 (에러 처리 포함)
+  // totalCount를 사고 발생 건수로 사용
+  const accidentCount =
+    riskStatsData?.header?.isSuccess && riskStatsData?.statistics?.totalCount
+      ? riskStatsData.statistics.totalCount
+      : 0;
+  const riskCount =
+    riskStatsData?.header?.isSuccess && riskStatsData?.statistics?.riskCount
+      ? riskStatsData.statistics.riskCount
+      : 0;
 
-  // TODO: TanStack Query Hook(useQuery)으로 사용자 프로필 정보 가져오기
-  // const { data: profile } = useQuery({
-  //   queryKey: ['userProfile', user?.id],
-  //   queryFn: () => fetchUserProfile(user?.id),
-  // });
-  // 프로필 정보 (사용자 정보에서 가져오기)
-  const profileName = user?.displayName || '김철수';
-  const profileLabel = '관리감독자';
-  const profileRoles = ['작업 현장 위험요인 파악 및 보고', '사고 발생 시 보고·조사·후속조치'];
+  // 프로필 정보 (에러 처리 포함)
+  const profileName =
+    profileData?.header?.isSuccess && profileData?.member?.memberName
+      ? profileData.member.memberName
+      : user?.displayName || '사용자';
+  const profileLabel =
+    profileData?.header?.isSuccess && profileData?.member?.memberRole
+      ? profileData.member.memberRole
+      : '관리감독자';
+  const profileRoles = ['작업 현장 위험요인 파악 및 보고', '사고 발생 시 보고·조사·후속조치']; // TODO: API에서 가져오기
 
-  // TODO: TanStack Query Hook(useQuery)으로 교육 이수율 가져오기
-  // const { data: education } = useQuery({
-  //   queryKey: ['educationRate', user?.id],
-  //   queryFn: () => fetchEducationRate(user?.id),
-  // });
-  const educationRate = 60;
+  // 교육 이수율 (응답 구조: educationCompletion.completionRate)
+  const educationRate =
+    educationData?.header?.isSuccess && educationData?.educationCompletion?.completionRate
+      ? parseFloat(String(educationData.educationCompletion.completionRate))
+      : 0;
 
   const handleViewDetail = () => {
     setEducationDetailModalOpen(true);
   };
 
   const handleSaveEducationDetail = () => {
-    // TODO: TanStack Query Hook(useMutation)으로 교육 기록 파일명 저장
-    // const saveMutation = useMutation({
-    //   mutationFn: (data) => saveEducationFileNames(data),
-    //   onSuccess: () => {
-    //     queryClient.invalidateQueries({ queryKey: ['educationDetail', user?.id] });
-    //   },
-    // });
-    console.log('교육 상세 저장');
+    // EducationDetailModal 내부에서 이미 파일명 저장이 완료되었으므로
+    // 교육 이수율 데이터를 새로고침하여 최신 정보 반영
+    queryClient.invalidateQueries({ queryKey: ['educationCompletionRate'] });
+    queryClient.invalidateQueries({ queryKey: ['educationDetail'] });
+
+    if (import.meta.env.DEV) {
+      console.log('✅ 교육 상세 저장 완료 - 데이터 새로고침');
+    }
   };
 
   const handleAccidentNavigate = () => {
-    // TODO: 사고 발생 페이지로 이동
-    // navigate('/dashboard/operation/accident-report');
-    console.log('사고발생 바로가기');
+    // 사고 발생 현황 채팅방으로 이동
+    navigate(`${paths.dashboard.operation.chat}?roomId=emergency`);
   };
 
   const handleRiskNavigate = () => {
-    // TODO: 위험 보고 페이지로 이동
-    // navigate('/dashboard/operation/risk-report');
-    console.log('위험보고 바로가기');
+    // 위험 보고 페이지로 이동
+    navigate(paths.dashboard.operation.riskReport);
   };
 
   const handleViewDocument = (id: string) => {
-    // TODO: API 호출로 문서 상세 정보 가져오기 및 문서 뷰어 열기
-    // const { data: document } = await fetchDocumentDetail(id);
-    // openDocumentViewer(document);
-    console.log('문서보기:', id);
+    // documentId 형식: safetyIdx-itemNumber-documentNumber (예: "1-2-2165")
+    // 또는 단순히 risk_id일 수 있음
+    // documentId를 risk_id로 사용하고, safety_id는 documentId에서 추출
+    const parts = id.split('-');
+    if (parts.length >= 3) {
+      // safetyIdx-itemNumber-documentNumber 형식
+      const safetyId = parts[0]; // safetyIdx
+      const riskId = id; // 전체 documentId를 risk_id로 사용
+      // 문서 수정 페이지로 이동
+      navigate(`/dashboard/safety-system/${safetyId}/risk-2200/${riskId}/edit`);
+    } else {
+      // documentId가 다른 형식이거나, API를 통해 safety_id를 가져와야 할 수 있음
+      // 일단 documentId를 그대로 사용
+      console.warn('⚠️ Document ID format not recognized:', id);
+      // TODO: API 호출로 문서 상세 정보 가져오기 및 safety_id 확인
+    }
   };
 
   const handleViewAll = () => {
     // TODO: 공유된 문서 전체 목록 페이지로 이동
-    // navigate('/dashboard/shared-documents');
     console.log('전체 보기');
   };
+
+  const handlePeriodTypeChange = (type: 'year' | 'month' | 'week') => {
+    setPeriodType(type);
+    // 기간 변경 시 통계 데이터 새로고침
+    queryClient.invalidateQueries({ queryKey: ['riskReportStatistics'] });
+  };
+
+  const handlePeriodValueChange = (value: string) => {
+    setPeriodValue(value);
+    // 기간 값 변경 시 통계 데이터 새로고침
+    queryClient.invalidateQueries({ queryKey: ['riskReportStatistics'] });
+  };
+
+  const handlePendingPageChange = (page: number) => {
+    setPendingPage(page);
+    // 클라이언트 사이드 페이지네이션은 데이터 새로고침 불필요
+  };
+
+  const handleSharedPageChange = (page: number) => {
+    setSharedPage(page);
+    // 클라이언트 사이드 페이지네이션은 데이터 새로고침 불필요
+  };
+
+  // 로딩 상태
+  const isLoading =
+    pendingLoading || sharedLoading || riskStatsLoading || profileLoading || educationLoading;
 
   return (
     <DashboardContent maxWidth="xl" sx={{ width: '100%', height: '100%' }}>
@@ -199,6 +291,13 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
         >
           {description}
         </Typography>
+      )}
+      {isLoading && (
+        <Box sx={{ p: 3, textAlign: 'center' }}>
+          <Typography variant="body2" color="text.secondary">
+            데이터를 불러오는 중...
+          </Typography>
+        </Box>
       )}
       <Stack spacing={{ xs: 2, sm: 2.5, md: 3 }} sx={{ width: '100%' }}>
         {/* 첫 번째 섹션: 프로필 카드 + 사고·위험 보고 현황 */}
@@ -223,18 +322,8 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
               periodValue={periodValue}
               accidentCount={accidentCount}
               riskCount={riskCount}
-              onPeriodTypeChange={(type) => {
-                setPeriodType(type);
-                // TODO: 기간 변경 시 TanStack Query로 통계 데이터 새로고침
-                // const queryClient = useQueryClient();
-                // queryClient.invalidateQueries({ queryKey: ['accidentRiskStatistics', type, periodValue] });
-              }}
-              onPeriodValueChange={(value) => {
-                setPeriodValue(value);
-                // TODO: 기간 값 변경 시 TanStack Query로 통계 데이터 새로고침
-                // const queryClient = useQueryClient();
-                // queryClient.invalidateQueries({ queryKey: ['accidentRiskStatistics', periodType, value] });
-              }}
+              onPeriodTypeChange={handlePeriodTypeChange}
+              onPeriodValueChange={handlePeriodValueChange}
               onAccidentNavigate={handleAccidentNavigate}
               onRiskNavigate={handleRiskNavigate}
             />
@@ -252,12 +341,7 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
               rows={pendingPageData}
               page={pendingPage}
               totalPages={pendingTotalPages}
-              onPageChange={(page) => {
-                setPendingPage(page);
-                // TODO: 페이지 변경 시 TanStack Query로 서명 대기 문서 목록 새로고침
-                // const queryClient = useQueryClient();
-                // queryClient.invalidateQueries({ queryKey: ['pendingSignatures', page] });
-              }}
+              onPageChange={handlePendingPageChange}
               onViewDocument={handleViewDocument}
             />
           </Box>
@@ -266,12 +350,7 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
               rows={sharedPageData}
               page={sharedPage}
               totalPages={sharedTotalPages}
-              onPageChange={(page) => {
-                setSharedPage(page);
-                // TODO: 페이지 변경 시 TanStack Query로 공유된 문서 목록 새로고침
-                // const queryClient = useQueryClient();
-                // queryClient.invalidateQueries({ queryKey: ['sharedDocuments', page] });
-              }}
+              onPageChange={handleSharedPageChange}
               onViewAll={handleViewAll}
             />
           </Box>
@@ -283,15 +362,23 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
         onClose={() => setEducationDetailModalOpen(false)}
         onSave={handleSaveEducationDetail}
         user={
-          user
+          user && profileData?.header?.isSuccess && profileData?.member
             ? {
-                id: user.id || '',
-                name: user.displayName || profileName,
-                department: '경영관리팀', // TODO: 사용자 정보에서 가져오기
-                joinDate: '2025-10-31', // TODO: 사용자 정보에서 가져오기
+                id: String(profileData.member.memberIdx || user.id || ''),
+                name: profileName,
+                department: '경영관리팀', // TODO: API에서 가져오기
+                joinDate: '2025-10-31', // TODO: API에서 가져오기
                 role: profileRoles[0] || profileLabel,
               }
-            : null
+            : user
+              ? {
+                  id: user.id || '',
+                  name: profileName,
+                  department: '경영관리팀', // TODO: API에서 가져오기
+                  joinDate: '2025-10-31', // TODO: API에서 가져오기
+                  role: profileRoles[0] || profileLabel,
+                }
+              : null
         }
       />
     </DashboardContent>

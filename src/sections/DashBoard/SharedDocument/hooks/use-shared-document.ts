@@ -7,7 +7,7 @@ import type { SharedDocument } from '../components/Table';
 
 export type SharedDocumentFilters = {
   tab: 'all' | 'public' | 'private';
-  priority: 'urgent' | 'important' | 'reference' | '';
+  priority: 'URGENT' | 'IMPORTANT' | 'REFERENCE' | '';
   startDate: Dayjs | null;
   endDate: Dayjs | null;
   searchValue: string;
@@ -16,7 +16,7 @@ export type SharedDocumentFilters = {
 export type UseSharedDocumentResult = {
   filters: SharedDocumentFilters;
   onChangeTab: (tab: 'all' | 'public' | 'private') => void;
-  onChangePriority: (priority: 'urgent' | 'important' | 'reference' | '') => void;
+  onChangePriority: (priority: 'URGENT' | 'IMPORTANT' | 'REFERENCE' | '') => void;
   onChangeStartDate: (date: Dayjs | null) => void;
   onChangeEndDate: (date: Dayjs | null) => void;
   onChangeSearchValue: (value: string) => void;
@@ -54,11 +54,11 @@ export function useSharedDocument(
   const filtered = useMemo(() => {
     let result = [...allData];
 
-    // 탭 필터 (공개/비공개)
+    // 탭 필터 (공개/비공개) - isPublic: 1=공개, 0=비공개
     if (filters.tab === 'public') {
-      result = result.filter((item) => item.status === 'public');
+      result = result.filter((item) => item.isPublic === 1);
     } else if (filters.tab === 'private') {
-      result = result.filter((item) => item.status === 'private');
+      result = result.filter((item) => item.isPublic === 0);
     }
 
     // 중요도 필터
@@ -66,18 +66,20 @@ export function useSharedDocument(
       result = result.filter((item) => item.priority === filters.priority);
     }
 
-    // 날짜 필터
+    // 날짜 필터 - createAt 사용
     if (filters.startDate) {
       const startDateStr = filters.startDate.format('YYYY-MM-DD');
       result = result.filter((item) => {
-        const itemDate = item.registeredDate.split(' ')[0];
+        if (!item.createAt) return false;
+        const itemDate = item.createAt.split('T')[0];
         return itemDate >= startDateStr;
       });
     }
     if (filters.endDate) {
       const endDateStr = filters.endDate.format('YYYY-MM-DD');
       result = result.filter((item) => {
-        const itemDate = item.registeredDate.split(' ')[0];
+        if (!item.createAt) return false;
+        const itemDate = item.createAt.split('T')[0];
         return itemDate <= endDateStr;
       });
     }
@@ -91,10 +93,10 @@ export function useSharedDocument(
     return result;
   }, [allData, filters]);
 
-  // 카운트 계산
+  // 카운트 계산 - isPublic: 1=공개, 0=비공개
   const countAll = allData.length;
-  const countPublic = allData.filter((item) => item.status === 'public').length;
-  const countPrivate = allData.filter((item) => item.status === 'private').length;
+  const countPublic = allData.filter((item) => item.isPublic === 1).length;
+  const countPrivate = allData.filter((item) => item.isPublic === 0).length;
 
   // 페이지네이션된 데이터
   const paginatedData = useMemo(() => {

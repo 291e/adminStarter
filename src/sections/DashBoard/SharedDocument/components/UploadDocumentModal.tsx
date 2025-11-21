@@ -17,6 +17,7 @@ import Button from '@mui/material/Button';
 
 import { Iconify } from 'src/components/iconify';
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
+import { COLOR_VALUES } from '../constants/colors';
 
 // ----------------------------------------------------------------------
 
@@ -31,7 +32,12 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onSave: (data: UploadDocumentFormData) => void;
-  priorities?: Array<{ id: string; label: string; color: string }>; // 중요도 목록
+  priorities?: Array<{
+    id: string;
+    label: string;
+    color: string;
+    labelType?: string;
+  }>; // 중요도 목록
 };
 
 export default function UploadDocumentModal({ open, onClose, onSave, priorities = [] }: Props) {
@@ -206,30 +212,41 @@ export default function UploadDocumentModal({ open, onClose, onSave, priorities 
                 value={formData.priority}
                 onChange={(e) => handleChange('priority', e.target.value)}
                 displayEmpty
-                renderValue={(selected) => {
-                  if (!selected) {
-                    return (
-                      <Typography component="span" sx={{ color: 'text.disabled', fontSize: 15 }}>
-                        중요도를 선택해주세요
-                      </Typography>
-                    );
-                  }
-                  const priority = priorities.find((p) => p.id === selected);
-                  return priority?.label || selected;
-                }}
                 sx={{
                   fontSize: 15,
                   lineHeight: '24px',
                   '& .MuiSelect-select': {
-                    py: 1,
+                    py: 2,
                   },
                 }}
               >
-                {priorities.map((priority) => (
-                  <MenuItem key={priority.id} value={priority.id}>
-                    {priority.label}
-                  </MenuItem>
-                ))}
+                <MenuItem value="" disabled>
+                  중요도를 선택하세요
+                </MenuItem>
+                {priorities.map((priority) => {
+                  // labelType을 우선적으로 사용, 없으면 label 사용
+                  const displayLabel = priority.labelType || priority.label || '중요도';
+                  // color가 HEX 코드인 경우 그대로 사용, 아니면 COLOR_VALUES에서 찾기
+                  const colorHex = priority.color.startsWith('#')
+                    ? priority.color
+                    : COLOR_VALUES[priority.color] || priority.color;
+
+                  return (
+                    <MenuItem key={priority.id} value={priority.id}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box
+                          sx={{
+                            width: 12,
+                            height: 12,
+                            borderRadius: '50%',
+                            bgcolor: colorHex,
+                          }}
+                        />
+                        <Typography>{displayLabel}</Typography>
+                      </Box>
+                    </MenuItem>
+                  );
+                })}
               </Select>
               {errors.priority && (
                 <Typography variant="caption" sx={{ color: 'error.main', mt: 0.5, ml: 1.75 }}>

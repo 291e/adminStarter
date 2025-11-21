@@ -2,27 +2,35 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import {
   getChatRooms,
-  getMessages,
+  createChatRoom,
+  getChatRoom,
+  updateChatRoom,
   getParticipants,
-  sendMessage,
   inviteParticipants,
   removeParticipants,
-  getEmergencyStats,
+  backupMessage,
+  shareDocument,
+  updateLastReadAt,
+  getUnreadCount,
+  getEmergencyStatistics,
   getAttachments,
-  uploadImage,
-  uploadVoice,
+  createOrJoinEmergencyRoom,
 } from 'src/services/chat/chat.service';
 import type {
   GetChatRoomsParams,
-  GetMessagesParams,
+  CreateChatRoomParams,
+  GetChatRoomParams,
+  UpdateChatRoomParams,
   GetParticipantsParams,
-  SendMessageParams,
   InviteParticipantsParams,
   RemoveParticipantsParams,
-  GetEmergencyStatsParams,
+  BackupMessageParams,
+  ShareDocumentParams,
+  UpdateLastReadAtParams,
+  GetUnreadCountParams,
+  GetEmergencyStatisticsParams,
   GetAttachmentsParams,
-  UploadImageParams,
-  UploadVoiceParams,
+  CreateOrJoinEmergencyRoomParams,
 } from 'src/services/chat/chat.types';
 
 // ----------------------------------------------------------------------
@@ -30,7 +38,7 @@ import type {
 /**
  * 채팅방 목록 조회 Hook
  */
-export function useChatRooms(params: GetChatRoomsParams) {
+export function useChatRooms(params?: GetChatRoomsParams) {
   return useQuery({
     queryKey: ['chatRooms', params],
     queryFn: () => getChatRooms(params),
@@ -38,13 +46,42 @@ export function useChatRooms(params: GetChatRoomsParams) {
 }
 
 /**
- * 메시지 목록 조회 Hook
+ * 채팅방 생성 Mutation Hook
  */
-export function useMessages(params: GetMessagesParams) {
+export function useCreateChatRoom() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (params: CreateChatRoomParams) => createChatRoom(params),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['chatRooms'] });
+    },
+  });
+}
+
+/**
+ * 채팅방 정보 조회 Hook
+ */
+export function useChatRoom(params: GetChatRoomParams) {
   return useQuery({
-    queryKey: ['chatMessages', params.roomId, params.page],
-    queryFn: () => getMessages(params),
-    enabled: !!params.roomId,
+    queryKey: ['chatRoom', params.chatRoomId],
+    queryFn: () => getChatRoom(params),
+    enabled: !!params.chatRoomId,
+  });
+}
+
+/**
+ * 채팅방 이름 변경 Mutation Hook
+ */
+export function useUpdateChatRoom() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (params: UpdateChatRoomParams) => updateChatRoom(params),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['chatRooms'] });
+      queryClient.invalidateQueries({ queryKey: ['chatRoom', variables.chatRoomId] });
+    },
   });
 }
 
@@ -53,23 +90,9 @@ export function useMessages(params: GetMessagesParams) {
  */
 export function useParticipants(params: GetParticipantsParams) {
   return useQuery({
-    queryKey: ['chatParticipants', params.roomId],
+    queryKey: ['chatParticipants', params.chatRoomId],
     queryFn: () => getParticipants(params),
-    enabled: !!params.roomId,
-  });
-}
-
-/**
- * 메시지 전송 Mutation Hook
- */
-export function useSendMessage() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (params: SendMessageParams) => sendMessage(params),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['chatMessages', variables.roomId] });
-    },
+    enabled: !!params.chatRoomId,
   });
 }
 
@@ -82,7 +105,7 @@ export function useInviteParticipants() {
   return useMutation({
     mutationFn: (params: InviteParticipantsParams) => inviteParticipants(params),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['chatParticipants', variables.roomId] });
+      queryClient.invalidateQueries({ queryKey: ['chatParticipants', variables.chatRoomId] });
     },
   });
 }
@@ -96,19 +119,63 @@ export function useRemoveParticipants() {
   return useMutation({
     mutationFn: (params: RemoveParticipantsParams) => removeParticipants(params),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['chatParticipants', variables.roomId] });
+      queryClient.invalidateQueries({ queryKey: ['chatParticipants', variables.chatRoomId] });
     },
+  });
+}
+
+/**
+ * 메시지 백업 Mutation Hook
+ */
+export function useBackupMessage() {
+  return useMutation({
+    mutationFn: (params: BackupMessageParams) => backupMessage(params),
+  });
+}
+
+/**
+ * 공유 문서 채팅방 공유 Mutation Hook
+ */
+export function useShareDocument() {
+  return useMutation({
+    mutationFn: (params: ShareDocumentParams) => shareDocument(params),
+  });
+}
+
+/**
+ * 마지막 읽은 시간 업데이트 Mutation Hook
+ */
+export function useUpdateLastReadAt() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (params: UpdateLastReadAtParams) => updateLastReadAt(params),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['chatRooms'] });
+      queryClient.invalidateQueries({ queryKey: ['chatRoom', variables.chatRoomId] });
+    },
+  });
+}
+
+/**
+ * 안 읽은 메시지 수 조회 Hook
+ */
+export function useUnreadCount(params: GetUnreadCountParams) {
+  return useQuery({
+    queryKey: ['chatUnreadCount', params.chatRoomId],
+    queryFn: () => getUnreadCount(params),
+    enabled: !!params.chatRoomId,
   });
 }
 
 /**
  * 응급 통계 조회 Hook
  */
-export function useEmergencyStats(params: GetEmergencyStatsParams) {
+export function useEmergencyStatistics(params: GetEmergencyStatisticsParams) {
   return useQuery({
-    queryKey: ['emergencyStats', params.roomId],
-    queryFn: () => getEmergencyStats(params),
-    enabled: !!params.roomId,
+    queryKey: ['emergencyStatistics', params.chatRoomId, params.startDate, params.endDate],
+    queryFn: () => getEmergencyStatistics(params),
+    enabled: !!params.chatRoomId,
   });
 }
 
@@ -117,27 +184,22 @@ export function useEmergencyStats(params: GetEmergencyStatsParams) {
  */
 export function useAttachments(params: GetAttachmentsParams) {
   return useQuery({
-    queryKey: ['chatAttachments', params.roomId],
+    queryKey: ['chatAttachments', params.chatRoomId],
     queryFn: () => getAttachments(params),
-    enabled: !!params.roomId,
+    enabled: !!params.chatRoomId,
   });
 }
 
 /**
- * 이미지 업로드 Mutation Hook
+ * 사고 발생 현황 채팅방 자동 생성/참가 Mutation Hook
  */
-export function useUploadImage() {
+export function useCreateOrJoinEmergencyRoom() {
+  const queryClient = useQueryClient();
+
   return useMutation({
-    mutationFn: (params: UploadImageParams) => uploadImage(params),
+    mutationFn: (params: CreateOrJoinEmergencyRoomParams) => createOrJoinEmergencyRoom(params),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['chatRooms'] });
+    },
   });
 }
-
-/**
- * 음성 업로드 Mutation Hook
- */
-export function useUploadVoice() {
-  return useMutation({
-    mutationFn: (params: UploadVoiceParams) => uploadVoice(params),
-  });
-}
-

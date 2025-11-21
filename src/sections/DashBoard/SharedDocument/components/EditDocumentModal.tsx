@@ -13,21 +13,15 @@ import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import FormControl from '@mui/material/FormControl';
 import Switch from '@mui/material/Switch';
-import Chip from '@mui/material/Chip';
 
 import { Iconify } from 'src/components/iconify';
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
+import type { SharedDocument as ApiSharedDocument } from 'src/services/dashboard/dashboard.types';
 
 // ----------------------------------------------------------------------
 
-export type SharedDocument = {
-  id: string;
-  priority: 'urgent' | 'important' | 'reference';
-  documentName: string;
-  registeredDate: string;
-  status: 'public' | 'private';
-  fileName?: string; // 파일명
-};
+// API 타입 직접 사용
+export type SharedDocument = ApiSharedDocument;
 
 export type EditDocumentFormData = {
   documentName: string;
@@ -41,7 +35,12 @@ type Props = {
   onClose: () => void;
   onSave: (data: EditDocumentFormData) => void;
   document: SharedDocument | null;
-  priorities?: Array<{ id: string; label: string; color: string; labelType?: string; customLabel?: string }>;
+  priorities?: Array<{
+    id: string;
+    label: string;
+    color: string;
+    labelType?: string;
+  }>;
 };
 
 export default function EditDocumentModal({
@@ -63,28 +62,33 @@ export default function EditDocumentModal({
 
   useEffect(() => {
     if (open && document) {
-      // TODO: TanStack Query Hook(useQuery)으로 중요도 목록 가져오기
-      // const { data: priorityList } = useQuery({
-      //   queryKey: ['prioritySettings'],
-      //   queryFn: () => fetchPrioritySettings(),
-      // });
-      // setPriorities(priorityList || []);
+      // document.priority는 'URGENT' | 'IMPORTANT' | 'REFERENCE' 형식 (대문자)
+      // priorities에서 해당 priority의 id를 찾아서 설정
+      const documentPriorityUpper = document.priority?.toUpperCase();
 
-      // TODO: TanStack Query Hook(useQuery)으로 문서 상세 정보 가져오기
-      // const { data: documentDetail } = useQuery({
-      //   queryKey: ['sharedDocument', document.id],
-      //   queryFn: () => fetchSharedDocumentDetail(document.id),
-      // });
+      // 여러 방법으로 매핑 시도
+      let documentPrioritySetting = priorities.find((p) => {
+        const labelTypeUpper = p.labelType?.toUpperCase();
+        return labelTypeUpper === documentPriorityUpper;
+      });
+
+      // 매핑 실패 시 document.priority를 id로 직접 사용하는 경우도 확인
+      if (!documentPrioritySetting && document.priority) {
+        documentPrioritySetting = priorities.find((p) => p.id === document.priority);
+      }
+
+      // 매핑된 prioritySetting의 id를 사용, 없으면 document.priority를 그대로 사용
+      const priorityId = documentPrioritySetting?.id || document.priority || '';
 
       setFormData({
         documentName: document.documentName || '',
-        priority: document.priority || '',
+        priority: priorityId,
         file: null,
-        isPublic: document.status === 'public',
+        isPublic: document.isPublic === 1,
       });
       setErrors({});
     }
-  }, [open, document]);
+  }, [open, document, priorities]);
 
   const handleChange = (field: keyof EditDocumentFormData, value: unknown) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -153,16 +157,8 @@ export default function EditDocumentModal({
       return;
     }
 
-    // TODO: TanStack Query Hook(useMutation)으로 문서 수정
-    // const updateMutation = useMutation({
-    //   mutationFn: (data: EditDocumentFormData) => updateSharedDocument(document.id, data),
-    //   onSuccess: () => {
-    //     queryClient.invalidateQueries({ queryKey: ['sharedDocuments'] });
-    //     onClose();
-    //   },
-    // });
-    // updateMutation.mutate(formData);
-
+    // 저장 로직은 view.tsx의 handleSaveEdit에서 처리
+    // 모달에서는 데이터만 전달
     onSave(formData);
   };
 
@@ -177,7 +173,6 @@ export default function EditDocumentModal({
     onClose();
   };
 
-  const selectedPriority = priorities.find((p) => p.id === formData.priority);
   const currentFileName = formData.file?.name || document?.fileName || '';
 
   return (
@@ -330,25 +325,26 @@ export default function EditDocumentModal({
                   <MenuItem value="" disabled>
                     중요도를 선택하세요
                   </MenuItem>
-                  {priorities.map((priority) => (
-                    <MenuItem key={priority.id} value={priority.id}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Box
-                          sx={{
-                            width: 12,
-                            height: 12,
-                            borderRadius: '50%',
-                            bgcolor: priority.color,
-                          }}
-                        />
-                        <Typography>
-                          {priority.labelType === 'custom' && priority.customLabel
-                            ? priority.customLabel
-                            : priority.label}
-                        </Typography>
-                      </Box>
-                    </MenuItem>
-                  ))}
+                  {priorities.map((priority) => {
+                    // labelType을 우선적으로 사용, 없으면 label 사용
+                    const displayLabel = priority.labelType || priority.label || '중요도';
+
+                    return (
+                      <MenuItem key={priority.id} value={priority.id}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box
+                            sx={{
+                              width: 12,
+                              height: 12,
+                              borderRadius: '50%',
+                              bgcolor: priority.color,
+                            }}
+                          />
+                          <Typography>{displayLabel}</Typography>
+                        </Box>
+                      </MenuItem>
+                    );
+                  })}
                 </Select>
               </FormControl>
             </Stack>
@@ -386,11 +382,7 @@ export default function EditDocumentModal({
           <DialogBtn variant="outlined" onClick={handleClose} sx={{ minHeight: 48, fontSize: 15 }}>
             취소
           </DialogBtn>
-          <DialogBtn
-            variant="contained"
-            onClick={handleSave}
-            sx={{ minHeight: 48, fontSize: 15 }}
-          >
+          <DialogBtn variant="contained" onClick={handleSave} sx={{ minHeight: 48, fontSize: 15 }}>
             적용
           </DialogBtn>
         </Stack>
@@ -398,4 +390,3 @@ export default function EditDocumentModal({
     </Dialog>
   );
 }
-

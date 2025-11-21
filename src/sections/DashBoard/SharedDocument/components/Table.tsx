@@ -16,56 +16,33 @@ import TableRow from '@mui/material/TableRow';
 import Paper from '@mui/material/Paper';
 
 import { Iconify } from 'src/components/iconify';
+import { hexToRgba } from 'src/utils/color';
+import type {
+  SharedDocument as ApiSharedDocument,
+  PrioritySetting,
+} from 'src/services/dashboard/dashboard.types';
+import { PRIORITY_CONFIG, STATUS_CONFIG } from '../constants/priority';
 
 // ----------------------------------------------------------------------
 
-export type SharedDocument = {
-  id: string;
-  priority: 'urgent' | 'important' | 'reference';
-  documentName: string;
-  registeredDate: string; // YYYY-MM-DD HH:mm:ss 형식
-  status: 'public' | 'private';
-};
+// API 타입 직접 사용
+export type SharedDocument = ApiSharedDocument;
 
 type Props = {
   rows: SharedDocument[];
+  prioritySettings?: PrioritySetting[];
   onShareToChat?: (row: SharedDocument) => void;
   onEdit?: (row: SharedDocument) => void;
   onDelete?: (row: SharedDocument) => void;
 };
 
-const PRIORITY_CONFIG = {
-  urgent: {
-    label: '긴급',
-    color: '#b71d18',
-    bgColor: 'rgba(255, 86, 48, 0.16)',
-  },
-  important: {
-    label: '중요',
-    color: '#b76e00',
-    bgColor: 'rgba(255, 171, 0, 0.16)',
-  },
-  reference: {
-    label: '참고',
-    color: '#1d7bf5',
-    bgColor: 'rgba(29, 123, 245, 0.16)',
-  },
-};
-
-const STATUS_CONFIG = {
-  public: {
-    label: '공개',
-    color: '#007867',
-    bgColor: 'rgba(0, 167, 111, 0.16)',
-  },
-  private: {
-    label: '비공개',
-    color: 'text.secondary',
-    bgColor: 'rgba(145, 158, 171, 0.16)',
-  },
-};
-
-export default function SharedDocumentTable({ rows, onShareToChat, onEdit, onDelete }: Props) {
+export default function SharedDocumentTable({
+  rows,
+  prioritySettings = [],
+  onShareToChat,
+  onEdit,
+  onDelete,
+}: Props) {
   const [menuAnchorEl, setMenuAnchorEl] = useState<{ [key: string]: HTMLElement | null }>({});
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
@@ -78,11 +55,6 @@ export default function SharedDocumentTable({ rows, onShareToChat, onEdit, onDel
   const handleCloseMenu = (rowId: string) => {
     setMenuAnchorEl((prev) => ({ ...prev, [rowId]: null }));
     setOpenMenuId(null);
-  };
-
-  const formatDate = (dateString: string) => {
-    const [date, time] = dateString.split(' ');
-    return { date, time };
   };
 
   return (
@@ -126,9 +98,48 @@ export default function SharedDocumentTable({ rows, onShareToChat, onEdit, onDel
 
         <TableBody>
           {rows.map((row, index) => {
-            const priorityConfig = PRIORITY_CONFIG[row.priority];
-            const statusConfig = STATUS_CONFIG[row.status];
-            const { date, time } = formatDate(row.registeredDate);
+            // prioritySettings에서 해당 priority의 labelType과 일치하는 설정 찾기
+            const prioritySetting = prioritySettings.find(
+              (setting) => setting.labelType === row.priority
+            );
+
+            // prioritySettings에서 찾은 경우 해당 색상 사용, 없으면 PRIORITY_CONFIG 또는 기본값 사용
+            let priorityConfig: { label: string; color: string; bgColor: string };
+            if (prioritySetting && prioritySetting.color) {
+              // prioritySettings에서 찾은 경우
+              const colorHex = prioritySetting.color;
+              // HEX 색상을 rgba로 변환 (투명도 0.16)
+              const bgColor = hexToRgba(colorHex, 0.16);
+
+              priorityConfig = {
+                label: prioritySetting.labelType || row.priority || '중요도',
+                color: colorHex,
+                bgColor,
+              };
+            } else {
+              // prioritySettings에서 찾지 못한 경우 PRIORITY_CONFIG 또는 기본값 사용
+              priorityConfig =
+                PRIORITY_CONFIG[row.priority || ''] ||
+                (row.priority
+                  ? {
+                      label: row.priority,
+                      color: PRIORITY_CONFIG.DEFAULT.color,
+                      bgColor: PRIORITY_CONFIG.DEFAULT.bgColor,
+                    }
+                  : PRIORITY_CONFIG.DEFAULT);
+            }
+
+            const statusConfig = STATUS_CONFIG[row.isPublic] || STATUS_CONFIG[0];
+            // createAt을 등록일로 사용 (YYYY-MM-DD 형식)
+            const createDate = row.createAt
+              ? new Date(row.createAt).toISOString().split('T')[0]
+              : '';
+            const createTime = row.createAt
+              ? new Date(row.createAt).toLocaleTimeString('ko-KR', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+              : '';
             const isMenuOpen = openMenuId === row.id;
 
             return (
@@ -167,10 +178,10 @@ export default function SharedDocumentTable({ rows, onShareToChat, onEdit, onDel
                 <TableCell>
                   <Box>
                     <Typography variant="body2" sx={{ fontSize: 14, color: 'text.primary' }}>
-                      {date}
+                      {createDate}
                     </Typography>
                     <Typography variant="body2" sx={{ fontSize: 14, color: 'text.secondary' }}>
-                      {time}
+                      {createTime}
                     </Typography>
                   </Box>
                 </TableCell>

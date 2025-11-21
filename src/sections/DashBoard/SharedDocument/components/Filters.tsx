@@ -13,8 +13,8 @@ import type { Dayjs } from 'dayjs';
 import { Iconify } from 'src/components/iconify';
 
 type Props = {
-  priority: 'urgent' | 'important' | 'reference' | '';
-  onChangePriority: (value: 'urgent' | 'important' | 'reference' | '') => void;
+  priority: 'URGENT' | 'IMPORTANT' | 'REFERENCE' | '';
+  onChangePriority: (value: 'URGENT' | 'IMPORTANT' | 'REFERENCE' | '') => void;
   startDate: Dayjs | null;
   onChangeStartDate: (value: Dayjs | null) => void;
   endDate: Dayjs | null;
@@ -51,9 +51,7 @@ export default function SharedDocumentFilters({
             displayEmpty
             value={priority}
             onChange={(e) => {
-              onChangePriority((e.target.value || '') as 'urgent' | 'important' | 'reference' | '');
-              // TODO: 중요도 필터 변경 시 TanStack Query로 공유 문서 목록 새로고침
-              // queryClient.invalidateQueries({ queryKey: ['sharedDocuments'] });
+              onChangePriority((e.target.value || '') as 'URGENT' | 'IMPORTANT' | 'REFERENCE' | '');
             }}
             renderValue={(selected) => {
               if (!selected) {
@@ -70,10 +68,10 @@ export default function SharedDocumentFilters({
                   </Typography>
                 );
               }
-              const labels = {
-                urgent: '긴급',
-                important: '중요',
-                reference: '참고',
+              const labels: Record<'URGENT' | 'IMPORTANT' | 'REFERENCE', string> = {
+                URGENT: '긴급',
+                IMPORTANT: '중요',
+                REFERENCE: '참고',
               };
               return (
                 <Typography
@@ -84,7 +82,7 @@ export default function SharedDocumentFilters({
                     color: 'text.primary',
                   }}
                 >
-                  {labels[selected]}
+                  {labels[selected as 'URGENT' | 'IMPORTANT' | 'REFERENCE']}
                 </Typography>
               );
             }}
@@ -104,9 +102,9 @@ export default function SharedDocumentFilters({
               },
             }}
           >
-            <MenuItem value="urgent">긴급</MenuItem>
-            <MenuItem value="important">중요</MenuItem>
-            <MenuItem value="reference">참고</MenuItem>
+            <MenuItem value="URGENT">긴급</MenuItem>
+            <MenuItem value="IMPORTANT">중요</MenuItem>
+            <MenuItem value="REFERENCE">참고</MenuItem>
           </Select>
         </FormControl>
 

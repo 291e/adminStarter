@@ -4,19 +4,12 @@ import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 
 import { Iconify } from 'src/components/iconify';
+import type { DocumentSignature } from 'src/services/dashboard/dashboard.types';
 
 // ----------------------------------------------------------------------
 
-export type PendingSignature = {
-  id: string;
-  documentName: string;
-  author: string;
-  date: string;
-  time: string;
-};
-
 type Props = {
-  rows: PendingSignature[];
+  rows: DocumentSignature[];
   page: number;
   totalPages: number;
   onPageChange: (page: number) => void;
@@ -100,20 +93,32 @@ export default function PendingSignaturesCard({
                   maxWidth: 140,
                 }}
               >
-                {row.documentName}
+                {row.documentId}
               </Typography>
               <Typography variant="body2" sx={{ maxWidth: '100%', fontSize: { xs: 13, sm: 14 } }}>
-                {row.author}
+                {row.targetMemberName}
               </Typography>
               <Box sx={{ width: { xs: '100%', sm: 80 } }}>
                 <Typography variant="body2" sx={{ fontSize: { xs: 13, sm: 14 } }}>
-                  {row.date}
+                  {row.requestedAt
+                    ? new Date(row.requestedAt).toLocaleDateString('ko-KR', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                      })
+                    : ''}
                 </Typography>
                 <Typography
                   variant="caption"
                   sx={{ color: 'text.secondary', fontSize: { xs: 11, sm: 12 } }}
                 >
-                  {row.time}
+                  {row.requestedAt
+                    ? new Date(row.requestedAt).toLocaleTimeString('ko-KR', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: true,
+                      })
+                    : ''}
                 </Typography>
               </Box>
             </Box>

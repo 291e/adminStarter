@@ -54,19 +54,52 @@ export type CreateRiskReportResponse = BaseResponseDto<{
   riskReport: RiskReport;
 }>;
 
-// 위험 보고 비활성화 요청 파라미터
-export type DeactivateRiskReportParams = {
-  id: string;
+// 위험 보고 정보 조회 요청
+export type GetRiskReportParams = {
+  riskReportId: string;
 };
 
-// 위험 보고 비활성화 응답
-export type DeactivateRiskReportResponse = BaseResponseDto;
+// 위험 보고 정보 조회 응답
+export type GetRiskReportResponse = BaseResponseDto<RiskReport>;
+
+// 위험 보고 수정 요청
+export type UpdateRiskReportParams = {
+  riskReportId: string;
+  title?: string;
+  content?: string;
+  location?: string;
+  address?: string;
+  addressDetail?: string;
+  images?: File[];
+};
+
+// 위험 보고 수정 응답
+export type UpdateRiskReportResponse = BaseResponseDto<RiskReport>;
+
+// 위험 보고 비활성화 요청 파라미터
+export type DeactivateRiskReportParams = {
+  riskReportId: string;
+};
 
 // 위험 보고 삭제 요청 파라미터
 export type DeleteRiskReportParams = {
-  id: string;
+  riskReportId: string;
 };
 
-// 위험 보고 삭제 응답
-export type DeleteRiskReportResponse = BaseResponseDto;
+// 채팅방에서 위험 보고 생성 요청
+export type CreateRiskReportFromChatParams = {
+  chatRoomId: string;
+  title: string;
+  content: string;
+  location?: string;
+  images?: File[];
+};
+
+// 채팅방에서 위험 보고 생성 응답
+export type CreateRiskReportFromChatResponse = BaseResponseDto<RiskReport>;
+
+// 위험 보고 확인 요청
+export type ConfirmRiskReportParams = {
+  riskReportId: string;
+};
 

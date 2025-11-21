@@ -1,5 +1,5 @@
 import type { Theme, SxProps } from '@mui/material/styles';
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 
 import Box from '@mui/material/Box';
@@ -19,6 +19,7 @@ import FooterButtons from './components/FooterButtons';
 import { generatePDF } from './utils/pdf-utils';
 import { getRiskAssessmentTableData } from './data/table-data';
 import type { DefaultTableRow } from './tables/Default';
+import SignatureModal from '../edit/components/SignatureModal';
 
 // ----------------------------------------------------------------------
 
@@ -106,17 +107,44 @@ export function Risk_2200View({
     console.log('샘플 보기');
   };
 
-  const handleAddSignature = () => {
-    // TODO: TanStack Query Hook(useMutation)으로 서명 추가
-    // const mutation = useMutation({
-    //   mutationFn: (signatureData: Risk2200SignatureParams) => addRisk2200Signature(signatureData),
-    //   onSuccess: () => {
-    //     queryClient.invalidateQueries({ queryKey: ['risk2200ApprovalInfo', riskId] });
-    //   },
-    // });
-    // mutation.mutate({ riskId, signatureType: 'writer' });
-    console.log('서명 추가');
-  };
+  // 서명 패드 모달 상태
+  const [signatureModal, setSignatureModal] = useState<{
+    open: boolean;
+    type: 'writer' | 'reviewer' | 'approver' | null;
+  }>({ open: false, type: null });
+
+  const handleAddSignature = useCallback(() => {
+    // 서명 패드 모달 열기 (작성자 서명)
+    setSignatureModal({ open: true, type: 'writer' });
+  }, []);
+
+  const handleCloseSignatureModal = useCallback(() => {
+    setSignatureModal({ open: false, type: null });
+  }, []);
+
+  const handleConfirmSignature = useCallback(
+    (signatureDataUrl: string) => {
+      // TODO: TanStack Query Hook(useMutation)으로 서명 추가
+      // const mutation = useMutation({
+      //   mutationFn: (signatureData: Risk2200SignatureParams) => addRisk2200Signature(signatureData),
+      //   onSuccess: () => {
+      //     queryClient.invalidateQueries({ queryKey: ['risk2200ApprovalInfo', riskId] });
+      //   },
+      // });
+      // mutation.mutate({
+      //   riskId: riskId!,
+      //   signatureType: signatureModal.type!,
+      //   signature: signatureDataUrl,
+      // });
+      console.log('서명 저장:', {
+        riskId,
+        type: signatureModal.type,
+        signature: signatureDataUrl.substring(0, 50) + '...',
+      });
+      handleCloseSignatureModal();
+    },
+    [riskId, signatureModal.type, handleCloseSignatureModal]
+  );
 
   // riskId에서 문서 정보 추출 (형식: safetyIdx-itemNumber-documentNumber)
   const extractedInfo = riskId
@@ -195,190 +223,208 @@ export function Risk_2200View({
     item || (safetyIdx && itemNumber ? getItem(safetyIdx, itemNumber) : undefined);
 
   return (
-    <DashboardContent maxWidth="xl">
-      <Box
-        sx={[
-          {
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 5,
-            alignItems: 'center',
-          },
-          ...(Array.isArray(sx) ? sx : [sx]),
-        ]}
-      >
-        <DetailHeader
-          title={
-            resolvedItem?.documentName || system?.systemName || '위험요인 제거·대체 및 통제 등록'
-          }
-          onBack={handleBack}
-          onSampleView={handleSampleView}
-        />
-
-        {/* Main Card */}
+    <>
+      <DashboardContent maxWidth="xl">
         <Box
-          ref={pdfRef}
-          component="div"
-          data-pdf-content
-          sx={{
-            bgcolor: 'background.paper',
-            borderRadius: 2,
-            boxShadow: 3,
-            width: '100%',
-
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            py: 4,
-          }}
+          sx={[
+            {
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 5,
+              alignItems: 'center',
+            },
+            ...(Array.isArray(sx) ? sx : [sx]),
+          ]}
         >
-          <DocumentHeader
-            formattedDate={formattedDate}
+          <DetailHeader
             title={
-              is1100Series
-                ? '위험요인 파악'
-                : is1200Series && documentTableData?.type === '1200-industrial'
-                  ? '사고조사 보고서'
-                  : is1200Series
-                    ? '아차 사고 조사표'
-                    : is2100Series
-                      ? '위험요인별 위험성 평가'
-                      : is1500Series
-                        ? '위험장소 및 작업형태별 위험요인'
-                        : is1400Series
-                          ? '유해인자'
-                          : is1300Series
-                            ? '위험 기계·기구·설비'
-                            : is2300Series
-                              ? '종합대책 수립·이행'
-                              : is2200Series
-                                ? '위험요인 제거·대체 및 통제 계획'
-                                : is2400TBM
-                                  ? 'TBM 일지'
-                                  : is2400Education
-                                    ? '연간 교육 계획'
-                                    : undefined
+              resolvedItem?.documentName || system?.systemName || '위험요인 제거·대체 및 통제 등록'
             }
-            approvalVariant={
-              is1100Series ||
-              is1200Series ||
-              is2100Series ||
-              is1500Series ||
-              is1400Series ||
-              is1300Series ||
-              is2300Series ||
-              is2200Series ||
-              is2400TBM ||
-              is2400Education
-                ? 'four'
-                : 'default'
-            }
-            onAddSignature={handleAddSignature}
-            riskId={riskId}
+            onBack={handleBack}
+            onSampleView={handleSampleView}
           />
 
-          {(() => {
-            // 문서 테이블 데이터가 있으면 사용, 없으면 기본값
-            if (is1100Series && documentTableData?.type === '1100') {
-              const TableComp = tableRegistry['1-1-1100'] as any;
-              return <TableComp rows={documentTableData.rows} />;
-            }
-            if (is2100Series && documentTableData?.type === '2100') {
-              const TableComp = tableRegistry['2-1-2100'] as any;
-              return <TableComp data={documentTableData.data} />;
-            }
-            if (is1200Series && documentTableData?.type === '1200-industrial') {
-              const TableComp = tableRegistry['1-2-1200-industrial'] as any;
-              return <TableComp row={documentTableData.rows[0]} />;
-            }
-            if (is1200Series && documentTableData?.type === '1200-near-miss') {
-              const TableComp = tableRegistry['1-2-1200'] as any;
-              return <TableComp row={documentTableData.row} />;
-            }
-            if (is1500Series && documentTableData?.type === '1500') {
-              const TableComp = tableRegistry['1-5-1500'] as any;
-              return <TableComp rows={documentTableData.rows} />;
-            }
-            if (is1400Series && documentTableData?.type === '1400') {
-              const TableComp = tableRegistry['1-4-1400'] as any;
-              return <TableComp data={documentTableData.data} />;
-            }
-            if (is1300Series && documentTableData?.type === '1300') {
-              const TableComp = tableRegistry['1-3-1300'] as any;
-              return <TableComp rows={documentTableData.rows} />;
-            }
-            if (is2300Series && documentTableData?.type === '2300') {
-              const TableComp = tableRegistry['2-3-2300'] as any;
-              return <TableComp rows={documentTableData.rows} />;
-            }
-            if (is2200Series && documentTableData?.type === '2200') {
-              const TableComp = tableRegistry['2-2'] as any;
-              return <TableComp data={documentTableData.rows} />;
-            }
-            if (is2400TBM && documentTableData?.type === '2400-tbm') {
-              const TableComp = tableRegistry['2-4-2400-tbm'] as any;
-              return <TableComp data={documentTableData.data} />;
-            }
-            if (is2400Education && documentTableData?.type === '2400-education') {
-              const TableComp = tableRegistry['2-4-2400-education'] as any;
-              return (
-                <TableComp
-                  rows={documentTableData.rows}
-                  minimumEducationRows={documentTableData.minimumEducationRows}
-                />
-              );
-            }
+          {/* Main Card */}
+          <Box
+            ref={pdfRef}
+            component="div"
+            data-pdf-content
+            sx={{
+              bgcolor: 'background.paper',
+              borderRadius: 2,
+              boxShadow: 3,
+              width: '100%',
 
-            // 기본값: 문서 데이터가 없거나 매칭되지 않는 경우
-            if (is1100Series) {
-              const TableComp = tableRegistry['1-1-1100'] as any;
-              return <TableComp />;
-            }
-            if (is1200Series) {
-              const TableComp = tableRegistry['1-2-1200'] as any;
-              return <TableComp />;
-            }
-            if (is2100Series) {
-              const TableComp = tableRegistry['2-1-2100'] as any;
-              return <TableComp />;
-            }
-            if (is1500Series) {
-              const TableComp = tableRegistry['1-5-1500'] as any;
-              return <TableComp />;
-            }
-            if (is1400Series) {
-              const TableComp = tableRegistry['1-4-1400'] as any;
-              return <TableComp />;
-            }
-            if (is1300Series) {
-              const TableComp = tableRegistry['1-3-1300'] as any;
-              return <TableComp />;
-            }
-            if (is2300Series) {
-              const TableComp = tableRegistry['2-3-2300'] as any;
-              return <TableComp />;
-            }
-            if (is2200Series) {
-              const TableComp = tableRegistry['2-2'] as TableComponent;
-              return <TableComp data={tableData as DefaultTableRow[]} />;
-            }
-            if (is2400TBM) {
-              const TableComp = tableRegistry['2-4-2400-tbm'] as any;
-              return <TableComp />;
-            }
-            if (is2400Education) {
-              const TableComp = tableRegistry['2-4-2400-education'] as any;
-              return <TableComp />;
-            }
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              py: 4,
+            }}
+          >
+            <DocumentHeader
+              formattedDate={formattedDate}
+              title={
+                is1100Series
+                  ? '위험요인 파악'
+                  : is1200Series && documentTableData?.type === '1200-industrial'
+                    ? '사고조사 보고서'
+                    : is1200Series
+                      ? '아차 사고 조사표'
+                      : is2100Series
+                        ? '위험요인별 위험성 평가'
+                        : is1500Series
+                          ? '위험장소 및 작업형태별 위험요인'
+                          : is1400Series
+                            ? '유해인자'
+                            : is1300Series
+                              ? '위험 기계·기구·설비'
+                              : is2300Series
+                                ? '종합대책 수립·이행'
+                                : is2200Series
+                                  ? '위험요인 제거·대체 및 통제 계획'
+                                  : is2400TBM
+                                    ? 'TBM 일지'
+                                    : is2400Education
+                                      ? '연간 교육 계획'
+                                      : undefined
+              }
+              approvalVariant={
+                is1100Series ||
+                is1200Series ||
+                is2100Series ||
+                is1500Series ||
+                is1400Series ||
+                is1300Series ||
+                is2300Series ||
+                is2200Series ||
+                is2400TBM ||
+                is2400Education
+                  ? 'four'
+                  : 'default'
+              }
+              onAddSignature={handleAddSignature}
+              riskId={riskId}
+            />
 
-            const key = item ? `${item.safetyIdx}-${item.itemNumber}` : 'Default';
-            const TableComp = (tableRegistry as any)[key] || tableRegistry.Default;
-            return <TableComp data={tableData as any[]} />;
-          })()}
+            {(() => {
+              // 문서 테이블 데이터가 있으면 사용, 없으면 기본값
+              if (is1100Series && documentTableData?.type === '1100') {
+                const TableComp = tableRegistry['1-1-1100'] as any;
+                return <TableComp rows={documentTableData.rows} />;
+              }
+              if (is2100Series && documentTableData?.type === '2100') {
+                const TableComp = tableRegistry['2-1-2100'] as any;
+                return <TableComp data={documentTableData.data} />;
+              }
+              if (is1200Series && documentTableData?.type === '1200-industrial') {
+                const TableComp = tableRegistry['1-2-1200-industrial'] as any;
+                return <TableComp row={documentTableData.rows[0]} />;
+              }
+              if (is1200Series && documentTableData?.type === '1200-near-miss') {
+                const TableComp = tableRegistry['1-2-1200'] as any;
+                return <TableComp row={documentTableData.row} />;
+              }
+              if (is1500Series && documentTableData?.type === '1500') {
+                const TableComp = tableRegistry['1-5-1500'] as any;
+                return <TableComp rows={documentTableData.rows} />;
+              }
+              if (is1400Series && documentTableData?.type === '1400') {
+                const TableComp = tableRegistry['1-4-1400'] as any;
+                return <TableComp data={documentTableData.data} />;
+              }
+              if (is1300Series && documentTableData?.type === '1300') {
+                const TableComp = tableRegistry['1-3-1300'] as any;
+                return <TableComp rows={documentTableData.rows} />;
+              }
+              if (is2300Series && documentTableData?.type === '2300') {
+                const TableComp = tableRegistry['2-3-2300'] as any;
+                return <TableComp rows={documentTableData.rows} />;
+              }
+              if (is2200Series && documentTableData?.type === '2200') {
+                const TableComp = tableRegistry['2-2'] as any;
+                return <TableComp data={documentTableData.rows} />;
+              }
+              if (is2400TBM && documentTableData?.type === '2400-tbm') {
+                const TableComp = tableRegistry['2-4-2400-tbm'] as any;
+                return <TableComp data={documentTableData.data} />;
+              }
+              if (is2400Education && documentTableData?.type === '2400-education') {
+                const TableComp = tableRegistry['2-4-2400-education'] as any;
+                return (
+                  <TableComp
+                    rows={documentTableData.rows}
+                    minimumEducationRows={documentTableData.minimumEducationRows}
+                  />
+                );
+              }
+
+              // 기본값: 문서 데이터가 없거나 매칭되지 않는 경우
+              if (is1100Series) {
+                const TableComp = tableRegistry['1-1-1100'] as any;
+                return <TableComp />;
+              }
+              if (is1200Series) {
+                const TableComp = tableRegistry['1-2-1200'] as any;
+                return <TableComp />;
+              }
+              if (is2100Series) {
+                const TableComp = tableRegistry['2-1-2100'] as any;
+                return <TableComp />;
+              }
+              if (is1500Series) {
+                const TableComp = tableRegistry['1-5-1500'] as any;
+                return <TableComp />;
+              }
+              if (is1400Series) {
+                const TableComp = tableRegistry['1-4-1400'] as any;
+                return <TableComp />;
+              }
+              if (is1300Series) {
+                const TableComp = tableRegistry['1-3-1300'] as any;
+                return <TableComp />;
+              }
+              if (is2300Series) {
+                const TableComp = tableRegistry['2-3-2300'] as any;
+                return <TableComp />;
+              }
+              if (is2200Series) {
+                const TableComp = tableRegistry['2-2'] as TableComponent;
+                return <TableComp data={tableData as DefaultTableRow[]} />;
+              }
+              if (is2400TBM) {
+                const TableComp = tableRegistry['2-4-2400-tbm'] as any;
+                return <TableComp />;
+              }
+              if (is2400Education) {
+                const TableComp = tableRegistry['2-4-2400-education'] as any;
+                return <TableComp />;
+              }
+
+              const key = item ? `${item.safetyIdx}-${item.itemNumber}` : 'Default';
+              const TableComp = (tableRegistry as any)[key] || tableRegistry.Default;
+              return <TableComp data={tableData as any[]} />;
+            })()}
+          </Box>
+
+          <FooterButtons onDownloadPDF={handleDownloadPDF} />
         </Box>
+      </DashboardContent>
 
-        <FooterButtons onDownloadPDF={handleDownloadPDF} />
-      </Box>
-    </DashboardContent>
+      {/* 서명 패드 모달 */}
+      <SignatureModal
+        open={signatureModal.open}
+        onClose={handleCloseSignatureModal}
+        onConfirm={handleConfirmSignature}
+        targetLabel={
+          signatureModal.type === 'writer'
+            ? '작성자'
+            : signatureModal.type === 'reviewer'
+              ? '검토자'
+              : signatureModal.type === 'approver'
+                ? '승인자'
+                : '결재자'
+        }
+      />
+    </>
   );
 }

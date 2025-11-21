@@ -6,16 +6,12 @@ import Box from '@mui/material/Box';
 
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
 import warningIcon from 'src/assets/icons/safeyoui/warning.svg';
+import type { SharedDocument as ApiSharedDocument } from 'src/services/dashboard/dashboard.types';
 
 // ----------------------------------------------------------------------
 
-export type SharedDocument = {
-  id: string;
-  priority: 'urgent' | 'important' | 'reference';
-  documentName: string;
-  registeredDate: string;
-  status: 'public' | 'private';
-};
+// API 타입 직접 사용
+export type SharedDocument = ApiSharedDocument;
 
 type Props = {
   open: boolean;

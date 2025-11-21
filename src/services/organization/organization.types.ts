@@ -80,7 +80,7 @@ export type DeleteOrganizationResponse = BaseResponseDto;
 
 // 조직 상세 조회 요청 파라미터
 export type GetOrganizationDetailParams = {
-  id: string;
+  companyIdx: number;
 };
 
 // 멤버 정보
@@ -105,34 +105,152 @@ export type OrganizationDetail = {
 // 조직 상세 조회 응답
 export type GetOrganizationDetailResponse = BaseResponseDto<OrganizationDetail>;
 
+// 지사 생성 요청
+export type CreateBranchParams = {
+  branchName: string;
+  address?: string;
+  addressDetail?: string;
+  manager?: string;
+  phone?: string;
+};
+
+// 지사 생성 응답
+export type CreateBranchResponse = BaseResponseDto<{
+  branchIdx: number;
+  branchName: string;
+}>;
+
+// 지사 목록 조회 파라미터
+export type GetBranchesParams = {
+  page?: number;
+  pageSize?: number;
+};
+
+// 지사 정보
+export type Branch = {
+  branchIdx: number;
+  branchName: string;
+  address?: string;
+  addressDetail?: string;
+  manager?: string;
+  phone?: string;
+  createdAt: string;
+};
+
+// 지사 목록 조회 응답
+export type GetBranchesResponse = BaseResponseDto<{
+  branches: Branch[];
+  total: number;
+}>;
+
+// 지사 수정 요청
+export type UpdateBranchParams = Partial<CreateBranchParams>;
+
+// 지사 수정 응답
+export type UpdateBranchResponse = BaseResponseDto<Branch>;
+
+// 구독 목록 조회 파라미터
+export type GetSubscriptionsParams = {
+  page?: number;
+  pageSize?: number;
+};
+
+// 구독 정보
+export type Subscription = {
+  subscriptionId: string;
+  servicePlanId: string;
+  servicePlanName: string;
+  status: 'active' | 'cancelled' | 'expired';
+  startDate: string;
+  endDate?: string;
+};
+
+// 구독 목록 조회 응답
+export type GetSubscriptionsResponse = BaseResponseDto<{
+  subscriptions: Subscription[];
+  total: number;
+}>;
+
+// 서비스 구독 요청
+export type SubscribeParams = {
+  servicePlanId: string;
+};
+
+// 서비스 구독 응답
+export type SubscribeResponse = BaseResponseDto<Subscription>;
+
+// 구독 취소 요청
+export type CancelSubscriptionParams = {
+  companyIdx: number;
+  subscriptionId: string;
+};
+
 // 서비스 업그레이드 요청 파라미터
 export type UpgradeServiceParams = {
-  organizationId: string;
   servicePlanId: string;
 };
 
 // 서비스 업그레이드 응답
-export type UpgradeServiceResponse = BaseResponseDto;
-
-// 서비스 취소 요청 파라미터
-export type CancelServiceParams = {
-  organizationId: string;
-  servicePlanId: string;
-};
-
-// 서비스 취소 응답
-export type CancelServiceResponse = BaseResponseDto;
+export type UpgradeServiceResponse = BaseResponseDto<Subscription>;
 
 // 카드 액션 타입
 export type CardActionType = 'setPrimary' | 'edit' | 'delete';
 
 // 카드 액션 요청 파라미터
 export type CardActionParams = {
-  organizationId: string;
-  cardId: string;
   action: CardActionType;
   cardData?: unknown; // 카드 정보 (수정 시)
 };
 
 // 카드 액션 응답
 export type CardActionResponse = BaseResponseDto;
+
+// 무재해 인증 정보 수정 요청
+export type UpdateAccidentFreeParams = {
+  accidentFreeDays?: number;
+  certificationDate?: string;
+  certificationNumber?: string;
+};
+
+// 조직원 초대 요청
+export type InviteMemberParams = {
+  email: string;
+  role?: string;
+};
+
+// 조직원 초대 응답
+export type InviteMemberResponse = BaseResponseDto<{
+  invitationLink: string;
+  invitationCode: string;
+}>;
+
+// 초대 수락 요청
+export type AcceptInvitationParams = {
+  link?: string;
+  code?: string;
+  password: string;
+  memberName: string;
+  memberNameOrg: string;
+};
+
+// 초대 수락 응답
+export type AcceptInvitationResponse = BaseResponseDto<{
+  memberIndex: number;
+  memberId: string;
+  accessToken: string;
+  refreshToken: string;
+}>;
+
+// 회사/지점별 역할별 멤버 조회 파라미터
+export type GetCompanyMembersParams = {
+  branchIdx?: number;
+  role?: string;
+  page?: number;
+  pageSize?: number;
+};
+
+// 회사/지점별 역할별 멤버 조회 응답
+export type GetCompanyMembersResponse = BaseResponseDto<{
+  members: Member[];
+  total: number;
+}>;

@@ -8,7 +8,7 @@ import {
   deleteOrganization,
   getOrganizationDetail,
   upgradeService,
-  cancelService,
+  cancelSubscription,
   cardAction,
 } from 'src/services/organization/organization.service';
 import type {
@@ -17,7 +17,7 @@ import type {
   UpdateOrganizationParams,
   GetOrganizationDetailParams,
   UpgradeServiceParams,
-  CancelServiceParams,
+  CancelSubscriptionParams,
   CardActionParams,
 } from 'src/services/organization/organization.types';
 
@@ -39,9 +39,9 @@ export function useOrganizations(params: GetOrganizationsParams) {
  */
 export function useOrganizationDetail(params: GetOrganizationDetailParams) {
   return useQuery({
-    queryKey: ['organizationDetail', params.id],
+    queryKey: ['organizationDetail', params.companyIdx],
     queryFn: () => getOrganizationDetail(params),
-    enabled: !!params.id,
+    enabled: !!params.companyIdx,
   });
 }
 
@@ -66,11 +66,11 @@ export function useUpdateOrganization() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, ...params }: UpdateOrganizationParams & { id: string }) =>
-      updateOrganization(id, params),
+    mutationFn: ({ companyIdx, ...params }: UpdateOrganizationParams & { companyIdx: number }) =>
+      updateOrganization(companyIdx, params),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['organizations'] });
-      queryClient.invalidateQueries({ queryKey: ['organizationDetail', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['organizationDetail', variables.companyIdx] });
     },
   });
 }
@@ -82,7 +82,7 @@ export function useDeactivateOrganization() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => deactivateOrganization(id),
+    mutationFn: (companyIdx: number) => deactivateOrganization(companyIdx),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['organizations'] });
     },
@@ -96,7 +96,7 @@ export function useDeleteOrganization() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => deleteOrganization(id),
+    mutationFn: (companyIdx: number) => deleteOrganization(companyIdx),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['organizations'] });
     },
@@ -110,23 +110,26 @@ export function useUpgradeService() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (params: UpgradeServiceParams) => upgradeService(params),
+    mutationFn: ({
+      companyIdx,
+      ...params
+    }: UpgradeServiceParams & { companyIdx: number }) => upgradeService(companyIdx, params),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['organizationDetail', variables.organizationId] });
+      queryClient.invalidateQueries({ queryKey: ['organizationDetail', variables.companyIdx] });
     },
   });
 }
 
 /**
- * 서비스 취소 Mutation Hook
+ * 구독 취소 Mutation Hook
  */
 export function useCancelService() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (params: CancelServiceParams) => cancelService(params),
+    mutationFn: (params: CancelSubscriptionParams) => cancelSubscription(params),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['organizationDetail', variables.organizationId] });
+      queryClient.invalidateQueries({ queryKey: ['organizationDetail', variables.companyIdx] });
     },
   });
 }
@@ -138,10 +141,12 @@ export function useCardAction() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (params: CardActionParams) => cardAction(params),
+    mutationFn: ({
+      companyIdx,
+      ...params
+    }: CardActionParams & { companyIdx: number }) => cardAction(companyIdx, params),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['organizationDetail', variables.organizationId] });
+      queryClient.invalidateQueries({ queryKey: ['organizationDetail', variables.companyIdx] });
     },
   });
 }
-
