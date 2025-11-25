@@ -37,6 +37,7 @@ type CertificationRecord = {
   applicationYear?: string; // YYYY년 (없으면 검토 대기)
   certificateFileName?: string;
   accidentFreeYear?: number | null;
+  status?: string; // API 응답의 status 필드 (PENDING, APPROVED, REJECTED 등)
 };
 
 type StatusType = 'valid' | 'pending' | 'expired';
@@ -72,6 +73,7 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
         companyIdx,
         accidentFreeData,
         accidentFreeInfo,
+        historyList: accidentFreeInfo?.historyList,
         isLoadingAccidentFree,
         isErrorAccidentFree,
       });
@@ -149,55 +151,53 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
     }
   }, [initialAchievementDate, achievementDate]);
 
-  // TODO: TanStack Query Hook(useQuery)으로 인증 이력 목록 가져오기
-  // const { data: certificationRecords } = useQuery({
-  //   queryKey: ['certificationRecords', organizationId, page, rowsPerPage],
-  //   queryFn: () => getCertificationRecords({ organizationId, page, rowsPerPage }),
-  // });
+  // API 응답의 historyList를 CertificationRecord 타입으로 변환
+  const certificationRecords: CertificationRecord[] = useMemo(() => {
+    const historyList = accidentFreeInfo?.historyList || [];
 
-  // 목업 데이터
-  const mockCertificationRecords: CertificationRecord[] = [
-    {
-      id: '1',
-      registrationDate: '2025-09-30 16:45:35',
-      certificationDate: '2025-09-30',
-      applicationYear: '2026년',
-      accidentFreeYear: 2024,
-    },
-    {
-      id: '2',
-      registrationDate: '2025-09-30 16:45:35',
-      certificationDate: '2025-09-30',
-      applicationYear: '2025년',
-      accidentFreeYear: null,
-    },
-    {
-      id: '3',
-      registrationDate: '2025-09-30 16:45:35',
-      certificationDate: '2025-09-30',
-      applicationYear: '2024년',
-      accidentFreeYear: 2024,
-    },
-    {
-      id: '4',
-      registrationDate: '2025-09-30 16:45:35',
-      certificationDate: '2025-09-30',
-      applicationYear: '2023년',
-      accidentFreeYear: 2023,
-    },
-    {
-      id: '5',
-      registrationDate: '2025-09-30 16:45:35',
-      certificationDate: '2025-09-30',
-      // 적용 연도 없음 - 검토 대기
-      accidentFreeYear: null,
-    },
-  ];
+    if (!historyList || historyList.length === 0) {
+      return [];
+    }
 
-  const paginatedRecords = mockCertificationRecords.slice(
-    page * rowsPerPage,
-    (page + 1) * rowsPerPage
-  );
+    const records = historyList.map((history: any, index: number) => {
+      const registeredAt = history.registeredAt
+        ? dayjs(history.registeredAt).format('YYYY-MM-DD HH:mm:ss')
+        : '';
+      const certifiedAt = history.certifiedAt
+        ? dayjs(history.certifiedAt).format('YYYY-MM-DD')
+        : '';
+      const appliedYear =
+        history.appliedYear && history.appliedYear > 0 ? `${history.appliedYear}년` : undefined; // appliedYear가 0이거나 없으면 undefined (검토 대기)
+
+      // 파일명 추출 (fileUrl에서)
+      const certificateFileName = history.fileUrl
+        ? history.fileUrl.split('/').pop() || undefined
+        : undefined;
+
+      return {
+        id: `history-${index}`,
+        registrationDate: registeredAt,
+        certificationDate: certifiedAt,
+        applicationYear: appliedYear,
+        certificateFileName,
+        accidentFreeYear:
+          history.appliedYear && history.appliedYear > 0 ? history.appliedYear : null,
+        status: history.status || 'PENDING', // API 응답의 status 필드 추가
+      };
+    });
+
+    // 디버깅
+    if (import.meta.env.DEV) {
+      console.log('🔍 [AccidentFreeWorkplace] 인증 이력 변환', {
+        historyList,
+        certificationRecords: records,
+      });
+    }
+
+    return records;
+  }, [accidentFreeInfo?.historyList]);
+
+  const paginatedRecords = certificationRecords.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
 
   const handleChangePage = (newPage: number) => {
     setPage(newPage);
@@ -280,6 +280,32 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
 
   // 상태 계산 함수
   const getStatus = (record: CertificationRecord): StatusType => {
+    // API 응답의 status 필드가 있으면 우선 사용
+    if (record.status) {
+      const statusUpper = record.status.toUpperCase();
+      if (statusUpper === 'APPROVED') {
+        // APPROVED인 경우 적용 연도로 유효/만료 판단
+        if (!record.applicationYear) {
+          return 'pending';
+        }
+        const applicationYearNum = extractYear(record.applicationYear);
+        if (applicationYearNum === null) {
+          return 'pending';
+        }
+        if (applicationYearNum === currentYear) {
+          return 'valid';
+        }
+        return 'expired';
+      }
+      if (statusUpper === 'PENDING') {
+        return 'pending';
+      }
+      if (statusUpper === 'REJECTED') {
+        return 'expired';
+      }
+    }
+
+    // status 필드가 없으면 기존 로직 사용
     // 적용 연도가 없으면 검토 대기
     if (!record.applicationYear) {
       return 'pending';
@@ -526,25 +552,73 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ bgcolor: 'grey.100', fontWeight: 600, fontSize: 14, p: 2 }}>
+                    <TableCell
+                      align="left"
+                      sx={{
+                        bgcolor: 'grey.100',
+                        fontWeight: 600,
+                        fontSize: 14,
+                        p: 2,
+                        width: 120,
+                        minWidth: 120,
+                        maxWidth: 120,
+                      }}
+                    >
                       등록일
                     </TableCell>
-                    <TableCell sx={{ bgcolor: 'grey.100', fontWeight: 600, fontSize: 14, p: 2 }}>
+                    <TableCell
+                      align="left"
+                      sx={{
+                        bgcolor: 'grey.100',
+                        fontWeight: 600,
+                        fontSize: 14,
+                        p: 2,
+                        width: 120,
+                        minWidth: 120,
+                        maxWidth: 120,
+                      }}
+                    >
                       인증일자
                     </TableCell>
-                    <TableCell sx={{ bgcolor: 'grey.100', fontWeight: 600, fontSize: 14, p: 2 }}>
+                    <TableCell
+                      align="center"
+                      sx={{
+                        bgcolor: 'grey.100',
+                        fontWeight: 600,
+                        fontSize: 14,
+                        p: 2,
+                        width: 100,
+                        minWidth: 100,
+                        maxWidth: 100,
+                      }}
+                    >
                       적용연도
                     </TableCell>
-                    <TableCell sx={{ bgcolor: 'grey.100', fontWeight: 600, fontSize: 14, p: 2 }}>
+                    <TableCell
+                      align="left"
+                      sx={{
+                        bgcolor: 'grey.100',
+                        fontWeight: 600,
+                        fontSize: 14,
+                        p: 2,
+                        width: 'auto',
+                      }}
+                    >
                       인증 파일
                     </TableCell>
-                    <TableCell sx={{ bgcolor: 'grey.100', fontWeight: 600, fontSize: 14, p: 2 }}>
-                      상태
-                    </TableCell>
                     <TableCell
-                      sx={{ bgcolor: 'grey.100', fontWeight: 600, fontSize: 14, p: 2, width: 68 }}
+                      align="center"
+                      sx={{
+                        bgcolor: 'grey.100',
+                        fontWeight: 600,
+                        fontSize: 14,
+                        p: 2,
+                        width: 100,
+                        minWidth: 100,
+                        maxWidth: 100,
+                      }}
                     >
-                      &nbsp;
+                      상태
                     </TableCell>
                   </TableRow>
                 </TableHead>
@@ -556,7 +630,7 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
                         key={record.id}
                         sx={{ borderBottom: '1px dashed', borderColor: 'divider' }}
                       >
-                        <TableCell sx={{ fontSize: 14, px: 2 }}>
+                        <TableCell align="left">
                           <Stack>
                             <Typography variant="body2">{regDate}</Typography>
                             <Typography variant="caption" color="text.secondary">
@@ -564,13 +638,13 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
                             </Typography>
                           </Stack>
                         </TableCell>
-                        <TableCell sx={{ fontSize: 14, px: 2 }}>
+                        <TableCell align="left">
                           <Typography variant="body2">{record.certificationDate}</Typography>
                         </TableCell>
-                        <TableCell sx={{ fontSize: 14, px: 2 }}>
+                        <TableCell align="center">
                           <Typography variant="body2">{record.applicationYear}</Typography>
                         </TableCell>
-                        <TableCell sx={{ px: 2 }}>
+                        <TableCell align="left" sx={{ px: 2, width: 'auto' }}>
                           <Stack direction="row" spacing={1} alignItems="center">
                             {uploadedFiles[record.id] || record.certificateFileName ? (
                               <Typography
@@ -620,16 +694,7 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
                             ) : null}
                           </Stack>
                         </TableCell>
-                        <TableCell sx={{ px: 2 }}>{renderStatusBadge(getStatus(record))}</TableCell>
-                        <TableCell sx={{ px: 2, width: 68 }}>
-                          <IconButton
-                            size="small"
-                            onClick={() => handleDownload(record.id)}
-                            sx={{ width: 22, height: 22 }}
-                          >
-                            <Iconify icon="solar:download-bold" width={22} />
-                          </IconButton>
-                        </TableCell>
+                        <TableCell align="center">{renderStatusBadge(getStatus(record))}</TableCell>
                       </TableRow>
                     );
                   })}
@@ -637,7 +702,7 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
               </Table>
               {/* 페이지네이션 */}
               <AccidentFreeWorkplacePagination
-                count={mockCertificationRecords.length}
+                count={certificationRecords.length}
                 page={page}
                 rowsPerPage={rowsPerPage}
                 onChangePage={handleChangePage}

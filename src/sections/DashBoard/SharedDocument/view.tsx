@@ -405,7 +405,7 @@ export function SharedDocumentView({ title = '공유 문서함', description, sx
 
       <SharedDocumentBreadcrumbs
         items={[
-          { label: '대시보드', href: `/test${paths.dashboard.root}` },
+          { label: '대시보드', href: `/admin${paths.dashboard.root}` },
           { label: '공유 문서함' },
         ]}
         onPrioritySettings={handlePrioritySettings}

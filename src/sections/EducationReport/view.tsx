@@ -131,8 +131,8 @@ export function EducationReportView({ title = '교육 이수 현황', descriptio
 
       <EducationReportBreadcrumbs
         items={[
-          { label: '대시보드', href: '/test/dashboard' },
-          { label: '현장 운영 관리', href: '/test/dashboard/operation' },
+          { label: '대시보드', href: '/admin/dashboard' },
+          { label: '현장 운영 관리', href: '/admin/dashboard/operation' },
           { label: title },
         ]}
       />

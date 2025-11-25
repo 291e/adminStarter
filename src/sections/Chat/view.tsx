@@ -436,8 +436,8 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
 
       <ChatBreadcrumbs
         items={[
-          { label: '대시보드', href: '/test/dashboard' },
-          { label: '현장 운영 관리', href: '/test/dashboard/operation' },
+          { label: '대시보드', href: '/admin/dashboard' },
+          { label: '현장 운영 관리', href: '/admin/dashboard/operation' },
           { label: '채팅' },
         ]}
       />

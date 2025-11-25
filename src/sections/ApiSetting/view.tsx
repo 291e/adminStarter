@@ -130,8 +130,8 @@ export function ApiSettingView({ title = 'API 관리', description, sx }: Props)
 
       <ApiSettingBreadcrumbs
         items={[
-          { label: '대시보드', href: '/test/dashboard' },
-          { label: '설정 및 관리', href: '/test/dashboard/system-setting' },
+          { label: '대시보드', href: '/admin/dashboard' },
+          { label: '설정 및 관리', href: '/admin/dashboard/system-setting' },
           { label: title },
         ]}
         onCreate={handleCreate}

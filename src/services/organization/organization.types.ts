@@ -238,6 +238,15 @@ export type CardActionParams = {
 // 카드 액션 응답
 export type CardActionResponse = BaseResponseDto;
 
+// 무재해 인증 이력 항목
+export type AccidentFreeHistoryItem = {
+  registeredAt: string; // 등록일 (ISO 문자열)
+  certifiedAt: string; // 인증일 (ISO 문자열)
+  appliedYear: number; // 신청 연도 (0일 수도 있음)
+  fileUrl: string; // 파일 URL
+  status: string; // 상태 (PENDING, APPROVED, REJECTED 등)
+};
+
 // 무재해 인증 정보 조회 응답
 export type GetAccidentFreeResponse = BaseResponseDto<{
   isAccidentFreeWorksite: 0 | 1;
@@ -247,6 +256,7 @@ export type GetAccidentFreeResponse = BaseResponseDto<{
   accidentFreeFileUrl?: string | null;
   industrialAccidentCount: number;
   nearMissCount: number;
+  historyList: AccidentFreeHistoryItem[];
 }>;
 
 // 무재해 인증 정보 수정 요청
