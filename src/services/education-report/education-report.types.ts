@@ -165,7 +165,7 @@ export type EducationStandard = {
 // 역할별 교육 이수 기준 시간 조회 응답
 export type GetEducationStandardListResponse = BaseResponseDto<{
   standards: EducationStandard[];
-}>;
+  }>;
 
 // 역할별 교육 이수 기준 시간 생성 요청
 export type CreateEducationStandardParams = {

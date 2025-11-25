@@ -11,9 +11,10 @@ import MenuItem from '@mui/material/MenuItem';
 import { useState, useEffect, useMemo } from 'react';
 
 import { fDateTime } from 'src/utils/format-time';
-import type { Member } from 'src/sections/Organization/types/member';
-import type { Company } from 'src/_mock/_company';
+import type { Organization, CompanyType } from 'src/services/organization/organization.types';
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
+import { useUpdateOrganization, useInviteMember } from '../../hooks/use-organization-api';
+import { useQueryClient } from '@tanstack/react-query';
 
 import SubscriptionService from './SubscriptionService';
 import AccidentFreeWorkplace from './AccidentFreeWorkplace';
@@ -42,23 +43,54 @@ declare global {
 // ----------------------------------------------------------------------
 
 const BUSINESS_TYPE_OPTIONS = ['법인 사업자', '개인 사업자'];
-const DIVISION_OPTIONS = ['운영사', '회원사', '총판', '대리점', '딜러', '비회원'];
+const DIVISION_OPTIONS: Array<{ label: string; value: CompanyType }> = [
+  { label: '운영사', value: 'OPERATOR' },
+  { label: '회원사', value: 'MEMBER' },
+  { label: '총판', value: 'DISTRIBUTOR' },
+  { label: '대리점', value: 'AGENCY' },
+  { label: '딜러', value: 'DEALER' },
+  { label: '비회원', value: 'NON_MEMBER' },
+];
+
+// businessType을 숫자로 변환 (0: 법인 사업자, 1: 개인 사업자)
+const businessTypeToNumber = (businessType: string): number | undefined => {
+  if (!businessType) return undefined;
+  if (businessType === '법인 사업자') {
+    return 0;
+  }
+  if (businessType === '개인 사업자') {
+    return 1;
+  }
+  // 이미 숫자 문자열인 경우
+  const num = Number(businessType);
+  return isNaN(num) ? undefined : num;
+};
+
+// 숫자를 businessType 문자열로 변환 (0: 법인 사업자, 1: 개인 사업자)
+const numberToBusinessType = (value: number | string | null | undefined): string => {
+  if (value === null || value === undefined || value === '') return '';
+  const num = typeof value === 'string' ? Number(value) : value;
+  if (num === 0) return '법인 사업자';
+  if (num === 1) return '개인 사업자';
+  return '';
+};
 
 type Props = {
-  organization: Company | undefined;
-  organizationMembers: Member[];
-  onInviteMember?: () => void;
-  onEditOrganization?: () => void;
+  organization: Organization;
+  organizationId: number;
   onTabChange?: (tabValue: number) => void;
+  companyMemberList?: any[]; // 조직 상세 API 응답의 companyMemberList (담당자 정보 조회용)
 };
 
 export default function OrganizationInfo({
   organization,
-  organizationMembers,
-  onInviteMember,
-  onEditOrganization,
+  organizationId,
   onTabChange,
+  companyMemberList,
 }: Props) {
+  const queryClient = useQueryClient();
+  const updateOrganizationMutation = useUpdateOrganization();
+  const inviteMemberMutation = useInviteMember();
   const [tabValue, setTabValue] = useState(0);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -85,10 +117,10 @@ export default function OrganizationInfo({
     representativePhone: '',
     representativeEmail: '',
     businessCategory: '',
+    businessType: '',
     businessItem: '',
     address: '',
     detailAddress: '',
-    manager: '',
     division: '',
   });
 
@@ -98,45 +130,35 @@ export default function OrganizationInfo({
   };
 
   // 조직 정보 초기화
-  const orgData = useMemo(
-    () =>
-      organization || {
-        companyIdx: 0,
-        companyName: '이편한 자동화기술',
-        companyType: '법인 사업자',
-        businessNumber: '122-56-55475',
-        representativeName: '김안전',
-        representativePhone: '010-0123-4567',
-        representativeEmail: 'safe@safeyou.kr',
-        businessCategory: '제조업',
-        businessItem: '안전보건',
-        address: '대전광역시 유성구 복용동로 342',
-        detailAddress: '필드빌딩 2층',
-        manager: '김안전',
-        division: '운영사',
-        lastAccessIp: '168.126.222.111',
-        createAt: '2025-10-23 16:55:45',
-        lastAccessDate: '2025-10-23 16:55:45',
-      },
-    [organization]
-  );
+  const orgData = useMemo(() => organization, [organization]);
 
   // 조직 정보가 변경되면 formData 초기화
   useEffect(() => {
-    setFormData({
-      companyName: orgData.companyName || '',
-      companyType: orgData.companyType || '',
-      businessNumber: orgData.businessNumber || '',
-      representativeName: orgData.representativeName || '',
-      representativePhone: orgData.representativePhone || '',
-      representativeEmail: orgData.representativeEmail || '',
-      businessCategory: orgData.businessCategory || '',
-      businessItem: orgData.businessItem || '',
-      address: orgData.address || '',
-      detailAddress: orgData.detailAddress || '',
-      manager: orgData.manager || '',
-      division: orgData.division || '',
-    });
+    if (orgData) {
+      const newFormData = {
+        companyName: orgData.companyName || '',
+        companyType: numberToBusinessType(orgData.businessType), // 사업자 유형 (법인 사업자, 개인 사업자)
+        businessNumber: orgData.businessNumber || '',
+        representativeName: orgData.representativeName || '',
+        representativePhone: orgData.phone || '',
+        representativeEmail: orgData.email || '',
+        businessCategory: orgData.businessCategory || '',
+        businessType: orgData.businessType ? String(orgData.businessType) : '', // 숫자 문자열로 저장 (변환용)
+        businessItem: orgData.businessItem || '',
+        address: orgData.address || '',
+        detailAddress: orgData.addressDetail || '',
+        division: orgData.companyType || '', // 구분 (OPERATOR, MEMBER 등)
+      };
+
+      if (import.meta.env.DEV) {
+        console.log('🔄 [OrganizationInfo] formData 초기화', {
+          orgData,
+          newFormData,
+        });
+      }
+
+      setFormData(newFormData);
+    }
   }, [orgData]);
 
   const handleChange = (field: keyof typeof formData, value: string) => {
@@ -147,23 +169,61 @@ export default function OrganizationInfo({
     setIsEditMode(true);
   };
 
-  const handleSave = () => {
-    // TODO: TanStack Query Hook(useMutation)으로 조직정보 수정 API 호출
-    // const mutation = useMutation({
-    //   mutationFn: (data: OrganizationFormData) => updateOrganization(organization?.companyIdx, data),
-    //   onSuccess: () => {
-    //     queryClient.invalidateQueries({ queryKey: ['organization', organization?.companyIdx] });
-    //     setIsEditMode(false);
-    //     // 성공 토스트 메시지 표시
-    //   },
-    //   onError: (error) => {
-    //     console.error('조직정보 수정 실패:', error);
-    //     // 에러 토스트 메시지 표시
-    //   },
-    // });
-    // mutation.mutate(formData);
-    setIsEditMode(false);
-    onEditOrganization?.();
+  const handleSave = async () => {
+    try {
+      // 수정 요청 파라미터 구성
+      const updateParams = {
+        companyIdx: organizationId,
+        companyName: formData.companyName,
+        companyCode: orgData.companyCode,
+        businessNumber: formData.businessNumber || undefined,
+        address: formData.address || undefined,
+        phone: formData.representativePhone || undefined,
+        email: formData.representativeEmail || undefined,
+        companyType: formData.division as CompanyType,
+        representativeName: formData.representativeName || undefined,
+        businessType: businessTypeToNumber(formData.businessType),
+        businessCategory: formData.businessCategory || undefined,
+        businessItem: formData.businessItem || undefined,
+      };
+
+      if (import.meta.env.DEV) {
+        console.log('💾 [조직정보 수정 시작]', {
+          organizationId,
+          formData,
+          updateParams,
+          orgData,
+        });
+      }
+
+      const result = await updateOrganizationMutation.mutateAsync(updateParams);
+
+      if (import.meta.env.DEV) {
+        console.log('✅ [조직정보 수정 성공]', {
+          result,
+          updateParams,
+        });
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['organizationDetail', organizationId] });
+      queryClient.invalidateQueries({ queryKey: ['organizations'] });
+      setIsEditMode(false);
+
+      if (import.meta.env.DEV) {
+        console.log('✅ [조직정보 수정 완료 - 쿼리 무효화 완료]');
+      }
+    } catch (error: any) {
+      if (import.meta.env.DEV) {
+        console.error('❌ [조직정보 수정 실패]', {
+          error,
+          errorMessage: error?.message,
+          errorResponse: error?.response?.data,
+          organizationId,
+          formData,
+        });
+      }
+      console.error('❌ [조직정보 수정 실패]', error);
+    }
   };
 
   const handleSearchAddress = () => {
@@ -189,14 +249,19 @@ export default function OrganizationInfo({
     }).open();
   };
 
-  // 첫 번째 멤버의 정보를 기본값으로 사용
-  const firstMember = organizationMembers[0];
-  const registrationDate = fDateTime(orgData.createAt, 'YYYY-MM-DD HH:mm:ss');
-  const lastAccessDate = orgData.lastAccessDate
-    ? fDateTime(orgData.lastAccessDate, 'YYYY-MM-DD HH:mm:ss')
-    : firstMember?.lastSigninDate
-      ? fDateTime(firstMember.lastSigninDate, 'YYYY-MM-DD HH:mm:ss')
-      : '-';
+  const registrationDate = orgData.createAt
+    ? fDateTime(orgData.createAt, 'YYYY-MM-DD HH:mm:ss')
+    : '-';
+
+  // 담당자 정보에서 접속일과 최근 접속 IP 가져오기
+  const managerMemberIdx = (orgData as any).managerMemberIdx;
+  const managerMember = companyMemberList?.find(
+    (member: any) => member.memberIdx === managerMemberIdx
+  );
+  const lastAccessDate = managerMember?.lastSigninAt
+    ? fDateTime(managerMember.lastSigninAt, 'YYYY-MM-DD HH:mm:ss')
+    : '-';
+  const lastAccessIP = managerMember?.lastSigninIP || managerMember?.ipAddress || '-';
 
   return (
     <Box
@@ -265,7 +330,7 @@ export default function OrganizationInfo({
                   최근 접속 IP
                 </Typography>
                 <Typography variant="body2" sx={{ fontSize: 14, lineHeight: '22px' }}>
-                  {orgData.lastAccessIp || '-'}
+                  {lastAccessIP}
                 </Typography>
               </Stack>
             </Stack>
@@ -386,7 +451,12 @@ export default function OrganizationInfo({
                   />
                 </Stack>
 
-                <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ minHeight: 96 }}>
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  alignItems="flex-start"
+                  sx={{ minHeight: 96, pt: 0.5 }}
+                >
                   <Typography
                     variant="subtitle2"
                     sx={{
@@ -394,7 +464,7 @@ export default function OrganizationInfo({
                       fontSize: 14,
                       fontWeight: 600,
                       lineHeight: '22px',
-                      pt: 1.5,
+                      pt: 1,
                     }}
                   >
                     사업장 주소
@@ -463,7 +533,7 @@ export default function OrganizationInfo({
                   <Select
                     fullWidth
                     size="small"
-                    value={formData.division}
+                    value={formData.division || ''}
                     onChange={(e) => handleChange('division', e.target.value)}
                     disabled={!isEditMode}
                     sx={{
@@ -472,8 +542,12 @@ export default function OrganizationInfo({
                     }}
                   >
                     {DIVISION_OPTIONS.map((option) => (
-                      <MenuItem key={option} value={option}>
-                        {option}
+                      <MenuItem
+                        key={option.value}
+                        value={option.value}
+                        disabled={option.value === 'OPERATOR'}
+                      >
+                        {option.label}
                       </MenuItem>
                     ))}
                   </Select>
@@ -586,33 +660,6 @@ export default function OrganizationInfo({
                     }}
                   />
                 </Stack>
-
-                <Stack direction="row" spacing={1} alignItems="center" sx={{ height: 48 }}>
-                  <Typography
-                    variant="subtitle2"
-                    sx={{
-                      minWidth: 100,
-                      fontSize: 14,
-                      fontWeight: 600,
-                      lineHeight: '22px',
-                    }}
-                  >
-                    담당자
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    value={formData.manager}
-                    onChange={(e) => handleChange('manager', e.target.value)}
-                    disabled={!isEditMode}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        fontSize: 15,
-                        lineHeight: '24px',
-                      },
-                    }}
-                  />
-                </Stack>
               </Stack>
             </Stack>
 
@@ -634,8 +681,12 @@ export default function OrganizationInfo({
                 조직원 초대
               </DialogBtn>
               {isEditMode ? (
-                <DialogBtn variant="contained" onClick={handleSave}>
-                  저장
+                <DialogBtn
+                  variant="contained"
+                  onClick={handleSave}
+                  disabled={updateOrganizationMutation.isPending}
+                >
+                  {updateOrganizationMutation.isPending ? '저장 중...' : '저장'}
                 </DialogBtn>
               ) : (
                 <DialogBtn variant="contained" onClick={handleEditClick}>
@@ -651,78 +702,58 @@ export default function OrganizationInfo({
       <InviteMemberModal
         open={inviteModalOpen}
         onClose={() => setInviteModalOpen(false)}
-        onSend={(data) => {
-          // TODO: TanStack Query Hook(useMutation)으로 조직원 초대 API 호출
-          // const mutation = useMutation({
-          //   mutationFn: (data: InviteMemberFormData) => inviteMember(organization?.companyIdx, data),
-          //   onSuccess: () => {
-          //     queryClient.invalidateQueries({ queryKey: ['organization', organization?.companyIdx, 'members'] });
-          //     // 성공 토스트 메시지 표시
-          //   },
-          //   onError: (error) => {
-          //     console.error('조직원 초대 실패:', error);
-          //     // 에러 토스트 메시지 표시
-          //   },
-          // });
-          // mutation.mutate(data);
-          console.log('조직원 초대:', data);
-          onInviteMember?.();
+        onSend={async (data) => {
+          try {
+            if (import.meta.env.DEV) {
+              console.log('📧 [조직원 초대]', { organizationId, data });
+            }
+
+            await inviteMemberMutation.mutateAsync({
+              companyIdx: organizationId,
+              email: data.email,
+              role: data.role,
+            });
+
+            queryClient.invalidateQueries({ queryKey: ['companyMembers', organizationId] });
+            setInviteModalOpen(false);
+
+            if (import.meta.env.DEV) {
+              console.log('✅ [조직원 초대 완료]');
+            }
+          } catch (error) {
+            console.error('❌ [조직원 초대 실패]', error);
+          }
         }}
         organizationName={orgData.companyName}
       />
 
-      {tabValue === 1 && (
-        <AccidentFreeWorkplace organizationId={organization?.companyIdx?.toString()} />
-      )}
+      {tabValue === 1 && <AccidentFreeWorkplace organizationId={organizationId.toString()} />}
 
       {tabValue === 2 && (
         <SubscriptionService
           onUpgrade={(planId) => {
-            // TODO: TanStack Query Hook(useMutation)으로 서비스 업그레이드
-            // const mutation = useMutation({
-            //   mutationFn: (planId: string) => upgradeSubscriptionService(organizationId, planId),
-            //   onSuccess: () => {
-            //     queryClient.invalidateQueries({ queryKey: ['organization', organizationId, 'subscription'] });
-            //   },
-            // });
-            // mutation.mutate(planId);
-            console.log('서비스 업그레이드:', planId);
+            if (import.meta.env.DEV) {
+              console.log('📈 [서비스 업그레이드]', { organizationId, planId });
+            }
+            // TODO: 서비스 업그레이드 API 구현 필요
           }}
           onCancel={() => {
-            // TODO: TanStack Query Hook(useMutation)으로 서비스 취소
-            // const mutation = useMutation({
-            //   mutationFn: () => cancelSubscriptionService(organizationId),
-            //   onSuccess: () => {
-            //     queryClient.invalidateQueries({ queryKey: ['organization', organizationId, 'subscription'] });
-            //   },
-            // });
-            // mutation.mutate();
-            console.log('서비스 취소');
+            if (import.meta.env.DEV) {
+              console.log('❌ [서비스 취소]', { organizationId });
+            }
+            // TODO: 서비스 취소 API 구현 필요
           }}
           onAddCard={() => {
-            // TODO: 카드 추가 모달 열기 (모달 내부에서 TanStack Query Hook(useMutation) 사용)
-            // const mutation = useMutation({
-            //   mutationFn: (cardData: CardFormData) => addPaymentCard(organizationId, cardData),
-            //   onSuccess: () => {
-            //     queryClient.invalidateQueries({ queryKey: ['organization', organizationId, 'paymentCards'] });
-            //   },
-            // });
-            console.log('카드 추가');
+            if (import.meta.env.DEV) {
+              console.log('💳 [카드 추가]', { organizationId });
+            }
+            // TODO: 카드 추가 모달 열기
           }}
           onCardMenuClick={(cardId, action) => {
-            // TODO: TanStack Query Hook(useMutation)으로 카드 액션 처리 (대표 카드 설정, 수정, 삭제)
-            // const mutation = useMutation({
-            //   mutationFn: () => {
-            //     if (action === 'setPrimary') return setPrimaryCard(organizationId, cardId);
-            //     if (action === 'edit') return updatePaymentCard(organizationId, cardId, cardData);
-            //     if (action === 'delete') return deletePaymentCard(organizationId, cardId);
-            //   },
-            //   onSuccess: () => {
-            //     queryClient.invalidateQueries({ queryKey: ['organization', organizationId, 'paymentCards'] });
-            //   },
-            // });
-            // mutation.mutate();
-            console.log('카드 액션:', cardId, action);
+            if (import.meta.env.DEV) {
+              console.log('💳 [카드 액션]', { organizationId, cardId, action });
+            }
+            // TODO: 카드 액션 API 구현 필요
           }}
         />
       )}

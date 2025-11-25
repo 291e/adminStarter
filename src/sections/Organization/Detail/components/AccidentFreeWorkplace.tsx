@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import dayjs, { type Dayjs } from 'dayjs';
 
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
@@ -13,17 +14,17 @@ import TableRow from '@mui/material/TableRow';
 import Paper from '@mui/material/Paper';
 import IconButton from '@mui/material/IconButton';
 import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
+import Alert from '@mui/material/Alert';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import type { Dayjs } from 'dayjs';
 
 import { Iconify } from 'src/components/iconify';
 import Button from '@mui/material/Button';
 import Badge from 'src/components/safeyoui/badge';
 
-import { mockCompanies } from 'src/_mock/_company';
-import type { Company } from 'src/_mock/_company';
+import { useAccidentFree } from '../../hooks/use-organization-api';
 import AccidentFreeWorkplacePagination from './AccidentFreeWorkplacePagination';
 import UpdateCertificationModal from './UpdateCertificationModal';
 
@@ -52,25 +53,101 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
   const [uploadedFiles, setUploadedFiles] = useState<{ [key: string]: File | null }>({});
   const [updateModalOpen, setUpdateModalOpen] = useState(false);
 
-  // TODO: TanStack Query Hook(useQuery)으로 무재해 사업장 정보 가져오기
-  // const { data: workplaceInfo } = useQuery({
-  //   queryKey: ['accidentFreeWorkplace', organizationId],
-  //   queryFn: () => getAccidentFreeWorkplaceInfo(organizationId),
-  // });
+  const companyIdx = organizationId ? parseInt(organizationId, 10) : 0;
 
-  // _company 목업 데이터와 연동
-  const companies = mockCompanies();
-  const organization: Company | undefined = useMemo(() => {
-    if (!organizationId) return undefined;
-    return companies.find((c) => c.companyIdx.toString() === organizationId);
-  }, [organizationId, companies]);
+  // 무재해 인증 정보 조회
+  const {
+    data: accidentFreeData,
+    isLoading: isLoadingAccidentFree,
+    isError: isErrorAccidentFree,
+  } = useAccidentFree(companyIdx);
 
-  // 목업 데이터 - organization의 accidentFreeYear를 기반으로 설정
-  const accidentFreeYear = organization ? 2024 : null; // TODO: API에서 가져온 실제 값으로 교체
-  const currentStatus = accidentFreeYear ? `${accidentFreeYear}년 무재해 사업장` : null;
-  const industrialAccidents = 0;
-  const accidentFreeDays = 365;
-  const nearMissAccidents = 2;
+  // API 응답 데이터 추출 (axios interceptor가 평탄화하므로 직접 접근)
+  const accidentFreeInfo = accidentFreeData as any;
+
+  // 디버깅
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.log('🔍 [AccidentFreeWorkplace] 무재해 인증 정보', {
+        companyIdx,
+        accidentFreeData,
+        accidentFreeInfo,
+        isLoadingAccidentFree,
+        isErrorAccidentFree,
+      });
+    }
+  }, [companyIdx, accidentFreeData, accidentFreeInfo, isLoadingAccidentFree, isErrorAccidentFree]);
+
+  // 무재해 인증 정보에서 데이터 추출
+  const accidentFreeStatus = accidentFreeInfo?.accidentFreeStatus || null;
+  const accidentFreeCertifiedAt = accidentFreeInfo?.accidentFreeCertifiedAt
+    ? dayjs(accidentFreeInfo.accidentFreeCertifiedAt)
+    : null;
+  const accidentFreeExpiresAt = accidentFreeInfo?.accidentFreeExpiresAt
+    ? dayjs(accidentFreeInfo.accidentFreeExpiresAt)
+    : null;
+  const industrialAccidents = accidentFreeInfo?.industrialAccidentCount || 0;
+  const nearMissAccidents = accidentFreeInfo?.nearMissCount || 0;
+
+  // 무재해 시작일 설정 (인증일자 기준)
+  const initialStartDate = useMemo(() => {
+    if (accidentFreeCertifiedAt) {
+      return accidentFreeCertifiedAt;
+    }
+    return null;
+  }, [accidentFreeCertifiedAt]);
+
+  // 다음 달성일 설정 (만료일 기준)
+  const initialAchievementDate = useMemo(() => {
+    if (accidentFreeExpiresAt) {
+      return accidentFreeExpiresAt;
+    }
+    return null;
+  }, [accidentFreeExpiresAt]);
+
+  // 인증 상태 표시
+  const currentStatus = useMemo(() => {
+    if (accidentFreeStatus === 'APPROVED' && accidentFreeCertifiedAt) {
+      const year = accidentFreeCertifiedAt.year();
+      return `${year}년 무재해 사업장`;
+    }
+    return null;
+  }, [accidentFreeStatus, accidentFreeCertifiedAt]);
+
+  // 무재해 일수 계산 (시작일부터 현재 날짜까지, 단 다음 달성일이 있으면 그 날짜까지만)
+  const accidentFreeDays = useMemo(() => {
+    if (!startDate) return 0;
+
+    // 현재 날짜 (자정으로 정규화)
+    const today = dayjs().startOf('day');
+
+    // 시작일을 자정으로 정규화
+    const normalizedStartDate = startDate.startOf('day');
+
+    // 다음 달성일(만료일)이 있고, 현재 날짜보다 이전이면 만료일까지만 카운트
+    // 다음 달성일이 없거나 현재 날짜보다 이후면 현재 날짜까지 카운트
+    const endDate =
+      accidentFreeExpiresAt && accidentFreeExpiresAt.startOf('day').isBefore(today)
+        ? accidentFreeExpiresAt.startOf('day')
+        : today;
+
+    const days = endDate.diff(normalizedStartDate, 'day');
+    return Math.max(0, days);
+  }, [startDate, accidentFreeExpiresAt]);
+
+  // 시작일 초기화
+  useEffect(() => {
+    if (initialStartDate && !startDate) {
+      setStartDate(initialStartDate);
+    }
+  }, [initialStartDate, startDate]);
+
+  // 다음 달성일 초기화
+  useEffect(() => {
+    if (initialAchievementDate && !achievementDate) {
+      setAchievementDate(initialAchievementDate);
+    }
+  }, [initialAchievementDate, achievementDate]);
 
   // TODO: TanStack Query Hook(useQuery)으로 인증 이력 목록 가져오기
   // const { data: certificationRecords } = useQuery({
@@ -237,6 +314,41 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
     }
   };
 
+  // 로딩 상태
+  if (isLoadingAccidentFree) {
+    return (
+      <LocalizationProvider dateAdapter={AdapterDayjs}>
+        <Box bgcolor="grey.50">
+          <Stack spacing={3} p={3}>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                minHeight: 200,
+              }}
+            >
+              <CircularProgress />
+            </Box>
+          </Stack>
+        </Box>
+      </LocalizationProvider>
+    );
+  }
+
+  // 에러 상태
+  if (isErrorAccidentFree) {
+    return (
+      <LocalizationProvider dateAdapter={AdapterDayjs}>
+        <Box bgcolor="grey.50">
+          <Stack spacing={3} p={3}>
+            <Alert severity="error">무재해 인증 정보를 불러오는 중 오류가 발생했습니다.</Alert>
+          </Stack>
+        </Box>
+      </LocalizationProvider>
+    );
+  }
+
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <Box bgcolor="grey.50">
@@ -254,12 +366,14 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
                   value={startDate}
                   onChange={setStartDate}
                   format="YYYY-MM-DD"
+                  disabled
                   slotProps={{
                     textField: {
                       size: 'small',
                       sx: {
                         flex: 1,
                         bgcolor: 'common.white',
+                        pointerEvents: 'none',
                         '& .MuiOutlinedInput-root': {
                           bgcolor: 'common.white',
                         },
@@ -274,8 +388,12 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
                 </Typography>
                 {currentStatus ? (
                   <Chip label={currentStatus} variant="outlined" color="info" size="medium" />
-                ) : (
+                ) : accidentFreeStatus === 'PENDING' ? (
                   renderStatusBadge('pending')
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    인증 정보 없음
+                  </Typography>
                 )}
               </Stack>
               <Stack direction="row" spacing={2} alignItems="center">
@@ -288,9 +406,11 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
                   InputProps={{
                     readOnly: true,
                   }}
+                  disabled
                   sx={{
                     flex: 1,
                     bgcolor: 'common.white',
+                    pointerEvents: 'none',
                     '& .MuiOutlinedInput-root': {
                       bgcolor: 'common.white',
                     },
@@ -311,9 +431,11 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
                   InputProps={{
                     readOnly: true,
                   }}
+                  disabled
                   sx={{
                     flex: 1,
                     bgcolor: 'common.white',
+                    pointerEvents: 'none',
                     '& .MuiOutlinedInput-root': {
                       bgcolor: 'common.white',
                     },
@@ -329,12 +451,14 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
                   value={achievementDate}
                   onChange={setAchievementDate}
                   format="YYYY-MM-DD"
+                  disabled
                   slotProps={{
                     textField: {
                       size: 'small',
                       sx: {
                         flex: 1,
                         bgcolor: 'common.white',
+                        pointerEvents: 'none',
                         '& .MuiOutlinedInput-root': {
                           bgcolor: 'common.white',
                         },
@@ -353,9 +477,11 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
                   InputProps={{
                     readOnly: true,
                   }}
+                  disabled
                   sx={{
                     flex: 1,
                     bgcolor: 'common.white',
+                    pointerEvents: 'none',
                     '& .MuiOutlinedInput-root': {
                       bgcolor: 'common.white',
                     },

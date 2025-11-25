@@ -10,7 +10,10 @@ import {
   upgradeService,
   cancelSubscription,
   cardAction,
+  getAccidentFree,
   updateAccidentFree,
+  getCompanyMembers,
+  inviteMember,
 } from 'src/services/organization/organization.service';
 import type {
   GetOrganizationsParams,
@@ -21,6 +24,8 @@ import type {
   CancelSubscriptionParams,
   CardActionParams,
   UpdateAccidentFreeParams,
+  GetCompanyMembersParams,
+  InviteMemberParams,
 } from 'src/services/organization/organization.types';
 
 // ----------------------------------------------------------------------
@@ -68,11 +73,34 @@ export function useUpdateOrganization() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ companyIdx, ...params }: UpdateOrganizationParams & { companyIdx: number }) =>
-      updateOrganization(companyIdx, params),
-    onSuccess: (_, variables) => {
+    mutationFn: ({ companyIdx, ...params }: UpdateOrganizationParams & { companyIdx: number }) => {
+      if (import.meta.env.DEV) {
+        console.log('📤 [useUpdateOrganization] API 호출 시작', {
+          companyIdx,
+          params,
+        });
+      }
+      return updateOrganization(companyIdx, params);
+    },
+    onSuccess: (data, variables) => {
+      if (import.meta.env.DEV) {
+        console.log('✅ [useUpdateOrganization] API 호출 성공', {
+          data,
+          variables,
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ['organizations'] });
       queryClient.invalidateQueries({ queryKey: ['organizationDetail', variables.companyIdx] });
+    },
+    onError: (error: any, variables) => {
+      if (import.meta.env.DEV) {
+        console.error('❌ [useUpdateOrganization] API 호출 실패', {
+          error,
+          errorMessage: error?.message,
+          errorResponse: error?.response?.data,
+          variables,
+        });
+      }
     },
   });
 }
@@ -150,6 +178,18 @@ export function useCardAction() {
 }
 
 /**
+ * 무재해 인증 정보 조회 Hook
+ */
+export function useAccidentFree(companyIdx: number) {
+  return useQuery({
+    queryKey: ['accidentFree', companyIdx],
+    queryFn: () => getAccidentFree(companyIdx),
+    enabled: !!companyIdx,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/**
  * 무재해 인증 정보 수정 Mutation Hook
  */
 export function useUpdateAccidentFree() {
@@ -160,6 +200,35 @@ export function useUpdateAccidentFree() {
       updateAccidentFree(companyIdx, params),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['organizations'] });
+      queryClient.invalidateQueries({ queryKey: ['organizationDetail', variables.companyIdx] });
+      queryClient.invalidateQueries({ queryKey: ['accidentFree', variables.companyIdx] });
+    },
+  });
+}
+
+/**
+ * 회사/지점별 역할별 멤버 조회 Hook
+ */
+export function useCompanyMembers(companyIdx: number, params?: GetCompanyMembersParams) {
+  return useQuery({
+    queryKey: ['companyMembers', companyIdx, params],
+    queryFn: () => getCompanyMembers(companyIdx, params),
+    enabled: !!companyIdx,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/**
+ * 조직원 초대 Mutation Hook
+ */
+export function useInviteMember() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ companyIdx, ...params }: InviteMemberParams & { companyIdx: number }) =>
+      inviteMember(companyIdx, params),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['companyMembers', variables.companyIdx] });
       queryClient.invalidateQueries({ queryKey: ['organizationDetail', variables.companyIdx] });
     },
   });

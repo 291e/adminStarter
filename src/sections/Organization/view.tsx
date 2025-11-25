@@ -11,18 +11,12 @@ import OrganizationTabs from './components/Tabs';
 import OrganizationFilters from './components/Filters';
 import OrganizationTable from './components/Table';
 import OrganizationPagination from './components/Pagination';
-import CreateOrganizationModal, {
-  type OrganizationFormData,
-} from './components/CreateOrganizationModal';
+import CreateOrganizationModal from './components/CreateOrganizationModal';
 import { useNavigate } from 'react-router';
 import React from 'react';
 import { paths } from 'src/routes/paths';
 import dayjs from 'dayjs';
-import {
-  useCreateOrganization,
-  useDeactivateOrganization,
-  useDeleteOrganization,
-} from './hooks/use-organization-api';
+import { useDeactivateOrganization, useDeleteOrganization } from './hooks/use-organization-api';
 import { useOrganization } from './hooks/use-organization';
 import type { Organization } from 'src/services/organization/organization.types';
 
@@ -61,8 +55,6 @@ export function OrganizationView({ title = 'Blank', description, sx }: Props) {
     error: organizationsError,
   } = useOrganization();
 
-  // Mutations
-  const createOrganizationMutation = useCreateOrganization();
   const deactivateOrganizationMutation = useDeactivateOrganization();
   const deleteOrganizationMutation = useDeleteOrganization();
 
@@ -89,35 +81,6 @@ export function OrganizationView({ title = 'Blank', description, sx }: Props) {
       }
     } catch (error) {
       console.error('❌ 조직 삭제 실패:', error);
-    }
-  };
-
-  const handleSaveCreate = async (data: OrganizationFormData) => {
-    try {
-      // OrganizationFormData를 CreateOrganizationParams로 변환
-      const params = {
-        companyName: data.organizationName,
-        companyType: data.companyType, // 필수 필드
-        businessNumber: data.businessNumber,
-        representativeName: data.representativeName,
-        representativePhone: data.representativePhone,
-        representativeEmail: data.representativeEmail,
-        businessType: data.businessCategory,
-        businessCategory: data.businessItem,
-        address: data.address,
-        addressDetail: data.detailAddress,
-        manager: data.manager,
-        subscriptionService: data.subscriptionService,
-        sendInviteEmail: data.sendInvitationEmail,
-      };
-
-      await createOrganizationMutation.mutateAsync(params);
-      setCreateModalOpen(false);
-      if (import.meta.env.DEV) {
-        console.log('✅ 조직 등록 완료');
-      }
-    } catch (error) {
-      console.error('❌ 조직 등록 실패:', error);
     }
   };
 
@@ -197,11 +160,7 @@ export function OrganizationView({ title = 'Blank', description, sx }: Props) {
         {renderContent()}
       </Box>
 
-      <CreateOrganizationModal
-        open={createModalOpen}
-        onClose={() => setCreateModalOpen(false)}
-        onSave={handleSaveCreate}
-      />
+      <CreateOrganizationModal open={createModalOpen} onClose={() => setCreateModalOpen(false)} />
     </DashboardContent>
   );
 }

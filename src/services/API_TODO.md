@@ -1311,6 +1311,160 @@ export class LoginResponseDto {
 - **타입**: `useQuery`
 - **파라미터**: safetyIdx, itemNumber, filterType, searchField, searchValue, page, pageSize
 
+#### 26. 문서 수정
+
+- **위치**: `src/sections/PDF/Risk_2200/edit/view.tsx:955`
+- **기능**: 기존 문서를 수정합니다. 문서 타입별로 다른 데이터 구조를 가집니다.
+- **타입**: `useMutation`
+- **파라미터**: 문서 ID (SafetySystemDocument.id, UUID), 문서 정보 (documentDate, approvalDeadline, 테이블 데이터, safetyIdx, itemNumber)
+
+#### 29. 이미지 업로드
+
+- **위치**: `src/sections/PDF/Risk_2200/create/view.tsx:933`, `src/sections/PDF/Risk_2200/create/tables/modal/ImageUploadModal.tsx:98`
+- **기능**: 문서에 첨부할 이미지를 업로드합니다. 산업재해/아차사고 이미지, TBM 일지 서명 이미지 등에 사용됩니다.
+- **타입**: `useMutation`
+- **파라미터**: 파일, 문서 ID (선택적)
+- **참고**: 파일 업로드 API (`/system/upload`)를 사용하여 파일을 업로드하고, 반환된 파일 URL을 문서 데이터에 저장합니다.
+
+#### 30. 위험성 평가 기준 저장
+
+- **위치**: `src/sections/PDF/Risk_2200/view.tsx:257`, `src/sections/PDF/Risk_2200/create/view.tsx:361`, `src/sections/PDF/Risk_2200/components/RiskAssessmentSettingModal.tsx:202`
+- **기능**: 위험성 평가 기준을 저장합니다. 1500번대 문서에서 사용됩니다.
+- **타입**: `useMutation`
+- **파라미터**: 위험성 평가 기준 정보 (위험도, 평가 기준 등)
+
+#### 31. 고위험작업 목록 조회
+
+- **위치**: `src/sections/PDF/Risk_2200/create/view.tsx:785`, `src/sections/PDF/Risk_2200/create/tables/modal/SelectHighRiskWorkModal.tsx:29`
+- **기능**: 고위험작업 목록을 조회합니다. 체크리스트에서 정의된 고위험작업 목록을 가져옵니다.
+- **타입**: `useQuery`
+- **파라미터**: 업종 (선택적)
+- **참고**: `Checklist` 테이블에서 고위험작업/상황 정보를 조회합니다.
+
+#### 32. 업종별 고위험작업 목록 조회
+
+- **위치**: `src/sections/PDF/Risk_2200/create/tables/modal/SelectHighRiskWorkModal.tsx:58`
+- **기능**: 특정 업종의 고위험작업 목록을 조회합니다.
+- **타입**: `useQuery`
+- **파라미터**: 업종
+- **참고**: `Checklist` 테이블에서 업종별로 필터링하여 조회합니다.
+
+#### 33. 재해유발요인 목록 조회
+
+- **위치**: `src/sections/PDF/Risk_2200/create/view.tsx:795`, `src/sections/PDF/Risk_2200/create/tables/modal/SelectDisasterFactorModal.tsx:29`
+- **기능**: 재해유발요인 목록을 조회합니다. 체크리스트에서 정의된 재해유발요인 목록을 가져옵니다.
+- **타입**: `useQuery`
+- **파라미터**: 체크리스트 ID (선택적), 고위험작업 ID (선택적)
+- **참고**: `DisasterFactor` 테이블에서 재해유발요인 정보를 조회합니다.
+
+#### 34. 고위험작업별 재해유발요인 목록 조회
+
+- **위치**: `src/sections/PDF/Risk_2200/create/tables/modal/SelectDisasterFactorModal.tsx:59`
+- **기능**: 특정 고위험작업에 연결된 재해유발요인 목록을 조회합니다.
+- **타입**: `useQuery`
+- **파라미터**: 고위험작업 ID
+- **참고**: `DisasterFactor` 테이블에서 고위험작업별로 필터링하여 조회합니다.
+
+#### 35. 기계 설비 정보 조회
+
+- **위치**: `src/sections/PDF/Risk_2200/create/tables/modal/MachineEquipmentSelectModal.tsx`, `src/sections/PDF/Risk_2200/create/tables/modal/MachineEquipment1500Modal.tsx:84`
+- **기능**: 코드 관리에서 정의된 기계 설비 정보를 조회합니다. 1300번대, 1500번대 문서에서 사용됩니다.
+- **타입**: `useQuery`
+- **파라미터**: 검색 조건 (코드, 명칭 등)
+- **참고**: `MachineEquipment` 테이블에서 기계 설비 정보를 조회합니다.
+
+#### 36. 기계 설비 정보 검증 및 저장
+
+- **위치**: `src/sections/PDF/Risk_2200/create/tables/modal/MachineEquipmentSelectModal.tsx:90`, `src/sections/PDF/Risk_2200/create/tables/modal/MachineEquipment1500Modal.tsx:141, 165`
+- **기능**: 선택된 기계 설비 정보를 검증하고 문서에 저장합니다.
+- **타입**: `useMutation`
+- **파라미터**: 기계 설비 ID, 문서 ID (선택적)
+
+#### 37. 유해인자명 목록 조회
+
+- **위치**: `src/sections/PDF/Risk_2200/create/tables/modal/HazardFactorRegisterModal.tsx:26`
+- **기능**: 유해인자명 목록을 조회합니다. 1400번대 문서에서 사용됩니다.
+- **타입**: `useQuery`
+- **파라미터**: 검색 조건 (명칭 등)
+- **참고**: `HazardFactor` 테이블에서 유해인자 정보를 조회합니다.
+
+#### 38. 유해인자 정보 검증 및 저장
+
+- **위치**: `src/sections/PDF/Risk_2200/create/tables/modal/HazardFactorRegisterModal.tsx:102`
+- **기능**: 입력된 유해인자 정보를 검증하고 문서에 저장합니다.
+- **타입**: `useMutation`
+- **파라미터**: 유해인자 정보, 문서 ID (선택적)
+
+#### 39. 화학물질 목록 조회
+
+- **위치**: `src/sections/PDF/Risk_2200/create/tables/Table1400Form.tsx:430`, `src/sections/PDF/Risk_2200/create/tables/Table1500Form.tsx:366`
+- **기능**: 화학물질 목록을 조회합니다. 1400번대, 1500번대 문서에서 사용됩니다.
+- **타입**: `useQuery`
+- **파라미터**: 검색 조건 (화학물질명, CAS No 등)
+- **참고**: 외부 API 연동 또는 정적 데이터로 처리할 수 있습니다.
+
+#### 40. 한국산업안전보건공단 물질안전보건자료 API 호출
+
+- **위치**: `src/sections/PDF/Risk_2200/create/tables/modal/ChemicalNameSearchModal.tsx:17`
+- **기능**: 한국산업안전보건공단의 물질안전보건자료(MSDS) API를 호출하여 화학물질 정보를 조회합니다.
+- **타입**: 외부 API 호출 또는 `useQuery`
+- **파라미터**: 화학물질명, CAS No 등
+- **참고**: 프런트엔드에서 직접 호출하거나 백엔드를 통해 프록시할 수 있습니다.
+
+#### 41. 교육영상 목록 조회
+
+- **위치**: `src/sections/PDF/Risk_2200/create/tables/Table2400TBMForm.tsx:38`, `src/sections/PDF/Risk_2200/create/tables/modal/EducationVideoSelectModal.tsx:43`
+- **기능**: 교육영상(VOD) 목록을 조회합니다. 2400번대 TBM 일지에서 사용됩니다.
+- **타입**: `useQuery`
+- **파라미터**: 검색 조건 (제목, 카테고리 등)
+- **참고**: `LibraryReport` 테이블에서 교육영상 정보를 조회합니다.
+
+#### 42. 사고조사반 후보자 목록 조회
+
+- **위치**: `src/sections/PDF/Risk_2200/create/tables/modal/InvestigationTeamSelectModal.tsx:44`
+- **기능**: 사고조사반 후보자 목록을 조회합니다. 1200번대 산업재해/아차사고 문서에서 사용됩니다.
+- **타입**: `useQuery`
+- **파라미터**: 조직 ID (companyIdx)
+- **참고**: 조직의 멤버 중에서 사고조사반 후보자를 조회합니다. `Member` 테이블에서 `companyIdx`로 필터링합니다.
+
+#### 43. 사고조사반 추가
+
+- **위치**: `src/sections/PDF/Risk_2200/create/tables/modal/InvestigationTeamSelectModal.tsx:176`
+- **기능**: 사고조사반을 추가합니다. 선택된 멤버들을 사고조사반으로 등록합니다.
+- **타입**: `useMutation`
+- **파라미터**: 문서 ID (선택적), 멤버 ID 목록
+
+#### 44. 필터/검색/페이지 변경 시 자동 새로고침
+
+- **위치**: `src/sections/PDF/Risk_2200/view.tsx:323, 328, 333, 338, 363, 368`
+- **기능**: 검색일 구분, 시작일, 종료일, 검색어, 페이지, 페이지 크기 변경 시 문서 목록을 자동으로 새로고침합니다.
+- **타입**: `queryClient.invalidateQueries`
+- **파라미터**: queryKey: ['risk2200Documents', safetyIdx, itemNumber, filterType, searchField, searchValue, page, pageSize]
+
+#### 45. 문서 복사 시 상세 정보 조회
+
+- **위치**: `src/sections/PDF/Risk_2200/view.tsx:178`
+- **기능**: 문서 복사 시 원본 문서의 상세 정보를 조회합니다.
+- **타입**: `useQuery`
+- **파라미터**: 문서 ID (SafetySystemDocument.id, UUID)
+- **참고**: 복사할 문서의 모든 데이터를 가져와서 새 문서 생성 시 사용합니다.
+
+#### 46. 문서 게시 상태 변경
+
+- **위치**: `src/sections/PDF/Risk_2200/view.tsx:202`, `src/sections/PDF/Risk_2200/components/Table.tsx:120`, `src/sections/PDF/Risk_2200/components/PublishModal.tsx:63`
+- **기능**: 문서의 게시 상태를 변경합니다. 게시 시 공유 문서함에 추가됩니다.
+- **타입**: `useMutation`
+- **파라미터**: 문서 ID (SafetySystemDocument.id, UUID), 게시 여부, 중요도, 공개 여부
+- **참고**: 게시 시 `SafetySystemDocument.isPublished = 1`로 설정하고, `SharedDocument` 테이블에 레코드를 생성합니다.
+
+#### 47. 문서 정보 조회 (PDF 파일명 생성용)
+
+- **위치**: `src/sections/PDF/Risk_2200/[risk_id]/view.tsx:59`
+- **기능**: PDF 다운로드라이브 파일명 생성에 필요한 문서 정보를 조회합니다.
+- **타입**: `useQuery`
+- **파라미터**: 문서 ID (SafetySystemDocument.id, UUID)
+- **참고**: 문서명, 문서번호 등 PDF 파일명에 사용할 정보를 조회합니다.
+
 ---
 
 ## Push Notification (푸시 알림)

@@ -118,11 +118,11 @@ export function OperationView({ title = 'Blank', description, sx }: Props) {
 
       <OperationBreadcrumbs
         items={[
-          { label: '대시보드', href: '/dashboard' },
-          { label: '현장 운영 관리', href: '/dashboard/operation' },
+          { label: '대시보드', href: '/test/dashboard' },
+          { label: '현장 운영 관리', href: '/test/dashboard/operation' },
           { label: title },
         ]}
-        onCreate={() => navigate('/dashboard/operation/risk-report/create')}
+        onCreate={() => navigate('/test/dashboard/operation/risk-report/create')}
       />
 
       <Box sx={[(theme) => ({ mt: 2, width: 1 }), ...(Array.isArray(sx) ? sx : [sx])]}>

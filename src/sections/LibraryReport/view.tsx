@@ -152,8 +152,8 @@ export function LibraryReportView({ title = '라이브러리', description, sx }
 
       <LibraryReportBreadcrumbs
         items={[
-          { label: '대시보드', href: '/dashboard' },
-          { label: '현장 운영 관리', href: '/dashboard/operation' },
+          { label: '대시보드', href: '/test/dashboard' },
+          { label: '현장 운영 관리', href: '/test/dashboard/operation' },
           { label: title },
         ]}
         onCategorySettings={() => setCategoryModalOpen(true)}

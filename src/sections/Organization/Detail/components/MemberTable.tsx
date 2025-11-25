@@ -21,20 +21,29 @@ type Props = {
   onEdit?: (member: Member) => void;
 };
 
-// 역할 매핑 함수
+// 역할 매핑 함수 (역할은 조직 관리자, 관리 감독자, 안전보건 담당자, 근로자 4개만)
 const getRoleLabel = (memberRole: string): string => {
+  if (!memberRole) return '';
+
+  const roleUpper = memberRole.toUpperCase();
   const roleMap: { [key: string]: string } = {
+    // 대문자 키
+    ADMIN: '조직 관리자',
+    ORGANIZATION_ADMIN: '조직 관리자',
+    SUPERVISOR: '관리 감독자',
+    SAFETY_MANAGER: '안전보건 담당자',
+    WORKER: '근로자',
+    MEMBER: '근로자',
+    // 소문자 키 (하위 호환성)
+    admin: '조직 관리자',
     organization_admin: '조직 관리자',
     supervisor: '관리 감독자',
     safety_manager: '안전보건 담당자',
     worker: '근로자',
-    admin: '조직 관리자',
     member: '근로자',
-    distributor: '총판',
-    agency: '대리점',
-    dealer: '딜러',
   };
-  return roleMap[memberRole] || memberRole;
+
+  return roleMap[roleUpper] || roleMap[memberRole] || memberRole;
 };
 
 // 직종 매핑 함수 (실제로는 멤버 데이터에 직종 정보가 있어야 함)

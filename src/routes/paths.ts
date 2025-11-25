@@ -46,6 +46,10 @@ export const paths = {
       resetPassword: `${ROOTS.AUTH}/supabase/reset-password`,
     },
   },
+  // ADMIN
+  admin: {
+    invitation: '/invitation',
+  },
   // DASHBOARD
   dashboard: {
     root: ROOTS.DASHBOARD,

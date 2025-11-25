@@ -12,7 +12,7 @@ import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
 
 import { paths } from 'src/routes/paths';
-import { useRouter } from 'src/routes/hooks';
+import { useRouter, useSearchParams } from 'src/routes/hooks';
 import { RouterLink } from 'src/routes/components';
 
 import { Iconify } from 'src/components/iconify';
@@ -45,6 +45,8 @@ export const SignUpSchema = zod.object({
 
 export function JwtSignUpView() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const invitationCode = searchParams.get('code');
 
   const showPassword = useBoolean();
 
@@ -71,11 +73,18 @@ export function JwtSignUpView() {
 
   const onSubmit = handleSubmit(async (data) => {
     try {
+      if (!invitationCode) {
+        setErrorMessage('초대 코드가 필요합니다. 초대 링크를 통해 접근해주세요.');
+        return;
+      }
+
       await signUp({
         email: data.email,
         password: data.password,
         firstName: data.firstName,
         lastName: data.lastName,
+        link: window.location.href,
+        code: invitationCode,
       });
       await checkUserSession?.();
 

@@ -36,7 +36,6 @@ function StatCard({ icon, title, count, onNavigate }: StatCardProps) {
         gap: { xs: 1.5, sm: 2 },
         flex: 1,
         width: '100%',
-        maxWidth: 314,
       }}
     >
       <Box

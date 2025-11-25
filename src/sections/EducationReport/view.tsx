@@ -91,7 +91,8 @@ export function EducationReportView({ title = '교육 이수 현황', descriptio
           // TODO: API에서 무재해 사업장 인증 여부 가져오기
           // const isAccidentFreeWorkplace = await checkAccidentFreeWorkplace(row.organizationName);
           // 목업: 일부 조직만 무재해 사업장으로 설정
-          const isAccidentFreeWorkplace = row.id.includes('1') || row.id.includes('3') || row.id.includes('5');
+          const isAccidentFreeWorkplace =
+            row.id.includes('1') || row.id.includes('3') || row.id.includes('5');
 
           setSelectedDetailData({
             report: row,
@@ -130,8 +131,8 @@ export function EducationReportView({ title = '교육 이수 현황', descriptio
 
       <EducationReportBreadcrumbs
         items={[
-          { label: '대시보드', href: '/dashboard' },
-          { label: '현장 운영 관리', href: '/dashboard/operation' },
+          { label: '대시보드', href: '/test/dashboard' },
+          { label: '현장 운영 관리', href: '/test/dashboard/operation' },
           { label: title },
         ]}
       />

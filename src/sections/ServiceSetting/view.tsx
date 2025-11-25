@@ -180,8 +180,8 @@ export function ServiceSettingView({ title = '서비스 관리', description, sx
 
       <ServiceSettingBreadcrumbs
         items={[
-          { label: '대시보드', href: '/dashboard' },
-          { label: '설정 및 관리', href: '/dashboard/system-setting' },
+          { label: '대시보드', href: '/test/dashboard' },
+          { label: '설정 및 관리', href: '/test/dashboard/system-setting' },
           { label: title },
         ]}
         onCreate={handleCreate}

@@ -147,150 +147,172 @@ export default function OrganizationTable({ rows, onViewDetail, onDeactivate, on
         </TableHead>
 
         <TableBody>
-          {rows.map((row, idx) => (
-            <TableRow key={row.companyIdx} hover>
-              <TableCell>{idx + 1}</TableCell>
-              <TableCell>
-                <Stack>
-                  <Typography variant="body2">
-                    {row.createAt ? fDateTime(row.createAt, 'YYYY-MM-DD') : '-'}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {row.createAt ? fDateTime(row.createAt, 'HH:mm:ss') : ''}
-                  </Typography>
-                </Stack>
-              </TableCell>
-              <TableCell>
-                <Typography variant="body2">{getDivisionLabel(row)}</Typography>
-              </TableCell>
-              <TableCell>
-                <Typography variant="subtitle2">{row.companyName}</Typography>
-              </TableCell>
-              <TableCell>
-                {row.manager ? (
+          {rows.map((row, idx) => {
+            const accidentInfo = row.accidentFreeInformation;
+            const accidentStatus = accidentInfo?.accidentFreeStatus;
+            const accidentYear = accidentInfo?.accidentFreeExpiresAt
+              ? new Date(accidentInfo.accidentFreeExpiresAt).getFullYear()
+              : accidentInfo?.accidentFreeCertifiedAt
+                ? new Date(accidentInfo.accidentFreeCertifiedAt).getFullYear()
+                : null;
+            const accidentLabel = accidentYear
+              ? `${accidentYear}년 무재해 사업장`
+              : '무재해 사업장';
+
+            return (
+              <TableRow key={row.companyIdx} hover>
+                <TableCell>{idx + 1}</TableCell>
+                <TableCell>
                   <Stack>
-                    <Typography variant="body2">{row.manager.memberName || '-'}</Typography>
+                    <Typography variant="body2">
+                      {row.createAt ? fDateTime(row.createAt, 'YYYY-MM-DD') : '-'}
+                    </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {row.manager.memberEmail || '-'}
+                      {row.createAt ? fDateTime(row.createAt, 'HH:mm:ss') : ''}
                     </Typography>
                   </Stack>
-                ) : (
-                  '-'
-                )}
-              </TableCell>
-              <TableCell>
-                <Stack>
-                  <Typography variant="body2">{row.phone || '-'}</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {row.email || '-'}
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2">{getDivisionLabel(row)}</Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="subtitle2">{row.companyName}</Typography>
+                </TableCell>
+                <TableCell>
+                  {row.manager ? (
+                    <Stack>
+                      <Typography variant="body2">{row.manager.memberName || '-'}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {row.manager.memberEmail || '-'}
+                      </Typography>
+                    </Stack>
+                  ) : (
+                    '-'
+                  )}
+                </TableCell>
+                <TableCell>
+                  <Stack>
+                    <Typography variant="body2">{row.phone || '-'}</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {row.email || '-'}
+                    </Typography>
+                  </Stack>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2">
+                    {row.address ? `${row.address} ${row.addressDetail || ''}`.trim() : '-'}
                   </Typography>
-                </Stack>
-              </TableCell>
-              <TableCell>
-                <Typography variant="body2">
-                  {row.address ? `${row.address} ${row.addressDetail || ''}`.trim() : '-'}
-                </Typography>
-              </TableCell>
-              <TableCell>
-                {/* 무재해 사업장 정보는 Organization 타입에 없으므로 임시 처리 */}
-                <Button
-                  variant="outlined"
-                  color="inherit"
-                  size="small"
-                  endIcon={<Iconify icon="eva:arrow-forward-fill" width={16} />}
-                  onClick={() => handleOpenModal(row)}
-                  sx={{
-                    height: 24,
-                    minHeight: 24,
-                    px: 0.75,
-                    py: 0,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    lineHeight: '20px',
-                    borderRadius: 0.75,
-                    borderWidth: 1,
-                    borderColor: 'grey.900',
-                    color: 'grey.900',
-                    textTransform: 'none',
-                    '&:hover': {
-                      borderColor: 'grey.800',
-                      bgcolor: 'action.hover',
-                    },
-                  }}
-                >
-                  검토 대기
-                </Button>
-              </TableCell>
-              <TableCell align="center">
-                {row.status === 'active' ? (
-                  <Chip label="활성" size="small" color="success" variant="soft" />
-                ) : (
-                  <Chip label="비활성" size="small" sx={{ bgcolor: 'grey.300' }} />
-                )}
-              </TableCell>
-              <TableCell align="right">
-                <IconButton
-                  size="small"
-                  onClick={(e) => handleOpenMenu(e, row.companyIdx.toString())}
-                  aria-label="actions"
-                >
-                  <Iconify icon="eva:more-vertical-fill" width={16} />
-                </IconButton>
-                <Menu
-                  open={openMenuId === row.companyIdx.toString()}
-                  anchorEl={menuAnchorEl[row.companyIdx.toString()]}
-                  onClose={() => handleCloseMenu(row.companyIdx.toString())}
-                  anchorOrigin={{
-                    vertical: 'bottom',
-                    horizontal: 'right',
-                  }}
-                  transformOrigin={{
-                    vertical: 'top',
-                    horizontal: 'right',
-                  }}
-                  slotProps={{
-                    paper: {
-                      sx: { minWidth: 120 },
-                    },
-                  }}
-                >
-                  <MenuList>
-                    <MenuItem
-                      onClick={() => {
-                        handleCloseMenu(row.companyIdx.toString());
-                        onViewDetail?.(row);
-                      }}
-                    >
-                      상세 보기
-                    </MenuItem>
-                    <MenuItem
-                      onClick={() => {
-                        handleCloseMenu(row.companyIdx.toString());
-                        handleOpenDeactivateModal(row);
-                      }}
-                    >
-                      비활성화
-                    </MenuItem>
-                    <Divider />
-                    <MenuItem
-                      onClick={() => {
-                        handleCloseMenu(row.companyIdx.toString());
-                        handleOpenDeleteModal(row);
-                      }}
+                </TableCell>
+                <TableCell>
+                  {accidentStatus === 'APPROVED' ? (
+                    <Chip
+                      color="info"
+                      variant="outlined"
+                      size="small"
+                      label={accidentLabel}
+                      sx={{ fontWeight: 600, pointerEvents: 'none' }}
+                    />
+                  ) : (
+                    <Button
+                      variant="outlined"
+                      color="inherit"
+                      size="small"
+                      endIcon={<Iconify icon="eva:arrow-forward-fill" width={16} />}
+                      onClick={() => handleOpenModal(row)}
                       sx={{
-                        color: 'error.main',
+                        height: 24,
+                        minHeight: 24,
+                        px: 0.75,
+                        py: 0,
+                        fontSize: 12,
+                        fontWeight: 700,
+                        lineHeight: '20px',
+                        borderRadius: 0.75,
+                        borderWidth: 1,
+                        borderColor: 'grey.900',
+                        color: 'grey.900',
+                        textTransform: 'none',
                         '&:hover': {
-                          bgcolor: 'error.lighter',
+                          borderColor: 'grey.800',
+                          bgcolor: 'action.hover',
                         },
                       }}
                     >
-                      삭제
-                    </MenuItem>
-                  </MenuList>
-                </Menu>
-              </TableCell>
-            </TableRow>
-          ))}
+                      검토 대기
+                    </Button>
+                  )}
+                </TableCell>
+                <TableCell align="center">
+                  {row.status === 'active' ? (
+                    <Chip label="활성" size="small" color="success" variant="soft" />
+                  ) : (
+                    <Chip label="비활성" size="small" sx={{ bgcolor: 'grey.300' }} />
+                  )}
+                </TableCell>
+                <TableCell align="right">
+                  <IconButton
+                    size="small"
+                    onClick={(e) => handleOpenMenu(e, row.companyIdx.toString())}
+                    aria-label="actions"
+                  >
+                    <Iconify icon="eva:more-vertical-fill" width={16} />
+                  </IconButton>
+                  <Menu
+                    open={openMenuId === row.companyIdx.toString()}
+                    anchorEl={menuAnchorEl[row.companyIdx.toString()]}
+                    onClose={() => handleCloseMenu(row.companyIdx.toString())}
+                    anchorOrigin={{
+                      vertical: 'bottom',
+                      horizontal: 'right',
+                    }}
+                    transformOrigin={{
+                      vertical: 'top',
+                      horizontal: 'right',
+                    }}
+                    slotProps={{
+                      paper: {
+                        sx: { minWidth: 120 },
+                      },
+                    }}
+                  >
+                    <MenuList>
+                      <MenuItem
+                        onClick={() => {
+                          handleCloseMenu(row.companyIdx.toString());
+                          onViewDetail?.(row);
+                        }}
+                      >
+                        상세 보기
+                      </MenuItem>
+                      <MenuItem
+                        onClick={() => {
+                          handleCloseMenu(row.companyIdx.toString());
+                          handleOpenDeactivateModal(row);
+                        }}
+                      >
+                        비활성화
+                      </MenuItem>
+                      <Divider />
+                      <MenuItem
+                        onClick={() => {
+                          handleCloseMenu(row.companyIdx.toString());
+                          handleOpenDeleteModal(row);
+                        }}
+                        sx={{
+                          color: 'error.main',
+                          '&:hover': {
+                            bgcolor: 'error.lighter',
+                          },
+                        }}
+                      >
+                        삭제
+                      </MenuItem>
+                    </MenuList>
+                  </Menu>
+                </TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
 

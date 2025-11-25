@@ -36,6 +36,14 @@ export type GetOrganizationsParams = {
   pageSize: number;
 };
 
+export type AccidentFreeInformation = {
+  isAccidentFreeWorksite: 0 | 1;
+  accidentFreeStatus: string;
+  accidentFreeCertifiedAt?: string | null;
+  accidentFreeExpiresAt?: string | null;
+  accidentFreeFileUrl?: string | null;
+};
+
 // 조직 정보
 export type Organization = {
   id?: string;
@@ -47,8 +55,9 @@ export type Organization = {
   representativeName?: string;
   phone?: string; // 전화번호
   email?: string; // 이메일
-  businessType?: string;
+  businessType?: string | number;
   businessCategory?: string;
+  businessItem?: string;
   address?: string;
   addressDetail?: string;
   manager?: ManagerInfo | null; // 담당자 정보 객체 (ADMIN 역할 멤버)
@@ -58,9 +67,10 @@ export type Organization = {
   isActive?: number; // API 응답의 isActive 필드 (1: active, 0: inactive)
   isAccidentFreeWorksite?: number; // 무재해 사업장 여부
   accidentFreeStatus?: string; // 무재해 사업장 상태
-  accidentFreeCertifiedAt?: string; // 무재해 사업장 인증일
-  accidentFreeExpiresAt?: string; // 무재해 사업장 만료일
+  accidentFreeCertifiedAt?: string | null; // 무재해 사업장 인증일
+  accidentFreeExpiresAt?: string | null; // 무재해 사업장 만료일
   accidentFreeFileUrl?: string | null; // 무재해 인증 파일 URL
+  accidentFreeInformation?: AccidentFreeInformation | null;
   // description, memo, deletedAt 필드 제거됨
 };
 
@@ -73,29 +83,25 @@ export type GetOrganizationsResponse = BaseResponseDto<{
 
 // 조직 등록 요청 파라미터
 export type CreateOrganizationParams = {
-  companyName: string; // 조직명
-  companyType: CompanyType; // 조직 구분 (필수): OPERATOR, MEMBER, DISTRIBUTOR, AGENCY, DEALER, NON_MEMBER
-  businessNumber?: string; // 사업자 번호
-  representativeName: string; // 대표자명
-  representativePhone: string; // 대표 전화번호
-  representativeEmail: string; // 대표 이메일
-  businessType?: string; // 업태
-  businessCategory?: string; // 종목
-  address?: string; // 사업장 주소
-  addressDetail?: string; // 상세주소
-  manager?: string; // 담당자 (문자열, 초대 이메일 발송 시 사용)
-  subscriptionService?: string; // 구독 서비스
-  sendInviteEmail?: boolean; // 초대 이메일 발송
-  // description, memo 필드 제거됨
+  companyName: string;
+  companyCode?: string;
+  businessNumber?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  companyType: CompanyType;
 };
 
 // 조직 등록 응답
-export type CreateOrganizationResponse = BaseResponseDto<{
-  organization: Organization;
-}>;
+export type CreateOrganizationResponse = BaseResponseDto;
 
 // 조직 수정 요청 파라미터
-export type UpdateOrganizationParams = Partial<CreateOrganizationParams>;
+export type UpdateOrganizationParams = Partial<CreateOrganizationParams> & {
+  representativeName?: string; // 대표자명
+  businessType?: number; // 사업자 유형 (0: 법인 사업자, 1: 개인 사업자)
+  businessCategory?: string; // 업태
+  businessItem?: string; // 종목
+};
 
 // 조직 수정 응답
 export type UpdateOrganizationResponse = BaseResponseDto<{
@@ -232,12 +238,23 @@ export type CardActionParams = {
 // 카드 액션 응답
 export type CardActionResponse = BaseResponseDto;
 
+// 무재해 인증 정보 조회 응답
+export type GetAccidentFreeResponse = BaseResponseDto<{
+  isAccidentFreeWorksite: 0 | 1;
+  accidentFreeStatus: string;
+  accidentFreeCertifiedAt?: string | null;
+  accidentFreeExpiresAt?: string | null;
+  accidentFreeFileUrl?: string | null;
+  industrialAccidentCount: number;
+  nearMissCount: number;
+}>;
+
 // 무재해 인증 정보 수정 요청
 export type UpdateAccidentFreeParams = {
-  accidentFreeDays?: number;
-  certificationDate?: string;
-  certificationNumber?: string;
-  accidentFreeFileUrl?: string | null; // 무재해 인증 파일 URL (파일 업로드 API로 업로드 후 받은 파일 URL)
+  accidentFreeStatus: 'PENDING' | 'APPROVED' | 'REJECTED';
+  accidentFreeCertifiedAt?: string | null;
+  accidentFreeExpiresAt?: string | null;
+  accidentFreeFileUrl?: string | null;
 };
 
 // 조직원 초대 요청

@@ -15,11 +15,13 @@ import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
+import InputAdornment from '@mui/material/InputAdornment';
+import Alert from '@mui/material/Alert';
 import Checkbox from '@mui/material/Checkbox';
 import FormControlLabel from '@mui/material/FormControlLabel';
-import InputAdornment from '@mui/material/InputAdornment';
 
 import { Iconify } from 'src/components/iconify';
+import { useCreateOrganization } from '../hooks/use-organization-api';
 
 // 다음 주소 API 타입 정의
 declare global {
@@ -46,26 +48,25 @@ declare global {
 import type { CompanyType } from 'src/services/organization/organization.types';
 
 export type OrganizationFormData = {
-  companyType: CompanyType; // 조직 구분 (필수)
-  organizationName: string; // 조직명
-  businessType: string; // 사업자 유형
-  businessNumber: string; // 사업자 번호
-  representativeName: string; // 대표자명
-  representativePhone: string; // 대표 전화번호
-  representativeEmail: string; // 대표 이메일
-  businessCategory: string; // 업태
-  businessItem: string; // 종목
-  address: string; // 사업장 주소
-  detailAddress: string; // 상세주소
-  manager: string; // 담당자
-  subscriptionService: string; // 구독 서비스
-  sendInvitationEmail: boolean; // 초대 이메일 발송 여부
+  companyType: CompanyType;
+  companyName: string;
+  companyCode: string;
+  businessType: string;
+  businessNumber: string;
+  representativeName: string;
+  representativePhone: string;
+  representativeEmail: string;
+  businessCategory: string;
+  businessItem: string;
+  address: string;
+  detailAddress: string;
+  subscriptionService: string;
+  sendInvitationEmail: boolean;
 };
 
 type Props = {
   open: boolean;
   onClose: () => void;
-  onSave: (data: OrganizationFormData) => void;
 };
 
 // 조직 구분 옵션 (한글 표시 -> API enum 값 매핑)
@@ -77,26 +78,36 @@ const COMPANY_TYPE_OPTIONS: Array<{ label: string; value: CompanyType }> = [
   { label: '딜러', value: 'DEALER' },
   { label: '비회원', value: 'NON_MEMBER' },
 ];
-const BUSINESS_TYPE_OPTIONS = ['개인사업자', '법인사업자'];
-const SUBSCRIPTION_SERVICE_OPTIONS = ['기본', '프리미엄', '엔터프라이즈'];
 
-export default function CreateOrganizationModal({ open, onClose, onSave }: Props) {
-  const [formData, setFormData] = useState<OrganizationFormData>({
-    companyType: 'MEMBER' as CompanyType,
-    organizationName: '',
-    businessType: '',
-    businessNumber: '',
-    representativeName: '',
-    representativePhone: '',
-    representativeEmail: '',
-    businessCategory: '',
-    businessItem: '',
-    address: '',
-    detailAddress: '',
-    manager: '',
-    subscriptionService: '',
-    sendInvitationEmail: false,
-  });
+const DEFAULT_FORM_DATA: OrganizationFormData = {
+  companyType: 'MEMBER',
+  companyName: '',
+  companyCode: '',
+  businessType: '',
+  businessNumber: '',
+  representativeName: '',
+  representativePhone: '',
+  representativeEmail: '',
+  businessCategory: '',
+  businessItem: '',
+  address: '',
+  detailAddress: '',
+  subscriptionService: '',
+  sendInvitationEmail: false,
+};
+
+const REQUIRED_FIELDS: Array<keyof OrganizationFormData> = [
+  'companyType',
+  'companyName',
+  'representativeName',
+  'representativePhone',
+  'representativeEmail',
+];
+
+export default function CreateOrganizationModal({ open, onClose }: Props) {
+  const [formData, setFormData] = useState<OrganizationFormData>({ ...DEFAULT_FORM_DATA });
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const createOrganizationMutation = useCreateOrganization();
 
   const addressInputRef = useRef<HTMLInputElement>(null);
 
@@ -117,22 +128,8 @@ export default function CreateOrganizationModal({ open, onClose, onSave }: Props
 
   useEffect(() => {
     if (open) {
-      setFormData({
-        companyType: 'MEMBER' as CompanyType,
-        organizationName: '',
-        businessType: '',
-        businessNumber: '',
-        representativeName: '',
-        representativePhone: '',
-        representativeEmail: '',
-        businessCategory: '',
-        businessItem: '',
-        address: '',
-        detailAddress: '',
-        manager: '',
-        subscriptionService: '',
-        sendInvitationEmail: false,
-      });
+      setFormData({ ...DEFAULT_FORM_DATA });
+      setErrorMessage(null);
     }
   }, [open]);
 
@@ -165,47 +162,50 @@ export default function CreateOrganizationModal({ open, onClose, onSave }: Props
     handleSearchAddress();
   };
 
-  const handleSubmit = () => {
-    // 필수 필드 검증
-    if (
-      !formData.companyType ||
-      !formData.organizationName ||
-      !formData.representativeName ||
-      !formData.representativePhone ||
-      !formData.representativeEmail ||
-      !formData.manager
-    ) {
-      alert('필수 항목을 모두 입력해주세요.');
+  const handleSubmit = async () => {
+    const missingField = REQUIRED_FIELDS.find((field) => {
+      const value = formData[field];
+      if (typeof value === 'string') {
+        return !value.trim();
+      }
+      return !value;
+    });
+
+    if (missingField) {
+      setErrorMessage('필수 항목을 모두 입력해주세요.');
       return;
     }
-    onSave(formData);
-    onClose();
+
+    try {
+      setErrorMessage(null);
+      await createOrganizationMutation.mutateAsync({
+        companyName: formData.companyName,
+        companyCode: formData.companyCode || undefined,
+        businessNumber: formData.businessNumber || undefined,
+        address:
+          [formData.address, formData.detailAddress].filter(Boolean).join(' ').trim() || undefined,
+        phone: formData.representativePhone || undefined,
+        email: formData.representativeEmail || undefined,
+        companyType: formData.companyType,
+      });
+      setFormData({ ...DEFAULT_FORM_DATA });
+      onClose();
+    } catch (error) {
+      console.error('❌ 조직 등록 실패:', error);
+      setErrorMessage('조직 등록에 실패했습니다. 잠시 후 다시 시도해주세요.');
+    }
   };
 
   const handleClose = () => {
-    setFormData({
-      companyType: 'MEMBER' as CompanyType,
-      organizationName: '',
-      businessType: '',
-      businessNumber: '',
-      representativeName: '',
-      representativePhone: '',
-      representativeEmail: '',
-      businessCategory: '',
-      businessItem: '',
-      address: '',
-      detailAddress: '',
-      manager: '',
-      subscriptionService: '',
-      sendInvitationEmail: false,
-    });
+    setFormData({ ...DEFAULT_FORM_DATA });
+    setErrorMessage(null);
     onClose();
   };
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-      <DialogTitle>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+      <DialogTitle component="div">
+        <Typography component="p" variant="h6" sx={{ fontWeight: 600 }}>
           조직 등록
         </Typography>
         <IconButton
@@ -223,10 +223,15 @@ export default function CreateOrganizationModal({ open, onClose, onSave }: Props
       </DialogTitle>
 
       <DialogContent>
-        <Box>
+        {errorMessage && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {errorMessage}
+          </Alert>
+        )}
+        <Box sx={{ py: 1 }}>
           <Stack spacing={3}>
             {/* 첫 번째 행: 구분, 조직명 */}
-            <Stack direction="row" spacing={2}>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <FormControl fullWidth>
                 <InputLabel id="company-type-label">
                   구분
@@ -257,14 +262,14 @@ export default function CreateOrganizationModal({ open, onClose, onSave }: Props
                     </Typography>
                   </>
                 }
-                placeholder="조직명"
-                value={formData.organizationName}
-                onChange={(e) => handleChange('organizationName', e.target.value)}
+                placeholder="세이프유아이"
+                value={formData.companyName}
+                onChange={(e) => handleChange('companyName', e.target.value)}
               />
             </Stack>
 
-            {/* 두 번째 행: 사업자 유형, 사업자 번호 */}
-            <Stack direction="row" spacing={2}>
+            {/* 사업자 유형, 사업자 번호 */}
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <FormControl fullWidth>
                 <InputLabel id="business-type-label">사업자 유형</InputLabel>
                 <Select
@@ -273,7 +278,7 @@ export default function CreateOrganizationModal({ open, onClose, onSave }: Props
                   value={formData.businessType}
                   onChange={(e) => handleChange('businessType', e.target.value)}
                 >
-                  {BUSINESS_TYPE_OPTIONS.map((option) => (
+                  {['개인사업자', '법인사업자', '기타'].map((option) => (
                     <MenuItem key={option} value={option}>
                       {option}
                     </MenuItem>
@@ -283,11 +288,20 @@ export default function CreateOrganizationModal({ open, onClose, onSave }: Props
               <TextField
                 fullWidth
                 label="사업자 번호"
-                placeholder="사업자 번호"
+                placeholder="123-45-67890"
                 value={formData.businessNumber}
                 onChange={(e) => handleChange('businessNumber', e.target.value)}
               />
             </Stack>
+
+            {/* 회사 코드 */}
+            <TextField
+              fullWidth
+              label="회사 코드"
+              placeholder="SAFE001"
+              value={formData.companyCode}
+              onChange={(e) => handleChange('companyCode', e.target.value)}
+            />
 
             {/* 대표자명 */}
             <TextField
@@ -300,7 +314,7 @@ export default function CreateOrganizationModal({ open, onClose, onSave }: Props
                   </Typography>
                 </>
               }
-              placeholder="대표자명"
+              placeholder="홍길동"
               value={formData.representativeName}
               onChange={(e) => handleChange('representativeName', e.target.value)}
             />
@@ -316,7 +330,7 @@ export default function CreateOrganizationModal({ open, onClose, onSave }: Props
                   </Typography>
                 </>
               }
-              placeholder="대표 전화번호"
+              placeholder="02-1234-5678"
               value={formData.representativePhone}
               onChange={(e) => handleChange('representativePhone', e.target.value)}
             />
@@ -332,14 +346,14 @@ export default function CreateOrganizationModal({ open, onClose, onSave }: Props
                   </Typography>
                 </>
               }
-              placeholder="대표 이메일"
+              placeholder="contact@company.com"
               type="email"
               value={formData.representativeEmail}
               onChange={(e) => handleChange('representativeEmail', e.target.value)}
             />
 
             {/* 업태, 종목 */}
-            <Stack direction="row" spacing={2}>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <TextField
                 fullWidth
                 label="업태"
@@ -362,7 +376,7 @@ export default function CreateOrganizationModal({ open, onClose, onSave }: Props
                 inputRef={addressInputRef}
                 fullWidth
                 label="사업장 주소"
-                placeholder="사업장 주소"
+                placeholder="서울시 강남구 ..."
                 value={formData.address}
                 onClick={handleAddressFieldClick}
                 InputProps={{
@@ -400,22 +414,6 @@ export default function CreateOrganizationModal({ open, onClose, onSave }: Props
               onChange={(e) => handleChange('detailAddress', e.target.value)}
             />
 
-            {/* 담당자 */}
-            <TextField
-              fullWidth
-              label={
-                <>
-                  담당자
-                  <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
-                    *
-                  </Typography>
-                </>
-              }
-              placeholder="담당자"
-              value={formData.manager}
-              onChange={(e) => handleChange('manager', e.target.value)}
-            />
-
             {/* 구독 서비스 */}
             <FormControl fullWidth>
               <InputLabel id="subscription-service-label">구독 서비스</InputLabel>
@@ -425,7 +423,7 @@ export default function CreateOrganizationModal({ open, onClose, onSave }: Props
                 value={formData.subscriptionService}
                 onChange={(e) => handleChange('subscriptionService', e.target.value)}
               >
-                {SUBSCRIPTION_SERVICE_OPTIONS.map((option) => (
+                {['기본', '프리미엄', '엔터프라이즈'].map((option) => (
                   <MenuItem key={option} value={option}>
                     {option}
                   </MenuItem>
@@ -433,7 +431,7 @@ export default function CreateOrganizationModal({ open, onClose, onSave }: Props
               </Select>
             </FormControl>
 
-            {/* 초대 이메일 발송 체크박스 */}
+            {/* 초대 이메일 */}
             <FormControlLabel
               control={
                 <Checkbox
@@ -443,6 +441,8 @@ export default function CreateOrganizationModal({ open, onClose, onSave }: Props
               }
               label="초대 이메일을 발송합니다."
             />
+
+            <Divider sx={{ borderStyle: 'dashed' }} />
           </Stack>
         </Box>
       </DialogContent>
@@ -450,11 +450,19 @@ export default function CreateOrganizationModal({ open, onClose, onSave }: Props
       <Divider />
 
       <DialogActions sx={{ p: 3 }}>
-        <Button variant="outlined" onClick={handleClose}>
+        <Button
+          variant="outlined"
+          onClick={handleClose}
+          disabled={createOrganizationMutation.isPending}
+        >
           취소
         </Button>
-        <Button variant="contained" onClick={handleSubmit}>
-          등록
+        <Button
+          variant="contained"
+          onClick={handleSubmit}
+          disabled={createOrganizationMutation.isPending}
+        >
+          {createOrganizationMutation.isPending ? '등록 중...' : '등록'}
         </Button>
       </DialogActions>
     </Dialog>

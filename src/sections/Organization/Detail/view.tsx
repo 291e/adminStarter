@@ -1,4 +1,5 @@
 import { useParams, useNavigate } from 'react-router';
+import { useState } from 'react';
 
 import type { Theme, SxProps } from '@mui/material/styles';
 
@@ -6,20 +7,19 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
+import CircularProgress from '@mui/material/CircularProgress';
+import Alert from '@mui/material/Alert';
 
 import { DashboardContent } from 'src/layouts/dashboard';
 import { Iconify } from 'src/components/iconify';
-import { mockMembers } from 'src/_mock';
-import { mockCompanies } from 'src/_mock/_company';
-
-import { useState } from 'react';
-
+import { useOrganizationDetail as useOrganizationDetailApi } from 'src/sections/Organization/hooks/use-organization-api';
 import { useOrganizationDetail } from './hooks/use-organization-detail';
 import OrganizationInfo from './components/OrganizationInfo';
 import MemberTabs from './components/MemberTabs';
 import MemberFilters from './components/MemberFilters';
 import MemberTable from './components/MemberTable';
 import MemberPagination from './components/MemberPagination';
+import type { Organization } from 'src/services/organization/organization.types';
 
 // ----------------------------------------------------------------------
 
@@ -34,37 +34,83 @@ export function OrganizationDetailView({ title = '조직 관리', description, s
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(0);
 
-  // TODO: TanStack Query Hook(useQuery)으로 조직 정보 및 멤버 목록 가져오기
-  // const { data: organization } = useQuery({
-  //   queryKey: ['organization', id],
-  //   queryFn: () => getOrganizationDetail(id!),
-  //   enabled: !!id,
-  // });
-  // const { data: members } = useQuery({
-  //   queryKey: ['organizationMembers', id],
-  //   queryFn: () => getOrganizationMembers(id!),
-  //   enabled: !!id,
-  // });
-  // 목업 데이터 사용
-  const allMembers = mockMembers(50);
-  const allCompanies = mockCompanies();
   const organizationId = id ? parseInt(id, 10) : null;
 
-  // 해당 조직의 멤버들 필터링
-  const organizationMembers = organizationId
-    ? allMembers.filter((member) => member.companyIdx === organizationId)
-    : [];
+  // 조직 상세 정보 조회
+  const {
+    data: organizationDetailData,
+    isLoading: isLoadingOrganization,
+    isError: isErrorOrganization,
+  } = useOrganizationDetailApi({
+    companyIdx: organizationId || 0,
+  });
 
-  // 조직 정보 찾기
-  const organization = organizationId
-    ? allCompanies.find((company) => company.companyIdx === organizationId)
-    : undefined;
+  // axios interceptor가 응답을 평탄화하므로 organizationDetailData는 OrganizationDetail 타입
+  // 실제 API 응답 구조: { ...organizationFields, companyMemberList: [...], header: {...} }
+  // 즉, organization 필드가 없고 직접 Organization 필드들이 있음
+  const responseData = organizationDetailData as any;
+  const organization =
+    responseData?.organization ||
+    (responseData?.companyIdx ? (responseData as Organization) : null);
 
-  const logic = useOrganizationDetail(organizationMembers);
+  // 멤버 목록 및 필터링 로직 (조직 상세 API 응답의 companyMemberList 사용)
+  const companyMemberList = responseData?.companyMemberList;
+  const logic = useOrganizationDetail(organizationId, companyMemberList);
 
   const handleBack = () => {
     navigate('/dashboard/organization');
   };
+
+  // 디버깅
+  if (import.meta.env.DEV) {
+    console.log('🔍 [OrganizationDetailView]', {
+      organizationId,
+      organizationDetailData,
+      organization,
+      membersCount: logic.filtered.length,
+      total: logic.total,
+      isLoadingOrganization,
+      isErrorOrganization,
+      isLoadingMembers: logic.isLoading,
+      isErrorMembers: logic.isError,
+    });
+  }
+
+  // 로딩 상태
+  if (isLoadingOrganization) {
+    return (
+      <DashboardContent maxWidth="xl">
+        <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
+          <IconButton onClick={handleBack} sx={{ p: 0 }}>
+            <Iconify icon="eva:arrow-ios-back-fill" width={24} />
+          </IconButton>
+          <Typography variant="h4">{title}</Typography>
+        </Stack>
+        <Box
+          sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}
+        >
+          <CircularProgress />
+        </Box>
+      </DashboardContent>
+    );
+  }
+
+  // 에러 상태
+  if (isErrorOrganization || !organization) {
+    return (
+      <DashboardContent maxWidth="xl">
+        <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
+          <IconButton onClick={handleBack} sx={{ p: 0 }}>
+            <Iconify icon="eva:arrow-ios-back-fill" width={24} />
+          </IconButton>
+          <Typography variant="h4">{title}</Typography>
+        </Stack>
+        <Alert severity="error" sx={{ mt: 2 }}>
+          조직 정보를 불러오는 중 오류가 발생했습니다.
+        </Alert>
+      </DashboardContent>
+    );
+  }
 
   return (
     <DashboardContent maxWidth="xl">
@@ -79,28 +125,9 @@ export function OrganizationDetailView({ title = '조직 관리', description, s
       <Box sx={[(theme) => ({ mt: 2, width: 1 }), ...(Array.isArray(sx) ? sx : [sx])]}>
         {/* 조직 정보 섹션 */}
         <OrganizationInfo
-          organization={organization}
-          organizationMembers={organizationMembers}
-          onInviteMember={() => {
-            // TODO: 조직원 초대 모달 열기 또는 TanStack Query Hook(useMutation)으로 조직원 초대
-            // const mutation = useMutation({
-            //   mutationFn: (email: string) => inviteOrganizationMember(organizationId!, email),
-            //   onSuccess: () => {
-            //     queryClient.invalidateQueries({ queryKey: ['organizationMembers', organizationId] });
-            //   },
-            // });
-            console.log('조직원 초대');
-          }}
-          onEditOrganization={() => {
-            // TODO: 조직정보 수정 모달 열기 또는 TanStack Query Hook(useMutation)으로 조직정보 수정
-            // const mutation = useMutation({
-            //   mutationFn: (data: OrganizationFormData) => updateOrganization(organizationId!, data),
-            //   onSuccess: () => {
-            //     queryClient.invalidateQueries({ queryKey: ['organization', organizationId] });
-            //   },
-            // });
-            console.log('조직정보 수정');
-          }}
+          organization={organization as Organization}
+          organizationId={organizationId || 0}
+          companyMemberList={companyMemberList}
           onTabChange={(tabValue) => {
             setActiveTab(tabValue);
           }}
@@ -117,43 +144,58 @@ export function OrganizationDetailView({ title = '조직 관리', description, s
               mt: 3,
             }}
           >
-            <MemberTabs
-              value={logic.filters.tab}
-              onChange={logic.onChangeTab}
-              counts={logic.counts}
-            />
+            {logic.isLoading ? (
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  minHeight: 200,
+                }}
+              >
+                <CircularProgress />
+              </Box>
+            ) : logic.isError ? (
+              <Alert severity="error" sx={{ m: 2 }}>
+                멤버 목록을 불러오는 중 오류가 발생했습니다.
+              </Alert>
+            ) : (
+              <>
+                <MemberTabs
+                  value={logic.filters.tab}
+                  onChange={logic.onChangeTab}
+                  counts={logic.counts}
+                />
 
-            <MemberFilters
-              role={logic.filters.role}
-              onChangeRole={logic.onChangeRole}
-              searchFilter={logic.filters.searchFilter}
-              onChangeSearchFilter={logic.onChangeSearchFilter}
-              searchValue={logic.filters.searchValue}
-              onChangeSearchValue={logic.onChangeSearchValue}
-            />
+                <MemberFilters
+                  role={logic.filters.role}
+                  onChangeRole={logic.onChangeRole}
+                  searchFilter={logic.filters.searchFilter}
+                  onChangeSearchFilter={logic.onChangeSearchFilter}
+                  searchValue={logic.filters.searchValue}
+                  onChangeSearchValue={logic.onChangeSearchValue}
+                />
 
-            <MemberTable
-              organizationId={organizationId?.toString()}
-              rows={logic.filtered}
-              onEdit={(member) => {
-                // TODO: 멤버 수정 모달 열기 또는 TanStack Query Hook(useMutation)으로 멤버 수정
-                // const mutation = useMutation({
-                //   mutationFn: (data: MemberFormData) => updateMember(member.memberIdx, data),
-                //   onSuccess: () => {
-                //     queryClient.invalidateQueries({ queryKey: ['organization', organizationId, 'invited-members'] });
-                //   },
-                // });
-                console.log('멤버 수정:', member);
-              }}
-            />
+                <MemberTable
+                  organizationId={organizationId?.toString()}
+                  rows={logic.filtered}
+                  onEdit={(member) => {
+                    // TODO: 멤버 수정 모달 열기 또는 TanStack Query Hook(useMutation)으로 멤버 수정
+                    if (import.meta.env.DEV) {
+                      console.log('📝 [멤버 수정]', member);
+                    }
+                  }}
+                />
 
-            <MemberPagination
-              count={logic.total}
-              page={logic.page}
-              rowsPerPage={logic.rowsPerPage}
-              onChangePage={logic.onChangePage}
-              onChangeRowsPerPage={logic.onChangeRowsPerPage}
-            />
+                <MemberPagination
+                  count={logic.total}
+                  page={logic.page}
+                  rowsPerPage={logic.rowsPerPage}
+                  onChangePage={logic.onChangePage}
+                  onChangeRowsPerPage={logic.onChangeRowsPerPage}
+                />
+              </>
+            )}
           </Box>
         )}
       </Box>

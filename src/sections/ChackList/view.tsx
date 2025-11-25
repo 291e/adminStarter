@@ -201,8 +201,8 @@ export function ChecklistView({ title = '업종별 체크리스트', description
 
       <ChecklistBreadcrumbs
         items={[
-          { label: '대시보드', href: '/dashboard' },
-          { label: '설정 및 관리', href: '/dashboard/system-setting' },
+          { label: '대시보드', href: '/test/dashboard' },
+          { label: '설정 및 관리', href: '/test/dashboard/system-setting' },
           { label: title },
         ]}
         onIndustrySettings={handleIndustrySettings}

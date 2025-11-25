@@ -15,6 +15,8 @@ export type SignUpParams = {
   password: string;
   firstName: string;
   lastName: string;
+  link?: string;
+  code?: string;
 };
 
 /** **************************************
@@ -70,12 +72,17 @@ export const signUp = async ({
   password,
   firstName,
   lastName,
+  link,
+  code,
 }: SignUpParams): Promise<void> => {
-  // 새로운 API 사용 (초대 링크/코드가 필요하므로 임시로 처리)
-  // 실제로는 초대 링크/코드를 받아서 사용해야 함
+  // 새로운 API 사용 (초대 링크/코드가 필요)
+  if (!link || !code) {
+    throw new Error('초대 링크와 코드가 필요합니다.');
+  }
+
   const params = {
-    link: '', // 초대 링크 필요
-    code: '', // 초대 코드 필요
+    link,
+    code,
     password,
     memberName: `${firstName} ${lastName}`,
     memberNameOrg: `${firstName} ${lastName}`,

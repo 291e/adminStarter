@@ -27,6 +27,7 @@ import type {
   SubscribeParams,
   SubscribeResponse,
   CancelSubscriptionParams,
+  GetAccidentFreeResponse,
   UpdateAccidentFreeParams,
   InviteMemberParams,
   InviteMemberResponse,
@@ -86,10 +87,26 @@ export async function updateOrganization(
   companyIdx: number,
   params: UpdateOrganizationParams
 ): Promise<UpdateOrganizationResponse> {
+  if (import.meta.env.DEV) {
+    console.log('📤 [updateOrganization] API 요청', {
+      url: `${endpoints.company.base}/${companyIdx}`,
+      method: 'PATCH',
+      params,
+    });
+  }
+
   const response = await axiosInstance.patch<UpdateOrganizationResponse>(
     `${endpoints.company.base}/${companyIdx}`,
     params
   );
+
+  if (import.meta.env.DEV) {
+    console.log('✅ [updateOrganization] API 응답', {
+      status: response.status,
+      data: response.data,
+    });
+  }
+
   return response.data;
 }
 
@@ -229,6 +246,17 @@ export async function cardAction(
   const response = await axiosInstance.post<CardActionResponse>(
     `${endpoints.company.cards}/${companyIdx}/cards`,
     params
+  );
+  return response.data;
+}
+
+/**
+ * 무재해 인증 정보 조회
+ * GET /companies/{companyIdx}/accident-free
+ */
+export async function getAccidentFree(companyIdx: number): Promise<GetAccidentFreeResponse> {
+  const response = await axiosInstance.get<GetAccidentFreeResponse>(
+    `${endpoints.company.accidentFree}/${companyIdx}/accident-free`
   );
   return response.data;
 }

@@ -142,10 +142,20 @@ export function useOrganization(): UseOrganizationResult {
       return [];
     }
     // isActive를 status로 변환만 수행 (필드명 매핑 제거)
-    return orgs.map((org: any) => ({
-      ...org,
-      status: org.isActive === 1 ? 'active' : 'inactive',
-    }));
+    return orgs.map((org: any) => {
+      const accidentInfo = org.accidentFreeInformation ?? null;
+
+      return {
+        ...org,
+        status: org.isActive === 1 ? 'active' : 'inactive',
+        accidentFreeInformation: accidentInfo,
+        isAccidentFreeWorksite: accidentInfo?.isAccidentFreeWorksite,
+        accidentFreeStatus: accidentInfo?.accidentFreeStatus,
+        accidentFreeCertifiedAt: accidentInfo?.accidentFreeCertifiedAt,
+        accidentFreeExpiresAt: accidentInfo?.accidentFreeExpiresAt,
+        accidentFreeFileUrl: accidentInfo?.accidentFreeFileUrl,
+      };
+    });
   }, [organizationsData]);
 
   // 카운트 계산

@@ -5,6 +5,7 @@ import IconButton from '@mui/material/IconButton';
 
 import { Iconify } from 'src/components/iconify';
 import type { DocumentSignature } from 'src/services/dashboard/dashboard.types';
+import EmptyPendingSignatures from './EmptyPendingSignatures';
 
 // ----------------------------------------------------------------------
 
@@ -23,6 +24,8 @@ export default function PendingSignaturesCard({
   onPageChange,
   onViewDocument,
 }: Props) {
+  const hasRows = rows.length > 0;
+
   return (
     <Box
       sx={{
@@ -56,160 +59,166 @@ export default function PendingSignaturesCard({
       </Box>
 
       {/* 테이블 */}
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 1.5, sm: 2 } }}>
-        {rows.map((row) => (
-          <Box
-            key={row.id}
-            sx={{
-              bgcolor: 'background.default',
-              border: '1px solid',
-              borderColor: 'grey.100',
-              borderRadius: 1.5,
-              p: 1,
-              display: 'flex',
-              flexDirection: { xs: 'column', sm: 'row' },
-              alignItems: { xs: 'stretch', sm: 'center' },
-            }}
-          >
+      {hasRows ? (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 1.5, sm: 2 } }}>
+          {rows.map((row) => (
             <Box
+              key={row.id}
               sx={{
-                flex: 1,
+                bgcolor: 'background.default',
+                border: '1px solid',
+                borderColor: 'grey.100',
+                borderRadius: 1.5,
+                p: 1,
                 display: 'flex',
                 flexDirection: { xs: 'column', sm: 'row' },
-                gap: { xs: 1, sm: 2 },
-                alignItems: { xs: 'flex-start', sm: 'center' },
-                justifyContent: 'space-between',
-                minHeight: 56,
+                alignItems: { xs: 'stretch', sm: 'center' },
               }}
             >
-              <Typography
-                variant="body2"
+              <Box
                 sx={{
                   flex: 1,
-                  fontSize: { xs: 13, sm: 14 },
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: { xs: 'normal', sm: 'nowrap' },
-                  maxWidth: 140,
+                  display: 'flex',
+                  flexDirection: { xs: 'column', sm: 'row' },
+                  gap: { xs: 1, sm: 2 },
+                  alignItems: { xs: 'flex-start', sm: 'center' },
+                  justifyContent: 'space-between',
+                  minHeight: 56,
                 }}
               >
-                {row.documentId}
-              </Typography>
-              <Typography variant="body2" sx={{ maxWidth: '100%', fontSize: { xs: 13, sm: 14 } }}>
-                {row.targetMemberName}
-              </Typography>
-              <Box sx={{ width: { xs: '100%', sm: 80 } }}>
-                <Typography variant="body2" sx={{ fontSize: { xs: 13, sm: 14 } }}>
-                  {row.requestedAt
-                    ? new Date(row.requestedAt).toLocaleDateString('ko-KR', {
-                        year: 'numeric',
-                        month: '2-digit',
-                        day: '2-digit',
-                      })
-                    : ''}
-                </Typography>
                 <Typography
-                  variant="caption"
-                  sx={{ color: 'text.secondary', fontSize: { xs: 11, sm: 12 } }}
+                  variant="body2"
+                  sx={{
+                    flex: 1,
+                    fontSize: { xs: 13, sm: 14 },
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: { xs: 'normal', sm: 'nowrap' },
+                    maxWidth: 140,
+                  }}
                 >
-                  {row.requestedAt
-                    ? new Date(row.requestedAt).toLocaleTimeString('ko-KR', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        hour12: true,
-                      })
-                    : ''}
+                  {row.documentId}
                 </Typography>
+                <Typography variant="body2" sx={{ maxWidth: '100%', fontSize: { xs: 13, sm: 14 } }}>
+                  {row.targetMemberName}
+                </Typography>
+                <Box sx={{ width: { xs: '100%', sm: 80 } }}>
+                  <Typography variant="body2" sx={{ fontSize: { xs: 13, sm: 14 } }}>
+                    {row.requestedAt
+                      ? new Date(row.requestedAt).toLocaleDateString('ko-KR', {
+                          year: 'numeric',
+                          month: '2-digit',
+                          day: '2-digit',
+                        })
+                      : ''}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    sx={{ color: 'text.secondary', fontSize: { xs: 11, sm: 12 } }}
+                  >
+                    {row.requestedAt
+                      ? new Date(row.requestedAt).toLocaleTimeString('ko-KR', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          hour12: true,
+                        })
+                      : ''}
+                  </Typography>
+                </Box>
+              </Box>
+              <Box sx={{ pl: 2 }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => onViewDocument?.(row.id)}
+                  sx={{
+                    minHeight: { xs: 32, sm: 36 },
+                    fontSize: { xs: 12, sm: 14 },
+                    fontWeight: 700,
+
+                    width: { xs: '100%', sm: 'auto' },
+                    borderColor: '#2563E9',
+                    color: '#2563E9',
+                    '&:hover': {
+                      borderColor: '#2563E9',
+                      bgcolor: 'rgba(37, 99, 233, 0.04)',
+                    },
+                  }}
+                >
+                  문서보기
+                </Button>
               </Box>
             </Box>
-            <Box sx={{ pl: 2 }}>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => onViewDocument?.(row.id)}
-                sx={{
-                  minHeight: { xs: 32, sm: 36 },
-                  fontSize: { xs: 12, sm: 14 },
-                  fontWeight: 700,
-
-                  width: { xs: '100%', sm: 'auto' },
-                  borderColor: '#2563E9',
-                  color: '#2563E9',
-                  '&:hover': {
-                    borderColor: '#2563E9',
-                    bgcolor: 'rgba(37, 99, 233, 0.04)',
-                  },
-                }}
-              >
-                문서보기
-              </Button>
-            </Box>
-          </Box>
-        ))}
-      </Box>
+          ))}
+        </Box>
+      ) : (
+        <EmptyPendingSignatures sx={{ py: { xs: 3, sm: 4 } }} />
+      )}
 
       {/* 페이지네이션 */}
-      <Box
-        sx={{ display: 'flex', flexDirection: 'column', gap: 1.25, alignItems: 'center', pt: 2 }}
-      >
-        <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'center', justifyContent: 'center' }}>
-          <IconButton
-            size="small"
-            onClick={() => onPageChange(page - 1)}
-            disabled={page === 1}
-            sx={{
-              width: 32,
-              height: 32,
-              borderRadius: 1,
-              opacity: page === 1 ? 0.48 : 1,
-            }}
-          >
-            <Iconify icon="eva:arrow-ios-back-fill" width={20} />
-          </IconButton>
-          <Box
-            sx={{
-              width: 32,
-              height: 32,
-              borderRadius: 1,
-              bgcolor: 'rgba(37, 99, 233, 0.1)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#2563E9' }}>
-              {page}
+      {hasRows && (
+        <Box
+          sx={{ display: 'flex', flexDirection: 'column', gap: 1.25, alignItems: 'center', pt: 2 }}
+        >
+          <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'center', justifyContent: 'center' }}>
+            <IconButton
+              size="small"
+              onClick={() => onPageChange(page - 1)}
+              disabled={page === 1}
+              sx={{
+                width: 32,
+                height: 32,
+                borderRadius: 1,
+                opacity: page === 1 ? 0.48 : 1,
+              }}
+            >
+              <Iconify icon="eva:arrow-ios-back-fill" width={20} />
+            </IconButton>
+            <Box
+              sx={{
+                width: 32,
+                height: 32,
+                borderRadius: 1,
+                bgcolor: 'rgba(37, 99, 233, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#2563E9' }}>
+                {page}
+              </Typography>
+            </Box>
+            <Typography variant="body2" sx={{ mx: 0.5 }}>
+              /
             </Typography>
+            <Box
+              sx={{
+                width: 32,
+                height: 32,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Typography variant="body2">{totalPages}</Typography>
+            </Box>
+            <IconButton
+              size="small"
+              onClick={() => onPageChange(page + 1)}
+              disabled={page === totalPages}
+              sx={{
+                width: 32,
+                height: 32,
+                borderRadius: 1,
+                opacity: page === totalPages ? 0.48 : 1,
+              }}
+            >
+              <Iconify icon="eva:arrow-ios-forward-fill" width={20} />
+            </IconButton>
           </Box>
-          <Typography variant="body2" sx={{ mx: 0.5 }}>
-            /
-          </Typography>
-          <Box
-            sx={{
-              width: 32,
-              height: 32,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Typography variant="body2">{totalPages}</Typography>
-          </Box>
-          <IconButton
-            size="small"
-            onClick={() => onPageChange(page + 1)}
-            disabled={page === totalPages}
-            sx={{
-              width: 32,
-              height: 32,
-              borderRadius: 1,
-              opacity: page === totalPages ? 0.48 : 1,
-            }}
-          >
-            <Iconify icon="eva:arrow-ios-forward-fill" width={20} />
-          </IconButton>
         </Box>
-      </Box>
+      )}
     </Box>
   );
 }

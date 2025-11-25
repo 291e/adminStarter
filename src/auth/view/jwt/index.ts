@@ -13,3 +13,5 @@ export * from './jwt-reset-password-view';
 export * from './jwt-reset-password-new-view';
 
 export * from './jwt-verify-code-view';
+
+export * from './jwt-invitation-view';
