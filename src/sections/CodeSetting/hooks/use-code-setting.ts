@@ -1,7 +1,7 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
 
-import type { CodeSetting } from 'src/_mock/_code-setting';
+import type { CodeSetting } from 'src/services/code-setting/code-setting.types';
 
 // ----------------------------------------------------------------------
 
@@ -27,18 +27,16 @@ export type UseCodeSettingResult = {
   onChangePage: (page: number) => void;
   onChangeRowsPerPage: (rows: number) => void;
   filtered: CodeSetting[];
+  paginated: CodeSetting[];
   total: number;
 };
 
-export function useCodeSetting(
-  codes: CodeSetting[],
-  category: string
-): UseCodeSettingResult {
+export function useCodeSetting(codes: CodeSetting[], category: string): UseCodeSettingResult {
   const [filters, setFilters] = useState<CodeSettingFilters>({
-    status: 'all',
+    status: '',
     startDate: null,
     endDate: null,
-    searchFilter: 'all',
+    searchFilter: '',
     searchValue: '',
     categoryFilter: 'all',
   });
@@ -84,42 +82,60 @@ export function useCodeSetting(
     setPage(0);
   }, []);
 
+  // 카테고리 변경 시 필터 초기화
+  useEffect(() => {
+    setFilters({
+      status: '',
+      startDate: null,
+      endDate: null,
+      searchFilter: '',
+      searchValue: '',
+      categoryFilter: 'all',
+    });
+    setPage(0);
+  }, [category]);
+
+  // 필터링
   const filteredAll = useMemo(
     () =>
       codes.filter((c) => {
-        // 카테고리 타입 필터
-        if (category === 'machine' && c.categoryType !== 'machine') {
+        // 카테고리 타입 필터 (machine/hazard)
+        const categoryTypeUpper = c.categoryType?.toUpperCase();
+        if (category === 'machine' && categoryTypeUpper !== 'MACHINE') {
           return false;
         }
-        if (category === 'hazard' && c.categoryType !== 'hazard') {
+        if (category === 'hazard' && categoryTypeUpper !== 'HAZARD') {
           return false;
         }
 
-        // 유해인자 카테고리 필터
-        if (category === 'hazard' && filters.categoryFilter && filters.categoryFilter !== 'all') {
-          if (c.category !== filters.categoryFilter) {
+        // 상태 필터 (대소문자 모두 지원)
+        if (filters.status) {
+          const statusUpper = c.status?.toUpperCase();
+          if (filters.status === '활성' && statusUpper !== 'ACTIVE') {
+            return false;
+          }
+          if (filters.status === '비활성' && statusUpper !== 'INACTIVE') {
             return false;
           }
         }
-
-        // 상태 필터
-        if (filters.status === '활성' && c.status !== 'active') {
-          return false;
-        }
-        if (filters.status === '비활성' && c.status !== 'inactive') {
-          return false;
+        // 유해인자 카테고리 필터
+        if (category === 'hazard' && filters.categoryFilter && filters.categoryFilter !== 'all') {
+          if (c.codeSettingHazardCategoryInformation?.name !== filters.categoryFilter) {
+            return false;
+          }
         }
 
         // 날짜 필터
-        if (filters.startDate) {
-          const registrationDate = dayjs(c.registrationDate);
-          if (registrationDate.isBefore(filters.startDate, 'day')) {
+        const dateToCompare = c.updateAt || c.createAt;
+        if (filters.startDate && dateToCompare) {
+          const compareDate = dayjs(dateToCompare);
+          if (compareDate.isBefore(filters.startDate, 'day')) {
             return false;
           }
         }
-        if (filters.endDate) {
-          const registrationDate = dayjs(c.registrationDate);
-          if (registrationDate.isAfter(filters.endDate, 'day')) {
+        if (filters.endDate && dateToCompare) {
+          const compareDate = dayjs(dateToCompare);
+          if (compareDate.isAfter(filters.endDate, 'day')) {
             return false;
           }
         }
@@ -132,13 +148,20 @@ export function useCodeSetting(
         const searchLower = filters.searchValue.toLowerCase();
         let searchMatch = false;
 
-        if (filters.searchFilter === 'all') {
+        if (!filters.searchFilter) {
+          // 검색어 필터가 없으면 코드와 이름 모두 검색
           searchMatch =
             c.code.toLowerCase().includes(searchLower) ||
             c.name.toLowerCase().includes(searchLower);
-        } else if (filters.searchFilter === '기계·설비 코드' || filters.searchFilter === '유해인자 코드') {
+        } else if (
+          filters.searchFilter === '기계·설비 코드' ||
+          filters.searchFilter === '유해인자 코드'
+        ) {
           searchMatch = c.code.toLowerCase().includes(searchLower);
-        } else if (filters.searchFilter === '기계·설비명' || filters.searchFilter === '유해인자명') {
+        } else if (
+          filters.searchFilter === '기계·설비명' ||
+          filters.searchFilter === '유해인자명'
+        ) {
           searchMatch = c.name.toLowerCase().includes(searchLower);
         }
 
@@ -147,12 +170,13 @@ export function useCodeSetting(
     [codes, category, filters]
   );
 
-  const total = filteredAll.length;
-
-  const filtered = useMemo(() => {
+  // 페이지네이션 적용
+  const paginated = useMemo(() => {
     const start = page * rowsPerPage;
     return filteredAll.slice(start, start + rowsPerPage);
   }, [filteredAll, page, rowsPerPage]);
+
+  const total = filteredAll.length;
 
   return {
     filters,
@@ -166,8 +190,8 @@ export function useCodeSetting(
     rowsPerPage,
     onChangePage,
     onChangeRowsPerPage,
-    filtered,
+    filtered: filteredAll,
+    paginated,
     total,
   };
 }
-

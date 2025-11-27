@@ -18,7 +18,7 @@ type Props = {
 };
 
 const statusOptions = ['전체', '활성', '비활성'];
-const searchOptions = ['전체', '서비스명', '서비스 기간'];
+const searchOptions = ['전체', '서비스명'];
 
 export default function ServiceSettingFilters({
   status,

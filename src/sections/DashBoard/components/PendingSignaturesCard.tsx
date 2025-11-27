@@ -61,9 +61,12 @@ export default function PendingSignaturesCard({
       {/* 테이블 */}
       {hasRows ? (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 1.5, sm: 2 } }}>
-          {rows.map((row) => (
+          {rows.map((row, index) => {
+            // 고유한 key 생성 (id가 없거나 중복될 수 있으므로 index도 포함)
+            const rowKey = row.id || `document-${index}`;
+            return (
             <Box
-              key={row.id}
+              key={rowKey}
               sx={{
                 bgcolor: 'background.default',
                 border: '1px solid',
@@ -97,7 +100,7 @@ export default function PendingSignaturesCard({
                     maxWidth: 140,
                   }}
                 >
-                  {row.documentId}
+                  {row.documentName || row.documentId || '문서명 없음'}
                 </Typography>
                 <Typography variant="body2" sx={{ maxWidth: '100%', fontSize: { xs: 13, sm: 14 } }}>
                   {row.targetMemberName}
@@ -149,7 +152,8 @@ export default function PendingSignaturesCard({
                 </Button>
               </Box>
             </Box>
-          ))}
+            );
+          })}
         </Box>
       ) : (
         <EmptyPendingSignatures sx={{ py: { xs: 3, sm: 4 } }} />

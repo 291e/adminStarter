@@ -34,11 +34,67 @@ import type {
 export async function getEducationReports(
   params?: GetEducationReportsParams
 ): Promise<GetEducationReportsResponse> {
-  const response = await axiosInstance.get<GetEducationReportsResponse>(
-    endpoints.education.reports,
-    { params }
-  );
-  return response.data;
+  // 디버깅: 요청 파라미터 로그
+  if (import.meta.env.DEV) {
+    console.log('📤 API Request: getEducationReports', {
+      method: 'GET',
+      url: endpoints.education.reports,
+      params,
+    });
+  }
+
+  const response = await axiosInstance.get(endpoints.education.reports, { params });
+
+  // 디버깅: 응답 로그
+  if (import.meta.env.DEV) {
+    console.log('📥 API Response: getEducationReports', {
+      method: 'GET',
+      url: endpoints.education.reports,
+      status: response.status,
+      data: response.data,
+    });
+  }
+
+  // 실제 API 응답 구조에 맞게 매핑
+  // 응답이 { header, educationReportList, totalCount } 형태일 수 있음
+  const rawData = response.data;
+  
+  // BaseResponseDto 구조로 변환
+  const mappedResponse: GetEducationReportsResponse = {
+    header: rawData.header || {
+      isSuccess: true,
+      resultCode: '0',
+      resultMessage: 'SUCCESS',
+      timestamp: new Date().toISOString(),
+    },
+    body: {
+      educationReports: Array.isArray(rawData.educationReportList)
+        ? rawData.educationReportList.map((item: any) => ({
+            id: item.educationReportId || item.id || String(item.memberIdx || ''),
+            educationReportId: item.educationReportId || item.id,
+            memberIdx: item.memberIdx,
+            companyIdx: item.companyIdx,
+            organizationName: item.organizationName || '',
+            name: item.name || '',
+            position: item.position || '',
+            department: item.department || '',
+            role: item.role || '',
+            mandatoryEducation: item.mandatoryEducation || 0,
+            regularEducation: item.regularEducation || 0,
+            totalEducation: item.totalEducation || 0,
+            standardEducation: item.standardEducation || 0,
+            completionRate: item.completionRate || 0,
+            description: item.description,
+            memo: item.memo,
+          }))
+        : [],
+      total: rawData.totalCount || 0,
+      page: params?.page || 1,
+      pageSize: params?.pageSize || 10,
+    },
+  };
+
+  return mappedResponse;
 }
 
 /**
@@ -48,10 +104,30 @@ export async function getEducationReports(
 export async function createEducationReport(
   params: CreateEducationReportParams
 ): Promise<CreateEducationReportResponse> {
+  // 디버깅: 요청 파라미터 로그
+  if (import.meta.env.DEV) {
+    console.log('📤 API Request: createEducationReport', {
+      method: 'POST',
+      url: endpoints.education.reports,
+      params,
+    });
+  }
+
   const response = await axiosInstance.post<CreateEducationReportResponse>(
     endpoints.education.reports,
     params
   );
+
+  // 디버깅: 응답 로그
+  if (import.meta.env.DEV) {
+    console.log('📥 API Response: createEducationReport', {
+      method: 'POST',
+      url: endpoints.education.reports,
+      status: response.status,
+      data: response.data,
+    });
+  }
+
   return response.data;
 }
 
@@ -62,9 +138,29 @@ export async function createEducationReport(
 export async function getEducationReport(
   params: GetEducationReportParams
 ): Promise<GetEducationReportResponse> {
+  // 디버깅: 요청 파라미터 로그
+  if (import.meta.env.DEV) {
+    console.log('📤 API Request: getEducationReport', {
+      method: 'GET',
+      url: `${endpoints.education.reports}/${params.educationReportIdx}`,
+      params,
+    });
+  }
+
   const response = await axiosInstance.get<GetEducationReportResponse>(
-    `${endpoints.education.reports}/${params.educationReportId}`
+    `${endpoints.education.reports}/${params.educationReportIdx}`
   );
+
+  // 디버깅: 응답 로그
+  if (import.meta.env.DEV) {
+    console.log('📥 API Response: getEducationReport', {
+      method: 'GET',
+      url: `${endpoints.education.reports}/${params.educationReportIdx}`,
+      status: response.status,
+      data: response.data,
+    });
+  }
+
   return response.data;
 }
 
@@ -75,10 +171,31 @@ export async function getEducationReport(
 export async function updateEducationReport(
   params: UpdateEducationReportParams
 ): Promise<UpdateEducationReportResponse> {
+  // 디버깅: 요청 파라미터 로그
+  if (import.meta.env.DEV) {
+    console.log('📤 API Request: updateEducationReport', {
+      method: 'PUT',
+      url: `${endpoints.education.reports}/${params.educationReportIdx}`,
+      params,
+    });
+  }
+
+  const { educationReportIdx, ...body } = params;
   const response = await axiosInstance.put<UpdateEducationReportResponse>(
-    `${endpoints.education.reports}/${params.educationReportId}`,
-    params
+    `${endpoints.education.reports}/${educationReportIdx}`,
+    body
   );
+
+  // 디버깅: 응답 로그
+  if (import.meta.env.DEV) {
+    console.log('📥 API Response: updateEducationReport', {
+      method: 'PUT',
+      url: `${endpoints.education.reports}/${educationReportIdx}`,
+      status: response.status,
+      data: response.data,
+    });
+  }
+
   return response.data;
 }
 
@@ -89,26 +206,30 @@ export async function updateEducationReport(
 export async function createEducationRecord(
   params: CreateEducationRecordParams
 ): Promise<CreateEducationRecordResponse> {
-  const formData = new FormData();
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined) {
-      if (key === 'files' && Array.isArray(value)) {
-        value.forEach((file) => formData.append('files', file));
-      } else {
-        formData.append(key, String(value));
-      }
-    }
-  });
+  // 디버깅: 요청 파라미터 로그
+  if (import.meta.env.DEV) {
+    console.log('📤 API Request: createEducationRecord', {
+      method: 'POST',
+      url: endpoints.education.records,
+      params,
+    });
+  }
 
   const response = await axiosInstance.post<CreateEducationRecordResponse>(
     endpoints.education.records,
-    formData,
-    {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    }
+    params
   );
+
+  // 디버깅: 응답 로그
+  if (import.meta.env.DEV) {
+    console.log('📥 API Response: createEducationRecord', {
+      method: 'POST',
+      url: endpoints.education.records,
+      status: response.status,
+      data: response.data,
+    });
+  }
+
   return response.data;
 }
 
@@ -119,10 +240,31 @@ export async function createEducationRecord(
 export async function updateEducationRecord(
   params: UpdateEducationRecordParams
 ): Promise<UpdateEducationRecordResponse> {
+  // 디버깅: 요청 파라미터 로그
+  if (import.meta.env.DEV) {
+    console.log('📤 API Request: updateEducationRecord', {
+      method: 'PUT',
+      url: `${endpoints.education.records}/${params.educationRecordIdx}`,
+      params,
+    });
+  }
+
+  const { educationRecordIdx, ...body } = params;
   const response = await axiosInstance.put<UpdateEducationRecordResponse>(
-    `${endpoints.education.records}/${params.educationRecordId}`,
-    params
+    `${endpoints.education.records}/${educationRecordIdx}`,
+    body
   );
+
+  // 디버깅: 응답 로그
+  if (import.meta.env.DEV) {
+    console.log('📥 API Response: updateEducationRecord', {
+      method: 'PUT',
+      url: `${endpoints.education.records}/${educationRecordIdx}`,
+      status: response.status,
+      data: response.data,
+    });
+  }
+
   return response.data;
 }
 
@@ -133,7 +275,27 @@ export async function updateEducationRecord(
 export async function deleteEducationRecord(
   params: DeleteEducationRecordParams
 ): Promise<void> {
-  await axiosInstance.delete(`${endpoints.education.records}/${params.educationRecordId}`);
+  // 디버깅: 요청 파라미터 로그
+  if (import.meta.env.DEV) {
+    console.log('📤 API Request: deleteEducationRecord', {
+      method: 'DELETE',
+      url: `${endpoints.education.records}/${params.educationRecordIdx}`,
+      params,
+    });
+  }
+
+  const response = await axiosInstance.delete(
+    `${endpoints.education.records}/${params.educationRecordIdx}`
+  );
+
+  // 디버깅: 응답 로그
+  if (import.meta.env.DEV) {
+    console.log('📥 API Response: deleteEducationRecord', {
+      method: 'DELETE',
+      url: `${endpoints.education.records}/${params.educationRecordIdx}`,
+      status: response.status,
+    });
+  }
 }
 
 /**
@@ -143,19 +305,59 @@ export async function deleteEducationRecord(
 export async function getEducationDetail(
   params: GetEducationDetailStatisticsParams
 ): Promise<GetEducationDetailStatisticsResponse> {
+  // 디버깅: 요청 파라미터 로그
+  if (import.meta.env.DEV) {
+    console.log('📤 API Request: getEducationDetail', {
+      method: 'GET',
+      url: endpoints.education.detail,
+      params,
+    });
+  }
+
   // memberIdx는 필수 파라미터이므로 명시적으로 전달
-  const response = await axiosInstance.get<GetEducationDetailStatisticsResponse>(
-    endpoints.education.detail,
-    {
-      params: {
-        memberIdx: params.memberIdx, // 필수 파라미터
-        role: params.role,
-        startDate: params.startDate,
-        endDate: params.endDate,
-      },
-    }
-  );
-  return response.data;
+  const response = await axiosInstance.get(endpoints.education.detail, {
+    params: {
+      memberIdx: params.memberIdx, // 필수 파라미터
+      role: params.role,
+      startDate: params.startDate,
+      endDate: params.endDate,
+    },
+  });
+
+  // 디버깅: 응답 로그
+  if (import.meta.env.DEV) {
+    console.log('📥 API Response: getEducationDetail', {
+      method: 'GET',
+      url: endpoints.education.detail,
+      status: response.status,
+      data: response.data,
+    });
+  }
+
+  // 실제 API 응답 구조에 맞게 매핑
+  const rawData = response.data;
+  
+  // BaseResponseDto 구조로 변환
+  const mappedResponse: GetEducationDetailStatisticsResponse = {
+    header: rawData.header || {
+      isSuccess: true,
+      resultCode: '0',
+      resultMessage: 'SUCCESS',
+      timestamp: new Date().toISOString(),
+    },
+    body: {
+      mandatoryEducation: rawData.educationDetail?.mandatoryEducation || rawData.educationDetail?.mandatoryEducationList || [],
+      regularEducation: rawData.educationDetail?.regularEducation || rawData.educationDetail?.regularEducationList || [],
+      mandatoryTotal: rawData.educationDetail?.mandatoryTotal || 0,
+      regularTotal: rawData.educationDetail?.regularTotal || 0,
+      totalTime: rawData.educationDetail?.totalTime || 0,
+      joinDate: rawData.educationDetail?.joinDate,
+      isAccidentFreeWorkplace: rawData.educationDetail?.isAccidentFreeWorkplace || false,
+      ...rawData.educationDetail,
+    },
+  };
+
+  return mappedResponse;
 }
 
 /**

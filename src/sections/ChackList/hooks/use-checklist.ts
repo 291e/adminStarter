@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
 
-import type { Checklist } from 'src/_mock/_checklist';
+import type { Checklist } from 'src/services/checklist/checklist.types';
 
 // ----------------------------------------------------------------------
 
@@ -42,11 +42,8 @@ export function useChecklist(allData: Checklist[], industry: string): UseCheckli
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  // 업종별 필터링
-  const filteredByIndustry = useMemo(() => {
-    if (industry === 'all') return allData;
-    return allData.filter((item) => item.industry === industry);
-  }, [allData, industry]);
+  // 업종별 필터링 비활성화 (탭은 표시만 하고 필터링하지 않음)
+  const filteredByIndustry = useMemo(() => allData, [allData]);
 
   // 필터 적용
   const filteredAll = useMemo(() => {
@@ -54,7 +51,12 @@ export function useChecklist(allData: Checklist[], industry: string): UseCheckli
 
     // 상태 필터
     if (filters.status !== 'all') {
-      result = result.filter((item) => item.status === filters.status);
+      result = result.filter((item) => {
+        const statusUpper = item.status?.toUpperCase();
+        if (filters.status === 'active' && statusUpper === 'ACTIVE') return true;
+        if (filters.status === 'inactive' && statusUpper === 'INACTIVE') return true;
+        return false;
+      });
     }
 
     // 날짜 필터
@@ -77,17 +79,12 @@ export function useChecklist(allData: Checklist[], industry: string): UseCheckli
       const searchLower = filters.searchValue.toLowerCase();
       result = result.filter((item) => {
         if (filters.searchFilter === 'all') {
-          return (
-            item.highRiskWork.toLowerCase().includes(searchLower) ||
-            item.disasterFactors.some((factor) => factor.toLowerCase().includes(searchLower))
-          );
+          return item.highRiskWork.toLowerCase().includes(searchLower);
         }
         if (filters.searchFilter === 'highRiskWork') {
           return item.highRiskWork.toLowerCase().includes(searchLower);
         }
-        if (filters.searchFilter === 'disasterFactors') {
-          return item.disasterFactors.some((factor) => factor.toLowerCase().includes(searchLower));
-        }
+        // disasterFactors는 별도 API로 가져오므로 여기서는 검색하지 않음
         return true;
       });
     }

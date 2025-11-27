@@ -20,18 +20,14 @@ import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Paper from '@mui/material/Paper';
+import CircularProgress from '@mui/material/CircularProgress';
+import Alert from '@mui/material/Alert';
 
 import { Iconify } from 'src/components/iconify';
-import type { Checklist } from 'src/_mock/_checklist';
+import type { Checklist, DisasterFactorItem } from 'src/services/checklist/checklist.types';
+import { useDisasterFactors } from '../hooks/use-checklist-api';
 
 // ----------------------------------------------------------------------
-
-export type DisasterFactorItem = {
-  id: string;
-  order: number;
-  name: string;
-  isActive: boolean;
-};
 
 type Props = {
   open: boolean;
@@ -39,51 +35,6 @@ type Props = {
   onSave: (factors: DisasterFactorItem[], isActive: boolean) => void;
   checklist?: Checklist | null;
 };
-
-const DEFAULT_DISASTER_FACTORS: DisasterFactorItem[] = [
-  {
-    id: '1',
-    order: 1,
-    name: '작업 중 기계·기구에 안전장치(방호장치 등) 미설치·미흡·무효화 8대 위험요인',
-    isActive: true,
-  },
-  {
-    id: '2',
-    order: 2,
-    name: '정비, 수리, 교체 및 청소 등의 작업 시 설비 가동 정지 후 불시가동을 방지하기 위한 조치 미실시',
-    isActive: true,
-  },
-  {
-    id: '3',
-    order: 3,
-    name: '정비, 수리, 교체 및 청소 등의 작업 시 설비·기계의 운전 정지 미실시',
-    isActive: true,
-  },
-  {
-    id: '4',
-    order: 4,
-    name: '추락의 위험이 있는 장소에서 정비·수리 등의 작업 시 추락위험 방지조치 미실시',
-    isActive: true,
-  },
-  {
-    id: '5',
-    order: 5,
-    name: '중량물, 설비 하부에서 작업 시 중량물 등의 미고정 등 깔림 위험 예방조치 미흡',
-    isActive: true,
-  },
-  {
-    id: '6',
-    order: 6,
-    name: '밀폐공간 내 작업 시 산소결핍 또는 유해 가스에 의한 질식·중독 위험 예방조치 미실시',
-    isActive: true,
-  },
-  {
-    id: '7',
-    order: 7,
-    name: '가동 중인 설비 인근에서 작업 시 끼임, 부딪힘 등 위험 예방조치를 위한 충분한 공간 확보 미흡',
-    isActive: true,
-  },
-];
 
 export default function DisasterFactorsModal({ open, onClose, onSave, checklist }: Props) {
   const [factors, setFactors] = useState<DisasterFactorItem[]>([]);
@@ -93,31 +44,45 @@ export default function DisasterFactorsModal({ open, onClose, onSave, checklist 
   const [newFactorName, setNewFactorName] = useState<string | null>(null);
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
 
+  // API에서 재해유발요인 목록 가져오기
+  const disasterFactorsQuery = useDisasterFactors({
+    checklistIdx: checklist?.checklistIdx || 0,
+  });
+
   // 초기 데이터로 재해유발요인 목록 채우기
   useEffect(() => {
-    if (open) {
-      // TODO: TanStack Query Hook(useQuery)으로 재해유발요인 목록 가져오기
-      // const { data: factors } = useQuery({
-      //   queryKey: ['disasterFactors', checklist?.id],
-      //   queryFn: () => getDisasterFactors(checklist?.id),
-      //   enabled: !!checklist?.id,
-      // });
-      // if (factors) setFactors(factors);
-      // 임시 기본 데이터
-      if (checklist?.disasterFactors && checklist.disasterFactors.length > 0) {
-        const mappedFactors = checklist.disasterFactors.map((name, idx) => ({
-          id: `factor-${idx + 1}`,
-          order: idx + 1,
-          name,
-          isActive: true,
-        }));
-        setFactors(mappedFactors);
-      } else {
-        setFactors(DEFAULT_DISASTER_FACTORS);
+    if (open && checklist?.checklistIdx) {
+      if (disasterFactorsQuery.data?.disasterFactorList) {
+        const list = disasterFactorsQuery.data.disasterFactorList;
+        // string[]인 경우 처리
+        if (Array.isArray(list) && list.length > 0 && typeof list[0] === 'string') {
+          const mappedFactors = (list as string[]).map((name, idx) => ({
+            id: `factor-${idx + 1}`,
+            disasterFactorIdx: undefined,
+            factorName: name,
+            name,
+            order: idx + 1,
+            isActive: true,
+          }));
+          setFactors(mappedFactors);
+        } else {
+          // DisasterFactorItem[]인 경우
+          const mappedFactors = (list as DisasterFactorItem[]).map((item, idx) => ({
+            id: item.disasterFactorIdx?.toString() || `factor-${idx + 1}`,
+            disasterFactorIdx: item.disasterFactorIdx,
+            factorName: item.factorName || item.name || '',
+            name: item.factorName || item.name || '',
+            order: item.order || idx + 1,
+            isActive: typeof item.isActive === 'boolean' ? item.isActive : item.isActive === 1,
+          }));
+          setFactors(mappedFactors);
+        }
       }
-      setIsActive(checklist?.status === 'active' || true);
+      setIsActive(
+        checklist.status?.toUpperCase() === 'ACTIVE' || checklist.status === 'active' || true
+      );
     }
-  }, [open, checklist]);
+  }, [open, checklist, disasterFactorsQuery.data]);
 
   const handleToggleActive = (id: string) => {
     setFactors((prev) =>
@@ -126,8 +91,8 @@ export default function DisasterFactorsModal({ open, onClose, onSave, checklist 
   };
 
   const handleStartEdit = (factor: DisasterFactorItem) => {
-    setEditingId(factor.id);
-    setEditValue(factor.name);
+    setEditingId(factor.id || '');
+    setEditValue(factor.name || factor.factorName || '');
   };
 
   const handleCancelEdit = () => {
@@ -138,7 +103,15 @@ export default function DisasterFactorsModal({ open, onClose, onSave, checklist 
   const handleSaveEdit = (id: string) => {
     if (editValue.trim()) {
       setFactors((prev) =>
-        prev.map((factor) => (factor.id === id ? { ...factor, name: editValue.trim() } : factor))
+        prev.map((factor) =>
+          factor.id === id
+            ? {
+                ...factor,
+                factorName: editValue.trim(),
+                name: editValue.trim(),
+              }
+            : factor
+        )
       );
     }
     setEditingId(null);
@@ -164,8 +137,10 @@ export default function DisasterFactorsModal({ open, onClose, onSave, checklist 
 
     const newFactor: DisasterFactorItem = {
       id: `factor-${Date.now()}`,
-      order: factors.length + 1,
+      disasterFactorIdx: undefined,
+      factorName: newFactorName.trim(),
       name: newFactorName.trim(),
+      order: factors.length + 1,
       isActive: true,
     };
 
@@ -179,9 +154,6 @@ export default function DisasterFactorsModal({ open, onClose, onSave, checklist 
   };
 
   const handleConfirmSave = () => {
-    // TODO: TanStack Query Hook(useMutation)으로 재해유발요인 목록 저장 (view.tsx의 handleSaveDisasterFactors에서 처리)
-    // 실제 API 호출은 view.tsx의 handleSaveDisasterFactors에서 수행됩니다.
-
     onSave(factors, isActive);
     setConfirmModalOpen(false);
     handleClose();
@@ -197,11 +169,14 @@ export default function DisasterFactorsModal({ open, onClose, onSave, checklist 
     onClose();
   };
 
+  const isLoading = disasterFactorsQuery.isLoading;
+  const error = disasterFactorsQuery.error;
+
   return (
     <>
       <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
         <DialogTitle>
-          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+          <Typography component="div" variant="h6" sx={{ fontWeight: 600 }}>
             재해유발요인
           </Typography>
           <IconButton
@@ -219,73 +194,171 @@ export default function DisasterFactorsModal({ open, onClose, onSave, checklist 
         </DialogTitle>
 
         <DialogContent>
-          <Stack spacing={3} sx={{ mt: 1, pb: 3 }}>
-            {/* 고위험작업/상황 정보 */}
-            {checklist && (
-              <Box
-                sx={{
-                  bgcolor: 'grey.50',
-                  p: 2,
-                  borderRadius: 1,
-                }}
-              >
-                <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
-                  고위험작업/상황
-                </Typography>
-                <Typography variant="body2">{checklist.highRiskWork}</Typography>
-              </Box>
-            )}
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              재해유발요인 목록을 불러오는데 실패했습니다. 다시 시도해주세요.
+            </Alert>
+          )}
 
-            {/* 재해유발요인 테이블 */}
-            <TableContainer component={Paper} variant="outlined">
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell sx={{ bgcolor: 'grey.100', minWidth: 60 }}>순번</TableCell>
-                    <TableCell sx={{ bgcolor: 'grey.100' }}>재해유발요인</TableCell>
-                    <TableCell align="center" sx={{ bgcolor: 'grey.100', minWidth: 100 }}>
-                      편집
-                    </TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {factors.map((factor) => (
-                    <TableRow key={factor.id} hover>
-                      <TableCell>
-                        <Typography variant="body2">{factor.order}</Typography>
+          {isLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : (
+            <Stack spacing={3} sx={{ mt: 1, pb: 3 }}>
+              {/* 고위험작업/상황 정보 */}
+              {checklist && (
+                <Box
+                  sx={{
+                    bgcolor: 'grey.50',
+                    p: 2,
+                    borderRadius: 1,
+                  }}
+                >
+                  <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                    고위험작업/상황
+                  </Typography>
+                  <Typography variant="body2">{checklist.highRiskWork}</Typography>
+                </Box>
+              )}
+
+              {/* 재해유발요인 테이블 */}
+              <TableContainer component={Paper} variant="outlined">
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ bgcolor: 'grey.100', minWidth: 60 }}>순번</TableCell>
+                      <TableCell sx={{ bgcolor: 'grey.100' }}>재해유발요인</TableCell>
+                      <TableCell align="center" sx={{ bgcolor: 'grey.100', minWidth: 100 }}>
+                        편집
                       </TableCell>
-                      <TableCell>
-                        {editingId === factor.id ? (
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {factors.map((factor) => (
+                      <TableRow key={factor.id} hover>
+                        <TableCell>
+                          <Typography variant="body2">{factor.order}</Typography>
+                        </TableCell>
+                        <TableCell>
+                          {editingId === factor.id ? (
+                            <TextField
+                              fullWidth
+                              size="small"
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              onKeyDown={(e) => handleKeyDown(e, factor.id || '')}
+                              autoFocus
+                              InputProps={{
+                                endAdornment: (
+                                  <IconButton
+                                    size="small"
+                                    onClick={handleCancelEdit}
+                                    sx={{ p: 0.5 }}
+                                  >
+                                    <Iconify icon="solar:close-circle-bold" width={16} />
+                                  </IconButton>
+                                ),
+                              }}
+                            />
+                          ) : (
+                            <Typography variant="body2">
+                              {factor.name || factor.factorName}
+                            </Typography>
+                          )}
+                        </TableCell>
+                        <TableCell align="center">
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            justifyContent="center"
+                            alignItems="center"
+                          >
+                            {editingId === factor.id ? (
+                              <IconButton
+                                size="small"
+                                onClick={() => handleSaveEdit(factor.id || '')}
+                                sx={{
+                                  color: 'primary.main',
+                                  '&:hover': {
+                                    bgcolor: 'action.hover',
+                                  },
+                                }}
+                              >
+                                <Iconify icon="solar:check-circle-bold" width={20} />
+                              </IconButton>
+                            ) : (
+                              <IconButton
+                                size="small"
+                                onClick={() => handleStartEdit(factor)}
+                                sx={{
+                                  color: 'text.secondary',
+                                  '&:hover': {
+                                    bgcolor: 'action.hover',
+                                  },
+                                }}
+                              >
+                                <Iconify icon="solar:pen-bold" width={20} />
+                              </IconButton>
+                            )}
+                            <Switch
+                              checked={
+                                typeof factor.isActive === 'boolean'
+                                  ? factor.isActive
+                                  : factor.isActive === 1
+                              }
+                              onChange={() => handleToggleActive(factor.id || '')}
+                              color="primary"
+                              size="small"
+                            />
+                          </Stack>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+
+                    {newFactorName !== null && (
+                      <TableRow>
+                        <TableCell>
+                          <Typography variant="body2">{factors.length + 1}</Typography>
+                        </TableCell>
+                        <TableCell>
                           <TextField
                             fullWidth
                             size="small"
-                            value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(e, factor.id)}
+                            placeholder="재해유발요인을 입력하세요"
+                            value={newFactorName || ''}
+                            onChange={(e) => setNewFactorName(e.target.value)}
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter') {
+                                handleAddFactor();
+                              }
+                            }}
                             autoFocus
                             InputProps={{
                               endAdornment: (
-                                <IconButton size="small" onClick={handleCancelEdit} sx={{ p: 0.5 }}>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => {
+                                    setNewFactorName(null);
+                                  }}
+                                  sx={{ p: 0.5 }}
+                                >
                                   <Iconify icon="solar:close-circle-bold" width={16} />
                                 </IconButton>
                               ),
                             }}
                           />
-                        ) : (
-                          <Typography variant="body2">{factor.name}</Typography>
-                        )}
-                      </TableCell>
-                      <TableCell align="center">
-                        <Stack
-                          direction="row"
-                          spacing={1}
-                          justifyContent="center"
-                          alignItems="center"
-                        >
-                          {editingId === factor.id ? (
+                        </TableCell>
+                        <TableCell align="center">
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            justifyContent="center"
+                            alignItems="center"
+                          >
                             <IconButton
                               size="small"
-                              onClick={() => handleSaveEdit(factor.id)}
+                              onClick={handleAddFactor}
                               sx={{
                                 color: 'primary.main',
                                 '&:hover': {
@@ -295,106 +368,30 @@ export default function DisasterFactorsModal({ open, onClose, onSave, checklist 
                             >
                               <Iconify icon="solar:check-circle-bold" width={20} />
                             </IconButton>
-                          ) : (
-                            <IconButton
-                              size="small"
-                              onClick={() => handleStartEdit(factor)}
-                              sx={{
-                                color: 'text.secondary',
-                                '&:hover': {
-                                  bgcolor: 'action.hover',
-                                },
-                              }}
-                            >
-                              <Iconify icon="solar:pen-bold" width={20} />
-                            </IconButton>
-                          )}
-                          <Switch
-                            checked={factor.isActive}
-                            onChange={() => handleToggleActive(factor.id)}
-                            color="primary"
-                            size="small"
-                          />
-                        </Stack>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                            <Switch checked disabled color="primary" size="small" />
+                          </Stack>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
 
-                  {newFactorName !== null && (
-                    <TableRow>
-                      <TableCell>
-                        <Typography variant="body2">{factors.length + 1}</Typography>
-                      </TableCell>
-                      <TableCell>
-                        <TextField
-                          fullWidth
-                          size="small"
-                          placeholder="재해유발요인을 입력하세요"
-                          value={newFactorName || ''}
-                          onChange={(e) => setNewFactorName(e.target.value)}
-                          onKeyPress={(e) => {
-                            if (e.key === 'Enter') {
-                              handleAddFactor();
-                            }
-                          }}
-                          autoFocus
-                          InputProps={{
-                            endAdornment: (
-                              <IconButton
-                                size="small"
-                                onClick={() => {
-                                  setNewFactorName(null);
-                                }}
-                                sx={{ p: 0.5 }}
-                              >
-                                <Iconify icon="solar:close-circle-bold" width={16} />
-                              </IconButton>
-                            ),
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell align="center">
-                        <Stack
-                          direction="row"
-                          spacing={1}
-                          justifyContent="center"
-                          alignItems="center"
-                        >
-                          <IconButton
-                            size="small"
-                            onClick={handleAddFactor}
-                            sx={{
-                              color: 'primary.main',
-                              '&:hover': {
-                                bgcolor: 'action.hover',
-                              },
-                            }}
-                          >
-                            <Iconify icon="solar:check-circle-bold" width={20} />
-                          </IconButton>
-                          <Switch checked disabled color="primary" size="small" />
-                        </Stack>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-
-            {/* 항목추가 버튼 */}
-            {!newFactorName && (
-              <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                <Button
-                  variant="outlined"
-                  startIcon={<Iconify icon="solar:add-circle-bold" width={20} />}
-                  onClick={handleShowAddField}
-                  sx={{ minWidth: 100 }}
-                >
-                  항목추가
-                </Button>
-              </Box>
-            )}
-          </Stack>
+              {/* 항목추가 버튼 */}
+              {!newFactorName && (
+                <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                  <Button
+                    variant="outlined"
+                    startIcon={<Iconify icon="solar:add-circle-bold" width={20} />}
+                    onClick={handleShowAddField}
+                    sx={{ minWidth: 100 }}
+                  >
+                    항목추가
+                  </Button>
+                </Box>
+              )}
+            </Stack>
+          )}
         </DialogContent>
 
         <Divider />
@@ -411,10 +408,20 @@ export default function DisasterFactorsModal({ open, onClose, onSave, checklist 
             label="활성"
           />
           <Box sx={{ flex: 1 }} />
-          <Button variant="outlined" onClick={handleClose} sx={{ minWidth: 64 }}>
+          <Button
+            variant="outlined"
+            onClick={handleClose}
+            disabled={isLoading}
+            sx={{ minWidth: 64 }}
+          >
             닫기
           </Button>
-          <Button variant="contained" onClick={handleSave} sx={{ minWidth: 64 }}>
+          <Button
+            variant="contained"
+            onClick={handleSave}
+            disabled={isLoading}
+            sx={{ minWidth: 64 }}
+          >
             저장
           </Button>
         </DialogActions>

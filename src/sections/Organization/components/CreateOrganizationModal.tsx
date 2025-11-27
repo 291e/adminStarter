@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -21,7 +21,12 @@ import Checkbox from '@mui/material/Checkbox';
 import FormControlLabel from '@mui/material/FormControlLabel';
 
 import { Iconify } from 'src/components/iconify';
-import { useCreateOrganization } from '../hooks/use-organization-api';
+import {
+  useCreateOrganization,
+  useSubscribe,
+  useInviteMember,
+} from '../hooks/use-organization-api';
+import { useServices } from 'src/sections/ServiceSetting/hooks/use-service-setting-api';
 
 // 다음 주소 API 타입 정의
 declare global {
@@ -50,7 +55,6 @@ import type { CompanyType } from 'src/services/organization/organization.types';
 export type OrganizationFormData = {
   companyType: CompanyType;
   companyName: string;
-  companyCode: string;
   businessType: string;
   businessNumber: string;
   representativeName: string;
@@ -62,6 +66,7 @@ export type OrganizationFormData = {
   detailAddress: string;
   subscriptionService: string;
   sendInvitationEmail: boolean;
+  invitationMemberId: string;
 };
 
 type Props = {
@@ -79,11 +84,20 @@ const COMPANY_TYPE_OPTIONS: Array<{ label: string; value: CompanyType }> = [
   { label: '비회원', value: 'NON_MEMBER' },
 ];
 
+type BusinessTypeOption = {
+  label: string;
+  value: 0 | 1;
+};
+
+const BUSINESS_TYPE_OPTIONS: BusinessTypeOption[] = [
+  { label: '법인사업자', value: 0 },
+  { label: '개인사업자', value: 1 },
+];
+
 const DEFAULT_FORM_DATA: OrganizationFormData = {
   companyType: 'MEMBER',
   companyName: '',
-  companyCode: '',
-  businessType: '',
+  businessType: String(BUSINESS_TYPE_OPTIONS[0]?.value ?? ''),
   businessNumber: '',
   representativeName: '',
   representativePhone: '',
@@ -94,6 +108,7 @@ const DEFAULT_FORM_DATA: OrganizationFormData = {
   detailAddress: '',
   subscriptionService: '',
   sendInvitationEmail: false,
+  invitationMemberId: '',
 };
 
 const REQUIRED_FIELDS: Array<keyof OrganizationFormData> = [
@@ -102,14 +117,102 @@ const REQUIRED_FIELDS: Array<keyof OrganizationFormData> = [
   'representativeName',
   'representativePhone',
   'representativeEmail',
+  'businessCategory',
+  'businessItem',
 ];
 
 export default function CreateOrganizationModal({ open, onClose }: Props) {
   const [formData, setFormData] = useState<OrganizationFormData>({ ...DEFAULT_FORM_DATA });
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [businessNumberError, setBusinessNumberError] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
   const createOrganizationMutation = useCreateOrganization();
+  const subscribeMutation = useSubscribe();
+  const inviteMemberMutation = useInviteMember();
 
   const addressInputRef = useRef<HTMLInputElement>(null);
+
+  const {
+    data: servicesData,
+    isLoading: isLoadingServices,
+    isError: isErrorServices,
+  } = useServices({ page: 1, pageSize: 100, status: 'ACTIVE' });
+
+  const serviceOptions = useMemo(() => {
+    const list = (servicesData as any)?.serviceSettingList;
+    return Array.isArray(list) ? list : [];
+  }, [servicesData]);
+
+  const isSubmitting =
+    createOrganizationMutation.isPending ||
+    subscribeMutation.isPending ||
+    inviteMemberMutation.isPending;
+
+  const formatBusinessNumber = (value: string) => {
+    const digits = value.replace(/\D/g, '').slice(0, 10);
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 5) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+    return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`;
+  };
+
+  const formatPhoneNumber = (value: string) => {
+    const digits = value.replace(/\D/g, '').slice(0, 11);
+    if (digits.startsWith('02')) {
+      if (digits.length <= 2) return digits;
+      if (digits.length <= 5) return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+      const middle = digits.slice(2, digits.length - 4);
+      const last = digits.slice(-4);
+      return `${digits.slice(0, 2)}-${middle}-${last}`;
+    }
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+    const middle = digits.slice(3, digits.length - 4);
+    const last = digits.slice(-4);
+    return `${digits.slice(0, 3)}-${middle}-${last}`;
+  };
+
+  const handleBusinessNumberChange = (value: string) => {
+    const formatted = formatBusinessNumber(value);
+    handleChange('businessNumber', formatted);
+    if (!formatted) {
+      setBusinessNumberError(null);
+      return;
+    }
+    setBusinessNumberError(
+      formatted.replace(/\D/g, '').length === 10 ? null : '사업자 번호는 10자리 숫자여야 합니다.'
+    );
+  };
+
+  const handlePhoneChange = (value: string) => {
+    const formatted = formatPhoneNumber(value);
+    handleChange('representativePhone', formatted);
+    if (!formatted) {
+      setPhoneError(null);
+      return;
+    }
+    setPhoneError(
+      formatted.replace(/\D/g, '').length >= 9 ? null : '전화번호 형식이 올바르지 않습니다.'
+    );
+  };
+
+  const validateEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+
+  const handleEmailChange = (value: string) => {
+    const trimmed = value.replace(/\s/g, '');
+    handleChange('representativeEmail', trimmed);
+    if (!trimmed) {
+      setEmailError(null);
+      return;
+    }
+    setEmailError(validateEmail(trimmed) ? null : '올바른 이메일 주소를 입력해주세요.');
+  };
+
+  const preventHyphenInput = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === '-') {
+      event.preventDefault();
+    }
+  };
 
   // 다음 주소 API 스크립트 로드
   useEffect(() => {
@@ -130,6 +233,9 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
     if (open) {
       setFormData({ ...DEFAULT_FORM_DATA });
       setErrorMessage(null);
+      setBusinessNumberError(null);
+      setPhoneError(null);
+      setEmailError(null);
     }
   }, [open]);
 
@@ -176,18 +282,95 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
       return;
     }
 
+    const sanitizeField = (value: string, maxLen = 100) => value.trim().slice(0, maxLen);
+    const digitsOnly = (value: string | undefined) =>
+      value ? value.replace(/\D/g, '') : undefined;
+
+    const businessTypeNumber =
+      formData.businessType !== '' ? Number(formData.businessType) : BUSINESS_TYPE_OPTIONS[0]?.value ?? 0;
+
+    // 필수 필드 검증
+    if (typeof businessTypeNumber !== 'number' || Number.isNaN(businessTypeNumber)) {
+      setErrorMessage('사업자 유형을 선택해주세요.');
+      return;
+    }
+
     try {
       setErrorMessage(null);
-      await createOrganizationMutation.mutateAsync({
-        companyName: formData.companyName,
-        companyCode: formData.companyCode || undefined,
-        businessNumber: formData.businessNumber || undefined,
+      const payload = {
+        companyName: sanitizeField(formData.companyName, 100),
+        businessNumber: digitsOnly(formData.businessNumber),
+        businessType: businessTypeNumber, // 필수 필드
+        representativeName: sanitizeField(formData.representativeName, 100),
+        phone: digitsOnly(formData.representativePhone),
+        email: formData.representativeEmail?.trim() || undefined,
+        businessCategory: sanitizeField(formData.businessCategory, 100),
+        businessItem: sanitizeField(formData.businessItem, 100),
         address:
           [formData.address, formData.detailAddress].filter(Boolean).join(' ').trim() || undefined,
-        phone: formData.representativePhone || undefined,
-        email: formData.representativeEmail || undefined,
         companyType: formData.companyType,
-      });
+        serviceSettingIdxes: formData.subscriptionService
+          ? [Number(formData.subscriptionService)]
+          : undefined,
+      };
+
+      if (import.meta.env.DEV) {
+        console.log('📤 [CreateOrganizationModal] 조직 등록 요청', payload);
+      }
+
+      const result = await createOrganizationMutation.mutateAsync(payload);
+      if (import.meta.env.DEV) {
+        console.log('✅ [CreateOrganizationModal] 조직 등록 성공', result);
+      }
+
+      const newCompanyIdx =
+        (result as any)?.companyIdx ??
+        (result as any)?.data?.companyIdx ??
+        (result as any)?.body?.companyIdx ??
+        null;
+
+      if (newCompanyIdx && formData.subscriptionService) {
+        try {
+          if (import.meta.env.DEV) {
+            console.log('📤 [CreateOrganizationModal] 서비스 구독 요청', {
+              companyIdx: newCompanyIdx,
+              serviceSettingIdx: Number(formData.subscriptionService),
+            });
+          }
+          await subscribeMutation.mutateAsync({
+            companyIdx: newCompanyIdx,
+            serviceSettingIdx: Number(formData.subscriptionService),
+          });
+          if (import.meta.env.DEV) {
+            console.log('✅ [CreateOrganizationModal] 서비스 구독 성공');
+          }
+        } catch (subscribeError) {
+          console.error('❌ 서비스 구독 실패:', subscribeError);
+        }
+      }
+
+      if (newCompanyIdx && formData.sendInvitationEmail) {
+        try {
+          const invitePayload = {
+            companyIdx: newCompanyIdx,
+            email: formData.representativeEmail?.trim() || '',
+            memberRole: 'OPERATOR_MANAGER',
+          } as const;
+
+          if (import.meta.env.DEV) {
+            console.log('📤 [CreateOrganizationModal] 초대 메일 요청', invitePayload);
+          }
+
+          await inviteMemberMutation.mutateAsync(invitePayload);
+
+          if (import.meta.env.DEV) {
+            console.log('✅ [CreateOrganizationModal] 초대 메일 성공');
+          }
+        } catch (inviteError) {
+          console.error('❌ 초대 메일 발송 실패:', inviteError);
+        }
+      }
+
       setFormData({ ...DEFAULT_FORM_DATA });
       onClose();
     } catch (error) {
@@ -199,6 +382,9 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
   const handleClose = () => {
     setFormData({ ...DEFAULT_FORM_DATA });
     setErrorMessage(null);
+    setBusinessNumberError(null);
+    setPhoneError(null);
+    setEmailError(null);
     onClose();
   };
 
@@ -246,7 +432,11 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
                   onChange={(e) => handleChange('companyType', e.target.value as CompanyType)}
                 >
                   {COMPANY_TYPE_OPTIONS.map((option) => (
-                    <MenuItem key={option.value} value={option.value}>
+                    <MenuItem
+                      key={option.value}
+                      value={option.value}
+                      disabled={option.value === 'OPERATOR'}
+                    >
                       {option.label}
                     </MenuItem>
                   ))}
@@ -278,9 +468,9 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
                   value={formData.businessType}
                   onChange={(e) => handleChange('businessType', e.target.value)}
                 >
-                  {['개인사업자', '법인사업자', '기타'].map((option) => (
-                    <MenuItem key={option} value={option}>
-                      {option}
+                  {BUSINESS_TYPE_OPTIONS.map((option) => (
+                    <MenuItem key={option.value} value={String(option.value)}>
+                      {option.label}
                     </MenuItem>
                   ))}
                 </Select>
@@ -290,18 +480,13 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
                 label="사업자 번호"
                 placeholder="123-45-67890"
                 value={formData.businessNumber}
-                onChange={(e) => handleChange('businessNumber', e.target.value)}
+                onChange={(e) => handleBusinessNumberChange(e.target.value)}
+                onKeyDown={preventHyphenInput}
+                inputMode="numeric"
+                error={!!businessNumberError}
+                helperText={businessNumberError ?? '숫자만 입력하면 자동으로 하이픈이 추가됩니다.'}
               />
             </Stack>
-
-            {/* 회사 코드 */}
-            <TextField
-              fullWidth
-              label="회사 코드"
-              placeholder="SAFE001"
-              value={formData.companyCode}
-              onChange={(e) => handleChange('companyCode', e.target.value)}
-            />
 
             {/* 대표자명 */}
             <TextField
@@ -330,9 +515,13 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
                   </Typography>
                 </>
               }
-              placeholder="02-1234-5678"
+              placeholder="02 또는 010으로 시작하는 숫자만 입력"
               value={formData.representativePhone}
-              onChange={(e) => handleChange('representativePhone', e.target.value)}
+              onChange={(e) => handlePhoneChange(e.target.value)}
+              onKeyDown={preventHyphenInput}
+              inputMode="tel"
+              error={!!phoneError}
+              helperText={phoneError ?? '숫자만 입력하면 자동으로 하이픈이 추가됩니다.'}
             />
 
             {/* 대표 이메일 */}
@@ -349,7 +538,9 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
               placeholder="contact@company.com"
               type="email"
               value={formData.representativeEmail}
-              onChange={(e) => handleChange('representativeEmail', e.target.value)}
+              onChange={(e) => handleEmailChange(e.target.value)}
+              error={!!emailError}
+              helperText={emailError ?? undefined}
             />
 
             {/* 업태, 종목 */}
@@ -422,10 +613,17 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
                 label="구독 서비스"
                 value={formData.subscriptionService}
                 onChange={(e) => handleChange('subscriptionService', e.target.value)}
+                disabled={isLoadingServices || serviceOptions.length === 0}
               >
-                {['기본', '프리미엄', '엔터프라이즈'].map((option) => (
-                  <MenuItem key={option} value={option}>
-                    {option}
+                <MenuItem value="">선택 안 함</MenuItem>
+                {isErrorServices && (
+                  <MenuItem value="error" disabled>
+                    서비스 불러오기 실패
+                  </MenuItem>
+                )}
+                {serviceOptions.map((service: any) => (
+                  <MenuItem key={service.id} value={service.id}>
+                    {service.serviceName}
                   </MenuItem>
                 ))}
               </Select>
@@ -441,6 +639,16 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
               }
               label="초대 이메일을 발송합니다."
             />
+            {formData.sendInvitationEmail && (
+              <TextField
+                fullWidth
+                label="사용할 ID (선택)"
+                placeholder="초대받을 사용자의 ID"
+                value={formData.invitationMemberId}
+                onChange={(e) => handleChange('invitationMemberId', e.target.value)}
+                helperText="참고용으로만 사용되며 API에는 전송되지 않습니다."
+              />
+            )}
 
             <Divider sx={{ borderStyle: 'dashed' }} />
           </Stack>
@@ -450,19 +658,11 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
       <Divider />
 
       <DialogActions sx={{ p: 3 }}>
-        <Button
-          variant="outlined"
-          onClick={handleClose}
-          disabled={createOrganizationMutation.isPending}
-        >
+        <Button variant="outlined" onClick={handleClose} disabled={isSubmitting}>
           취소
         </Button>
-        <Button
-          variant="contained"
-          onClick={handleSubmit}
-          disabled={createOrganizationMutation.isPending}
-        >
-          {createOrganizationMutation.isPending ? '등록 중...' : '등록'}
+        <Button variant="contained" onClick={handleSubmit} disabled={isSubmitting}>
+          {isSubmitting ? '등록 중...' : '등록'}
         </Button>
       </DialogActions>
     </Dialog>

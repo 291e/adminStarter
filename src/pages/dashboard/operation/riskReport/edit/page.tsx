@@ -1,16 +1,16 @@
 import { CONFIG } from 'src/global-config';
 
-import { OperationView } from 'src/sections/Operation/view';
+import { RiskReportEditView } from 'src/sections/Operation/edit/view';
 
 // ----------------------------------------------------------------------
 
-const metadata = { title: `위험 보고 | Dashboard - ${CONFIG.appName}` };
+const metadata = { title: `위험 보고 수정 | Dashboard - ${CONFIG.appName}` };
 
 export default function Page() {
   return (
     <>
       <title>{metadata.title}</title>
-      <OperationView title="위험 보고" />
+      <RiskReportEditView title="위험 보고 수정" />
     </>
   );
 }

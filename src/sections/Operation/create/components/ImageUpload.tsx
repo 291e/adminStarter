@@ -5,6 +5,7 @@ import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import Button from '@mui/material/Button';
 import Stack from '@mui/material/Stack';
+import Chip from '@mui/material/Chip';
 
 import { Iconify } from 'src/components/iconify';
 
@@ -13,23 +14,25 @@ import { Iconify } from 'src/components/iconify';
 type Props = {
   images: File[];
   onChange: (images: File[]) => void;
+  existingImageUrls?: string[];
+  onRemoveExistingUrl?: (url: string) => void;
 };
 
-export default function ImageUpload({ images, onChange }: Props) {
+export default function ImageUpload({
+  images,
+  onChange,
+  existingImageUrls = [],
+  onRemoveExistingUrl,
+}: Props) {
   const [isDragging, setIsDragging] = useState(false);
-  const [mainPreview, setMainPreview] = useState<string | null>(null);
-  const [thumbnails, setThumbnails] = useState<string[]>([]);
+  const [previews, setPreviews] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // images prop 변경 시 미리보기 업데이트
   useEffect(() => {
-    if (images.length === 0) {
-      setMainPreview(null);
-      setThumbnails([]);
+    if (!images.length) {
+      setPreviews([]);
       return;
     }
-
-    // 모든 이미지의 미리보기 생성
     const previewPromises = images.map(
       (file) =>
         new Promise<string>((resolve) => {
@@ -38,17 +41,7 @@ export default function ImageUpload({ images, onChange }: Props) {
           reader.readAsDataURL(file);
         })
     );
-
-    Promise.all(previewPromises).then((previews) => {
-      if (previews.length > 0) {
-        setMainPreview(previews[0]);
-        if (previews.length > 1) {
-          setThumbnails(previews.slice(1));
-        } else {
-          setThumbnails([]);
-        }
-      }
-    });
+    Promise.all(previewPromises).then((result) => setPreviews(result));
   }, [images]);
 
   const handleFileSelect = (files: FileList | null) => {
@@ -80,29 +73,44 @@ export default function ImageUpload({ images, onChange }: Props) {
     if (images.length > 0) {
       const newImages = images.slice(1);
       onChange(newImages);
-      // useEffect가 자동으로 미리보기를 업데이트함
     }
   };
 
   const handleRemoveThumbnail = (index: number) => {
-    // 썸네일 인덱스는 메인 이미지 다음부터 시작 (인덱스 1부터)
     const actualIndex = index + 1;
     const newImages = images.filter((_, i) => i !== actualIndex);
     onChange(newImages);
-    // useEffect가 자동으로 미리보기를 업데이트함
   };
 
   const handleRemoveAll = () => {
     onChange([]);
-    setMainPreview(null);
-    setThumbnails([]);
+    // 기존 이미지 URL도 모두 제거
+    existingImageUrls.forEach((url) => {
+      onRemoveExistingUrl?.(url);
+    });
   };
+
+  const handleSelectThumbnail = (index: number) => {
+    const actualIndex = index + 1;
+    if (actualIndex <= 0 || actualIndex >= images.length) return;
+    const selected = images[actualIndex];
+    const rest = images.filter((_, i) => i !== actualIndex);
+    onChange([selected, ...rest]);
+  };
+
+  // 기존 이미지 URL과 새로 업로드한 이미지 프리뷰 결합
+  const allImageUrls = [...existingImageUrls, ...previews];
+  const thumbnails = allImageUrls.slice(1);
+  const mainPreview = allImageUrls[0] ?? null;
+  const hasImages = images.length > 0 || existingImageUrls.length > 0;
 
   return (
     <Box>
-      <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>
-        이미지 업로드
-      </Typography>
+      {!hasImages && (
+        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>
+          이미지 업로드
+        </Typography>
+      )}
 
       {/* 메인 업로드 영역 */}
       <Box
@@ -149,11 +157,28 @@ export default function ImageUpload({ images, onChange }: Props) {
                   objectFit: 'contain',
                 }}
               />
+              <Chip
+                label="대표 이미지"
+                color="primary"
+                size="small"
+                sx={{
+                  position: 'absolute',
+                  top: 16,
+                  left: 16,
+                  fontWeight: 700,
+                }}
+              />
             </Box>
             <IconButton
               onClick={(e) => {
                 e.stopPropagation();
-                handleRemoveMain();
+                if (existingImageUrls.length > 0 && mainPreview === existingImageUrls[0]) {
+                  // 기존 이미지 URL 제거
+                  onRemoveExistingUrl?.(existingImageUrls[0]);
+                } else {
+                  // 새로 업로드한 이미지 제거
+                  handleRemoveMain();
+                }
               }}
               sx={{
                 position: 'absolute',
@@ -184,7 +209,7 @@ export default function ImageUpload({ images, onChange }: Props) {
               <Iconify icon="eva:cloud-upload-fill" width={80} sx={{ color: 'primary.main' }} />
             </Box>
             <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
-              교육 자료 업로드
+              이미지 업로드
             </Typography>
             <Typography variant="body2" color="text.secondary" textAlign="center">
               클릭하여 파일을 선택하거나 마우스로 드래그하여 옮겨주세요.
@@ -205,62 +230,87 @@ export default function ImageUpload({ images, onChange }: Props) {
       {thumbnails.length > 0 && (
         <Box sx={{ mt: 2.5 }}>
           <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 2.5 }}>
-            {thumbnails.map((thumbnail, index) => (
-              <Box
-                key={index}
-                sx={{
-                  position: 'relative',
-                  width: 72,
-                  height: 72,
-                  borderRadius: 1.5,
-                  overflow: 'hidden',
-                }}
-              >
-                <img
-                  src={thumbnail}
-                  alt={`Thumbnail ${index + 1}`}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                  }}
-                />
-                <IconButton
-                  onClick={() => handleRemoveThumbnail(index)}
+            {thumbnails.map((thumbnail, index) => {
+              const actualIndex = index + 1;
+              const isExistingUrl =
+                actualIndex <= existingImageUrls.length &&
+                thumbnail === existingImageUrls[actualIndex - 1];
+
+              return (
+                <Box
+                  key={index}
                   sx={{
-                    position: 'absolute',
-                    top: 4,
-                    left: 40,
-                    bgcolor: 'rgba(0, 0, 0, 0.48)',
-                    color: 'white',
-                    width: 18,
-                    height: 18,
-                    p: 0.5,
+                    position: 'relative',
+                    width: 84,
+                    height: 84,
+                    borderRadius: 1.5,
+                    overflow: 'hidden',
+                    border: '2px solid transparent',
+                    cursor: 'pointer',
                     '&:hover': {
-                      bgcolor: 'rgba(0, 0, 0, 0.6)',
+                      borderColor: 'primary.main',
                     },
                   }}
+                  onClick={() => {
+                    if (!isExistingUrl) {
+                      handleSelectThumbnail(index);
+                    }
+                  }}
                 >
-                  <Iconify icon="mingcute:close-line" width={14} />
-                </IconButton>
-              </Box>
-            ))}
-          </Stack>
-
-          {/* 액션 버튼 */}
-          <Stack direction="row" spacing={1.5} justifyContent="flex-end">
-            <Button variant="outlined" onClick={handleRemoveAll}>
-              모두 제거
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<Iconify icon="eva:cloud-upload-fill" width={20} />}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              업로드
-            </Button>
+                  <img
+                    src={thumbnail}
+                    alt={`Thumbnail ${index + 1}`}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                    }}
+                  />
+                  <IconButton
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (isExistingUrl) {
+                        onRemoveExistingUrl?.(thumbnail);
+                      } else {
+                        handleRemoveThumbnail(index);
+                      }
+                    }}
+                    sx={{
+                      position: 'absolute',
+                      top: 4,
+                      left: 48,
+                      bgcolor: 'rgba(0, 0, 0, 0.48)',
+                      color: 'white',
+                      width: 18,
+                      height: 18,
+                      p: 0.5,
+                      '&:hover': {
+                        bgcolor: 'rgba(0, 0, 0, 0.6)',
+                      },
+                    }}
+                  >
+                    <Iconify icon="mingcute:close-line" width={14} />
+                  </IconButton>
+                </Box>
+              );
+            })}
           </Stack>
         </Box>
+      )}
+
+      {hasImages && (
+        <Stack direction="row" spacing={1.5} justifyContent="flex-end" sx={{ mt: 2 }}>
+          <Button variant="outlined" onClick={handleRemoveAll}>
+            모두 제거
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<Iconify icon="eva:cloud-upload-fill" width={20} />}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            업로드
+          </Button>
+        </Stack>
       )}
     </Box>
   );

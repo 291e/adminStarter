@@ -11,16 +11,18 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import type { Dayjs } from 'dayjs';
 
 import { Iconify } from 'src/components/iconify';
+import type { PrioritySetting } from 'src/services/dashboard/dashboard.types';
 
 type Props = {
-  priority: 'URGENT' | 'IMPORTANT' | 'REFERENCE' | '';
-  onChangePriority: (value: 'URGENT' | 'IMPORTANT' | 'REFERENCE' | '') => void;
+  priority: string; // 중요도 labelType (자유 문자열)
+  onChangePriority: (value: string) => void;
   startDate: Dayjs | null;
   onChangeStartDate: (value: Dayjs | null) => void;
   endDate: Dayjs | null;
   onChangeEndDate: (value: Dayjs | null) => void;
   searchValue: string;
   onChangeSearchValue: (value: string) => void;
+  prioritySettings?: PrioritySetting[]; // 중요도 설정 목록
 };
 
 export default function SharedDocumentFilters({
@@ -32,7 +34,12 @@ export default function SharedDocumentFilters({
   onChangeEndDate,
   searchValue,
   onChangeSearchValue,
+  prioritySettings = [],
 }: Props) {
+  // 활성화된 중요도 설정 목록 (정렬 순서대로)
+  const activePrioritySettings = prioritySettings
+    .filter((setting) => setting.isActive === 1)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <Stack
@@ -51,7 +58,7 @@ export default function SharedDocumentFilters({
             displayEmpty
             value={priority}
             onChange={(e) => {
-              onChangePriority((e.target.value || '') as 'URGENT' | 'IMPORTANT' | 'REFERENCE' | '');
+              onChangePriority(e.target.value || '');
             }}
             renderValue={(selected) => {
               if (!selected) {
@@ -59,20 +66,19 @@ export default function SharedDocumentFilters({
                   <Typography
                     component="span"
                     sx={{
-                      color: 'text.disabled',
                       fontSize: 15,
                       lineHeight: '24px',
+                      color: 'text.primary',
                     }}
                   >
-                    중요도
+                    전체
                   </Typography>
                 );
               }
-              const labels: Record<'URGENT' | 'IMPORTANT' | 'REFERENCE', string> = {
-                URGENT: '긴급',
-                IMPORTANT: '중요',
-                REFERENCE: '참고',
-              };
+              // 선택된 중요도 설정 찾기
+              const selectedSetting = activePrioritySettings.find(
+                (setting) => setting.labelType === selected
+              );
               return (
                 <Typography
                   component="span"
@@ -82,7 +88,7 @@ export default function SharedDocumentFilters({
                     color: 'text.primary',
                   }}
                 >
-                  {labels[selected as 'URGENT' | 'IMPORTANT' | 'REFERENCE']}
+                  {selectedSetting?.labelType || selected}
                 </Typography>
               );
             }}
@@ -102,9 +108,23 @@ export default function SharedDocumentFilters({
               },
             }}
           >
-            <MenuItem value="URGENT">긴급</MenuItem>
-            <MenuItem value="IMPORTANT">중요</MenuItem>
-            <MenuItem value="REFERENCE">참고</MenuItem>
+            <MenuItem value="">
+              <Typography
+                component="span"
+                sx={{
+                  fontSize: 15,
+                  lineHeight: '24px',
+                  color: 'text.primary',
+                }}
+              >
+                전체
+              </Typography>
+            </MenuItem>
+            {activePrioritySettings.map((setting) => (
+              <MenuItem key={setting.priorityIdx} value={setting.labelType || ''}>
+                {setting.labelType || '중요도'}
+              </MenuItem>
+            ))}
           </Select>
         </FormControl>
 
@@ -211,4 +231,3 @@ export default function SharedDocumentFilters({
     </LocalizationProvider>
   );
 }
-

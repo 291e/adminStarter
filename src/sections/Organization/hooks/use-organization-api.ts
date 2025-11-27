@@ -14,6 +14,11 @@ import {
   updateAccidentFree,
   getCompanyMembers,
   inviteMember,
+  getServicePlans,
+  getCurrentSubscription,
+  getRegisteredCards,
+  registerCard,
+  subscribe,
 } from 'src/services/organization/organization.service';
 import type {
   GetOrganizationsParams,
@@ -26,6 +31,8 @@ import type {
   UpdateAccidentFreeParams,
   GetCompanyMembersParams,
   InviteMemberParams,
+  SubscribeParams,
+  RegisterCardParams,
 } from 'src/services/organization/organization.types';
 
 // ----------------------------------------------------------------------
@@ -156,8 +163,38 @@ export function useCancelService() {
 
   return useMutation({
     mutationFn: (params: CancelSubscriptionParams) => cancelSubscription(params),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['organizationDetail', variables.companyIdx] });
+    onSuccess: async (_, variables) => {
+      if (import.meta.env.DEV) {
+        console.log('✅ [useCancelService] 구독 취소 성공', {
+          companyIdx: variables.companyIdx,
+          serviceSettingIdx: variables.serviceSettingIdx,
+        });
+      }
+      // 관련 쿼리 무효화 및 재조회
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['currentSubscription', variables.companyIdx] }),
+        queryClient.invalidateQueries({ queryKey: ['subscriptions', variables.companyIdx] }),
+        queryClient.invalidateQueries({ queryKey: ['organizationDetail', variables.companyIdx] }),
+        queryClient.invalidateQueries({ queryKey: ['services'] }), // 서비스 목록도 갱신
+      ]);
+      // 쿼리 재조회
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ['currentSubscription', variables.companyIdx] }),
+        queryClient.refetchQueries({ queryKey: ['subscriptions', variables.companyIdx] }),
+        queryClient.refetchQueries({ queryKey: ['organizationDetail', variables.companyIdx] }),
+        queryClient.refetchQueries({ queryKey: ['services'] }),
+      ]);
+    },
+    onError: (error: any, variables) => {
+      if (import.meta.env.DEV) {
+        console.error('❌ [useCancelService] 구독 취소 실패', {
+          error,
+          errorMessage: error?.message,
+          errorResponse: error?.response?.data,
+          companyIdx: variables.companyIdx,
+          serviceSettingIdx: variables.serviceSettingIdx,
+        });
+      }
     },
   });
 }
@@ -230,6 +267,107 @@ export function useInviteMember() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['companyMembers', variables.companyIdx] });
       queryClient.invalidateQueries({ queryKey: ['organizationDetail', variables.companyIdx] });
+    },
+  });
+}
+
+/**
+ * 서비스 플랜 목록 조회 Hook
+ */
+export function useServicePlans(companyIdx: number) {
+  return useQuery({
+    queryKey: ['servicePlans', companyIdx],
+    queryFn: () => getServicePlans(companyIdx),
+    enabled: !!companyIdx,
+    staleTime: 10 * 60 * 1000, // 10분
+  });
+}
+
+/**
+ * 현재 구독 정보 조회 Hook
+ */
+export function useCurrentSubscription(companyIdx: number) {
+  return useQuery({
+    queryKey: ['currentSubscription', companyIdx],
+    queryFn: () => getCurrentSubscription(companyIdx),
+    enabled: !!companyIdx,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/**
+ * 등록된 카드 목록 조회 Hook
+ */
+export function useRegisteredCards(companyIdx: number) {
+  return useQuery({
+    queryKey: ['registeredCards', companyIdx],
+    queryFn: () => getRegisteredCards(companyIdx),
+    enabled: !!companyIdx,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/**
+ * 서비스 구독 Mutation Hook
+ */
+export function useSubscribe() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (params: SubscribeParams) => subscribe(params),
+    onSuccess: (_, variables) => {
+      if (import.meta.env.DEV) {
+        console.log('✅ [useSubscribe] 구독 성공', {
+          companyIdx: variables.companyIdx,
+          serviceSettingIdx: variables.serviceSettingIdx,
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ['currentSubscription', variables.companyIdx] });
+      queryClient.invalidateQueries({ queryKey: ['subscriptions', variables.companyIdx] });
+      queryClient.invalidateQueries({ queryKey: ['organizationDetail', variables.companyIdx] });
+      queryClient.invalidateQueries({ queryKey: ['services'] }); // 서비스 목록도 갱신
+    },
+    onError: (error: any, variables) => {
+      if (import.meta.env.DEV) {
+        console.error('❌ [useSubscribe] 구독 실패', {
+          error,
+          errorMessage: error?.message,
+          errorResponse: error?.response?.data,
+          companyIdx: variables.companyIdx,
+          serviceSettingIdx: variables.serviceSettingIdx,
+        });
+      }
+    },
+  });
+}
+
+/**
+ * 카드 등록 Mutation Hook
+ */
+export function useRegisterCard() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ companyIdx, ...params }: RegisterCardParams & { companyIdx: number }) =>
+      registerCard(companyIdx, params),
+    onSuccess: (_, variables) => {
+      if (import.meta.env.DEV) {
+        console.log('✅ [useRegisterCard] 카드 등록 성공', {
+          companyIdx: variables.companyIdx,
+          params: variables,
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ['registeredCards', variables.companyIdx] });
+    },
+    onError: (error: any, variables) => {
+      if (import.meta.env.DEV) {
+        console.error('❌ [useRegisterCard] 카드 등록 실패', {
+          error,
+          errorMessage: error?.message,
+          errorResponse: error?.response?.data,
+          companyIdx: variables.companyIdx,
+        });
+      }
     },
   });
 }

@@ -14,8 +14,6 @@ import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
-import Autocomplete from '@mui/material/Autocomplete';
-import Chip from '@mui/material/Chip';
 
 import { Iconify } from 'src/components/iconify';
 
@@ -24,9 +22,10 @@ import { Iconify } from 'src/components/iconify';
 export type MachineFormData = {
   code: string;
   name: string;
+  inspectionTarget: string;
+  protectiveDevices: string;
   inspectionCycle: string;
-  protectiveDevices: string[];
-  riskTypes: string[];
+  riskTypes: string;
 };
 
 type Props = {
@@ -35,47 +34,23 @@ type Props = {
   onSave: (data: MachineFormData) => void;
 };
 
+const INSPECTION_TARGET_OPTIONS = ['산업안전보건법', '안전보건관리규정', '기계설비 안전관리규정'];
+
 const INSPECTION_CYCLE_OPTIONS = ['1개월', '3개월', '6개월', '1년', '2년'];
-
-const PROTECTIVE_DEVICE_OPTIONS = [
-  '양수조작식 방호장치',
-  '광전자식 방호장치',
-  '권과방지장치',
-  '훅 방지장치',
-  '과부하방지장치',
-  '안전장치',
-  '비상정지장치',
-  '가드',
-  '인터록',
-  '안전밸브',
-  '압력계',
-  '안전커버',
-];
-
-const RISK_TYPE_OPTIONS = [
-  '협착',
-  '절단',
-  '끼임',
-  '추락',
-  '충돌',
-  '충격',
-  '화상',
-  '폭발',
-  '분진',
-];
 
 export default function CreateMachineModal({ open, onClose, onSave }: Props) {
   const [formData, setFormData] = useState<MachineFormData>({
     code: '',
     name: '',
+    inspectionTarget: '',
+    protectiveDevices: '',
     inspectionCycle: '',
-    protectiveDevices: [],
-    riskTypes: [],
+    riskTypes: '',
   });
 
   const [errors, setErrors] = useState<Partial<Record<keyof MachineFormData, string>>>({});
 
-  const handleChange = (field: keyof MachineFormData, value: string | string[]) => {
+  const handleChange = (field: keyof MachineFormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     // 에러 초기화
     if (errors[field]) {
@@ -114,9 +89,10 @@ export default function CreateMachineModal({ open, onClose, onSave }: Props) {
     setFormData({
       code: '',
       name: '',
+      inspectionTarget: '',
+      protectiveDevices: '',
       inspectionCycle: '',
-      protectiveDevices: [],
-      riskTypes: [],
+      riskTypes: '',
     });
     setErrors({});
     onClose();
@@ -125,7 +101,7 @@ export default function CreateMachineModal({ open, onClose, onSave }: Props) {
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
       <DialogTitle>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+        <Typography component="div" variant="h6" sx={{ fontWeight: 600 }}>
           기계·설비 등록
         </Typography>
         <IconButton
@@ -180,6 +156,34 @@ export default function CreateMachineModal({ open, onClose, onSave }: Props) {
             helperText={errors.name}
           />
 
+          {/* 검사 대상 */}
+          <FormControl fullWidth>
+            <InputLabel id="inspection-target-label">검사 대상</InputLabel>
+            <Select
+              labelId="inspection-target-label"
+              label="검사 대상"
+              value={formData.inspectionTarget}
+              onChange={(e) => handleChange('inspectionTarget', e.target.value)}
+            >
+              {INSPECTION_TARGET_OPTIONS.map((option) => (
+                <MenuItem key={option} value={option}>
+                  {option}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {/* 방호장치 */}
+          <TextField
+            fullWidth
+            label="방호장치"
+            placeholder="방호장치를 입력하세요"
+            value={formData.protectiveDevices}
+            onChange={(e) => handleChange('protectiveDevices', e.target.value)}
+            error={!!errors.protectiveDevices}
+            helperText={errors.protectiveDevices}
+          />
+
           {/* 검사주기 */}
           <FormControl fullWidth>
             <InputLabel id="inspection-cycle-label">검사주기</InputLabel>
@@ -197,44 +201,15 @@ export default function CreateMachineModal({ open, onClose, onSave }: Props) {
             </Select>
           </FormControl>
 
-          {/* 방호장치 */}
-          <Autocomplete
-            multiple
-            options={PROTECTIVE_DEVICE_OPTIONS}
-            value={formData.protectiveDevices}
-            onChange={(_, newValue) => handleChange('protectiveDevices', newValue)}
-            renderInput={(params) => <TextField {...params} label="방호장치" />}
-            renderTags={(value, getTagProps) =>
-              value.map((option, index) => (
-                <Chip
-                  {...getTagProps({ index })}
-                  key={option}
-                  label={option}
-                  size="small"
-                  variant="outlined"
-                />
-              ))
-            }
-          />
-
-          {/* 주요 위험유형 */}
-          <Autocomplete
-            multiple
-            options={RISK_TYPE_OPTIONS}
+          {/* 발생가능 재해형태 */}
+          <TextField
+            fullWidth
+            label="발생가능 재해형태"
+            placeholder="발생가능 재해형태를 입력하세요"
             value={formData.riskTypes}
-            onChange={(_, newValue) => handleChange('riskTypes', newValue)}
-            renderInput={(params) => <TextField {...params} label="주요 위험유형" />}
-            renderTags={(value, getTagProps) =>
-              value.map((option, index) => (
-                <Chip
-                  {...getTagProps({ index })}
-                  key={option}
-                  label={option}
-                  size="small"
-                  variant="outlined"
-                />
-              ))
-            }
+            onChange={(e) => handleChange('riskTypes', e.target.value)}
+            error={!!errors.riskTypes}
+            helperText={errors.riskTypes}
           />
         </Stack>
       </DialogContent>
@@ -252,4 +227,3 @@ export default function CreateMachineModal({ open, onClose, onSave }: Props) {
     </Dialog>
   );
 }
-

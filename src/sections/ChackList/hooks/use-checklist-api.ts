@@ -6,16 +6,20 @@ import {
   getDisasterFactors,
   saveDisasterFactors,
   getIndustries,
-  saveIndustries,
-  createRiskWork,
+  createIndustry,
+  updateIndustry,
+  deleteIndustry,
+  createChecklist,
 } from 'src/services/checklist/checklist.service';
 import type {
   GetChecklistsParams,
   UpdateHighRiskWorkParams,
   GetDisasterFactorsParams,
   SaveDisasterFactorsParams,
-  SaveIndustriesParams,
-  CreateRiskWorkParams,
+  CreateIndustryParams,
+  UpdateIndustryParams,
+  DeleteIndustryParams,
+  CreateChecklistParams,
 } from 'src/services/checklist/checklist.types';
 
 // ----------------------------------------------------------------------
@@ -50,9 +54,9 @@ export function useUpdateHighRiskWork() {
  */
 export function useDisasterFactors(params: GetDisasterFactorsParams) {
   return useQuery({
-    queryKey: ['disasterFactors', params.checklistId],
+    queryKey: ['disasterFactors', params.checklistIdx],
     queryFn: () => getDisasterFactors(params),
-    enabled: !!params.checklistId,
+    enabled: !!params.checklistIdx,
   });
 }
 
@@ -66,7 +70,7 @@ export function useSaveDisasterFactors() {
     mutationFn: (params: SaveDisasterFactorsParams) => saveDisasterFactors(params),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['checklists'] });
-      queryClient.invalidateQueries({ queryKey: ['disasterFactors', variables.checklistId] });
+      queryClient.invalidateQueries({ queryKey: ['disasterFactors', variables.checklistIdx] });
     },
   });
 }
@@ -82,15 +86,46 @@ export function useIndustries() {
 }
 
 /**
- * 업종 목록 저장 Mutation Hook
+ * 업종 등록 Mutation Hook
  */
-export function useSaveIndustries() {
+export function useCreateIndustry() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (params: SaveIndustriesParams) => saveIndustries(params),
+    mutationFn: (params: CreateIndustryParams) => createIndustry(params),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['industries'] });
+      queryClient.invalidateQueries({ queryKey: ['checklists'] });
+    },
+  });
+}
+
+/**
+ * 업종 수정 Mutation Hook
+ */
+export function useUpdateIndustry() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (params: UpdateIndustryParams) => updateIndustry(params),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['industries'] });
+      queryClient.invalidateQueries({ queryKey: ['checklists'] });
+    },
+  });
+}
+
+/**
+ * 업종 삭제 Mutation Hook
+ */
+export function useDeleteIndustry() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (params: DeleteIndustryParams) => deleteIndustry(params),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['industries'] });
+      queryClient.invalidateQueries({ queryKey: ['checklists'] });
     },
   });
 }
@@ -98,14 +133,13 @@ export function useSaveIndustries() {
 /**
  * 위험작업/상황 등록 Mutation Hook
  */
-export function useCreateRiskWork() {
+export function useCreateChecklist() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (params: CreateRiskWorkParams) => createRiskWork(params),
+    mutationFn: (params: CreateChecklistParams) => createChecklist(params),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['checklists'] });
     },
   });
 }
-

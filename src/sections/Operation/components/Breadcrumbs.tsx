@@ -3,7 +3,6 @@ import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
-import { Iconify } from 'src/components/iconify';
 
 type Props = {
   items: { label: string; href?: string }[];

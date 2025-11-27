@@ -40,9 +40,6 @@ export default function LibraryReportFilters({
   searchValue,
   onChangeSearchValue,
 }: Props) {
-  // 활성화된 카테고리만 필터 옵션으로 표시
-  const activeCategories = categories.filter((cat) => cat.isActive);
-
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ p: 2.5 }}>
@@ -55,7 +52,7 @@ export default function LibraryReportFilters({
             onChange={(e) => onChangeCategory(e.target.value)}
           >
             <MenuItem value="all">전체</MenuItem>
-            {activeCategories.map((cat) => (
+            {categories.map((cat) => (
               <MenuItem key={cat.id} value={cat.name}>
                 {cat.name}
               </MenuItem>

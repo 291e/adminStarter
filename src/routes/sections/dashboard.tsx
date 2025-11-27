@@ -23,6 +23,9 @@ const RiskReportPage = lazy(() => import('src/pages/dashboard/operation/riskRepo
 const RiskReportCreatePage = lazy(
   () => import('src/pages/dashboard/operation/riskReport/create/page')
 );
+const RiskReportEditPage = lazy(
+  () => import('src/pages/dashboard/operation/riskReport/edit/page')
+);
 const SafetyReportPage = lazy(() => import('src/pages/dashboard/operation/safetyReport/page'));
 const EducationReportPage = lazy(
   () => import('src/pages/dashboard/operation/educationReport/page')
@@ -92,6 +95,7 @@ export const dashboardRoutes: RouteObject[] = [
           { path: 'chat', element: <ChatPage /> },
           { path: 'risk-report', element: <RiskReportPage /> },
           { path: 'risk-report/create', element: <RiskReportCreatePage /> },
+          { path: 'risk-report/edit/:id', element: <RiskReportEditPage /> },
           { path: 'education-report', element: <EducationReportPage /> },
           {
             path: 'library-report',

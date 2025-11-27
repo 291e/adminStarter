@@ -40,6 +40,7 @@ export type Member = {
   memberPhone: string;
   memberAddress: string;
   memberAddressDetail?: string;
+  isSuperAdmin?: boolean;
   status: MemberStatus;
   createAt: string;
   // ... 기타 필드

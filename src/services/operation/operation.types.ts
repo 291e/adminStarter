@@ -5,18 +5,30 @@ import type { BaseResponseDto } from '../common';
 // ----------------------------------------------------------------------
 
 // 위험 보고 상태
-export type RiskReportStatus = 'active' | 'inactive';
+export type RiskReportStatus = 'CONFIRMED' | 'UNCONFIRMED' | 'PENDING';
 
-// 위험 보고 정보
 export type RiskReport = {
   id: string;
+  riskReportIdx: string | number;
   title: string;
+  location: string;
   content: string;
-  location?: string;
-  images?: string[];
   status: RiskReportStatus;
-  registrationDate: string;
-  // ... 기타 필드
+  registeredAt: string;
+  confirmedAt?: string | null;
+  companyName?: string;
+  companyIdx?: number;
+  reporterName?: string;
+  reporterMemberIdx?: number | null;
+  authorName?: string;
+  authorMemberIdx?: number | null;
+  imageUrl?: string | null;
+  imageUrls?: string[];
+  signalType?: string | null;
+  sourceType?: string | null;
+  description?: string | null;
+  memo?: string | null;
+  chatRoomId?: string | null;
 };
 
 // 위험 보고 목록 조회 요청 파라미터
@@ -32,21 +44,26 @@ export type GetRiskReportsParams = {
 
 // 위험 보고 목록 조회 응답
 export type GetRiskReportsResponse = BaseResponseDto<{
-  riskReports: RiskReport[];
-  total: number;
-  page: number;
-  pageSize: number;
+  riskReportList: RiskReport[];
+  totalCount: number;
 }>;
 
 // 위험 보고 등록 요청 파라미터
 export type CreateRiskReportParams = {
   title: string;
+  location: string;
   content: string;
-  location?: string;
-  address?: string;
-  addressDetail?: string;
-  images?: File[];
-  // ... 기타 필드
+  imageUrl?: string;
+  imageUrls?: string[];
+  signalType?: 'RISK' | 'RESCUE' | 'EVACUATION';
+  sourceType?: 'CHAT' | 'DIRECT';
+  description?: string;
+  memo?: string;
+  chatRoomIdx?: number; // 채팅방 Index
+  reporterMemberIdx?: number; // 보고자 INDEX
+  reporterName?: string;
+  authorMemberIdx?: number; // 작성자 INDEX
+  authorName?: string;
 };
 
 // 위험 보고 등록 응답
@@ -56,7 +73,7 @@ export type CreateRiskReportResponse = BaseResponseDto<{
 
 // 위험 보고 정보 조회 요청
 export type GetRiskReportParams = {
-  riskReportId: string;
+  riskReportIdx: string | number;
 };
 
 // 위험 보고 정보 조회 응답
@@ -64,42 +81,48 @@ export type GetRiskReportResponse = BaseResponseDto<RiskReport>;
 
 // 위험 보고 수정 요청
 export type UpdateRiskReportParams = {
-  riskReportId: string;
+  riskReportIdx: string | number;
   title?: string;
-  content?: string;
   location?: string;
-  address?: string;
-  addressDetail?: string;
-  images?: File[];
+  content?: string;
+  imageUrl?: string;
+  imageUrls?: string[];
+  signalType?: 'RISK' | 'RESCUE' | 'EVACUATION';
+  status?: 'UNCONFIRMED' | 'CONFIRMED';
+  description?: string;
+  memo?: string;
+  isActive?: boolean; // 활성화 여부 (false 시 비활성화)
+  reporterMemberIdx?: number;
+  reporterName?: string;
+  authorMemberIdx?: number;
+  authorName?: string;
 };
 
 // 위험 보고 수정 응답
 export type UpdateRiskReportResponse = BaseResponseDto<RiskReport>;
 
 // 위험 보고 비활성화 요청 파라미터
-export type DeactivateRiskReportParams = {
-  riskReportId: string;
-};
-
-// 위험 보고 삭제 요청 파라미터
 export type DeleteRiskReportParams = {
-  riskReportId: string;
+  riskReportIdx: string | number;
 };
 
 // 채팅방에서 위험 보고 생성 요청
 export type CreateRiskReportFromChatParams = {
-  chatRoomId: string;
+  chatRoomIdx: string | number;
   title: string;
   content: string;
-  location?: string;
-  images?: File[];
+  location: string;
+  imageUrl?: string;
+  imageUrls?: string[];
+  signalType?: 'RISK' | 'RESCUE' | 'EVACUATION';
+  sourceType?: 'CHAT' | 'DIRECT';
+  description?: string;
+  memo?: string;
+  reporterMemberIdx?: number;
+  reporterName?: string;
+  authorMemberIdx?: number;
+  authorName?: string;
 };
 
 // 채팅방에서 위험 보고 생성 응답
 export type CreateRiskReportFromChatResponse = BaseResponseDto<RiskReport>;
-
-// 위험 보고 확인 요청
-export type ConfirmRiskReportParams = {
-  riskReportId: string;
-};
-

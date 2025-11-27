@@ -16,79 +16,98 @@ import type {
   GetHazardCategoriesResponse,
   SaveHazardCategoriesParams,
   SaveHazardCategoriesResponse,
-  GetCodeDatesParams,
-  GetCodeDatesResponse,
-  GetHazardManagementParams,
-  GetHazardManagementResponse,
 } from './code-setting.types';
 
 // ----------------------------------------------------------------------
 
-export async function getCodes(
-  params: GetCodesParams
-): Promise<GetCodesResponse> {
-  // TODO: API 엔드포인트 구현
-  throw new Error('Not implemented');
+/**
+ * 코드 목록 조회
+ * GET /code-settings
+ */
+export async function getCodes(params: GetCodesParams): Promise<GetCodesResponse> {
+  const response = await axiosInstance.get<GetCodesResponse>('/code-settings', { params });
+  return response.data;
 }
 
-export async function getCodeDetail(
-  params: GetCodeDetailParams
-): Promise<GetCodeDetailResponse> {
-  // TODO: API 엔드포인트 구현
-  throw new Error('Not implemented');
+/**
+ * 코드 상세 정보 조회
+ * GET /code-settings/{codeSettingIdx}
+ */
+export async function getCodeDetail(params: GetCodeDetailParams): Promise<GetCodeDetailResponse> {
+  const response = await axiosInstance.get<GetCodeDetailResponse>(
+    `/code-settings/${params.codeSettingIdx}`
+  );
+  return response.data;
 }
 
-export async function createMachine(
-  params: CreateMachineParams
-): Promise<CreateMachineResponse> {
-  // TODO: API 엔드포인트 구현
-  throw new Error('Not implemented');
+/**
+ * 기계·설비 등록
+ * POST /code-settings/machine
+ */
+export async function createMachine(params: CreateMachineParams): Promise<CreateMachineResponse> {
+  const response = await axiosInstance.post<CreateMachineResponse>(
+    '/code-settings/machine',
+    params
+  );
+  return response.data;
 }
 
-export async function updateMachine(
-  params: UpdateMachineParams
-): Promise<UpdateMachineResponse> {
-  // TODO: API 엔드포인트 구현
-  throw new Error('Not implemented');
+/**
+ * 기계·설비 수정
+ * PUT /code-settings/machine/{codeSettingIdx}
+ */
+export async function updateMachine(params: UpdateMachineParams): Promise<UpdateMachineResponse> {
+  const { codeSettingIdx, ...body } = params;
+  const response = await axiosInstance.put<UpdateMachineResponse>(
+    `/code-settings/machine/${codeSettingIdx}`,
+    body
+  );
+  return response.data;
 }
 
-export async function createHazard(
-  params: CreateHazardParams
-): Promise<CreateHazardResponse> {
-  // TODO: API 엔드포인트 구현
-  throw new Error('Not implemented');
+/**
+ * 유해인자 등록
+ * POST /code-settings/hazard
+ */
+export async function createHazard(params: CreateHazardParams): Promise<CreateHazardResponse> {
+  const response = await axiosInstance.post<CreateHazardResponse>('/code-settings/hazard', params);
+  return response.data;
 }
 
-export async function updateHazard(
-  params: UpdateHazardParams
-): Promise<UpdateHazardResponse> {
-  // TODO: API 엔드포인트 구현
-  throw new Error('Not implemented');
+/**
+ * 유해인자 수정
+ * PUT /code-settings/hazard/{codeSettingIdx}
+ */
+export async function updateHazard(params: UpdateHazardParams): Promise<UpdateHazardResponse> {
+  const { codeSettingIdx, ...body } = params;
+  const response = await axiosInstance.put<UpdateHazardResponse>(
+    `/code-settings/hazard/${codeSettingIdx}`,
+    body
+  );
+  return response.data;
 }
 
+/**
+ * 유해인자 카테고리 목록 조회
+ * GET /code-settings/categories
+ */
 export async function getHazardCategories(): Promise<GetHazardCategoriesResponse> {
-  // TODO: API 엔드포인트 구현
-  throw new Error('Not implemented');
+  const response = await axiosInstance.get<GetHazardCategoriesResponse>(
+    '/code-settings/categories'
+  );
+  return response.data;
 }
 
+/**
+ * 유해인자 카테고리 목록 저장
+ * POST /code-settings/categories
+ */
 export async function saveHazardCategories(
   params: SaveHazardCategoriesParams
 ): Promise<SaveHazardCategoriesResponse> {
-  // TODO: API 엔드포인트 구현
-  throw new Error('Not implemented');
+  const response = await axiosInstance.post<SaveHazardCategoriesResponse>(
+    '/code-settings/categories',
+    params
+  );
+  return response.data;
 }
-
-export async function getCodeDates(
-  params: GetCodeDatesParams
-): Promise<GetCodeDatesResponse> {
-  // TODO: API 엔드포인트 구현
-  throw new Error('Not implemented');
-}
-
-export async function getHazardManagement(
-  params: GetHazardManagementParams
-): Promise<GetHazardManagementResponse> {
-  // TODO: API 엔드포인트 구현
-  throw new Error('Not implemented');
-}
-

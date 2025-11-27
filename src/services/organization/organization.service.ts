@@ -35,6 +35,11 @@ import type {
   AcceptInvitationResponse,
   GetCompanyMembersParams,
   GetCompanyMembersResponse,
+  GetServicePlansResponse,
+  GetCurrentSubscriptionResponse,
+  GetRegisteredCardsResponse,
+  RegisterCardParams,
+  RegisterCardResponse,
 } from './organization.types';
 
 // ----------------------------------------------------------------------
@@ -196,27 +201,30 @@ export async function getSubscriptions(
 }
 
 /**
- * 서비스 구독
+ * 서비스 구독 (하나만 구독 가능, 기존 구독은 자동 해지)
  * POST /companies/{companyIdx}/subscriptions
  */
-export async function subscribe(
-  companyIdx: number,
-  params: SubscribeParams
-): Promise<SubscribeResponse> {
+export async function subscribe(params: SubscribeParams): Promise<SubscribeResponse> {
+  const { companyIdx, serviceSettingIdx, billingKey, immediateCancel } = params;
   const response = await axiosInstance.post<SubscribeResponse>(
     `${endpoints.company.subscriptions}/${companyIdx}/subscriptions`,
-    params
+    {
+      serviceSettingIdx,
+      billingKey,
+      immediateCancel: immediateCancel ?? false,
+    }
   );
   return response.data;
 }
 
 /**
  * 구독 취소
- * DELETE /companies/{companyIdx}/subscriptions/{subscriptionId}
+ * DELETE /companies/{companyIdx}/subscriptions/{serviceSettingIdx}
  */
 export async function cancelSubscription(params: CancelSubscriptionParams): Promise<void> {
+  const { companyIdx, serviceSettingIdx } = params;
   await axiosInstance.delete(
-    `${endpoints.company.subscriptions}/${params.companyIdx}/subscriptions/${params.subscriptionId}`
+    `${endpoints.company.subscriptions}/${companyIdx}/subscriptions/${serviceSettingIdx}`
   );
 }
 
@@ -315,6 +323,56 @@ export async function getCompanyMembers(
   const response = await axiosInstance.get<GetCompanyMembersResponse>(
     `${endpoints.company.members}/${companyIdx}/members`,
     { params }
+  );
+  return response.data;
+}
+
+/**
+ * 서비스 플랜 목록 조회
+ * GET /companies/{companyIdx}/service-plans
+ */
+export async function getServicePlans(companyIdx: number): Promise<GetServicePlansResponse> {
+  const response = await axiosInstance.get<GetServicePlansResponse>(
+    `${endpoints.company.base}/${companyIdx}/service-plans`
+  );
+  return response.data;
+}
+
+/**
+ * 현재 구독 정보 조회
+ * GET /companies/{companyIdx}/subscriptions/current
+ */
+export async function getCurrentSubscription(
+  companyIdx: number
+): Promise<GetCurrentSubscriptionResponse> {
+  const response = await axiosInstance.get<GetCurrentSubscriptionResponse>(
+    `${endpoints.company.subscriptions}/${companyIdx}/subscriptions/current`
+  );
+  return response.data;
+}
+
+/**
+ * 등록된 카드 목록 조회
+ * GET /companies/{companyIdx}/cards
+ */
+export async function getRegisteredCards(companyIdx: number): Promise<GetRegisteredCardsResponse> {
+  const response = await axiosInstance.get<GetRegisteredCardsResponse>(
+    `${endpoints.company.cards}/${companyIdx}/cards`
+  );
+  return response.data;
+}
+
+/**
+ * 카드 등록 (페이플 콜백 후)
+ * POST /companies/{companyIdx}/cards/register
+ */
+export async function registerCard(
+  companyIdx: number,
+  params: RegisterCardParams
+): Promise<RegisterCardResponse> {
+  const response = await axiosInstance.post<RegisterCardResponse>(
+    `${endpoints.company.cards}/${companyIdx}/cards/register`,
+    params
   );
   return response.data;
 }

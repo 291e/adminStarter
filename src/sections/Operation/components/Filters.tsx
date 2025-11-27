@@ -98,8 +98,6 @@ export default function OperationFilters({
             value={startDate}
             onChange={(value) => {
               onChangeStartDate(value);
-              // TODO: 시작일 변경 시 TanStack Query로 위험 보고 목록 새로고침
-              // queryClient.invalidateQueries({ queryKey: ['riskReports'] });
             }}
             format="YYYY-MM-DD"
             slotProps={{
@@ -133,8 +131,6 @@ export default function OperationFilters({
             value={endDate}
             onChange={(value) => {
               onChangeEndDate(value);
-              // TODO: 종료일 변경 시 TanStack Query로 위험 보고 목록 새로고침
-              // queryClient.invalidateQueries({ queryKey: ['riskReports'] });
             }}
             format="YYYY-MM-DD"
             slotProps={{
@@ -170,8 +166,6 @@ export default function OperationFilters({
               value={searchField}
               onChange={(e) => {
                 setSearchField((e.target.value || '') as 'reporter' | 'author' | '');
-                // TODO: 검색 필드 변경 시 TanStack Query로 위험 보고 목록 새로고침
-                // queryClient.invalidateQueries({ queryKey: ['riskReports'] });
               }}
               renderValue={(selected) => {
                 if (!selected) {
@@ -228,8 +222,6 @@ export default function OperationFilters({
             value={searchValue}
             onChange={(e) => {
               onChangeSearchValue(e.target.value);
-              // TODO: 검색 값 변경 시 TanStack Query로 위험 보고 목록 새로고침
-              // queryClient.invalidateQueries({ queryKey: ['riskReports'] });
             }}
             InputProps={{
               startAdornment: (

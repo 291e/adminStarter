@@ -13,9 +13,8 @@ import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import InputAdornment from '@mui/material/InputAdornment';
-import Box from '@mui/material/Box';
 
-import type { Checklist } from 'src/_mock/_checklist';
+import type { Checklist } from 'src/services/checklist/checklist.types';
 import { fDateTime } from 'src/utils/format-time';
 import { Iconify } from 'src/components/iconify';
 
@@ -30,7 +29,7 @@ export default function ChecklistTable({ rows, onSave, onViewDisasterFactors }: 
   const [editValue, setEditValue] = useState<string>('');
 
   const handleStartEdit = (row: Checklist) => {
-    setEditingId(row.id);
+    setEditingId(row.id || null);
     setEditValue(row.highRiskWork);
   };
 
@@ -93,17 +92,23 @@ export default function ChecklistTable({ rows, onSave, onViewDisasterFactors }: 
             rows.map((row) => (
               <TableRow key={row.id} hover>
                 <TableCell>
-                  <Typography variant="body2">{row.order}</Typography>
+                  <Typography variant="body2">{row.order ?? '-'}</Typography>
                 </TableCell>
                 <TableCell>
-                  <Stack spacing={0.25}>
-                    <Typography variant="body2" sx={{ color: 'text.primary' }}>
-                      {fDateTime(row.registrationDate, 'YYYY-MM-DD')}
+                  {row.registrationDate ? (
+                    <Stack spacing={0.25}>
+                      <Typography variant="body2" sx={{ color: 'text.primary' }}>
+                        {fDateTime(row.registrationDate, 'YYYY-MM-DD')}
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: 14 }}>
+                        {fDateTime(row.registrationDate, 'HH:mm:ss')}
+                      </Typography>
+                    </Stack>
+                  ) : (
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                      -
                     </Typography>
-                    <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: 14 }}>
-                      {fDateTime(row.registrationDate, 'HH:mm:ss')}
-                    </Typography>
-                  </Stack>
+                  )}
                 </TableCell>
                 <TableCell>
                   {editingId === row.id ? (
@@ -112,16 +117,12 @@ export default function ChecklistTable({ rows, onSave, onViewDisasterFactors }: 
                       size="small"
                       value={editValue}
                       onChange={(e) => setEditValue(e.target.value)}
-                      onKeyDown={(e) => handleKeyDown(e, row.id)}
+                      onKeyDown={(e) => handleKeyDown(e, row.id || '')}
                       autoFocus
                       InputProps={{
                         endAdornment: (
                           <InputAdornment position="end">
-                            <IconButton
-                              size="small"
-                              onClick={handleCancelEdit}
-                              sx={{ p: 0.5 }}
-                            >
+                            <IconButton size="small" onClick={handleCancelEdit} sx={{ p: 0.5 }}>
                               <Iconify icon="solar:close-circle-bold" width={16} />
                             </IconButton>
                           </InputAdornment>
@@ -141,7 +142,7 @@ export default function ChecklistTable({ rows, onSave, onViewDisasterFactors }: 
                   {editingId === row.id ? (
                     <IconButton
                       size="small"
-                      onClick={() => handleSaveEdit(row.id)}
+                      onClick={() => handleSaveEdit(row.id || '')}
                       sx={{
                         color: 'primary.main',
                         '&:hover': {
@@ -181,7 +182,7 @@ export default function ChecklistTable({ rows, onSave, onViewDisasterFactors }: 
                   </IconButton>
                 </TableCell>
                 <TableCell align="center">
-                  {row.status === 'active' ? (
+                  {row.status?.toUpperCase() === 'ACTIVE' || row.status === 'active' ? (
                     <Chip label="활성" size="small" color="success" variant="soft" />
                   ) : (
                     <Chip label="비활성" size="small" sx={{ bgcolor: 'grey.300' }} />
@@ -195,4 +196,3 @@ export default function ChecklistTable({ rows, onSave, onViewDisasterFactors }: 
     </TableContainer>
   );
 }
-

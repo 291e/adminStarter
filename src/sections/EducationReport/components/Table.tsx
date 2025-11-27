@@ -12,8 +12,32 @@ import IconButton from '@mui/material/IconButton';
 import CircularProgress from '@mui/material/CircularProgress';
 import Stack from '@mui/material/Stack';
 
-import type { EducationReport } from 'src/_mock/_education-report';
+import type { EducationReport } from 'src/services/education-report/education-report.types';
 import { Iconify } from 'src/components/iconify';
+
+// 역할 한글 맵핑 함수
+const getRoleLabel = (role: string): string => {
+  if (!role) return '';
+
+  const roleUpper = role.toUpperCase();
+  const roleMap: { [key: string]: string } = {
+    OPERATOR_MANAGER: '조직 관리자',
+    MANAGEMENT_SUPERVISOR: '관리 감독자',
+    SAFETY_MANAGER: '안전보건 담당자',
+    WORKER: '근로자',
+    ADMIN: '조직 관리자',
+    MEMBER: '근로자',
+    // 소문자 키 (하위 호환성)
+    operator_manager: '조직 관리자',
+    management_supervisor: '관리 감독자',
+    safety_manager: '안전보건 담당자',
+    worker: '근로자',
+    admin: '조직 관리자',
+    member: '근로자',
+  };
+
+  return roleMap[roleUpper] || roleMap[role] || role;
+};
 
 type Props = {
   rows: EducationReport[];
@@ -31,7 +55,7 @@ export default function EducationReportTable({
   onViewDetail,
 }: Props) {
   // rows의 모든 ID가 selectedIds에 포함되어 있는지 확인
-  const rowIds = rows.map((row) => row.id);
+  const rowIds = rows.map((row) => row.id || row.educationReportId || String(row.memberIdx || ''));
   const allSelected = rows.length > 0 && rowIds.every((id) => selectedIds.includes(id));
   const someSelected =
     rows.length > 0 && rowIds.some((id) => selectedIds.includes(id)) && !allSelected;
@@ -81,46 +105,47 @@ export default function EducationReportTable({
 
         <TableBody>
           {rows.map((row) => {
-            const isSelected = selectedIds.includes(row.id);
+            const rowId = row.id || row.educationReportId || String(row.memberIdx || '');
+            const isSelected = selectedIds.includes(rowId);
             return (
-              <TableRow key={row.id} hover>
+              <TableRow key={rowId} hover>
                 <TableCell padding="checkbox">
                   <Checkbox
                     checked={isSelected}
-                    onChange={(e) => onSelectRow(row.id, e.target.checked)}
+                    onChange={(e) => onSelectRow(rowId, e.target.checked)}
                   />
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2">{row.organizationName}</Typography>
+                  <Typography variant="body2">{row.organizationName || '-'}</Typography>
                 </TableCell>
                 <TableCell>
                   <Stack spacing={0.5}>
-                    <Typography variant="body2">{row.name}</Typography>
+                    <Typography variant="body2">{row.name || '-'}</Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {row.position}
+                      {row.position || '-'}
                     </Typography>
                   </Stack>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2">{row.department}</Typography>
+                  <Typography variant="body2">{row.department || '-'}</Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2">{row.role}</Typography>
+                  <Typography variant="body2">{getRoleLabel(row.role || '') || '-'}</Typography>
                 </TableCell>
                 <TableCell align="center">
-                  <Typography variant="body2">{row.mandatoryEducation}</Typography>
+                  <Typography variant="body2">{row.mandatoryEducation || 0}</Typography>
                 </TableCell>
                 <TableCell align="center">
-                  <Typography variant="body2">{row.regularEducation}</Typography>
+                  <Typography variant="body2">{row.regularEducation || 0}</Typography>
                 </TableCell>
                 <TableCell align="center">
-                  <Typography variant="body2">{row.totalEducation}</Typography>
+                  <Typography variant="body2">{row.totalEducation || 0}</Typography>
                 </TableCell>
                 <TableCell align="center">
-                  <Typography variant="body2">{row.standardEducation}</Typography>
+                  <Typography variant="body2">{row.standardEducation || 0}</Typography>
                 </TableCell>
                 <TableCell align="center">
-                  <CompletionRateProgress value={row.completionRate} />
+                  <CompletionRateProgress value={row.completionRate || 0} />
                 </TableCell>
                 <TableCell align="center">
                   <IconButton
@@ -155,6 +180,7 @@ function CompletionRateProgress({ value }: CompletionRateProgressProps) {
   const size = 34;
   const thickness = 4;
   const normalizedValue = Math.min(Math.max(value, 0), 100);
+  const displayValue = Math.round(normalizedValue); // 정수로 변환
 
   return (
     <Box
@@ -185,7 +211,7 @@ function CompletionRateProgress({ value }: CompletionRateProgressProps) {
           color: 'text.secondary',
         }}
       >
-        {normalizedValue}%
+        {displayValue}%
       </Typography>
     </Box>
   );

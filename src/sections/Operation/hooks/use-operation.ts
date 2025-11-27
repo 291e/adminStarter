@@ -1,6 +1,7 @@
-import type { RiskReport } from 'src/_mock/_risk-report';
 import { useMemo, useState, useCallback } from 'react';
 import type { Dayjs } from 'dayjs';
+import dayjs from 'dayjs';
+import type { RiskReportStatus } from 'src/services/operation/operation.types';
 
 // ----------------------------------------------------------------------
 
@@ -11,9 +12,6 @@ export type UseOperationResult = {
   onChangeStartDate: (value: Dayjs | null) => void;
   endDate: Dayjs | null;
   onChangeEndDate: (value: Dayjs | null) => void;
-  countAll: number;
-  countConfirmed: number;
-  countUnconfirmed: number;
   searchField: 'reporter' | 'author' | '';
   setSearchField: (v: 'reporter' | 'author' | '') => void;
   searchValue: string;
@@ -22,11 +20,18 @@ export type UseOperationResult = {
   rowsPerPage: number;
   onChangePage: (page: number) => void;
   onChangeRowsPerPage: (rows: number) => void;
-  filtered: RiskReport[];
-  total: number;
+  queryParams: {
+    status?: RiskReportStatus;
+    searchKey?: string;
+    searchValue?: string;
+    startDate?: string;
+    endDate?: string;
+    page: number;
+    pageSize: number;
+  };
 };
 
-export function useOperation(reports: RiskReport[]): UseOperationResult {
+export function useOperation(): UseOperationResult {
   const [tab, setTab] = useState<string>('all');
   const [startDate, setStartDate] = useState<Dayjs | null>(null);
   const [endDate, setEndDate] = useState<Dayjs | null>(null);
@@ -64,47 +69,28 @@ export function useOperation(reports: RiskReport[]): UseOperationResult {
     setPage(0);
   }, []);
 
-  const filteredAll = useMemo(
-    () =>
-      reports.filter((r) => {
-        // 검색 필드 매칭
-        const fieldMatch =
-          searchValue && searchField
-            ? String(r[searchField] ?? '').toLowerCase().includes(searchValue.toLowerCase())
-            : true;
+  const mappedStatus = useMemo<RiskReportStatus | undefined>(() => {
+    if (tab === 'confirmed') return 'CONFIRMED';
+    if (tab === 'unconfirmed') return 'UNCONFIRMED';
+    return undefined;
+  }, [tab]);
 
-        // 날짜 필터링
-        const dateMatch =
-          startDate && endDate
-            ? (() => {
-                const reportDate = new Date(r.registeredAt);
-                const start = startDate.toDate();
-                const end = endDate.toDate();
-                return reportDate >= start && reportDate <= end;
-              })()
-            : true;
-
-        // 탭 필터링
-        const byTab =
-          tab === 'all'
-            ? true
-            : r.status === (tab === 'confirmed' ? 'confirmed' : 'unconfirmed');
-
-        return fieldMatch && dateMatch && byTab;
-      }),
-    [reports, searchField, searchValue, startDate, endDate, tab]
-  );
-
-  const total = filteredAll.length;
-
-  const countAll = reports.length;
-  const countConfirmed = reports.filter((r) => r.status === 'confirmed').length;
-  const countUnconfirmed = reports.filter((r) => r.status === 'unconfirmed').length;
-
-  const filtered = useMemo(() => {
-    const start = page * rowsPerPage;
-    return filteredAll.slice(start, start + rowsPerPage);
-  }, [filteredAll, page, rowsPerPage]);
+  const queryParams = useMemo(() => {
+    const params: UseOperationResult['queryParams'] = {
+      page: page + 1,
+      pageSize: rowsPerPage,
+    };
+    if (mappedStatus) params.status = mappedStatus;
+    if (searchField && searchValue.trim()) {
+      params.searchKey = searchField;
+      params.searchValue = searchValue.trim();
+    }
+    if (startDate && endDate) {
+      params.startDate = dayjs(startDate).format('YYYY-MM-DD');
+      params.endDate = dayjs(endDate).format('YYYY-MM-DD');
+    }
+    return params;
+  }, [page, rowsPerPage, mappedStatus, searchField, searchValue, startDate, endDate]);
 
   return {
     tab,
@@ -113,9 +99,6 @@ export function useOperation(reports: RiskReport[]): UseOperationResult {
     onChangeStartDate,
     endDate,
     onChangeEndDate,
-    countAll,
-    countConfirmed,
-    countUnconfirmed,
     searchField,
     setSearchField,
     searchValue,
@@ -124,7 +107,6 @@ export function useOperation(reports: RiskReport[]): UseOperationResult {
     rowsPerPage,
     onChangePage,
     onChangeRowsPerPage,
-    filtered,
-    total,
+    queryParams,
   };
 }

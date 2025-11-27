@@ -62,23 +62,16 @@ export default function EditDocumentModal({
 
   useEffect(() => {
     if (open && document) {
-      // document.priority는 'URGENT' | 'IMPORTANT' | 'REFERENCE' 형식 (대문자)
-      // priorities에서 해당 priority의 id를 찾아서 설정
-      const documentPriorityUpper = document.priority?.toUpperCase();
+      // priorityInformation에서 labelType 가져오기
+      const priorityLabelType = document.priorityInformation?.labelType;
 
-      // 여러 방법으로 매핑 시도
-      let documentPrioritySetting = priorities.find((p) => {
-        const labelTypeUpper = p.labelType?.toUpperCase();
-        return labelTypeUpper === documentPriorityUpper;
-      });
+      // priorities에서 해당 labelType의 id를 찾아서 설정
+      const documentPrioritySetting = priorities.find(
+        (p) => p.labelType === priorityLabelType
+      );
 
-      // 매핑 실패 시 document.priority를 id로 직접 사용하는 경우도 확인
-      if (!documentPrioritySetting && document.priority) {
-        documentPrioritySetting = priorities.find((p) => p.id === document.priority);
-      }
-
-      // 매핑된 prioritySetting의 id를 사용, 없으면 document.priority를 그대로 사용
-      const priorityId = documentPrioritySetting?.id || document.priority || '';
+      // 매핑된 prioritySetting의 id를 사용
+      const priorityId = documentPrioritySetting?.id || '';
 
       setFormData({
         documentName: document.documentName || '',

@@ -166,8 +166,18 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
       const certifiedAt = history.certifiedAt
         ? dayjs(history.certifiedAt).format('YYYY-MM-DD')
         : '';
-      const appliedYear =
-        history.appliedYear && history.appliedYear > 0 ? `${history.appliedYear}년` : undefined; // appliedYear가 0이거나 없으면 undefined (검토 대기)
+      const computedAppliedYear = (() => {
+        if (history.certifiedAt) {
+          const oneYearLater = dayjs(history.certifiedAt).add(1, 'year');
+          if (oneYearLater.isValid()) {
+            return `${oneYearLater.year()}년`;
+          }
+        }
+        if (history.appliedYear && history.appliedYear > 0) {
+          return `${history.appliedYear}년`;
+        }
+        return undefined;
+      })();
 
       // 파일명 추출 (fileUrl에서)
       const certificateFileName = history.fileUrl
@@ -178,7 +188,7 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
         id: `history-${index}`,
         registrationDate: registeredAt,
         certificationDate: certifiedAt,
-        applicationYear: appliedYear,
+        applicationYear: computedAppliedYear,
         certificateFileName,
         accidentFreeYear:
           history.appliedYear && history.appliedYear > 0 ? history.appliedYear : null,
@@ -717,7 +727,13 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
       <UpdateCertificationModal
         open={updateModalOpen}
         onClose={() => setUpdateModalOpen(false)}
+        companyIdx={companyIdx}
+        defaultCertifiedAt={accidentFreeInfo?.accidentFreeCertifiedAt ?? null}
+        defaultExpiresAt={accidentFreeInfo?.accidentFreeExpiresAt ?? null}
+        defaultStatus={accidentFreeInfo?.accidentFreeStatus ?? 'APPROVED'}
+        defaultFileUrl={accidentFreeInfo?.accidentFreeFileUrl ?? null}
         onSave={handleUpdateSave}
+        onUpdated={() => setUpdateModalOpen(false)}
       />
     </LocalizationProvider>
   );

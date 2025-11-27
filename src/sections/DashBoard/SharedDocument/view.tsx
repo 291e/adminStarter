@@ -109,7 +109,7 @@ export function SharedDocumentView({ title = '공유 문서함', description, sx
     return data.prioritySettingList as PrioritySetting[];
   }, [prioritySettingsData]);
 
-  const logic = useSharedDocument(sharedDocuments);
+  const logic = useSharedDocument(sharedDocuments, prioritySettings);
   const [prioritySettingsModalOpen, setPrioritySettingsModalOpen] = useState(false);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [shareToChatModalOpen, setShareToChatModalOpen] = useState(false);
@@ -142,10 +142,10 @@ export function SharedDocumentView({ title = '공유 문서함', description, sx
       // 현재는 개별 업데이트/생성으로 처리
       await Promise.all(
         priorities.map(async (priority, index) => {
-          // 기존 설정 찾기 (API는 id 필드 사용)
-          // priority.id는 모달에서 전달된 값 (API의 id 또는 새로 생성된 임시 id)
+          // 기존 설정 찾기 (API는 priorityIdx 필드 사용)
+          // priority.id는 모달에서 전달된 값 (priorityIdx를 문자열로 변환한 값 또는 새로 생성된 임시 id)
           const existingSetting = prioritySettings.find((s: PrioritySetting) => {
-            const settingId = s.id || s.prioritySettingId || '';
+            const settingId = String(s.priorityIdx);
             return settingId === priority.id;
           });
 
@@ -169,7 +169,7 @@ export function SharedDocumentView({ title = '공유 문서함', description, sx
           if (existingSetting) {
             // 기존 설정 업데이트
             const updateParams = {
-              prioritySettingId: existingSetting.id || existingSetting.prioritySettingId || '',
+              priorityIdx: existingSetting.priorityIdx,
               color: colorToSave, // hex 코드로 저장
               labelType: labelTypeToSave,
               isActive: priority.isActive ? 1 : 0,
@@ -200,10 +200,20 @@ export function SharedDocumentView({ title = '공유 문서함', description, sx
       );
 
       // 저장 완료 후 쿼리 무효화하여 최신 데이터 가져오기
-      await queryClient.invalidateQueries({ queryKey: ['prioritySettings'] });
+      // prioritySettings와 sharedDocuments 모두 무효화 (priorityInformation이 업데이트되므로)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['prioritySettings'] }),
+        queryClient.invalidateQueries({ queryKey: ['sharedDocuments'] }),
+      ]);
+
+      // 쿼리 재조회를 명시적으로 트리거
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ['prioritySettings'] }),
+        queryClient.refetchQueries({ queryKey: ['sharedDocuments'] }),
+      ]);
 
       if (import.meta.env.DEV) {
-        console.log('✅ 중요도 설정 저장 완료');
+        console.log('✅ 중요도 설정 저장 완료 및 쿼리 갱신');
       }
 
       setPrioritySettingsModalOpen(false);
@@ -238,30 +248,31 @@ export function SharedDocumentView({ title = '공유 문서함', description, sx
       const fileUrl = fileUrls[0];
       console.log('✅ 파일 업로드 완료:', fileUrl);
 
-      // priority를 API 형식에 맞게 변환 (모달에서 받은 priority는 id일 수 있음)
+      // priority를 API 형식에 맞게 변환 (모달에서 받은 priority는 priorityIdx를 문자열로 변환한 값)
       // prioritySettings에서 해당 ID를 찾아서 labelType 확인
-      const selectedPrioritySetting = prioritySettings.find(
-        (s) => (s.id || s.prioritySettingId) === data.priority
-      );
+      const selectedPrioritySetting = prioritySettings.find((s) => {
+        const settingId = String(s.priorityIdx);
+        return settingId === data.priority;
+      });
 
       // labelType을 그대로 사용 (자유 문자열)
       const priorityInfo = selectedPrioritySetting
         ? {
             priority: selectedPrioritySetting.labelType || null, // null 허용
-            priorityId: selectedPrioritySetting.id || selectedPrioritySetting.prioritySettingId,
+            priorityIdx: selectedPrioritySetting.priorityIdx,
           }
         : {
             priority: null,
-            priorityId: undefined,
+            priorityIdx: undefined,
           };
 
       // 2. 업로드된 파일 정보로 문서 생성
       await createDocumentMutation.mutateAsync({
         documentName: data.documentName,
         documentWrittenAt: new Date().toISOString().split('T')[0], // 오늘 날짜
-        referenceType: 'custom', // 기본값
+        referenceType: 'CUSTOM', // 기본값
         priority: priorityInfo.priority,
-        priorityId: priorityInfo.priorityId,
+        priorityIdx: priorityInfo.priorityIdx,
         isPublic: data.isPublic ? 1 : 0,
         fileName: data.file.name,
         fileUrl,
@@ -281,8 +292,8 @@ export function SharedDocumentView({ title = '공유 문서함', description, sx
   const handleShareToChatConfirm = async (roomId: string, documentId: string) => {
     try {
       await shareToChatMutation.mutateAsync({
-        documentId,
-        chatRoomIdList: [roomId],
+        sharedDocumentIdx: Number(documentId),
+        chatRoomIdxList: [Number(roomId)],
       });
       setShareToChatModalOpen(false);
       setSelectedDocumentForShare(null);
@@ -301,21 +312,21 @@ export function SharedDocumentView({ title = '공유 문서함', description, sx
 
     try {
       // priority를 API 형식에 맞게 변환
-      // data.priority는 EditDocumentModal에서 전달된 prioritySetting의 id
-      const selectedPrioritySetting = prioritySettings.find(
-        (s) => (s.id || s.prioritySettingId) === data.priority
-      );
+      // data.priority는 EditDocumentModal에서 전달된 prioritySetting의 priorityIdx를 문자열로 변환한 값
+      const selectedPrioritySetting = prioritySettings.find((s) => {
+        const settingId = String(s.priorityIdx);
+        return settingId === data.priority;
+      });
 
       // 디버깅: 수정 데이터 확인
       if (import.meta.env.DEV) {
         console.log('💾 문서 수정 데이터:', {
-          documentId: selectedDocumentForEdit.id,
+          sharedDocumentIdx: selectedDocumentForEdit.sharedDocumentIdx,
           formData: data,
           formDataPriority: data.priority,
           selectedPrioritySetting,
           prioritySettings: prioritySettings.map((s) => ({
-            id: s.id,
-            prioritySettingId: s.prioritySettingId,
+            priorityIdx: s.priorityIdx,
             labelType: s.labelType,
           })),
         });
@@ -324,29 +335,29 @@ export function SharedDocumentView({ title = '공유 문서함', description, sx
       // labelType을 그대로 사용 (자유 문자열, null 허용)
       let priorityInfo: {
         priority: string | null;
-        priorityId: string | undefined;
+        priorityIdx: number | undefined;
       };
 
       if (selectedPrioritySetting) {
         // 중요도 설정에서 찾은 경우
         priorityInfo = {
           priority: selectedPrioritySetting.labelType || null,
-          priorityId: selectedPrioritySetting.id || selectedPrioritySetting.prioritySettingId,
+          priorityIdx: selectedPrioritySetting.priorityIdx,
         };
       } else {
         // 중요도 설정에서 찾지 못한 경우
         // selectedDocumentForEdit은 이미 null 체크 완료
         priorityInfo = {
-          priority: selectedDocumentForEdit?.priority || null,
-          priorityId: undefined,
+          priority: selectedDocumentForEdit?.priorityInformation?.labelType || null,
+          priorityIdx: selectedDocumentForEdit?.priorityIdx,
         };
       }
 
       const updateParams = {
-        documentId: selectedDocumentForEdit.id,
+        sharedDocumentIdx: selectedDocumentForEdit.sharedDocumentIdx,
         documentName: data.documentName,
         priority: priorityInfo.priority,
-        priorityId: priorityInfo.priorityId,
+        priorityIdx: priorityInfo.priorityIdx,
         isPublic: data.isPublic ? 1 : 0,
       };
 
@@ -389,7 +400,7 @@ export function SharedDocumentView({ title = '공유 문서함', description, sx
 
     try {
       await deleteDocumentMutation.mutateAsync({
-        documentId: selectedDocumentForDelete.id,
+        sharedDocumentIdx: selectedDocumentForDelete.sharedDocumentIdx,
       });
       setDeleteModalOpen(false);
       setSelectedDocumentForDelete(null);
@@ -468,6 +479,7 @@ export function SharedDocumentView({ title = '공유 문서함', description, sx
             onChangeEndDate={logic.onChangeEndDate}
             searchValue={logic.filters.searchValue}
             onChangeSearchValue={logic.onChangeSearchValue}
+            prioritySettings={prioritySettings}
           />
 
           <SharedDocumentTable
@@ -505,7 +517,7 @@ export function SharedDocumentView({ title = '공유 문서함', description, sx
         initialPriorities={prioritySettings
           .sort((a: PrioritySetting, b: PrioritySetting) => (a.order || 0) - (b.order || 0))
           .map((setting: PrioritySetting) => ({
-            id: setting.id || setting.prioritySettingId || '', // API는 id 필드 사용
+            id: String(setting.priorityIdx), // API는 priorityIdx 필드 사용
             color:
               Object.keys(COLOR_VALUES).find(
                 (key) => COLOR_VALUES[key].toLowerCase() === setting.color.toLowerCase()
@@ -523,7 +535,7 @@ export function SharedDocumentView({ title = '공유 문서함', description, sx
           .filter((setting: PrioritySetting) => setting.isActive === 1)
           .sort((a: PrioritySetting, b: PrioritySetting) => (a.order || 0) - (b.order || 0))
           .map((setting: PrioritySetting) => ({
-            id: setting.id || setting.prioritySettingId || '',
+            id: String(setting.priorityIdx),
             label: setting.labelType || '중요도',
             color: setting.color || '#000000',
             labelType: setting.labelType || undefined,
@@ -538,7 +550,7 @@ export function SharedDocumentView({ title = '공유 문서함', description, sx
             setSelectedDocumentForShare(null);
           }}
           onShare={handleShareToChatConfirm}
-          documentId={selectedDocumentForShare.id}
+          documentId={String(selectedDocumentForShare.sharedDocumentIdx)}
           documentName={selectedDocumentForShare.documentName}
         />
       )}
@@ -556,7 +568,7 @@ export function SharedDocumentView({ title = '공유 문서함', description, sx
             .filter((setting: PrioritySetting) => setting.isActive === 1)
             .sort((a: PrioritySetting, b: PrioritySetting) => (a.order || 0) - (b.order || 0))
             .map((setting: PrioritySetting) => ({
-              id: setting.id || setting.prioritySettingId || '',
+              id: String(setting.priorityIdx),
               label: setting.labelType || '중요도',
               color: setting.color || '#000000',
               labelType: setting.labelType || undefined,

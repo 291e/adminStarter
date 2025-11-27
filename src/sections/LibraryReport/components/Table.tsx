@@ -9,15 +9,17 @@ import Paper from '@mui/material/Paper';
 import Checkbox from '@mui/material/Checkbox';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
+import Stack from '@mui/material/Stack';
 
-import type { LibraryReport } from 'src/_mock/_library-report';
+import type { LibraryReport } from 'src/services/library-report/library-report.types';
 import { Iconify } from 'src/components/iconify';
 import Badge from 'src/components/safeyoui/badge';
+import { fDateTime } from 'src/utils/format-time';
 
 type Props = {
   rows: LibraryReport[];
   selectedIds: string[];
-  onSelectAll: (checked: boolean) => void;
+  onSelectAll: (rows: LibraryReport[], checked: boolean) => void;
   onSelectRow: (id: string, checked: boolean) => void;
   onEdit?: (row: LibraryReport) => void;
 };
@@ -40,9 +42,16 @@ export default function LibraryReportTable({
       <Table size="small" stickyHeader>
         <TableHead>
           <TableRow>
+            <TableCell padding="checkbox" sx={{ bgcolor: 'grey.100', width: 56 }}>
+              <Checkbox
+                checked={allSelected}
+                indeterminate={someSelected}
+                onChange={(e) => onSelectAll(rows, e.target.checked)}
+              />
+            </TableCell>
             <TableCell sx={{ bgcolor: 'grey.100', minWidth: 80 }}>순번</TableCell>
             <TableCell sx={{ bgcolor: 'grey.100', minWidth: 180 }}>등록일</TableCell>
-            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 120 }}>조직명</TableCell>
+            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 140 }}>조직명</TableCell>
             <TableCell sx={{ bgcolor: 'grey.100', minWidth: 160 }}>카테고리</TableCell>
             <TableCell sx={{ bgcolor: 'grey.100', minWidth: 444 }}>제목</TableCell>
             <TableCell align="center" sx={{ bgcolor: 'grey.100', minWidth: 100 }}>
@@ -61,43 +70,77 @@ export default function LibraryReportTable({
         </TableHead>
 
         <TableBody>
-          {rows.map((row) => {
-            const isSelected = selectedIds.includes(row.id);
+          {rows.map((row, index) => {
+            const rowId = row.id ?? String(row.libraryReportIdx ?? index);
+            const isSelected = selectedIds.includes(rowId);
+            const status = row.status ?? (row.isActive === 0 ? 'inactive' : 'active');
+            const hasRegistrationDate = Boolean(row.registrationDate);
+            const registrationDate = row.registrationDate || '';
+            const displayOrg = row.organizationName || '-';
+            // libraryReportCategoryInformation에서 카테고리 정보 가져오기
+            const displayCategory = row.libraryReportCategoryInformation?.name || '-';
+            const displayTitle = row.title || '-';
+            const displayTime = row.playbackTime || '-';
             return (
-              <TableRow key={row.id} hover>
-                <TableCell>
-                  <Typography variant="body2">{row.order}</Typography>
+              <TableRow key={rowId} hover selected={isSelected}>
+                <TableCell padding="checkbox">
+                  <Checkbox
+                    checked={isSelected}
+                    onChange={(e) => onSelectRow(rowId, e.target.checked)}
+                  />
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2">{row.registrationDate}</Typography>
+                  <Typography variant="body2">{row.id}</Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2">{row.organizationName}</Typography>
+                  {hasRegistrationDate ? (
+                    <Stack spacing={0.25}>
+                      <Typography variant="body2" sx={{ color: 'text.primary' }}>
+                        {fDateTime(registrationDate, 'YYYY-MM-DD')}
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: 14 }}>
+                        {fDateTime(registrationDate, 'HH:mm:ss')}
+                      </Typography>
+                    </Stack>
+                  ) : (
+                    <Typography variant="body2">-</Typography>
+                  )}
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2">{row.category}</Typography>
+                  <Typography variant="body2">{displayOrg}</Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2">{row.title}</Typography>
+                  <Typography variant="body2">{displayCategory}</Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2">{displayTitle}</Typography>
                 </TableCell>
                 <TableCell align="center">
-                  <Typography variant="body2">{row.playbackTime}</Typography>
+                  <Typography variant="body2">{displayTime}</Typography>
                 </TableCell>
                 <TableCell align="center">
                   {row.hasSubtitles ? (
-                    <Iconify
-                      icon="solar:check-circle-bold"
-                      width={24}
-                      sx={{ color: 'info.main' }}
-                    />
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Iconify
+                        icon="solar:check-circle-bold"
+                        width={24}
+                        sx={{ color: 'info.main' }}
+                      />
+                    </Box>
                   ) : (
                     <Box sx={{ width: 24, height: 24 }} />
                   )}
                 </TableCell>
                 <TableCell align="center">
                   <Badge
-                    label={row.status === 'active' ? '활성' : '비활성'}
-                    variant={row.status === 'active' ? 'active' : 'inactive'}
+                    label={status === 'active' ? '활성' : '비활성'}
+                    variant={status === 'active' ? 'active' : 'inactive'}
                   />
                 </TableCell>
                 <TableCell align="center">

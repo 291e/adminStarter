@@ -21,11 +21,17 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
+import { useCreateEducationRecord } from '../hooks/use-education-report-api';
+import { uploadFile } from 'src/services/system/system.service';
+import type { CreateEducationRecordParams } from 'src/services/education-report/education-report.types';
 
 type Props = {
   open: boolean;
   onClose: () => void;
   onSave?: (data: EducationFormData) => void;
+  memberIdx?: number; // 교육 기록을 추가할 멤버의 Index
+  educationReportIdx?: number; // 교육 리포트 Index (단일 멤버용)
+  educationReportIdxes?: number[]; // 교육 리포트 Index 배열 (여러 멤버용)
 };
 
 export type EducationFormData = {
@@ -39,7 +45,14 @@ export type EducationFormData = {
   notes: string;
 };
 
-export default function AddEducationModal({ open, onClose, onSave }: Props) {
+export default function AddEducationModal({
+  open,
+  onClose,
+  onSave,
+  memberIdx,
+  educationReportIdx,
+  educationReportIdxes,
+}: Props) {
   const [formData, setFormData] = useState<EducationFormData>({
     educationType: 'mandatory',
     educationMethod: 'online',
@@ -53,6 +66,7 @@ export default function AddEducationModal({ open, onClose, onSave }: Props) {
 
   const [errors, setErrors] = useState<Partial<Record<keyof EducationFormData, string>>>({});
   const [openDatePicker, setOpenDatePicker] = useState(false);
+  const createEducationRecordMutation = useCreateEducationRecord();
 
   const handleChange = (field: keyof EducationFormData, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -99,10 +113,90 @@ export default function AddEducationModal({ open, onClose, onSave }: Props) {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSave = () => {
-    if (validate()) {
+  const handleSave = async () => {
+    if (!validate()) return;
+
+    // educationReportIdx 또는 educationReportIdxes가 없으면 에러
+    const targetReportIdxes =
+      educationReportIdxes || (educationReportIdx ? [educationReportIdx] : []);
+    if (targetReportIdxes.length === 0) {
+      setErrors({ educationName: '교육 리포트 정보를 찾을 수 없습니다.' });
+      return;
+    }
+
+    try {
+      // 파일이 있으면 먼저 업로드 (한 번만 업로드하고 모든 멤버에 동일한 파일 사용)
+      let fileUrl: string | undefined;
+      if (formData.evidenceFile) {
+        if (import.meta.env.DEV) {
+          console.log('📤 [AddEducationModal] 파일 업로드 시작', formData.evidenceFile.name);
+        }
+        const uploadResponse = await uploadFile({ files: [formData.evidenceFile] });
+        const uploadedUrls =
+          (uploadResponse as unknown as { fileUrls?: string[] }).fileUrls ??
+          uploadResponse?.body?.fileUrls ??
+          [];
+        if (uploadedUrls.length > 0) {
+          fileUrl = uploadedUrls[0];
+          if (import.meta.env.DEV) {
+            console.log('✅ [AddEducationModal] 파일 업로드 성공', fileUrl);
+          }
+        } else {
+          throw new Error('파일 업로드에 실패했습니다.');
+        }
+      }
+
+      // 공통 파라미터
+      const baseParams: Omit<CreateEducationRecordParams, 'educationReportIdx'> = {
+        method: (formData.educationMethod === 'online' ? '온라인' : '집체') as '온라인' | '집체',
+        educationName: formData.educationName,
+        educationTime: Number(formData.educationTime) || 0,
+        educationDate: formData.educationDate
+          ? dayjs(formData.educationDate).format('YYYY-MM-DD')
+          : '',
+        educationType: (formData.educationType === 'mandatory' ? 'MANDATORY' : 'REGULAR') as
+          | 'MANDATORY'
+          | 'REGULAR',
+        ...(formData.evidenceFile?.name && { fileName: formData.evidenceFile.name }),
+        ...(fileUrl && { fileUrl }),
+        ...(formData.notes && { description: formData.notes }),
+        ...(formData.notes && { memo: formData.notes }),
+      };
+
+      if (import.meta.env.DEV) {
+        console.log('🔍 [AddEducationModal] 교육 기록 등록 요청', {
+          count: targetReportIdxes.length,
+          educationReportIdxes: targetReportIdxes,
+          baseParams,
+        });
+      }
+
+      // 선택된 모든 멤버에 대해 순차적으로 교육 기록 등록
+      const results = await Promise.all(
+        targetReportIdxes.map((reportIdx) =>
+          createEducationRecordMutation.mutateAsync({
+            ...baseParams,
+            educationReportIdx: reportIdx,
+          })
+        )
+      );
+
+      if (import.meta.env.DEV) {
+        console.log('✅ [AddEducationModal] 교육 기록 등록 성공', {
+          count: results.length,
+          results,
+        });
+      }
+
       onSave?.(formData);
       handleClose();
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.error('❌ [AddEducationModal] 교육 기록 등록 실패', error);
+      }
+      setErrors({
+        educationName: `교육 기록 등록에 실패했습니다. (${targetReportIdxes.length}명 중 일부 실패)`,
+      });
     }
   };
 
@@ -124,7 +218,7 @@ export default function AddEducationModal({ open, onClose, onSave }: Props) {
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
       <DialogTitle>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+        <Typography component="div" variant="h6" sx={{ fontWeight: 600 }}>
           교육 추가
         </Typography>
       </DialogTitle>

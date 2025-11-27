@@ -29,15 +29,15 @@ const getRoleLabel = (memberRole: string): string => {
   const roleMap: { [key: string]: string } = {
     // 대문자 키
     ADMIN: '조직 관리자',
-    ORGANIZATION_ADMIN: '조직 관리자',
-    SUPERVISOR: '관리 감독자',
+    OPERATOR_MANAGER: '조직 관리자',
+    MANAGEMENT_SUPERVISOR: '관리 감독자',
     SAFETY_MANAGER: '안전보건 담당자',
     WORKER: '근로자',
     MEMBER: '근로자',
     // 소문자 키 (하위 호환성)
     admin: '조직 관리자',
-    organization_admin: '조직 관리자',
-    supervisor: '관리 감독자',
+    operator_manager: '조직 관리자',
+    management_supervisor: '관리 감독자',
     safety_manager: '안전보건 담당자',
     worker: '근로자',
     member: '근로자',

@@ -10,15 +10,15 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import Divider from '@mui/material/Divider';
-import Select from '@mui/material/Select';
-import MenuItem from '@mui/material/MenuItem';
-import FormControl from '@mui/material/FormControl';
-import InputLabel from '@mui/material/InputLabel';
 import Switch from '@mui/material/Switch';
 import FormControlLabel from '@mui/material/FormControlLabel';
 
 import { Iconify } from 'src/components/iconify';
-import type { ServiceSetting } from 'src/_mock/_service-setting';
+import type { ServiceSetting } from 'src/services/service-setting/service-setting.types';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
 
 // ----------------------------------------------------------------------
 
@@ -37,8 +37,6 @@ type Props = {
   initialData?: ServiceSetting | null;
 };
 
-const SERVICE_PERIOD_OPTIONS = ['1개월', '3개월', '6개월', '12개월'];
-
 export default function EditServiceModal({ open, onClose, onSave, initialData }: Props) {
   const [formData, setFormData] = useState<ServiceEditFormData>({
     serviceName: '',
@@ -48,17 +46,26 @@ export default function EditServiceModal({ open, onClose, onSave, initialData }:
     status: 'active',
   });
 
-  const [errors, setErrors] = useState<Partial<Record<keyof Omit<ServiceEditFormData, 'status'>, string>>>({});
+  const [errors, setErrors] = useState<
+    Partial<Record<keyof Omit<ServiceEditFormData, 'status'>, string>>
+  >({});
+
+  const SERVICE_PERIOD_OPTIONS = ['1개월', '3개월', '6개월', '12개월'];
 
   // 초기 데이터로 폼 채우기
   useEffect(() => {
     if (initialData && open) {
+      // servicePeriod가 숫자이면 "1개월" 형식으로 변환
+      const servicePeriodString = initialData.servicePeriod
+        ? `${initialData.servicePeriod}개월`
+        : '1개월';
+
       setFormData({
         serviceName: initialData.serviceName,
-        servicePeriod: initialData.servicePeriod,
+        servicePeriod: servicePeriodString,
         memberCount: initialData.memberCount,
         monthlyFee: initialData.monthlyFee,
-        status: initialData.status,
+        status: initialData.status === 'ACTIVE' ? 'active' : 'inactive',
       });
       setErrors({});
     }
@@ -122,7 +129,7 @@ export default function EditServiceModal({ open, onClose, onSave, initialData }:
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
       <DialogTitle>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+        <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
           서비스 수정
         </Typography>
         <IconButton
@@ -212,7 +219,12 @@ export default function EditServiceModal({ open, onClose, onSave, initialData }:
       <Divider />
 
       <DialogActions sx={{ px: 3, py: 2.5 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ width: '100%' }}>
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          sx={{ width: '100%' }}
+        >
           <FormControlLabel
             control={
               <Switch
@@ -241,4 +253,3 @@ export default function EditServiceModal({ open, onClose, onSave, initialData }:
     </Dialog>
   );
 }
-

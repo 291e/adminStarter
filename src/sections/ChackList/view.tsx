@@ -4,6 +4,8 @@ import type { Theme, SxProps } from '@mui/material/styles';
 
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
+import CircularProgress from '@mui/material/CircularProgress';
+import Stack from '@mui/material/Stack';
 
 import { DashboardContent } from 'src/layouts/dashboard';
 import ChecklistBreadcrumbs from './components/Breadcrumbs';
@@ -11,11 +13,22 @@ import ChecklistTabs from './components/Tabs';
 import ChecklistFilters from './components/Filters';
 import ChecklistTable from './components/Table';
 import ChecklistPagination from './components/Pagination';
-import IndustrySettingsModal, { type IndustryItem } from './components/IndustrySettingsModal';
-import CreateRiskWorkModal, { type RiskWorkFormData } from './components/CreateRiskWorkModal';
-import DisasterFactorsModal, { type DisasterFactorItem } from './components/DisasterFactorsModal';
+import IndustrySettingsModal from './components/IndustrySettingsModal';
+import CreateRiskWorkModal from './components/CreateRiskWorkModal';
+import DisasterFactorsModal from './components/DisasterFactorsModal';
 import { useChecklist } from './hooks/use-checklist';
-import { mockChecklists, type Checklist } from 'src/_mock/_checklist';
+import {
+  useChecklists,
+  useIndustries,
+  useCreateChecklist,
+  useUpdateHighRiskWork,
+  useSaveDisasterFactors,
+} from './hooks/use-checklist-api';
+import type {
+  Checklist,
+  IndustryItem,
+  DisasterFactorItem,
+} from 'src/services/checklist/checklist.types';
 
 // ----------------------------------------------------------------------
 
@@ -26,172 +39,185 @@ type Props = {
 };
 
 export function ChecklistView({ title = '업종별 체크리스트', description, sx }: Props) {
-  // TODO: TanStack Query Hook(useQuery)으로 체크리스트 목록 가져오기
-  // const { data: checklists, isLoading, error } = useQuery({
-  //   queryKey: ['checklists', industry, logic.filters],
-  //   queryFn: () => getChecklists({ industry, filters: logic.filters }),
-  // });
-  // 목업 데이터 사용
-  const checklists = mockChecklists(30);
-  const [industry, setIndustry] = useState('manufacturing');
-  const logic = useChecklist(checklists, industry);
+  const [industry, setIndustry] = useState<string>('all');
   const [industrySettingsModalOpen, setIndustrySettingsModalOpen] = useState(false);
   const [createRiskWorkModalOpen, setCreateRiskWorkModalOpen] = useState(false);
   const [disasterFactorsModalOpen, setDisasterFactorsModalOpen] = useState(false);
   const [selectedChecklist, setSelectedChecklist] = useState<Checklist | null>(null);
-  const [industries, setIndustries] = useState<IndustryItem[]>([]);
 
-  const renderContent = () => (
-    <Box
-      sx={{
-        bgcolor: 'background.paper',
-        borderRadius: 2,
-        boxShadow: (theme) => theme.customShadows.card,
-        width: '100%',
-        overflow: 'hidden',
-      }}
-    >
-      <ChecklistTabs
-        value={industry}
-        onChange={(newIndustry) => {
-          setIndustry(newIndustry);
-          // TODO: 업종 변경 시 TanStack Query로 체크리스트 목록 새로고침
-          // queryClient.invalidateQueries({ queryKey: ['checklists'] });
-        }}
-      />
+  // 업종 목록 조회
+  const industriesQuery = useIndustries();
+  const industries: IndustryItem[] =
+    industriesQuery.data?.industryList?.map((item) => ({
+      industryIdx: item.industryIdx,
+      name: item.name,
+      status: item.status,
+      isActive: item.status === 'ACTIVE',
+    })) || [];
 
-      <ChecklistFilters
-        status={logic.filters.status}
-        onChangeStatus={(status) => {
-          logic.onChangeStatus(status);
-          // TODO: 상태 필터 변경 시 TanStack Query로 체크리스트 목록 새로고침
-          // queryClient.invalidateQueries({ queryKey: ['checklists'] });
-        }}
-        startDate={logic.filters.startDate}
-        onChangeStartDate={(date) => {
-          logic.onChangeStartDate(date);
-          // TODO: 시작일 변경 시 TanStack Query로 체크리스트 목록 새로고침
-          // queryClient.invalidateQueries({ queryKey: ['checklists'] });
-        }}
-        endDate={logic.filters.endDate}
-        onChangeEndDate={(date) => {
-          logic.onChangeEndDate(date);
-          // TODO: 종료일 변경 시 TanStack Query로 체크리스트 목록 새로고침
-          // queryClient.invalidateQueries({ queryKey: ['checklists'] });
-        }}
-        searchFilter={logic.filters.searchFilter}
-        onChangeSearchFilter={(filter) => {
-          logic.onChangeSearchFilter(filter);
-          // TODO: 검색 필터 변경 시 TanStack Query로 체크리스트 목록 새로고침
-          // queryClient.invalidateQueries({ queryKey: ['checklists'] });
-        }}
-        searchValue={logic.filters.searchValue}
-        onChangeSearchValue={(value) => {
-          logic.onChangeSearchValue(value);
-          // TODO: 검색 값 변경 시 TanStack Query로 체크리스트 목록 새로고침
-          // queryClient.invalidateQueries({ queryKey: ['checklists'] });
-        }}
-      />
+  // 전체 체크리스트 목록 조회 (탭 생성을 위해 필터링 없이 조회)
+  const allChecklistsQuery = useChecklists({
+    page: 1,
+    pageSize: 1000, // 모든 데이터 가져오기
+  });
 
-      <ChecklistTable
-        rows={logic.filtered}
-        onSave={(rowId, newValue) => {
-          // TODO: TanStack Query Hook(useMutation)으로 고위험작업/상황 업데이트
-          // const mutation = useMutation({
-          //   mutationFn: ({ id, value }: { id: string; value: string }) =>
-          //     updateChecklist(id, { highRiskWork: value }),
-          //   onSuccess: () => {
-          //     queryClient.invalidateQueries({ queryKey: ['checklists'] });
-          //   },
-          // });
-          // mutation.mutate({ id: rowId, value: newValue });
-          console.log('저장:', rowId, newValue);
-        }}
-        onViewDisasterFactors={(row) => {
-          setSelectedChecklist(row);
-          setDisasterFactorsModalOpen(true);
-          // TODO: TanStack Query Hook(useQuery)으로 재해유발요인 목록 가져오기 (모달용)
-          // const { data: factors } = useQuery({
-          //   queryKey: ['disasterFactors', row.id],
-          //   queryFn: () => getDisasterFactors(row.id),
-          // });
-        }}
-      />
+  // 체크리스트 목록 조회 (서버 사이드 필터링은 industry만 사용, 나머지는 클라이언트 사이드)
+  const checklistsQuery = useChecklists({
+    page: 1,
+    pageSize: 1000, // 모든 데이터 가져오기
+    industry: industry !== 'all' ? industry : undefined, // industry는 industryIdx를 문자열로 변환한 값이거나 name
+  });
 
-      <ChecklistPagination
-        count={logic.total}
-        page={logic.page}
-        rowsPerPage={logic.rowsPerPage}
-        onChangePage={(event, newPage) => {
-          logic.onChangePage(event, newPage);
-          // TODO: 페이지 변경 시 TanStack Query로 체크리스트 목록 새로고침
-          // queryClient.invalidateQueries({ queryKey: ['checklists'] });
+  // 체크리스트 데이터 정규화
+  const checklists: Checklist[] = (() => {
+    const list = checklistsQuery.data?.checklistList;
+    if (!list || !Array.isArray(list) || list.length === 0) return [];
+    if (typeof list[0] === 'string') return [];
+    return (list as Checklist[]).map((item, index) => ({
+      ...item,
+      id: item.checklistIdx?.toString() || `checklist-${index}`,
+      registrationDate: item.createAt || item.updateAt || '',
+      order: index + 1,
+      industryName: item.industryName || item.industry,
+    }));
+  })();
+
+  // 클라이언트 사이드 필터링 및 페이지네이션
+  const logic = useChecklist(checklists, industry);
+
+  // Mutations
+  const createChecklistMutation = useCreateChecklist();
+  const updateHighRiskWorkMutation = useUpdateHighRiskWork();
+  const saveDisasterFactorsMutation = useSaveDisasterFactors();
+
+  const renderContent = () => {
+    if (checklistsQuery.isLoading) {
+      return (
+        <Stack alignItems="center" justifyContent="center" sx={{ py: 5 }}>
+          <CircularProgress />
+        </Stack>
+      );
+    }
+
+    return (
+      <Box
+        sx={{
+          bgcolor: 'background.paper',
+          borderRadius: 2,
+          boxShadow: (theme) => theme.customShadows.card,
+          width: '100%',
+          overflow: 'hidden',
         }}
-        onChangeRowsPerPage={(event) => {
-          logic.onChangeRowsPerPage(event);
-          // TODO: 페이지 크기 변경 시 TanStack Query로 체크리스트 목록 새로고침
-          // queryClient.invalidateQueries({ queryKey: ['checklists'] });
-        }}
-      />
-    </Box>
-  );
+      >
+        <ChecklistTabs
+          value={industry}
+          onChange={(newIndustry) => {
+            setIndustry(newIndustry);
+          }}
+          checklists={(allChecklistsQuery.data?.checklistList as Checklist[]) || []}
+        />
+
+        <ChecklistFilters
+          status={logic.filters.status}
+          onChangeStatus={(status) => {
+            logic.onChangeStatus(status);
+          }}
+          startDate={logic.filters.startDate}
+          onChangeStartDate={(date) => {
+            logic.onChangeStartDate(date);
+          }}
+          endDate={logic.filters.endDate}
+          onChangeEndDate={(date) => {
+            logic.onChangeEndDate(date);
+          }}
+          searchFilter={logic.filters.searchFilter}
+          onChangeSearchFilter={(filter) => {
+            logic.onChangeSearchFilter(filter);
+          }}
+          searchValue={logic.filters.searchValue}
+          onChangeSearchValue={(value) => {
+            logic.onChangeSearchValue(value);
+          }}
+        />
+
+        <ChecklistTable
+          rows={logic.filtered}
+          onSave={(rowId, newValue) => {
+            const checklist = checklists.find((c) => c.id === rowId);
+            if (checklist?.checklistIdx) {
+              updateHighRiskWorkMutation.mutate({
+                checklistIdx: checklist.checklistIdx,
+                highRiskWork: newValue,
+              });
+            }
+          }}
+          onViewDisasterFactors={(row) => {
+            setSelectedChecklist(row);
+            setDisasterFactorsModalOpen(true);
+          }}
+        />
+
+        <ChecklistPagination
+          count={logic.total}
+          page={logic.page}
+          rowsPerPage={logic.rowsPerPage}
+          onChangePage={(event, newPage) => {
+            logic.onChangePage(event, newPage);
+          }}
+          onChangeRowsPerPage={(event) => {
+            logic.onChangeRowsPerPage(event);
+          }}
+        />
+      </Box>
+    );
+  };
 
   const handleIndustrySettings = () => {
     setIndustrySettingsModalOpen(true);
-  };
-
-  const handleSaveIndustries = (newIndustries: IndustryItem[]) => {
-    // TODO: TanStack Query Hook(useMutation)으로 업종 목록 저장
-    // const mutation = useMutation({
-    //   mutationFn: (industries: IndustryItem[]) => saveIndustries(industries),
-    //   onSuccess: () => {
-    //     queryClient.invalidateQueries({ queryKey: ['industries'] });
-    //     setIndustrySettingsModalOpen(false);
-    //   },
-    // });
-    // mutation.mutate(newIndustries);
-    console.log('업종 저장:', newIndustries);
   };
 
   const handleCreate = () => {
     setCreateRiskWorkModalOpen(true);
   };
 
-  const handleSaveRiskWork = (data: RiskWorkFormData) => {
-    // TODO: TanStack Query Hook(useMutation)으로 위험작업/상황 등록
-    // const mutation = useMutation({
-    //   mutationFn: (formData: RiskWorkFormData) => createRiskWork({
-    //     industry: formData.industry,
-    //     highRiskWork: formData.highRiskWork,
-    //   }),
-    //   onSuccess: () => {
-    //     queryClient.invalidateQueries({ queryKey: ['checklists'] });
-    //     setCreateRiskWorkModalOpen(false);
-    //   },
-    // });
-    // mutation.mutate(data);
-    console.log('위험작업/상황 등록:', data);
+  const handleSaveRiskWork = (data: { industry: string; highRiskWork: string }) => {
+    // industry는 industryIdx로 변환 필요
+    const selectedIndustry = industries.find((ind) => ind.name === data.industry);
+    if (selectedIndustry?.industryIdx) {
+      createChecklistMutation.mutate(
+        {
+          industryIdx: selectedIndustry.industryIdx,
+          highRiskWork: data.highRiskWork,
+        },
+        {
+          onSuccess: () => {
+            setCreateRiskWorkModalOpen(false);
+          },
+        }
+      );
+    }
   };
 
   const handleSaveDisasterFactors = (factors: DisasterFactorItem[], isActive: boolean) => {
-    if (!selectedChecklist) return;
+    if (!selectedChecklist?.checklistIdx) return;
 
-    // TODO: TanStack Query Hook(useMutation)으로 재해유발요인 목록 저장
-    // const mutation = useMutation({
-    //   mutationFn: ({ checklistId, factors, isActive }: {
-    //     checklistId: string;
-    //     factors: DisasterFactorItem[];
-    //     isActive: boolean;
-    //   }) => saveDisasterFactors(checklistId, { factors, isActive }),
-    //   onSuccess: () => {
-    //     queryClient.invalidateQueries({ queryKey: ['checklists'] });
-    //     queryClient.invalidateQueries({ queryKey: ['disasterFactors', selectedChecklist.id] });
-    //     setDisasterFactorsModalOpen(false);
-    //     setSelectedChecklist(null);
-    //   },
-    // });
-    // mutation.mutate({ checklistId: selectedChecklist.id, factors, isActive });
-    console.log('재해유발요인 저장:', factors, isActive);
+    saveDisasterFactorsMutation.mutate(
+      {
+        checklistIdx: selectedChecklist.checklistIdx,
+        disasterFactorList: factors.map((factor) => ({
+          disasterFactorIdx: factor.disasterFactorIdx,
+          factorName: factor.factorName,
+          order: factor.order,
+          isActive: factor.isActive ? 1 : 0,
+        })),
+      },
+      {
+        onSuccess: () => {
+          setDisasterFactorsModalOpen(false);
+          setSelectedChecklist(null);
+        },
+      }
+    );
   };
 
   return (
@@ -216,7 +242,6 @@ export function ChecklistView({ title = '업종별 체크리스트', description
       <IndustrySettingsModal
         open={industrySettingsModalOpen}
         onClose={() => setIndustrySettingsModalOpen(false)}
-        onSave={handleSaveIndustries}
       />
 
       <CreateRiskWorkModal

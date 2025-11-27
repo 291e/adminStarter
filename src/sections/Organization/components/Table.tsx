@@ -22,7 +22,7 @@ import { fDateTime } from 'src/utils/format-time';
 import { Iconify } from 'src/components/iconify';
 import AccidentFreeWorksiteModal from './AccidentFreeWorksiteModal';
 import DeleteMemberModal from './DeleteMemberModal';
-import DeactivateMemberModal from './DeactivateMemberModal';
+import EditOrganizationModal from './EditOrganizationModal';
 
 type Props = {
   rows: Organization[];
@@ -31,17 +31,15 @@ type Props = {
   onDelete?: (row: Organization) => void;
 };
 
-export default function OrganizationTable({ rows, onViewDetail, onDeactivate, onDelete }: Props) {
+export default function OrganizationTable({ rows, onViewDetail, onDelete }: Props) {
   const [menuAnchorEl, setMenuAnchorEl] = useState<{ [key: string]: HTMLElement | null }>({});
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedOrganization, setSelectedOrganization] = useState<Organization | null>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [organizationToDelete, setOrganizationToDelete] = useState<Organization | null>(null);
-  const [deactivateModalOpen, setDeactivateModalOpen] = useState(false);
-  const [organizationToDeactivate, setOrganizationToDeactivate] = useState<Organization | null>(
-    null
-  );
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [organizationToEdit, setOrganizationToEdit] = useState<Organization | null>(null);
 
   const handleOpenMenu = (event: React.MouseEvent<HTMLElement>, rowId: string) => {
     event.stopPropagation();
@@ -91,21 +89,14 @@ export default function OrganizationTable({ rows, onViewDetail, onDeactivate, on
     }
   };
 
-  const handleOpenDeactivateModal = (organization: Organization) => {
-    setOrganizationToDeactivate(organization);
-    setDeactivateModalOpen(true);
+  const handleOpenEditModal = (organization: Organization) => {
+    setOrganizationToEdit(organization);
+    setEditModalOpen(true);
   };
 
-  const handleCloseDeactivateModal = () => {
-    setDeactivateModalOpen(false);
-    setOrganizationToDeactivate(null);
-  };
-
-  const handleConfirmDeactivate = () => {
-    if (organizationToDeactivate) {
-      onDeactivate?.(organizationToDeactivate);
-      handleCloseDeactivateModal();
-    }
+  const handleCloseEditModal = () => {
+    setEditModalOpen(false);
+    setOrganizationToEdit(null);
   };
 
   // 구분 매핑 함수 (companyType을 한글로 변환)
@@ -287,10 +278,10 @@ export default function OrganizationTable({ rows, onViewDetail, onDeactivate, on
                       <MenuItem
                         onClick={() => {
                           handleCloseMenu(row.companyIdx.toString());
-                          handleOpenDeactivateModal(row);
+                          handleOpenEditModal(row);
                         }}
                       >
-                        비활성화
+                        수정
                       </MenuItem>
                       <Divider />
                       <MenuItem
@@ -331,11 +322,10 @@ export default function OrganizationTable({ rows, onViewDetail, onDeactivate, on
         organization={organizationToDelete}
       />
 
-      <DeactivateMemberModal
-        open={deactivateModalOpen}
-        onClose={handleCloseDeactivateModal}
-        onConfirm={handleConfirmDeactivate}
-        organization={organizationToDeactivate}
+      <EditOrganizationModal
+        open={editModalOpen}
+        organization={organizationToEdit}
+        onClose={handleCloseEditModal}
       />
     </TableContainer>
   );

@@ -5,12 +5,13 @@ import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import InputAdornment from '@mui/material/InputAdornment';
+import RadioGroup from '@mui/material/RadioGroup';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Radio from '@mui/material/Radio';
+import FormLabel from '@mui/material/FormLabel';
 
-import { Iconify } from 'src/components/iconify';
 import ImageUpload from './ImageUpload';
-
-// 다음 주소 API 타입 정의
+import { Iconify } from 'src/components/iconify';
 declare global {
   interface Window {
     daum: {
@@ -29,44 +30,85 @@ declare global {
     };
   }
 }
-
 // ----------------------------------------------------------------------
 
 export type RiskReportFormData = {
-  images: File[];
-  address: string;
-  detailAddress: string;
+  title: string;
+  location: string;
   content: string;
-  reporter: string;
-  author: string;
+  images: File[];
+  signalType: string;
+  sourceType: string;
+  description: string;
+  memo: string;
+  chatRoomId: string;
+  reporterName: string;
+  authorName: string;
+  status?: 'CONFIRMED' | 'UNCONFIRMED';
 };
 
 type Props = {
   onSubmit: (data: RiskReportFormData) => void;
   onCancel: () => void;
+  isSubmitting?: boolean;
+  initialData?: Partial<RiskReportFormData> & {
+    existingImageUrls?: string[];
+    status?: 'CONFIRMED' | 'UNCONFIRMED' | 'PENDING';
+  };
+  mode?: 'create' | 'edit';
 };
 
-export default function RiskReportForm({ onSubmit, onCancel }: Props) {
+export default function RiskReportForm({
+  onSubmit,
+  onCancel,
+  isSubmitting,
+  initialData,
+  mode = 'create',
+}: Props) {
   const [formData, setFormData] = useState<RiskReportFormData>({
-    images: [],
-    address: '',
-    detailAddress: '',
-    content: '',
-    reporter: '',
-    author: '',
+    title: initialData?.title || '',
+    location: initialData?.location || '',
+    content: initialData?.content || '',
+    images: initialData?.images || [],
+    signalType: initialData?.signalType || '',
+    sourceType: initialData?.sourceType || '',
+    description: initialData?.description || '',
+    memo: initialData?.memo || '',
+    chatRoomId: initialData?.chatRoomId || '',
+    reporterName: initialData?.reporterName || '',
+    authorName: initialData?.authorName || '',
+    status:
+      initialData?.status === 'CONFIRMED' || initialData?.status === 'UNCONFIRMED'
+        ? initialData.status
+        : 'UNCONFIRMED',
   });
-
+  const [address, setAddress] = useState(() => {
+    // location에서 주소 부분 추출 (상세 주소 제외)
+    if (initialData?.location) {
+      const parts = initialData.location.split(' ');
+      return parts[0] || '';
+    }
+    return '';
+  });
+  const [detailAddress, setDetailAddress] = useState(() => {
+    // location에서 상세 주소 부분 추출
+    if (initialData?.location) {
+      const parts = initialData.location.split(' ');
+      return parts.slice(1).join(' ') || '';
+    }
+    return '';
+  });
+  const [existingImageUrls, setExistingImageUrls] = useState<string[]>(
+    initialData?.existingImageUrls || []
+  );
   const addressInputRef = useRef<HTMLInputElement>(null);
 
-  // 다음 주소 API 스크립트 로드
   useEffect(() => {
     const script = document.createElement('script');
     script.src = '//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
     script.async = true;
     document.head.appendChild(script);
-
     return () => {
-      // 컴포넌트 언마운트 시 스크립트 제거
       const existingScript = document.querySelector('script[src*="postcode.v2.js"]');
       if (existingScript) {
         document.head.removeChild(existingScript);
@@ -78,6 +120,10 @@ export default function RiskReportForm({ onSubmit, onCancel }: Props) {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  const updateLocation = (base: string, detail: string) => {
+    const combined = [base.trim(), detail.trim()].filter(Boolean).join(' ');
+    handleChange('location', combined);
+  };
   const handleSearchAddress = () => {
     if (!window.daum) {
       alert('주소 검색 서비스를 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
@@ -87,19 +133,10 @@ export default function RiskReportForm({ onSubmit, onCancel }: Props) {
     new window.daum.Postcode({
       oncomplete: (data) => {
         // 주소 선택 시 실행되는 콜백
-        let addr = ''; // 주소 변수
-
-        // 사용자가 선택한 주소 타입에 따라 해당 주소 값을 가져온다.
-        if (data.addressType === 'R') {
-          // 사용자가 도로명 주소를 선택했을 경우
-          addr = data.address;
-        } else {
-          // 사용자가 지번 주소를 선택했을 경우(J)
-          addr = data.address;
-        }
-
-        // 주소 필드에 값 설정
-        handleChange('address', addr);
+        const addr = data.address;
+        setAddress(addr);
+        updateLocation(addr, detailAddress);
+        addressInputRef.current?.focus();
       },
       width: '100%',
       height: '100%',
@@ -135,17 +172,34 @@ export default function RiskReportForm({ onSubmit, onCancel }: Props) {
         }}
       >
         <Typography variant="h6" sx={{ fontWeight: 600 }}>
-          위험 보고 등록
+          {mode === 'edit' ? '위험 보고 수정' : '위험 보고 등록'}
         </Typography>
       </Box>
 
       {/* 폼 내용 */}
       <Box sx={{ p: 3 }}>
         <Stack spacing={3}>
+          {/* 제목 */}
+          <Box>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>
+              제목
+            </Typography>
+            <TextField
+              fullWidth
+              placeholder="사고 상황을 입력하세요"
+              value={formData.title}
+              onChange={(e) => handleChange('title', e.target.value)}
+            />
+          </Box>
+
           {/* 이미지 업로드 */}
           <ImageUpload
             images={formData.images}
             onChange={(images) => handleChange('images', images)}
+            existingImageUrls={existingImageUrls}
+            onRemoveExistingUrl={(url) => {
+              setExistingImageUrls((prev) => prev.filter((u) => u !== url));
+            }}
           />
 
           {/* 위치 */}
@@ -153,30 +207,16 @@ export default function RiskReportForm({ onSubmit, onCancel }: Props) {
             <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
               위치
             </Typography>
+
             <Stack spacing={2}>
               <TextField
                 inputRef={addressInputRef}
                 fullWidth
                 placeholder="주소"
-                value={formData.address}
+                value={address}
                 onClick={handleAddressFieldClick}
                 InputProps={{
                   readOnly: true,
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <Button
-                        variant="text"
-                        color="primary"
-                        startIcon={<Iconify icon="eva:search-fill" width={20} />}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSearchAddress();
-                        }}
-                      >
-                        검색
-                      </Button>
-                    </InputAdornment>
-                  ),
                 }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
@@ -188,8 +228,11 @@ export default function RiskReportForm({ onSubmit, onCancel }: Props) {
                 <TextField
                   fullWidth
                   placeholder="상세 주소"
-                  value={formData.detailAddress}
-                  onChange={(e) => handleChange('detailAddress', e.target.value)}
+                  value={detailAddress}
+                  onChange={(e) => {
+                    setDetailAddress(e.target.value);
+                    updateLocation(address, e.target.value);
+                  }}
                 />
                 <Stack
                   direction="row"
@@ -229,7 +272,6 @@ export default function RiskReportForm({ onSubmit, onCancel }: Props) {
               }}
             />
           </Box>
-
           {/* 보고자/작성자 */}
           <Stack direction="row" spacing={2}>
             <Box sx={{ flex: 1 }}>
@@ -239,8 +281,8 @@ export default function RiskReportForm({ onSubmit, onCancel }: Props) {
               <TextField
                 fullWidth
                 placeholder="김안전"
-                value={formData.reporter}
-                onChange={(e) => handleChange('reporter', e.target.value)}
+                value={formData.reporterName}
+                onChange={(e) => handleChange('reporterName', e.target.value)}
               />
             </Box>
             <Box sx={{ flex: 1 }}>
@@ -250,11 +292,51 @@ export default function RiskReportForm({ onSubmit, onCancel }: Props) {
               <TextField
                 fullWidth
                 placeholder="트루트루스"
-                value={formData.author}
-                onChange={(e) => handleChange('author', e.target.value)}
+                value={formData.authorName}
+                onChange={(e) => handleChange('authorName', e.target.value)}
               />
             </Box>
           </Stack>
+
+          {/* 수정 모드일 때만 표시되는 필드 */}
+          {mode === 'edit' && (
+            <>
+              {/* 메모 */}
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>
+                  메모
+                </Typography>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={6}
+                  placeholder="메모를 입력하세요"
+                  value={formData.memo}
+                  onChange={(e) => handleChange('memo', e.target.value)}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      bgcolor: 'grey.50',
+                    },
+                  }}
+                />
+              </Box>
+
+              {/* 확인 */}
+              <Box>
+                <FormLabel sx={{ mb: 1.5, display: 'block', fontWeight: 600 }}>확인</FormLabel>
+                <RadioGroup
+                  row
+                  value={formData.status || 'UNCONFIRMED'}
+                  onChange={(e) =>
+                    handleChange('status', e.target.value as 'CONFIRMED' | 'UNCONFIRMED')
+                  }
+                >
+                  <FormControlLabel value="CONFIRMED" control={<Radio />} label="확인" />
+                  <FormControlLabel value="UNCONFIRMED" control={<Radio />} label="미확인" />
+                </RadioGroup>
+              </Box>
+            </>
+          )}
         </Stack>
       </Box>
 
@@ -268,11 +350,17 @@ export default function RiskReportForm({ onSubmit, onCancel }: Props) {
           gap: 2,
         }}
       >
-        <Button variant="outlined" size="large" onClick={onCancel}>
+        <Button variant="outlined" size="large" onClick={onCancel} disabled={isSubmitting}>
           취소
         </Button>
-        <Button variant="contained" size="large" onClick={handleSubmit}>
-          등록
+        <Button variant="contained" size="large" onClick={handleSubmit} disabled={isSubmitting}>
+          {isSubmitting
+            ? mode === 'edit'
+              ? '수정 중...'
+              : '등록 중...'
+            : mode === 'edit'
+              ? '수정'
+              : '등록'}
         </Button>
       </Box>
     </Box>

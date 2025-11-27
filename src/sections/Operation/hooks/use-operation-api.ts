@@ -3,14 +3,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getRiskReports,
   createRiskReport,
-  deactivateRiskReport,
   deleteRiskReport,
+  getRiskReport,
+  updateRiskReport,
+  createRiskReportFromChat,
 } from 'src/services/operation/operation.service';
 import type {
   GetRiskReportsParams,
   CreateRiskReportParams,
-  DeactivateRiskReportParams,
   DeleteRiskReportParams,
+  GetRiskReportParams,
+  UpdateRiskReportParams,
+  CreateRiskReportFromChatParams,
 } from 'src/services/operation/operation.types';
 
 // ----------------------------------------------------------------------
@@ -23,6 +27,18 @@ export function useRiskReports(params: GetRiskReportsParams) {
     queryKey: ['riskReports', params],
     queryFn: () => getRiskReports(params),
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+/**
+ * 위험 보고 상세 조회 Hook
+ */
+export function useRiskReportDetail(params: GetRiskReportParams, enabled = true) {
+  return useQuery({
+    queryKey: ['riskReportDetail', params.riskReportIdx],
+    queryFn: () => getRiskReport(params),
+    enabled,
+    staleTime: 2 * 60 * 1000,
   });
 }
 
@@ -41,20 +57,6 @@ export function useCreateRiskReport() {
 }
 
 /**
- * 위험 보고 비활성화 Mutation Hook
- */
-export function useDeactivateRiskReport() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (params: DeactivateRiskReportParams) => deactivateRiskReport(params),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['riskReports'] });
-    },
-  });
-}
-
-/**
  * 위험 보고 삭제 Mutation Hook
  */
 export function useDeleteRiskReport() {
@@ -62,6 +64,33 @@ export function useDeleteRiskReport() {
 
   return useMutation({
     mutationFn: (params: DeleteRiskReportParams) => deleteRiskReport(params),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['riskReports'] });
+    },
+  });
+}
+
+/**
+ * 위험 보고 수정 Mutation Hook
+ */
+export function useUpdateRiskReport() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (params: UpdateRiskReportParams) => updateRiskReport(params),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['riskReports'] });
+      queryClient.invalidateQueries({ queryKey: ['riskReportDetail', variables.riskReportIdx] });
+    },
+  });
+}
+
+/**
+ * 채팅 위험 보고 생성 Mutation Hook
+ */
+export function useCreateRiskReportFromChat() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (params: CreateRiskReportFromChatParams) => createRiskReportFromChat(params),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['riskReports'] });
     },

@@ -56,15 +56,46 @@ export default function PrioritySettingsModal({
   const deletePrioritySettingMutation = useDeletePrioritySetting();
 
   // PrioritySetting을 PriorityItem으로 변환
-  const convertPrioritySettingToItem = (setting: PrioritySetting): PriorityItem => {
-    // color 값이 hex 코드인 경우 색상 이름으로 변환 (간단한 매핑)
-    const colorName =
-      Object.keys(COLOR_VALUES).find(
-        (key) => COLOR_VALUES[key].toLowerCase() === setting.color.toLowerCase()
-      ) || 'red';
+  const convertPrioritySettingToItem = (setting: PrioritySetting, index?: number): PriorityItem => {
+    // color 값이 hex 코드인 경우 색상 이름으로 변환
+    // API에서 받은 색상 값과 COLOR_VALUES를 비교하여 매칭
+    const settingColorLower = setting.color.toLowerCase();
+
+    // 정확한 매칭 시도
+    let colorName = Object.keys(COLOR_VALUES).find(
+      (key) => COLOR_VALUES[key].toLowerCase() === settingColorLower
+    );
+
+    // 정확한 매칭이 없으면 유사한 색상 찾기 (헥스 코드 비교)
+    if (!colorName) {
+      // API에서 사용하는 색상 값들
+      const apiColorMap: Record<string, string> = {
+        '#b71d18': 'red', // 빨강
+        '#b76e00': 'yellow', // 노랑/주황
+        '#1d7bf5': 'blue', // 파랑
+        '#007867': 'green', // 초록
+        '#9c27b0': 'purple', // 보라
+      };
+      colorName = apiColorMap[settingColorLower] || 'red';
+    }
+
+    // priorityIdx를 id로 사용 (문자열로 변환)
+    const id = String(setting.priorityIdx);
+
+    // 디버깅: 변환 과정 확인
+    if (import.meta.env.DEV) {
+      console.log('🔄 convertPrioritySettingToItem:', {
+        setting,
+        priorityIdx: setting.priorityIdx,
+        color: setting.color,
+        colorName,
+        id,
+        colorMatched: COLOR_VALUES[colorName]?.toLowerCase() === settingColorLower,
+      });
+    }
 
     return {
-      id: setting.id || setting.prioritySettingId || '', // API는 id 필드 사용
+      id, // priorityIdx를 문자열로 변환하여 사용
       color: colorName,
       labelType: setting.labelType || '', // 자유 문자열
       isActive: setting.isActive === 1,
@@ -108,7 +139,7 @@ export default function PrioritySettingsModal({
 
     return priorityList
       .sort((a, b) => (a.order || 0) - (b.order || 0))
-      .map(convertPrioritySettingToItem);
+      .map((setting, index) => convertPrioritySettingToItem(setting, index));
   }, [prioritySettingsData]);
 
   useEffect(() => {
@@ -148,14 +179,28 @@ export default function PrioritySettingsModal({
   };
 
   const handleUpdateItem = (id: string, field: keyof PriorityItem, value: unknown) => {
-    setPriorities(
-      priorities.map((item) => {
-        if (item.id === id) {
-          return { ...item, [field]: value };
+    // id가 빈 문자열이면 업데이트하지 않음
+    if (!id || id.trim() === '') {
+      console.warn('⚠️ PrioritySettingsModal: Cannot update item with empty id');
+      return;
+    }
+
+    setPriorities((prevPriorities) => {
+      const updated = prevPriorities.map((item, index) => {
+        // id를 직접 비교 (빈 문자열이 아닌 경우에만)
+        const itemId = item.id && item.id.trim() !== '' ? item.id : `temp-${index}`;
+        const targetId = id && id.trim() !== '' ? id : `temp-${index}`;
+
+        if (itemId === targetId) {
+          const updatedItem = { ...item, [field]: value };
+
+          return updatedItem;
         }
         return item;
-      })
-    );
+      });
+
+      return updated;
+    });
   };
 
   const handleDeleteItem = async (id: string) => {
@@ -167,7 +212,7 @@ export default function PrioritySettingsModal({
     try {
       // 중요도 삭제 API 호출
       await deletePrioritySettingMutation.mutateAsync({
-        prioritySettingId: id,
+        priorityIdx: Number(id),
       });
 
       // 로컬 상태에서도 제거
@@ -224,132 +269,136 @@ export default function PrioritySettingsModal({
 
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1, pb: 3 }}>
-          {priorities.map((priority) => (
-            <Box
-              key={priority.id}
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
+          {priorities.map((priority, index) => {
+            // key가 빈 문자열이거나 중복될 수 있으므로 안전하게 처리
+            const safeKey = priority.id || `priority-${index}`;
+            return (
               <Box
+                key={safeKey}
                 sx={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 1,
-                  bgcolor: 'grey.100',
-                  borderRadius: 1.5,
-                  px: 2,
-                  py: 1,
+                  justifyContent: 'space-between',
                 }}
               >
-                <FormControl
-                  size="small"
-                  sx={{ width: 120, bgcolor: 'background.paper', borderRadius: 1.5 }}
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    bgcolor: 'grey.100',
+                    borderRadius: 1.5,
+                    px: 2,
+                    py: 1,
+                  }}
                 >
-                  <Select
-                    value={priority.color}
-                    onChange={(e) => handleUpdateItem(priority.id, 'color', e.target.value)}
-                    renderValue={(selected) => {
-                      const option = COLOR_OPTIONS.find((opt) => opt.value === selected);
-                      return (
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Box
-                            sx={{
-                              width: 24,
-                              height: 24,
-                              borderRadius: '50%',
-                              bgcolor: COLOR_VALUES[selected] || selected,
-                              border: '1px solid',
-                              borderColor: 'divider',
-                              flexShrink: 0,
-                            }}
-                          />
-                          <Typography
-                            component="span"
-                            sx={{
-                              fontSize: 15,
-                              lineHeight: '24px',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {option?.label || selected}
-                          </Typography>
-                        </Box>
-                      );
-                    }}
+                  <FormControl
+                    size="small"
+                    sx={{ width: 120, bgcolor: 'background.paper', borderRadius: 1.5 }}
+                  >
+                    <Select
+                      value={priority.color}
+                      onChange={(e) => handleUpdateItem(priority.id, 'color', e.target.value)}
+                      renderValue={(selected) => {
+                        const option = COLOR_OPTIONS.find((opt) => opt.value === selected);
+                        return (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Box
+                              sx={{
+                                width: 24,
+                                height: 24,
+                                borderRadius: '50%',
+                                bgcolor: COLOR_VALUES[selected] || selected,
+                                border: '1px solid',
+                                borderColor: 'divider',
+                                flexShrink: 0,
+                              }}
+                            />
+                            <Typography
+                              component="span"
+                              sx={{
+                                fontSize: 15,
+                                lineHeight: '24px',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {option?.label || selected}
+                            </Typography>
+                          </Box>
+                        );
+                      }}
+                      sx={{
+                        fontSize: 15,
+                        lineHeight: '24px',
+                        '& .MuiSelect-select': {
+                          py: 1,
+                        },
+                      }}
+                    >
+                      {COLOR_OPTIONS.map((option) => (
+                        <MenuItem key={option.value} value={option.value}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Box
+                              sx={{
+                                width: 24,
+                                height: 24,
+                                borderRadius: '50%',
+                                bgcolor: COLOR_VALUES[option.value],
+                                border: '1px solid',
+                                borderColor: 'divider',
+                                flexShrink: 0,
+                              }}
+                            />
+                            <Typography component="span" sx={{ fontSize: 15, lineHeight: '24px' }}>
+                              {option.label}
+                            </Typography>
+                          </Box>
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+
+                  <TextField
+                    size="small"
+                    placeholder="라벨 타입 입력 (예: 긴급, 중요, 참고)"
+                    value={priority.labelType}
+                    onChange={(e) => handleUpdateItem(priority.id, 'labelType', e.target.value)}
+                    disabled={!priority.color}
                     sx={{
-                      fontSize: 15,
-                      lineHeight: '24px',
-                      '& .MuiSelect-select': {
+                      width: 120,
+                      bgcolor: 'background.paper',
+                      borderRadius: 1.5,
+                      '& .MuiInputBase-input': {
+                        fontSize: 15,
+                        lineHeight: '24px',
                         py: 1,
                       },
                     }}
-                  >
-                    {COLOR_OPTIONS.map((option) => (
-                      <MenuItem key={option.value} value={option.value}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Box
-                            sx={{
-                              width: 24,
-                              height: 24,
-                              borderRadius: '50%',
-                              bgcolor: COLOR_VALUES[option.value],
-                              border: '1px solid',
-                              borderColor: 'divider',
-                              flexShrink: 0,
-                            }}
-                          />
-                          <Typography component="span" sx={{ fontSize: 15, lineHeight: '24px' }}>
-                            {option.label}
-                          </Typography>
-                        </Box>
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+                  />
+                </Box>
+                <Switch
+                  checked={priority.isActive}
+                  onChange={(e) => handleUpdateItem(priority.id, 'isActive', e.target.checked)}
+                  size="medium"
+                />
 
-                <TextField
+                <IconButton
                   size="small"
-                  placeholder="라벨 타입 입력 (예: 긴급, 중요, 참고)"
-                  value={priority.labelType}
-                  onChange={(e) => handleUpdateItem(priority.id, 'labelType', e.target.value)}
-                  disabled={!priority.color}
+                  onClick={() => handleDeleteItem(priority.id)}
                   sx={{
-                    width: 120,
-                    bgcolor: 'background.paper',
-                    borderRadius: 1.5,
-                    '& .MuiInputBase-input': {
-                      fontSize: 15,
-                      lineHeight: '24px',
-                      py: 1,
+                    color: 'text.secondary',
+                    '&:hover': {
+                      bgcolor: 'action.hover',
                     },
                   }}
-                />
+                >
+                  <Iconify icon="solar:trash-bin-trash-bold" width={24} />
+                </IconButton>
               </Box>
-              <Switch
-                checked={priority.isActive}
-                onChange={(e) => handleUpdateItem(priority.id, 'isActive', e.target.checked)}
-                size="medium"
-              />
-
-              <IconButton
-                size="small"
-                onClick={() => handleDeleteItem(priority.id)}
-                sx={{
-                  color: 'text.secondary',
-                  '&:hover': {
-                    bgcolor: 'action.hover',
-                  },
-                }}
-              >
-                <Iconify icon="solar:trash-bin-trash-bold" width={24} />
-              </IconButton>
-            </Box>
-          ))}
+            );
+          })}
 
           <Box sx={{ display: 'flex', justifyContent: 'center', pt: 1 }}>
             <DialogBtn

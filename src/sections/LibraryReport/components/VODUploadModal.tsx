@@ -15,6 +15,8 @@ import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
+import Alert from '@mui/material/Alert';
+import LoadingButton from '@mui/lab/LoadingButton';
 
 import { Iconify } from 'src/components/iconify';
 import type { CategoryItem } from './CategorySettingsModal';
@@ -25,14 +27,15 @@ export type VODUploadFormData = {
   category: string;
   title: string;
   videoFile: File | null;
-  subtitleFile: File | null;
-  subtitleTitle: string;
+  description: string;
+  isActive: boolean;
+  thumbnailDataUrl?: string | null; // 비디오에서 추출한 썸네일 (Data URL)
 };
 
 type Props = {
   open: boolean;
   onClose: () => void;
-  onSave: (data: VODUploadFormData) => void;
+  onSave: (data: VODUploadFormData) => Promise<void> | void;
   categories: CategoryItem[];
 };
 
@@ -41,17 +44,16 @@ export default function VODUploadModal({ open, onClose, onSave, categories }: Pr
     category: '',
     title: '',
     videoFile: null,
-    subtitleFile: null,
-    subtitleTitle: '',
+    description: '',
+    isActive: true,
+    thumbnailDataUrl: null,
   });
 
   const [isDraggingVideo, setIsDraggingVideo] = useState(false);
-  const [isDraggingSubtitle, setIsDraggingSubtitle] = useState(false);
+  const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const videoFileInputRef = useRef<HTMLInputElement>(null);
-  const subtitleFileInputRef = useRef<HTMLInputElement>(null);
-
-  // 활성화된 카테고리만 표시
-  const activeCategories = categories.filter((cat) => cat.isActive);
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     if (open) {
@@ -59,9 +61,13 @@ export default function VODUploadModal({ open, onClose, onSave, categories }: Pr
         category: '',
         title: '',
         videoFile: null,
-        subtitleFile: null,
-        subtitleTitle: '',
+        description: '',
+        isActive: true,
+        thumbnailDataUrl: null,
       });
+      setVideoPreview(null);
+      setIsSaving(false);
+      setErrorMessage('');
     }
   }, [open]);
 
@@ -72,13 +78,57 @@ export default function VODUploadModal({ open, onClose, onSave, categories }: Pr
   const handleVideoFileSelect = (file: File) => {
     if (file && file.type.startsWith('video/')) {
       handleChange('videoFile', file);
+      // 비디오에서 썸네일 추출
+      extractVideoThumbnail(file);
     }
   };
 
-  const handleSubtitleFileSelect = (file: File) => {
-    if (file && (file.type === 'text/vtt' || file.name.endsWith('.vtt') || file.name.endsWith('.srt'))) {
-      handleChange('subtitleFile', file);
-    }
+  const extractVideoThumbnail = (file: File) => {
+    const video = document.createElement('video');
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    video.preload = 'metadata';
+    video.src = URL.createObjectURL(file);
+
+    video.onloadedmetadata = () => {
+      // 비디오의 첫 프레임으로 썸네일 생성
+      video.currentTime = 0.1; // 0.1초 지점의 프레임 사용
+    };
+
+    video.onseeked = () => {
+      // 비디오 크기에 맞춰 캔버스 크기 설정
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      // 비디오 프레임을 캔버스에 그리기
+      ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // 캔버스를 이미지로 변환
+      const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.8);
+      setVideoPreview(thumbnailUrl);
+      // 썸네일 Data URL을 formData에 저장
+      handleChange('thumbnailDataUrl', thumbnailUrl);
+
+      // 메모리 정리
+      URL.revokeObjectURL(video.src);
+    };
+
+    video.onerror = () => {
+      // 에러 발생 시 기본 미리보기 사용
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setVideoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+      URL.revokeObjectURL(video.src);
+    };
+  };
+
+  const handleRemoveVideo = () => {
+    handleChange('videoFile', null);
+    handleChange('thumbnailDataUrl', null);
+    setVideoPreview(null);
   };
 
   const handleVideoDrop = (e: React.DragEvent) => {
@@ -90,40 +140,41 @@ export default function VODUploadModal({ open, onClose, onSave, categories }: Pr
     }
   };
 
-  const handleSubtitleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDraggingSubtitle(false);
-    const file = e.dataTransfer.files[0];
-    if (file) {
-      handleSubtitleFileSelect(file);
-    }
-  };
-
   const handleVideoDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDraggingVideo(true);
-  };
-
-  const handleSubtitleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDraggingSubtitle(true);
   };
 
   const handleVideoDragLeave = () => {
     setIsDraggingVideo(false);
   };
 
-  const handleSubtitleDragLeave = () => {
-    setIsDraggingSubtitle(false);
-  };
-
-  const handleSave = () => {
-    if (!formData.category || !formData.title || !formData.videoFile) {
-      // TODO: 에러 메시지 표시
+  const handleSave = async () => {
+    if (!formData.category.trim() || !formData.title.trim()) {
+      setErrorMessage('카테고리와 제목을 모두 입력해주세요.');
       return;
     }
-    onSave(formData);
-    onClose();
+    if (!formData.videoFile) {
+      setErrorMessage('비디오 파일을 업로드해주세요.');
+      return;
+    }
+    setErrorMessage('');
+    setIsSaving(true);
+    try {
+      await onSave(formData);
+      onClose();
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.error('❌ [VODUploadModal] 업로드 실패', error);
+      }
+      const message =
+        error instanceof Error
+          ? error.message || 'VOD 업로드 중 오류가 발생했습니다.'
+          : 'VOD 업로드 중 오류가 발생했습니다.';
+      setErrorMessage(message);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleClose = () => {
@@ -131,16 +182,20 @@ export default function VODUploadModal({ open, onClose, onSave, categories }: Pr
       category: '',
       title: '',
       videoFile: null,
-      subtitleFile: null,
-      subtitleTitle: '',
+      description: '',
+      isActive: true,
+      thumbnailDataUrl: null,
     });
+    setVideoPreview(null);
+    setErrorMessage('');
+    setIsSaving(false);
     onClose();
   };
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
       <DialogTitle>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+        <Typography component="div" variant="h6" sx={{ fontWeight: 600 }}>
           VOD 업로드
         </Typography>
         <IconButton
@@ -159,6 +214,11 @@ export default function VODUploadModal({ open, onClose, onSave, categories }: Pr
 
       <DialogContent sx={{ pb: 3 }}>
         <Stack spacing={3} sx={{ mt: 1 }}>
+          {errorMessage && (
+            <Alert severity="error" sx={{ mb: 1 }}>
+              {errorMessage}
+            </Alert>
+          )}
           {/* 카테고리 선택 */}
           <FormControl fullWidth>
             <InputLabel id="category-label">카테고리</InputLabel>
@@ -168,7 +228,7 @@ export default function VODUploadModal({ open, onClose, onSave, categories }: Pr
               value={formData.category}
               onChange={(e) => handleChange('category', e.target.value)}
             >
-              {activeCategories.map((cat) => (
+              {categories.map((cat) => (
                 <MenuItem key={cat.id} value={cat.name}>
                   {cat.name}
                 </MenuItem>
@@ -194,47 +254,94 @@ export default function VODUploadModal({ open, onClose, onSave, categories }: Pr
               onDrop={handleVideoDrop}
               onDragOver={handleVideoDragOver}
               onDragLeave={handleVideoDragLeave}
-              onClick={() => videoFileInputRef.current?.click()}
+              onClick={() => !videoPreview && videoFileInputRef.current?.click()}
               sx={{
                 bgcolor: 'grey.50',
                 border: '1px dashed',
                 borderColor: isDraggingVideo ? 'primary.main' : 'divider',
                 borderRadius: 1,
-                p: 5,
+                p: videoPreview ? 0 : 5,
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                cursor: 'pointer',
+                cursor: videoPreview ? 'default' : 'pointer',
                 transition: 'all 0.2s',
+                position: 'relative',
+                minHeight: videoPreview ? 300 : 'auto',
+                aspectRatio: videoPreview ? '16/9' : 'auto',
                 '&:hover': {
-                  bgcolor: 'grey.100',
-                  borderColor: 'primary.main',
+                  bgcolor: videoPreview ? 'grey.50' : 'grey.100',
+                  borderColor: videoPreview ? 'divider' : 'primary.main',
                 },
               }}
             >
-              <Box
-                sx={{
-                  width: 200,
-                  height: 150,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  mb: 2,
-                }}
-              >
-                <Iconify icon="eva:cloud-upload-fill" width={80} sx={{ color: 'primary.main' }} />
-              </Box>
-              <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
-                파일 업로드
-              </Typography>
-              <Typography variant="body2" color="text.secondary" textAlign="center">
-                클릭하여 파일을 선택하거나 마우스로 드래그하여 옮겨주세요.
-              </Typography>
-              {formData.videoFile && (
-                <Typography variant="body2" sx={{ mt: 2, color: 'primary.main' }}>
-                  {formData.videoFile.name}
-                </Typography>
+              {videoPreview ? (
+                <>
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      inset: 0,
+                      borderRadius: 1,
+                      overflow: 'hidden',
+                      width: '100%',
+                      height: '100%',
+                    }}
+                  >
+                    <img
+                      src={videoPreview}
+                      alt="Video preview"
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                      }}
+                    />
+                  </Box>
+                  <IconButton
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemoveVideo();
+                    }}
+                    sx={{
+                      position: 'absolute',
+                      top: 16,
+                      right: 16,
+                      bgcolor: 'rgba(0, 0, 0, 0.48)',
+                      color: 'white',
+                      '&:hover': {
+                        bgcolor: 'rgba(0, 0, 0, 0.6)',
+                      },
+                    }}
+                  >
+                    <Iconify icon="solar:close-circle-bold" width={18} />
+                  </IconButton>
+                </>
+              ) : (
+                <>
+                  <Box
+                    sx={{
+                      width: 200,
+                      height: 150,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      mb: 2,
+                    }}
+                  >
+                    <Iconify
+                      icon="eva:cloud-upload-fill"
+                      width={80}
+                      sx={{ color: 'primary.main' }}
+                    />
+                  </Box>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
+                    교육 자료 업로드
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" textAlign="center">
+                    클릭하여 파일을 선택하거나 마우스로 드래그하여 옮겨주세요.
+                  </Typography>
+                </>
               )}
               <input
                 ref={videoFileInputRef}
@@ -251,66 +358,15 @@ export default function VODUploadModal({ open, onClose, onSave, categories }: Pr
             </Box>
           </Box>
 
-          {/* 자막 업로드 */}
-          <Box>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>
-              자막 업로드
-            </Typography>
-            <Box
-              onDrop={handleSubtitleDrop}
-              onDragOver={handleSubtitleDragOver}
-              onDragLeave={handleSubtitleDragLeave}
-              onClick={() => subtitleFileInputRef.current?.click()}
-              sx={{
-                bgcolor: 'grey.50',
-                border: '1px dashed',
-                borderColor: isDraggingSubtitle ? 'primary.main' : 'divider',
-                borderRadius: 1.5,
-                p: 2.5,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 0.5,
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                '&:hover': {
-                  bgcolor: 'grey.100',
-                  borderColor: 'primary.main',
-                },
-              }}
-            >
-              <Iconify icon="eva:cloud-upload-fill" width={40} sx={{ color: 'text.disabled' }} />
-              <Typography variant="body2" color="text.disabled">
-                자막 업로드
-              </Typography>
-              {formData.subtitleFile && (
-                <Typography variant="body2" sx={{ mt: 1, color: 'primary.main' }}>
-                  {formData.subtitleFile.name}
-                </Typography>
-              )}
-              <input
-                ref={subtitleFileInputRef}
-                type="file"
-                accept=".vtt,.srt,text/vtt"
-                style={{ display: 'none' }}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    handleSubtitleFileSelect(file);
-                  }
-                }}
-              />
-            </Box>
-          </Box>
-
-          {/* 자막 제목 입력 */}
+          {/* 내용 입력 */}
           <TextField
             fullWidth
-            label="자막 제목"
-            placeholder="자막 제목"
-            value={formData.subtitleTitle}
-            onChange={(e) => handleChange('subtitleTitle', e.target.value)}
+            label="내용"
+            placeholder="내용을 입력해주세요"
+            multiline
+            minRows={4}
+            value={formData.description}
+            onChange={(e) => handleChange('description', e.target.value)}
             sx={{
               '& .MuiOutlinedInput-root': {
                 bgcolor: 'grey.50',
@@ -323,14 +379,13 @@ export default function VODUploadModal({ open, onClose, onSave, categories }: Pr
       <Divider />
 
       <DialogActions sx={{ p: 3 }}>
-        <Button variant="outlined" onClick={handleClose}>
+        <Button variant="outlined" onClick={handleClose} disabled={isSaving}>
           취소
         </Button>
-        <Button variant="contained" onClick={handleSave}>
+        <LoadingButton variant="contained" onClick={handleSave} loading={isSaving}>
           등록
-        </Button>
+        </LoadingButton>
       </DialogActions>
     </Dialog>
   );
 }
-

@@ -1,65 +1,88 @@
-import type { BaseResponseDto } from '../common';
+import type { BaseResponseDto, BaseResponseHeader } from '../common';
 
-export type ServiceStatus = 'active' | 'inactive';
+export type ServiceStatus = 'ACTIVE' | 'INACTIVE';
 
-export type Service = {
-  id: string;
+// 구독한 회사 정보
+export type SubscribedCompany = {
+  companyIdx: number;
+  companyName: string;
+  subscribedAt: string;
+  subscriptionStatus: 'ACTIVE' | 'CANCELLED';
+};
+
+// 서비스 설정 정보 (ServiceSettingItem)
+export type ServiceSetting = {
+  serviceSettingIdx?: number; // API 경로에서 사용
   serviceName: string;
-  servicePeriod: string;
+  servicePeriod?: number; // 서비스 기간 (개월 수, 예: 1, 3, 6, 12)
   memberCount: number;
   monthlyFee: number;
+  subscriptions: number;
   status: ServiceStatus;
-  registrationDate: string;
+  createAt: string;
+  updateAt: string;
+  subscribedCompanies: SubscribedCompany[];
 };
 
+// 서비스 목록 조회 파라미터
 export type GetServicesParams = {
-  status?: ServiceStatus;
-  searchKey?: string;
-  searchValue?: string;
-  page: number;
-  pageSize: number;
+  page?: number;
+  pageSize?: number;
+  status?: 'ACTIVE' | 'INACTIVE';
+  search?: string; // 검색어 (서비스명)
 };
 
-export type GetServicesResponse = BaseResponseDto<{
-  services: Service[];
-  total: number;
-}>;
+// 서비스 목록 조회 응답 (axios interceptor가 평탄화한 형태)
+export type GetServicesResponse = {
+  serviceSettingList: ServiceSetting[];
+  totalCount: number;
+  header: BaseResponseHeader;
+};
 
+// 서비스 상세 조회 파라미터
 export type GetServiceDetailParams = {
-  id: string;
+  serviceSettingIdx: number;
 };
 
-export type GetServiceDetailResponse = BaseResponseDto<Service>;
+// 서비스 상세 조회 응답
+export type GetServiceDetailResponse = BaseResponseDto<ServiceSetting>;
 
+// 서비스 등록 파라미터
 export type CreateServiceParams = {
   serviceName: string;
-  servicePeriod: string;
+  servicePeriod: number;
   memberCount: number;
   monthlyFee: number;
 };
 
-export type CreateServiceResponse = BaseResponseDto<Service>;
+// 서비스 등록 응답
+export type CreateServiceResponse = BaseResponseDto<ServiceSetting>;
 
+// 서비스 수정 파라미터
 export type UpdateServiceParams = {
-  id: string;
+  serviceSettingIdx: number;
   serviceName?: string;
-  servicePeriod?: string;
+  servicePeriod?: number;
   memberCount?: number;
   monthlyFee?: number;
   status?: ServiceStatus;
 };
 
-export type UpdateServiceResponse = BaseResponseDto<Service>;
+// 서비스 수정 응답
+export type UpdateServiceResponse = BaseResponseDto<ServiceSetting>;
 
+// 서비스 비활성화 파라미터
 export type DeactivateServiceParams = {
-  id: string;
+  serviceSettingIdx: number;
 };
 
+// 서비스 비활성화 응답
 export type DeactivateServiceResponse = BaseResponseDto;
 
+// 서비스 삭제 파라미터
 export type DeleteServiceParams = {
-  id: string;
+  serviceSettingIdx: number;
 };
 
+// 서비스 삭제 응답
 export type DeleteServiceResponse = BaseResponseDto;
-

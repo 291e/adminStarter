@@ -6,6 +6,9 @@ import {
   getEducationReport,
   updateEducationReport,
   getEducationDetail,
+  createEducationRecord,
+  updateEducationRecord,
+  deleteEducationRecord,
 } from 'src/services/education-report/education-report.service';
 import type {
   GetEducationReportsParams,
@@ -13,6 +16,9 @@ import type {
   CreateEducationReportParams,
   UpdateEducationReportParams,
   GetEducationDetailStatisticsParams,
+  CreateEducationRecordParams,
+  UpdateEducationRecordParams,
+  DeleteEducationRecordParams,
 } from 'src/services/education-report/education-report.types';
 
 // ----------------------------------------------------------------------
@@ -47,9 +53,9 @@ export function useCreateEducation() {
  */
 export function useEducationDetail(params: GetEducationReportParams) {
   return useQuery({
-    queryKey: ['educationReport', params.educationReportId],
+    queryKey: ['educationReport', params.educationReportIdx],
     queryFn: () => getEducationReport(params),
-    enabled: !!params.educationReportId,
+    enabled: !!params.educationReportIdx,
   });
 }
 
@@ -63,7 +69,7 @@ export function useUpdateEducationDetail() {
     mutationFn: (params: UpdateEducationReportParams) => updateEducationReport(params),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['educationReports'] });
-      queryClient.invalidateQueries({ queryKey: ['educationReport', variables.educationReportId] });
+      queryClient.invalidateQueries({ queryKey: ['educationReport', variables.educationReportIdx] });
     },
   });
 }
@@ -91,5 +97,61 @@ export function useEducationDetailStatistics(params?: GetEducationDetailStatisti
       return getEducationDetail(validParams);
     },
     enabled: !!params?.memberIdx,
+  });
+}
+
+/**
+ * 교육 기록 등록 Mutation Hook
+ */
+export function useCreateEducationRecord() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (params: CreateEducationRecordParams) => createEducationRecord(params),
+    onSuccess: (_, variables) => {
+      // 교육 상세 현황 새로고침
+      queryClient.invalidateQueries({ queryKey: ['educationDetailStatistics'] });
+      // 교육 리포트 목록도 새로고침 (필요시)
+      queryClient.invalidateQueries({ queryKey: ['educationReports'] });
+      if (variables?.educationReportIdx) {
+        queryClient.invalidateQueries({
+          queryKey: ['educationReport', variables.educationReportIdx],
+        });
+      }
+    },
+  });
+}
+
+/**
+ * 교육 기록 수정 Mutation Hook
+ */
+export function useUpdateEducationRecord() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (params: UpdateEducationRecordParams) => updateEducationRecord(params),
+    onSuccess: () => {
+      // 교육 상세 현황 새로고침
+      queryClient.invalidateQueries({ queryKey: ['educationDetailStatistics'] });
+      // 교육 리포트 목록도 새로고침 (필요시)
+      queryClient.invalidateQueries({ queryKey: ['educationReports'] });
+    },
+  });
+}
+
+/**
+ * 교육 기록 삭제 Mutation Hook
+ */
+export function useDeleteEducationRecord() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (params: DeleteEducationRecordParams) => deleteEducationRecord(params),
+    onSuccess: () => {
+      // 교육 상세 현황 새로고침
+      queryClient.invalidateQueries({ queryKey: ['educationDetailStatistics'] });
+      // 교육 리포트 목록도 새로고침 (필요시)
+      queryClient.invalidateQueries({ queryKey: ['educationReports'] });
+    },
   });
 }

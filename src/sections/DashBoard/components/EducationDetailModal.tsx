@@ -118,7 +118,7 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
 
   // 데이터 변환 (axios 인터셉터에서 평탄화됨)
   const educationDetail = useMemo(() => {
-    if (!educationDetailData?.header?.isSuccess || !educationDetailData?.educationDetail) {
+    if (!educationDetailData?.header?.isSuccess || !educationDetailData?.body) {
       if (import.meta.env.DEV && educationDetailData) {
         console.warn('⚠️ Education Detail: Invalid response structure', educationDetailData);
       }
@@ -131,7 +131,7 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
       };
     }
 
-    const detail = educationDetailData.educationDetail as any;
+    const detail = educationDetailData.body as any;
 
     // 디버깅: 실제 응답 구조 확인
     if (import.meta.env.DEV) {
@@ -198,7 +198,7 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
       const updates = Object.entries(fileNames)
         .filter(([recordId, fileName]) => fileName.trim() !== '')
         .map(([recordId, fileName]) => ({
-          educationRecordId: recordId,
+          educationRecordIdx: recordId,
           fileName: fileName.trim(),
         }));
 
@@ -206,7 +206,7 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
       await Promise.all(
         updates.map((update) =>
           saveFileNameMutation.mutateAsync({
-            educationRecordId: update.educationRecordId,
+            educationRecordIdx: update.educationRecordIdx,
             fileName: update.fileName,
           })
         )

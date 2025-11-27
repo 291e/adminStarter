@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 
 import type { Theme, SxProps } from '@mui/material/styles';
 
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
+import CircularProgress from '@mui/material/CircularProgress';
+import Stack from '@mui/material/Stack';
+import Alert from '@mui/material/Alert';
 
 import { DashboardContent } from 'src/layouts/dashboard';
 import CodeSettingBreadcrumbs from './components/Breadcrumbs';
@@ -17,7 +20,15 @@ import EditMachineModal, { type MachineEditFormData } from './components/EditMac
 import EditHazardModal, { type HazardEditFormData } from './components/EditHazardModal';
 import CategorySettingsModal, { type CategoryItem } from './components/CategorySettingsModal';
 import { useCodeSetting } from './hooks/use-code-setting';
-import { mockCodeSettings, type CodeSetting } from 'src/_mock/_code-setting';
+import {
+  useCodes,
+  useCreateMachine,
+  useUpdateMachine,
+  useCreateHazard,
+  useUpdateHazard,
+  useHazardCategories,
+} from './hooks/use-code-setting-api';
+import type { CodeSetting } from 'src/services/code-setting/code-setting.types';
 
 // ----------------------------------------------------------------------
 
@@ -28,112 +39,115 @@ type Props = {
 };
 
 export function CodeSettingView({ title = '코드 관리', description, sx }: Props) {
-  // TODO: TanStack Query Hook(useQuery)으로 코드 목록 가져오기
-  // const { data: codes, isLoading, error } = useQuery({
-  //   queryKey: ['codeSettings', category, logic.filters],
-  //   queryFn: () => getCodeSettings({ category, filters: logic.filters }),
-  // });
-  // 목업 데이터 사용
-  const codes = mockCodeSettings(20);
-  const [category, setCategory] = useState<string>('machine');
-  const logic = useCodeSetting(codes, category);
+  const [category, setCategory] = useState<'machine' | 'hazard'>('machine');
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [createHazardModalOpen, setCreateHazardModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedCode, setSelectedCode] = useState<CodeSetting | null>(null);
   const [categorySettingsModalOpen, setCategorySettingsModalOpen] = useState(false);
-  const [categories, setCategories] = useState<CategoryItem[]>([]);
 
-  const renderContent = () => (
-    <Box
-      sx={{
-        bgcolor: 'background.paper',
-        borderRadius: 2,
-        boxShadow: (theme) => theme.customShadows.card,
-        width: '100%',
-        overflow: 'hidden',
-      }}
-    >
-      <CodeSettingTabs
-        value={category}
-        onChange={(newCategory) => {
-          setCategory(newCategory);
-          // TODO: 탭 변경 시 TanStack Query로 코드 목록 새로고침
-          // queryClient.invalidateQueries({ queryKey: ['codeSettings'] });
-        }}
-      />
+  // API Hooks
+  const createMachineMutation = useCreateMachine();
+  const updateMachineMutation = useUpdateMachine();
+  const createHazardMutation = useCreateHazard();
+  const updateHazardMutation = useUpdateHazard();
 
-      <CodeSettingFilters
-        status={logic.filters.status}
-        onChangeStatus={(status) => {
-          logic.onChangeStatus(status);
-          // TODO: 상태 필터 변경 시 TanStack Query로 코드 목록 새로고침
-          // queryClient.invalidateQueries({ queryKey: ['codeSettings'] });
-        }}
-        startDate={logic.filters.startDate}
-        onChangeStartDate={(date) => {
-          logic.onChangeStartDate(date);
-          // TODO: 시작일 변경 시 TanStack Query로 코드 목록 새로고침
-          // queryClient.invalidateQueries({ queryKey: ['codeSettings'] });
-        }}
-        endDate={logic.filters.endDate}
-        onChangeEndDate={(date) => {
-          logic.onChangeEndDate(date);
-          // TODO: 종료일 변경 시 TanStack Query로 코드 목록 새로고침
-          // queryClient.invalidateQueries({ queryKey: ['codeSettings'] });
-        }}
-        searchFilter={logic.filters.searchFilter}
-        onChangeSearchFilter={(filter) => {
-          logic.onChangeSearchFilter(filter);
-          // TODO: 검색 필터 변경 시 TanStack Query로 코드 목록 새로고침
-          // queryClient.invalidateQueries({ queryKey: ['codeSettings'] });
-        }}
-        searchValue={logic.filters.searchValue}
-        onChangeSearchValue={(value) => {
-          logic.onChangeSearchValue(value);
-          // TODO: 검색 값 변경 시 TanStack Query로 코드 목록 새로고침
-          // queryClient.invalidateQueries({ queryKey: ['codeSettings'] });
-        }}
-        category={category as 'machine' | 'hazard'}
-        categoryFilter={logic.filters.categoryFilter}
-        onChangeCategoryFilter={(filter) => {
-          logic.onChangeCategoryFilter?.(filter);
-          // TODO: 카테고리 필터 변경 시 TanStack Query로 코드 목록 새로고침
-          // queryClient.invalidateQueries({ queryKey: ['codeSettings'] });
-        }}
-      />
+  // 코드 목록 조회
+  const codesQuery = useCodes({
+    categoryType: category,
+    page: 1,
+    pageSize: 1000, // 전체 데이터 조회 후 클라이언트 사이드 필터링
+  });
 
-      <CodeSettingTable
-        rows={logic.filtered}
-        onEdit={(row) => {
-          setSelectedCode(row);
-          setEditModalOpen(true);
-          // TODO: TanStack Query Hook(useQuery)으로 코드 상세 정보 가져오기 (수정 모달용)
-          // const { data: detail } = useQuery({
-          //   queryKey: ['codeDetail', row.id],
-          //   queryFn: () => getCodeDetail(row.id),
-          // });
-        }}
-        category={category as 'machine' | 'hazard'}
-      />
+  // 유해인자 카테고리 조회
+  const categoriesQuery = useHazardCategories();
 
-      <CodeSettingPagination
-        count={logic.total}
-        page={logic.page}
-        rowsPerPage={logic.rowsPerPage}
-        onChangePage={(page) => {
-          logic.onChangePage(page);
-          // TODO: 페이지 변경 시 TanStack Query로 코드 목록 새로고침
-          // queryClient.invalidateQueries({ queryKey: ['codeSettings'] });
+  // 카테고리 데이터 변환
+  const categories = useMemo<CategoryItem[]>(() => {
+    const apiCategories = categoriesQuery.data?.categoryList ?? [];
+    return apiCategories.map((item) => ({
+      hazardCategoryIdx: item.hazardCategoryIdx,
+      name: item.name,
+      isActive: item.status === 'ACTIVE',
+    }));
+  }, [categoriesQuery.data]);
+
+  // 코드 목록 데이터
+  const codes = useMemo(() => codesQuery.data?.codeSettingList ?? [], [codesQuery.data]);
+
+  // 클라이언트 사이드 필터링 및 페이지네이션
+  const logic = useCodeSetting(codes, category);
+
+  const renderContent = () => {
+    if (codesQuery.isLoading) {
+      return (
+        <Stack alignItems="center" justifyContent="center" sx={{ py: 5 }}>
+          <CircularProgress />
+        </Stack>
+      );
+    }
+
+    if (codesQuery.isError) {
+      return (
+        <Alert severity="error" sx={{ m: 2 }}>
+          코드 데이터를 불러오는 중 오류가 발생했습니다.
+        </Alert>
+      );
+    }
+
+    return (
+      <Box
+        sx={{
+          bgcolor: 'background.paper',
+          borderRadius: 2,
+          boxShadow: (theme) => theme.customShadows.card,
+          width: '100%',
+          overflow: 'hidden',
         }}
-        onChangeRowsPerPage={(rowsPerPage) => {
-          logic.onChangeRowsPerPage(rowsPerPage);
-          // TODO: 페이지 크기 변경 시 TanStack Query로 코드 목록 새로고침
-          // queryClient.invalidateQueries({ queryKey: ['codeSettings'] });
-        }}
-      />
-    </Box>
-  );
+      >
+        <CodeSettingTabs
+          value={category}
+          onChange={(newCategory) => {
+            setCategory(newCategory as 'machine' | 'hazard');
+          }}
+        />
+
+        <CodeSettingFilters
+          status={logic.filters.status}
+          onChangeStatus={logic.onChangeStatus}
+          startDate={logic.filters.startDate}
+          onChangeStartDate={logic.onChangeStartDate}
+          endDate={logic.filters.endDate}
+          onChangeEndDate={logic.onChangeEndDate}
+          searchFilter={logic.filters.searchFilter}
+          onChangeSearchFilter={logic.onChangeSearchFilter}
+          searchValue={logic.filters.searchValue}
+          onChangeSearchValue={logic.onChangeSearchValue}
+          category={category}
+          categoryFilter={logic.filters.categoryFilter}
+          onChangeCategoryFilter={logic.onChangeCategoryFilter}
+          hazardCategories={category === 'hazard' ? categories : []}
+        />
+
+        <CodeSettingTable
+          rows={logic.paginated}
+          onEdit={(row) => {
+            setSelectedCode(row);
+            setEditModalOpen(true);
+          }}
+          category={category}
+        />
+
+        <CodeSettingPagination
+          count={logic.total}
+          page={logic.page}
+          rowsPerPage={logic.rowsPerPage}
+          onChangePage={logic.onChangePage}
+          onChangeRowsPerPage={logic.onChangeRowsPerPage}
+        />
+      </Box>
+    );
+  };
 
   const handleCreate = () => {
     if (category === 'hazard') {
@@ -143,96 +157,130 @@ export function CodeSettingView({ title = '코드 관리', description, sx }: Pr
     }
   };
 
-  const handleSaveMachine = (data: MachineFormData) => {
-    // TODO: TanStack Query Hook(useMutation)으로 기계·설비 등록
-    // const mutation = useMutation({
-    //   mutationFn: (formData: MachineFormData) => createMachine({
-    //     code: formData.code,
-    //     name: formData.name,
-    //     inspectionCycle: formData.inspectionCycle,
-    //     protectiveDevices: formData.protectiveDevices,
-    //     riskTypes: formData.riskTypes,
-    //   }),
-    //   onSuccess: () => {
-    //     queryClient.invalidateQueries({ queryKey: ['codeSettings'] });
-    //     setCreateModalOpen(false);
-    //   },
-    // });
-    // mutation.mutate(data);
-    console.log('기계·설비 등록:', data);
+  const handleSaveMachine = async (data: MachineFormData) => {
+    try {
+      // 문자열을 배열로 변환
+      const protectiveDevicesArray = data.protectiveDevices
+        ? data.protectiveDevices
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [];
+      const riskTypesArray = data.riskTypes
+        ? data.riskTypes
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [];
+
+      await createMachineMutation.mutateAsync({
+        code: data.code,
+        name: data.name,
+        inspectionTarget: data.inspectionTarget,
+        protectiveDevices: protectiveDevicesArray,
+        inspectionCycle: data.inspectionCycle,
+        riskTypes: riskTypesArray,
+      });
+      setCreateModalOpen(false);
+    } catch (error) {
+      console.error('기계·설비 등록 실패:', error);
+    }
   };
 
-  const handleSaveEditMachine = (data: MachineEditFormData) => {
-    if (!selectedCode) return;
+  const handleSaveEditMachine = async (data: MachineEditFormData) => {
+    if (!selectedCode || !selectedCode.codeSettingIdx) return;
 
-    // TODO: TanStack Query Hook(useMutation)으로 기계·설비 수정
-    // const mutation = useMutation({
-    //   mutationFn: (formData: MachineEditFormData) => updateMachine(selectedCode.id, {
-    //     code: formData.code,
-    //     name: formData.name,
-    //     inspectionCycle: formData.inspectionCycle,
-    //     protectiveDevices: formData.protectiveDevices,
-    //     riskTypes: formData.riskTypes,
-    //     status: formData.status,
-    //   }),
-    //   onSuccess: () => {
-    //     queryClient.invalidateQueries({ queryKey: ['codeSettings'] });
-    //     queryClient.invalidateQueries({ queryKey: ['codeDetail', selectedCode.id] });
-    //     setEditModalOpen(false);
-    //     setSelectedCode(null);
-    //   },
-    // });
-    // mutation.mutate(data);
-    console.log('기계·설비 수정:', data);
+    try {
+      // 문자열을 배열로 변환
+      const protectiveDevicesArray =
+        typeof data.protectiveDevices === 'string'
+          ? data.protectiveDevices
+              .split(',')
+              .map((s) => s.trim())
+              .filter(Boolean)
+          : Array.isArray(data.protectiveDevices)
+            ? data.protectiveDevices
+            : [];
+      const riskTypesArray =
+        typeof data.riskTypes === 'string'
+          ? data.riskTypes
+              .split(',')
+              .map((s) => s.trim())
+              .filter(Boolean)
+          : Array.isArray(data.riskTypes)
+            ? data.riskTypes
+            : [];
+
+      const statusValue =
+        typeof data.status === 'string'
+          ? data.status.toUpperCase() === 'ACTIVE'
+            ? 'ACTIVE'
+            : 'INACTIVE'
+          : 'ACTIVE';
+
+      await updateMachineMutation.mutateAsync({
+        codeSettingIdx: selectedCode.codeSettingIdx,
+        code: data.code,
+        name: data.name,
+        inspectionTarget: data.inspectionTarget,
+        protectiveDevices: protectiveDevicesArray,
+        inspectionCycle: data.inspectionCycle,
+        riskTypes: riskTypesArray,
+        status: statusValue,
+      });
+      setEditModalOpen(false);
+      setSelectedCode(null);
+    } catch (error) {
+      console.error('기계·설비 수정 실패:', error);
+    }
   };
 
-  const handleSaveEditHazard = (data: HazardEditFormData) => {
-    if (!selectedCode) return;
+  const handleSaveEditHazard = async (data: HazardEditFormData) => {
+    if (!selectedCode || !selectedCode.codeSettingIdx) return;
 
-    // TODO: TanStack Query Hook(useMutation)으로 유해인자 수정
-    // const mutation = useMutation({
-    //   mutationFn: (formData: HazardEditFormData) => updateHazard(selectedCode.id, {
-    //     category: formData.category,
-    //     code: formData.code,
-    //     name: formData.name,
-    //     formAndType: formData.formAndType,
-    //     location: formData.location,
-    //     exposureRisk: formData.exposureRisk,
-    //     managementStandard: formData.managementStandard,
-    //     managementMeasures: formData.managementMeasures,
-    //     status: formData.status,
-    //   }),
-    //   onSuccess: () => {
-    //     queryClient.invalidateQueries({ queryKey: ['codeSettings'] });
-    //     queryClient.invalidateQueries({ queryKey: ['codeDetail', selectedCode.id] });
-    //     setEditModalOpen(false);
-    //     setSelectedCode(null);
-    //   },
-    // });
-    // mutation.mutate(data);
-    console.log('유해인자 수정:', data);
+    try {
+      const statusValue =
+        typeof data.status === 'string'
+          ? data.status.toUpperCase() === 'ACTIVE'
+            ? 'ACTIVE'
+            : 'INACTIVE'
+          : 'ACTIVE';
+
+      await updateHazardMutation.mutateAsync({
+        codeSettingIdx: selectedCode.codeSettingIdx,
+        code: data.code,
+        name: data.name,
+        hazardCategoryIdx: data.hazardCategoryIdx,
+        formAndType: data.formAndType,
+        location: data.location,
+        exposureRisk: data.exposureRisk,
+        managementStandard: data.managementStandard,
+        managementMeasure: data.managementMeasures,
+        status: statusValue,
+      });
+      setEditModalOpen(false);
+      setSelectedCode(null);
+    } catch (error) {
+      console.error('유해인자 수정 실패:', error);
+    }
   };
 
-  const handleSaveHazard = (data: HazardFormData) => {
-    // TODO: TanStack Query Hook(useMutation)으로 유해인자 등록
-    // const mutation = useMutation({
-    //   mutationFn: (formData: HazardFormData) => createHazard({
-    //     category: formData.category,
-    //     code: formData.code,
-    //     name: formData.name,
-    //     formAndType: formData.formAndType,
-    //     location: formData.location,
-    //     exposureRisk: formData.exposureRisk,
-    //     managementStandard: formData.managementStandard,
-    //     managementMeasures: formData.managementMeasures,
-    //   }),
-    //   onSuccess: () => {
-    //     queryClient.invalidateQueries({ queryKey: ['codeSettings'] });
-    //     setCreateHazardModalOpen(false);
-    //   },
-    // });
-    // mutation.mutate(data);
-    console.log('유해인자 등록:', data);
+  const handleSaveHazard = async (data: HazardFormData) => {
+    try {
+      await createHazardMutation.mutateAsync({
+        code: data.code,
+        name: data.name,
+        hazardCategoryIdx: data.hazardCategoryIdx,
+        formAndType: data.formAndType || undefined,
+        location: data.location || undefined,
+        exposureRisk: data.exposureRisk || undefined,
+        managementStandard: data.managementStandard || undefined,
+        managementMeasure: data.managementMeasures || undefined,
+      });
+      setCreateHazardModalOpen(false);
+    } catch (error) {
+      console.error('유해인자 등록 실패:', error);
+    }
   };
 
   return (
@@ -296,20 +344,6 @@ export function CodeSettingView({ title = '코드 관리', description, sx }: Pr
       <CategorySettingsModal
         open={categorySettingsModalOpen}
         onClose={() => setCategorySettingsModalOpen(false)}
-        onSave={(updatedCategories) => {
-          // TODO: TanStack Query Hook(useMutation)으로 카테고리 목록 저장
-          // const mutation = useMutation({
-          //   mutationFn: (categories: CategoryItem[]) => saveHazardCategories(categories),
-          //   onSuccess: () => {
-          //     queryClient.invalidateQueries({ queryKey: ['hazardCategories'] });
-          //     setCategories(updatedCategories);
-          //     setCategorySettingsModalOpen(false);
-          //   },
-          // });
-          // mutation.mutate(updatedCategories);
-          setCategories(updatedCategories);
-        }}
-        initialCategories={categories}
       />
     </DashboardContent>
   );

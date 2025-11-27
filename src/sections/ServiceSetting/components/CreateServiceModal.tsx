@@ -19,6 +19,8 @@ import { Iconify } from 'src/components/iconify';
 
 // ----------------------------------------------------------------------
 
+const SERVICE_PERIOD_OPTIONS = ['1개월', '3개월', '6개월', '12개월'];
+
 export type ServiceFormData = {
   serviceName: string;
   servicePeriod: string;
@@ -31,8 +33,6 @@ type Props = {
   onClose: () => void;
   onSave: (data: ServiceFormData) => void;
 };
-
-const SERVICE_PERIOD_OPTIONS = ['1개월', '3개월', '6개월', '12개월'];
 
 export default function CreateServiceModal({ open, onClose, onSave }: Props) {
   const [formData, setFormData] = useState<ServiceFormData>({

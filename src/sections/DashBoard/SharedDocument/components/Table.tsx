@@ -98,35 +98,23 @@ export default function SharedDocumentTable({
 
         <TableBody>
           {rows.map((row, index) => {
-            // prioritySettings에서 해당 priority의 labelType과 일치하는 설정 찾기
-            const prioritySetting = prioritySettings.find(
-              (setting) => setting.labelType === row.priority
-            );
+            // priorityInformation에서 직접 정보 가져오기
+            const priorityInfo = row.priorityInformation;
 
-            // prioritySettings에서 찾은 경우 해당 색상 사용, 없으면 PRIORITY_CONFIG 또는 기본값 사용
+            // priorityInformation이 있으면 해당 정보 사용, 없으면 기본값
             let priorityConfig: { label: string; color: string; bgColor: string };
-            if (prioritySetting && prioritySetting.color) {
-              // prioritySettings에서 찾은 경우
-              const colorHex = prioritySetting.color;
-              // HEX 색상을 rgba로 변환 (투명도 0.16)
+            if (priorityInfo && priorityInfo.color) {
+              const colorHex = priorityInfo.color;
               const bgColor = hexToRgba(colorHex, 0.16);
 
               priorityConfig = {
-                label: prioritySetting.labelType || row.priority || '중요도',
+                label: priorityInfo.labelType || '중요도',
                 color: colorHex,
                 bgColor,
               };
             } else {
-              // prioritySettings에서 찾지 못한 경우 PRIORITY_CONFIG 또는 기본값 사용
-              priorityConfig =
-                PRIORITY_CONFIG[row.priority || ''] ||
-                (row.priority
-                  ? {
-                      label: row.priority,
-                      color: PRIORITY_CONFIG.DEFAULT.color,
-                      bgColor: PRIORITY_CONFIG.DEFAULT.bgColor,
-                    }
-                  : PRIORITY_CONFIG.DEFAULT);
+              // priorityInformation이 없는 경우 기본값 사용
+              priorityConfig = PRIORITY_CONFIG.DEFAULT;
             }
 
             const statusConfig = STATUS_CONFIG[row.isPublic] || STATUS_CONFIG[0];
@@ -140,10 +128,11 @@ export default function SharedDocumentTable({
                   minute: '2-digit',
                 })
               : '';
-            const isMenuOpen = openMenuId === row.id;
+            const rowId = String(row.sharedDocumentIdx);
+            const isMenuOpen = openMenuId === rowId;
 
             return (
-              <TableRow key={row.id} hover>
+              <TableRow key={rowId} hover>
                 <TableCell>
                   <Typography variant="body2" sx={{ fontSize: 14, textAlign: 'center' }}>
                     {index + 1}
@@ -201,7 +190,7 @@ export default function SharedDocumentTable({
                 <TableCell align="center">
                   <IconButton
                     size="small"
-                    onClick={(e) => handleOpenMenu(e, row.id)}
+                    onClick={(e) => handleOpenMenu(e, rowId)}
                     sx={{
                       color: 'text.secondary',
                       '&:hover': {
@@ -212,18 +201,19 @@ export default function SharedDocumentTable({
                     <Iconify icon="eva:more-vertical-fill" width={20} />
                   </IconButton>
                   <Menu
-                    anchorEl={menuAnchorEl[row.id] || null}
+                    anchorEl={menuAnchorEl[rowId] || null}
                     open={isMenuOpen}
-                    onClose={() => handleCloseMenu(row.id)}
+                    onClose={() => handleCloseMenu(rowId)}
                     anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
                     transformOrigin={{ vertical: 'top', horizontal: 'right' }}
                   >
                     <MenuList>
                       {onShareToChat && (
                         <MenuItem
+                          key="share"
                           onClick={() => {
                             onShareToChat(row);
-                            handleCloseMenu(row.id);
+                            handleCloseMenu(rowId);
                           }}
                         >
                           채팅방 공유하기
@@ -231,9 +221,10 @@ export default function SharedDocumentTable({
                       )}
                       {onEdit && (
                         <MenuItem
+                          key="edit"
                           onClick={() => {
                             onEdit(row);
-                            handleCloseMenu(row.id);
+                            handleCloseMenu(rowId);
                           }}
                         >
                           수정하기
@@ -241,9 +232,10 @@ export default function SharedDocumentTable({
                       )}
                       {onDelete && (
                         <MenuItem
+                          key="delete"
                           onClick={() => {
                             onDelete(row);
-                            handleCloseMenu(row.id);
+                            handleCloseMenu(rowId);
                           }}
                           sx={{ color: 'error.main' }}
                         >

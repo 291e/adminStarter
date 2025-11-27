@@ -5,10 +5,10 @@ import MenuItem from '@mui/material/MenuItem';
 import InputLabel from '@mui/material/InputLabel';
 import FormControl from '@mui/material/FormControl';
 import InputAdornment from '@mui/material/InputAdornment';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import { type Dayjs } from 'dayjs';
+import type { Dayjs } from 'dayjs';
 
 import { Iconify } from 'src/components/iconify';
 
@@ -26,18 +26,13 @@ type Props = {
   category?: 'machine' | 'hazard';
   categoryFilter?: string;
   onChangeCategoryFilter?: (value: string) => void;
+  hazardCategories?: Array<{ name: string }>; // 실제 카테고리 목록
 };
 
-const statusOptions = ['전체', '활성', '비활성'];
-const machineSearchOptions = ['전체', '기계·설비 코드', '기계·설비명'];
-const hazardSearchOptions = ['전체', '유해인자 코드', '유해인자명'];
-const hazardCategoryOptions = [
-  '전체',
-  '화학물질',
-  '물리적 요인',
-  '생물학적 요인',
-  '인간공학적 요인',
-];
+const statusOptions = ['활성', '비활성'];
+
+const machineSearchOptions = ['기계·설비 코드', '기계·설비명'];
+const hazardSearchOptions = ['유해인자 코드', '유해인자명'];
 
 export default function CodeSettingFilters({
   status,
@@ -53,8 +48,12 @@ export default function CodeSettingFilters({
   category = 'machine',
   categoryFilter,
   onChangeCategoryFilter,
+  hazardCategories = [],
 }: Props) {
   const searchOptions = category === 'hazard' ? hazardSearchOptions : machineSearchOptions;
+
+  // 유해인자 카테고리 옵션 (실제 카테고리 목록 + 전체)
+  const hazardCategoryOptions = ['전체', ...hazardCategories.map((cat) => cat.name)];
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
@@ -77,16 +76,16 @@ export default function CodeSettingFilters({
           </FormControl>
         )}
 
-        <FormControl size="small" sx={{ minWidth: 160 }}>
+        <FormControl size="small" sx={{ minWidth: 80 }}>
           <InputLabel id="status-filter-label">상태</InputLabel>
           <Select
             labelId="status-filter-label"
             label="상태"
-            value={status}
+            value={status || ''}
             onChange={(e) => onChangeStatus(e.target.value)}
           >
             {statusOptions.map((option) => (
-              <MenuItem key={option} value={option === '전체' ? 'all' : option}>
+              <MenuItem key={option} value={option}>
                 {option}
               </MenuItem>
             ))}
@@ -97,10 +96,11 @@ export default function CodeSettingFilters({
           label="시작일"
           value={startDate}
           onChange={onChangeStartDate}
+          format="YYYY-MM-DD"
           slotProps={{
             textField: {
               size: 'small',
-              sx: { minWidth: 160 },
+              sx: { maxWidth: 160 },
             },
           }}
         />
@@ -109,10 +109,11 @@ export default function CodeSettingFilters({
           label="종료일"
           value={endDate}
           onChange={onChangeEndDate}
+          format="YYYY-MM-DD"
           slotProps={{
             textField: {
               size: 'small',
-              sx: { minWidth: 160 },
+              sx: { maxWidth: 160 },
             },
           }}
         />
@@ -122,11 +123,11 @@ export default function CodeSettingFilters({
           <Select
             labelId="search-filter-label"
             label="검색어 필터"
-            value={searchFilter}
+            value={searchFilter || ''}
             onChange={(e) => onChangeSearchFilter(e.target.value)}
           >
             {searchOptions.map((option) => (
-              <MenuItem key={option} value={option === '전체' ? 'all' : option}>
+              <MenuItem key={option} value={option}>
                 {option}
               </MenuItem>
             ))}

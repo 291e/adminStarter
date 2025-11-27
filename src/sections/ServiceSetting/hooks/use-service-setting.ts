@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback } from 'react';
 
-import type { ServiceSetting } from 'src/_mock/_service-setting';
+import type { ServiceSetting } from 'src/services/service-setting/service-setting.types';
 
 // ----------------------------------------------------------------------
 
@@ -59,12 +59,13 @@ export function useServiceSetting(services: ServiceSetting[]): UseServiceSetting
   const filteredAll = useMemo(
     () =>
       services.filter((s) => {
-        // 상태 필터
-        if (filters.status === '활성' && s.status !== 'active') {
-          return false;
-        }
-        if (filters.status === '비활성' && s.status !== 'inactive') {
-          return false;
+        // 상태 필터 ('활성' -> 'ACTIVE', '비활성' -> 'INACTIVE', 'all' -> 모두)
+        if (filters.status !== 'all' && filters.status !== '전체') {
+          if (filters.status === 'ACTIVE' || filters.status === '활성') {
+            if (s.status !== 'ACTIVE') return false;
+          } else if (filters.status === 'INACTIVE' || filters.status === '비활성') {
+            if (s.status !== 'INACTIVE') return false;
+          }
         }
 
         // 검색 필터
@@ -75,14 +76,10 @@ export function useServiceSetting(services: ServiceSetting[]): UseServiceSetting
         const searchLower = filters.searchValue.toLowerCase();
         let searchMatch = false;
 
-        if (filters.searchFilter === 'all') {
-          searchMatch =
-            s.serviceName.toLowerCase().includes(searchLower) ||
-            s.servicePeriod.toLowerCase().includes(searchLower);
+        if (filters.searchFilter === 'all' || filters.searchFilter === '전체') {
+          searchMatch = s.serviceName.toLowerCase().includes(searchLower);
         } else if (filters.searchFilter === '서비스명') {
           searchMatch = s.serviceName.toLowerCase().includes(searchLower);
-        } else if (filters.searchFilter === '서비스 기간') {
-          searchMatch = s.servicePeriod.toLowerCase().includes(searchLower);
         }
 
         return searchMatch;

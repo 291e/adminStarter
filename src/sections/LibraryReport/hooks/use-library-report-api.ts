@@ -7,8 +7,6 @@ import {
   createLibraryReport,
   updateLibraryReport,
   deleteLibraryReport,
-  getLibraryReportPreviewUrl,
-  getLibraryReportUpdateDate,
 } from 'src/services/library-report/library-report.service';
 import type {
   GetLibraryReportsParams,
@@ -16,8 +14,8 @@ import type {
   CreateLibraryReportParams,
   UpdateLibraryReportParams,
   DeleteLibraryReportParams,
-  GetLibraryReportPreviewUrlParams,
-  GetLibraryReportUpdateDateParams,
+  GetLibraryReportsResult,
+  GetLibraryCategoryListResult,
 } from 'src/services/library-report/library-report.types';
 
 // ----------------------------------------------------------------------
@@ -26,8 +24,8 @@ import type {
  * 라이브러리 리포트 목록 조회 Hook
  */
 export function useLibraryReports(params?: GetLibraryReportsParams) {
-  return useQuery({
-    queryKey: ['libraryReports', params],
+  return useQuery<GetLibraryReportsResult>({
+    queryKey: ['libraryReports'],
     queryFn: () => getLibraryReports(params),
     staleTime: 5 * 60 * 1000,
   });
@@ -37,7 +35,7 @@ export function useLibraryReports(params?: GetLibraryReportsParams) {
  * 카테고리 목록 조회 Hook
  */
 export function useCategories() {
-  return useQuery({
+  return useQuery<GetLibraryCategoryListResult>({
     queryKey: ['libraryCategories'],
     queryFn: () => getLibraryCategoryList(),
   });
@@ -82,13 +80,7 @@ export function useUpdateContent() {
     mutationFn: (params: UpdateLibraryReportParams) => updateLibraryReport(params),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['libraryReports'] });
-      queryClient.invalidateQueries({ queryKey: ['libraryReport', variables.libraryReportId] });
-      queryClient.invalidateQueries({
-        queryKey: ['videoPreview', variables.libraryReportId],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ['modifiedDate', variables.libraryReportId],
-      });
+      queryClient.invalidateQueries({ queryKey: ['libraryReport', variables.libraryReportIdx] });
     },
   });
 }
@@ -107,24 +99,3 @@ export function useDeleteContent() {
   });
 }
 
-/**
- * 비디오 파일 미리보기 URL 조회 Hook
- */
-export function useVideoPreview(params: GetLibraryReportPreviewUrlParams) {
-  return useQuery({
-    queryKey: ['videoPreview', params.libraryReportId],
-    queryFn: () => getLibraryReportPreviewUrl(params),
-    enabled: !!params.libraryReportId,
-  });
-}
-
-/**
- * 수정일 조회 Hook
- */
-export function useModifiedDate(params: GetLibraryReportUpdateDateParams) {
-  return useQuery({
-    queryKey: ['modifiedDate', params.libraryReportId],
-    queryFn: () => getLibraryReportUpdateDate(params),
-    enabled: !!params.libraryReportId,
-  });
-}

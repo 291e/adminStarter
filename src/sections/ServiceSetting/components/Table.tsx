@@ -16,7 +16,7 @@ import Stack from '@mui/material/Stack';
 
 import { useState } from 'react';
 
-import type { ServiceSetting } from 'src/_mock/_service-setting';
+import type { ServiceSetting } from 'src/services/service-setting/service-setting.types';
 import { fDateTime } from 'src/utils/format-time';
 import { Iconify } from 'src/components/iconify';
 
@@ -36,17 +36,14 @@ export default function ServiceSettingTable({
   onDelete,
 }: Props) {
   const [menuAnchorEl, setMenuAnchorEl] = useState<{ [key: string]: HTMLElement | null }>({});
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   const handleOpenMenu = (event: React.MouseEvent<HTMLElement>, rowId: string) => {
     event.stopPropagation();
     setMenuAnchorEl((prev) => ({ ...prev, [rowId]: event.currentTarget }));
-    setOpenMenuId(rowId);
   };
 
   const handleCloseMenu = (rowId: string) => {
     setMenuAnchorEl((prev) => ({ ...prev, [rowId]: null }));
-    setOpenMenuId(null);
   };
 
   const formatPrice = (price: number) => String(price).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -62,11 +59,13 @@ export default function ServiceSettingTable({
             <TableCell sx={{ bgcolor: 'grey.100', minWidth: 80 }}>순번</TableCell>
             <TableCell sx={{ bgcolor: 'grey.100', minWidth: 180 }}>등록일</TableCell>
             <TableCell sx={{ bgcolor: 'grey.100', minWidth: 200 }}>서비스명</TableCell>
-            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 120 }}>서비스 기간</TableCell>
+            <TableCell align="center" sx={{ bgcolor: 'grey.100', minWidth: 120 }}>
+              서비스 기간
+            </TableCell>
             <TableCell align="center" sx={{ bgcolor: 'grey.100', minWidth: 100 }}>
               조직원 수
             </TableCell>
-            <TableCell align="right" sx={{ bgcolor: 'grey.100', minWidth: 120 }}>
+            <TableCell align="center" sx={{ bgcolor: 'grey.100', minWidth: 120 }}>
               월 사용료(원)
             </TableCell>
             <TableCell align="center" sx={{ bgcolor: 'grey.100', minWidth: 100 }}>
@@ -82,18 +81,18 @@ export default function ServiceSettingTable({
         </TableHead>
 
         <TableBody>
-          {rows.map((row) => (
-            <TableRow key={row.id} hover>
+          {rows.map((row, index) => (
+            <TableRow key={row.serviceSettingIdx} hover>
               <TableCell>
-                <Typography variant="body2">{row.order}</Typography>
+                <Typography variant="body2">{row.serviceSettingIdx}</Typography>
               </TableCell>
               <TableCell>
                 <Stack spacing={0.25}>
                   <Typography variant="body2" sx={{ color: 'text.primary' }}>
-                    {fDateTime(row.registrationDate, 'YYYY-MM-DD')}
+                    {fDateTime(row.createAt, 'YYYY-MM-DD')}
                   </Typography>
                   <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: 14 }}>
-                    {fDateTime(row.registrationDate, 'HH:mm:ss')}
+                    {fDateTime(row.createAt, 'HH:mm:ss')}
                   </Typography>
                 </Stack>
               </TableCell>
@@ -101,19 +100,21 @@ export default function ServiceSettingTable({
                 <Typography variant="body2">{row.serviceName}</Typography>
               </TableCell>
               <TableCell>
-                <Typography variant="body2">{row.servicePeriod}</Typography>
+                <Typography align="center" variant="body2">
+                  {row.servicePeriod ? `${row.servicePeriod}개월` : '-'}
+                </Typography>
               </TableCell>
               <TableCell align="center">
                 <Typography variant="body2">{row.memberCount}</Typography>
               </TableCell>
-              <TableCell align="right">
+              <TableCell align="center">
                 <Typography variant="body2">{formatPrice(row.monthlyFee)}</Typography>
               </TableCell>
               <TableCell align="center">
                 <Typography variant="body2">{row.subscriptions}</Typography>
               </TableCell>
               <TableCell align="center">
-                {row.status === 'active' ? (
+                {row.status === 'ACTIVE' ? (
                   <Chip label="활성" size="small" color="success" variant="soft" />
                 ) : (
                   <Chip label="비활성" size="small" sx={{ bgcolor: 'grey.300' }} />
@@ -122,7 +123,7 @@ export default function ServiceSettingTable({
               <TableCell align="center">
                 <IconButton
                   size="small"
-                  onClick={(e) => handleOpenMenu(e, row.id)}
+                  onClick={(e) => handleOpenMenu(e, row.serviceSettingIdx?.toString() || '')}
                   sx={{
                     bgcolor: 'grey.200',
                     '&:hover': {
@@ -133,9 +134,9 @@ export default function ServiceSettingTable({
                   <Iconify icon="eva:more-vertical-fill" width={20} />
                 </IconButton>
                 <Menu
-                  anchorEl={menuAnchorEl[row.id]}
-                  open={openMenuId === row.id}
-                  onClose={() => handleCloseMenu(row.id)}
+                  anchorEl={menuAnchorEl[row.serviceSettingIdx?.toString() || '']}
+                  open={!!menuAnchorEl[row.serviceSettingIdx?.toString() || '']}
+                  onClose={() => handleCloseMenu(row.serviceSettingIdx?.toString() || '')}
                   anchorOrigin={{
                     vertical: 'bottom',
                     horizontal: 'right',
@@ -153,7 +154,7 @@ export default function ServiceSettingTable({
                   <MenuList>
                     <MenuItem
                       onClick={() => {
-                        handleCloseMenu(row.id);
+                        handleCloseMenu(row.serviceSettingIdx?.toString() || '');
                         onEdit?.(row);
                       }}
                     >
@@ -163,7 +164,7 @@ export default function ServiceSettingTable({
                     <Divider />
                     <MenuItem
                       onClick={() => {
-                        handleCloseMenu(row.id);
+                        handleCloseMenu(row.serviceSettingIdx?.toString() || '');
                         onDelete?.(row);
                       }}
                       sx={{

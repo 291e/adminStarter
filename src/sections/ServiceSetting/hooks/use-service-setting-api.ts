@@ -35,9 +35,9 @@ export function useServices(params: GetServicesParams) {
  */
 export function useServiceDetail(params: GetServiceDetailParams) {
   return useQuery({
-    queryKey: ['serviceDetail', params.id],
+    queryKey: ['serviceDetail', params.serviceSettingIdx],
     queryFn: () => getServiceDetail(params),
-    enabled: !!params.id,
+    enabled: !!params.serviceSettingIdx,
   });
 }
 
@@ -65,7 +65,7 @@ export function useUpdateService() {
     mutationFn: (params: UpdateServiceParams) => updateService(params),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
-      queryClient.invalidateQueries({ queryKey: ['serviceDetail', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['serviceDetail', variables.serviceSettingIdx] });
     },
   });
 }

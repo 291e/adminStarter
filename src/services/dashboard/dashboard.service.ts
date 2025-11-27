@@ -79,15 +79,15 @@ export async function createSharedDocument(
 
 /**
  * 공유 문서 수정
- * PUT /dashboard/shared-documents/{documentId}
+ * PUT /dashboard/shared-documents/{sharedDocumentIdx}
  */
 export async function updateSharedDocument(
   params: UpdateSharedDocumentParams
 ): Promise<UpdateSharedDocumentResponse> {
-  // documentId는 URL 경로에만 포함, body에는 제외
-  const { documentId, ...body } = params;
+  // sharedDocumentIdx는 URL 경로에만 포함, body에는 제외
+  const { sharedDocumentIdx, ...body } = params;
   const response = await axiosInstance.put<UpdateSharedDocumentResponse>(
-    `${endpoints.dashboard.sharedDocuments}/${documentId}`,
+    `${endpoints.dashboard.sharedDocuments}/${sharedDocumentIdx}`,
     body
   );
   return response.data;
@@ -95,23 +95,24 @@ export async function updateSharedDocument(
 
 /**
  * 공유 문서 삭제
- * DELETE /dashboard/shared-documents/{documentId}
+ * DELETE /dashboard/shared-documents/{sharedDocumentIdx}
  */
 export async function deleteSharedDocument(params: DeleteSharedDocumentParams): Promise<void> {
-  await axiosInstance.delete(`${endpoints.dashboard.sharedDocuments}/${params.documentId}`);
+  await axiosInstance.delete(`${endpoints.dashboard.sharedDocuments}/${params.sharedDocumentIdx}`);
 }
 
 /**
  * 공유 문서 채팅방 공유
- * POST /dashboard/shared-documents/{documentId}/share
+ * POST /dashboard/shared-documents/{sharedDocumentIdx}/share
  */
 export async function shareDocumentToChatRoom(
   params: ShareDocumentToChatRoomParams
 ): Promise<void> {
-  await axiosInstance.post(
-    `${endpoints.dashboard.sharedDocuments}/${params.documentId}/share`,
-    { chatRoomIdList: params.chatRoomIdList }
-  );
+  // sharedDocumentIdx는 URL 경로에만 포함, body에는 제외
+  const { sharedDocumentIdx, chatRoomIdxList } = params;
+  await axiosInstance.post(`${endpoints.dashboard.sharedDocuments}/${sharedDocumentIdx}/share`, {
+    chatRoomIdxList,
+  });
 }
 
 /**
@@ -180,25 +181,24 @@ export async function createPrioritySetting(
 
 /**
  * 중요도 설정 수정
- * PUT /dashboard/priority-settings/{prioritySettingId}
+ * PUT /dashboard/priority-settings/{priorityIdx}
  */
 export async function updatePrioritySetting(
   params: UpdatePrioritySettingParams
 ): Promise<UpdatePrioritySettingResponse> {
+  // priorityIdx는 URL 경로에만 포함, body에는 제외
+  const { priorityIdx, ...body } = params;
   const response = await axiosInstance.put<UpdatePrioritySettingResponse>(
-    `${endpoints.dashboard.prioritySettings}/${params.prioritySettingId}`,
-    params
+    `${endpoints.dashboard.prioritySettings}/${priorityIdx}`,
+    body
   );
   return response.data;
 }
 
 /**
  * 중요도 설정 삭제
- * DELETE /dashboard/priority-settings/{prioritySettingId}
+ * DELETE /dashboard/priority-settings/{priorityIdx}
  */
 export async function deletePrioritySetting(params: DeletePrioritySettingParams): Promise<void> {
-  await axiosInstance.delete(
-    `${endpoints.dashboard.prioritySettings}/${params.prioritySettingId}`
-  );
+  await axiosInstance.delete(`${endpoints.dashboard.prioritySettings}/${params.priorityIdx}`);
 }
-

@@ -2,12 +2,13 @@ import { useState, useMemo } from 'react';
 import type { Dayjs } from 'dayjs';
 
 import type { SharedDocument } from '../components/Table';
+import type { PrioritySetting } from 'src/services/dashboard/dashboard.types';
 
 // ----------------------------------------------------------------------
 
 export type SharedDocumentFilters = {
   tab: 'all' | 'public' | 'private';
-  priority: 'URGENT' | 'IMPORTANT' | 'REFERENCE' | '';
+  priority: string; // 중요도 labelType (자유 문자열)
   startDate: Dayjs | null;
   endDate: Dayjs | null;
   searchValue: string;
@@ -16,7 +17,7 @@ export type SharedDocumentFilters = {
 export type UseSharedDocumentResult = {
   filters: SharedDocumentFilters;
   onChangeTab: (tab: 'all' | 'public' | 'private') => void;
-  onChangePriority: (priority: 'URGENT' | 'IMPORTANT' | 'REFERENCE' | '') => void;
+  onChangePriority: (priority: string) => void;
   onChangeStartDate: (date: Dayjs | null) => void;
   onChangeEndDate: (date: Dayjs | null) => void;
   onChangeSearchValue: (value: string) => void;
@@ -33,8 +34,16 @@ export type UseSharedDocumentResult = {
   countPrivate: number;
 };
 
+// 레거시 호환성을 위한 영어 중요도 값을 한글 labelType으로 변환하는 매핑 (사용 안 함)
+// const PRIORITY_LABEL_MAP: Record<'URGENT' | 'IMPORTANT' | 'REFERENCE', string> = {
+//   URGENT: '긴급',
+//   IMPORTANT: '중요',
+//   REFERENCE: '참고',
+// };
+
 export function useSharedDocument(
   allData: SharedDocument[],
+  prioritySettings: PrioritySetting[] = [],
   initialFilters?: Partial<SharedDocumentFilters>
 ): UseSharedDocumentResult {
   const [filters, setFilters] = useState<SharedDocumentFilters>({
@@ -62,8 +71,12 @@ export function useSharedDocument(
     }
 
     // 중요도 필터
+    // filters.priority는 labelType 값
+    // item.priorityInformation?.labelType과 비교
     if (filters.priority) {
-      result = result.filter((item) => item.priority === filters.priority);
+      result = result.filter(
+        (item) => item.priorityInformation?.labelType === filters.priority
+      );
     }
 
     // 날짜 필터 - createAt 사용

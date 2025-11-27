@@ -19,22 +19,22 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import Box from '@mui/material/Box';
 
 import { Iconify } from 'src/components/iconify';
-import type { CodeSetting } from 'src/_mock/_code-setting';
+import type { CodeSetting } from 'src/services/code-setting/code-setting.types';
 import { fDateTime } from 'src/utils/format-time';
 import type { CategoryItem } from './CategorySettingsModal';
 
 // ----------------------------------------------------------------------
 
 export type HazardEditFormData = {
-  category: string;
+  hazardCategoryIdx?: number; // 카테고리 Index
   code: string;
   name: string;
   formAndType: string;
   location: string;
   exposureRisk: string;
-  managementStandard: string;
-  managementMeasures: string;
-  status: 'active' | 'inactive';
+  managementStandard?: string;
+  managementMeasures?: string;
+  status: 'ACTIVE' | 'INACTIVE' | 'active' | 'inactive';
 };
 
 type Props = {
@@ -53,7 +53,7 @@ export default function EditHazardModal({
   categories = [],
 }: Props) {
   const [formData, setFormData] = useState<HazardEditFormData>({
-    category: '',
+    hazardCategoryIdx: undefined,
     code: '',
     name: '',
     formAndType: '',
@@ -61,56 +61,49 @@ export default function EditHazardModal({
     exposureRisk: '',
     managementStandard: '',
     managementMeasures: '',
-    status: 'active',
+    status: 'ACTIVE',
   });
 
   const [errors, setErrors] = useState<
     Partial<Record<keyof Omit<HazardEditFormData, 'status'>, string>>
   >({});
 
-  const [localCategories, setLocalCategories] = useState<CategoryItem[]>(categories);
-
-  // 모달이 열릴 때 카테고리 목록 가져오기
-  useEffect(() => {
-    if (open && categories.length > 0) {
-      setLocalCategories(categories);
-    } else if (open && categories.length === 0) {
-      // TODO: API 호출로 카테고리 목록 가져오기
-      // const { data } = await fetchHazardCategories();
-      // setLocalCategories(data);
-      // 임시 기본 데이터
-      setLocalCategories([
-        { id: '1', name: '물리적 인자', isActive: true },
-        { id: '2', name: '생물학적 인자', isActive: true },
-        { id: '3', name: '인간공학적 인자', isActive: true },
-      ]);
-    }
-  }, [open, categories]);
-
   // 활성화된 카테고리만 필터링
-  const activeCategories = localCategories.filter((cat) => cat.isActive);
+  const activeCategories = categories.filter((cat) => cat.isActive);
 
   // 초기 데이터로 폼 채우기
   useEffect(() => {
-    if (initialData && open && initialData.categoryType === 'hazard') {
-      setFormData({
-        category: initialData.category || '',
-        code: initialData.code,
-        name: initialData.name,
-        formAndType: initialData.formAndType || '',
-        location: initialData.location || '',
-        exposureRisk: initialData.exposureRisk || '',
-        managementStandard: '', // TODO: TanStack Query Hook(useQuery)으로 관리기준 가져오기
-        managementMeasures: '', // TODO: TanStack Query Hook(useQuery)으로 관리대책 가져오기
-        status: initialData.status,
-      });
-      setErrors({});
+    if (initialData && open) {
+      const categoryTypeUpper = initialData.categoryType?.toUpperCase();
+      if (categoryTypeUpper === 'HAZARD') {
+        const statusValue =
+          typeof initialData.status === 'string'
+            ? initialData.status.toUpperCase() === 'ACTIVE'
+              ? 'ACTIVE'
+              : 'INACTIVE'
+            : 'ACTIVE';
+
+        setFormData({
+          hazardCategoryIdx:
+            initialData.hazardCategoryIdx ||
+            initialData.codeSettingHazardCategoryInformation?.hazardCategoryIdx,
+          code: initialData.code,
+          name: initialData.name,
+          formAndType: initialData.formAndType || '',
+          location: initialData.location || '',
+          exposureRisk: initialData.exposureRisk || '',
+          managementStandard: initialData.managementStandard || '',
+          managementMeasures: initialData.managementMeasures || '',
+          status: statusValue,
+        });
+        setErrors({});
+      }
     }
   }, [initialData, open]);
 
   const handleChange = (
     field: keyof HazardEditFormData,
-    value: string | boolean | 'active' | 'inactive'
+    value: string | number | boolean | 'ACTIVE' | 'INACTIVE' | 'active' | 'inactive' | undefined
   ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     // 에러 초기화
@@ -122,8 +115,8 @@ export default function EditHazardModal({
   const validate = (): boolean => {
     const newErrors: Partial<Record<keyof Omit<HazardEditFormData, 'status'>, string>> = {};
 
-    if (!formData.category.trim()) {
-      newErrors.category = '카테고리를 선택해주세요.';
+    if (!formData.hazardCategoryIdx) {
+      newErrors.hazardCategoryIdx = '카테고리를 선택해주세요.';
     }
 
     if (!formData.code.trim()) {
@@ -144,14 +137,6 @@ export default function EditHazardModal({
 
     if (!formData.exposureRisk.trim()) {
       newErrors.exposureRisk = '노출위험을 입력해주세요.';
-    }
-
-    if (!formData.managementStandard.trim()) {
-      newErrors.managementStandard = '관리기준을 입력해주세요.';
-    }
-
-    if (!formData.managementMeasures.trim()) {
-      newErrors.managementMeasures = '관리대책을 입력해주세요.';
     }
 
     setErrors(newErrors);
@@ -185,7 +170,7 @@ export default function EditHazardModal({
 
   const handleClose = () => {
     setFormData({
-      category: '',
+      hazardCategoryIdx: undefined,
       code: '',
       name: '',
       formAndType: '',
@@ -193,23 +178,24 @@ export default function EditHazardModal({
       exposureRisk: '',
       managementStandard: '',
       managementMeasures: '',
-      status: 'active',
+      status: 'ACTIVE',
     });
     setErrors({});
     onClose();
   };
 
-  const registrationDate = initialData?.registrationDate
-    ? fDateTime(initialData.registrationDate)
+  const registrationDate =
+    initialData?.updateAt || initialData?.createAt
+      ? fDateTime(initialData.updateAt || initialData.createAt, 'YYYY-MM-DD HH:mm:ss')
+      : '-';
+  const modificationDate = initialData?.updateAt
+    ? fDateTime(initialData.updateAt, 'YYYY-MM-DD HH:mm:ss')
     : '-';
-  const modificationDate = initialData?.registrationDate
-    ? fDateTime(initialData.registrationDate)
-    : '-'; // TODO: TanStack Query Hook(useQuery)으로 수정일 가져오기
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
       <DialogTitle>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+        <Typography component="div" variant="h6" sx={{ fontWeight: 600 }}>
           유해인자 수정
         </Typography>
         <IconButton
@@ -257,7 +243,7 @@ export default function EditHazardModal({
       <DialogContent>
         <Stack spacing={3} sx={{ mt: 1, pb: 3 }}>
           {/* 카테고리 */}
-          <FormControl fullWidth error={!!errors.category}>
+          <FormControl fullWidth error={!!errors.hazardCategoryIdx}>
             <InputLabel id="category-label">
               카테고리
               <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
@@ -274,18 +260,24 @@ export default function EditHazardModal({
                   </Typography>
                 </>
               }
-              value={formData.category}
-              onChange={(e) => handleChange('category', e.target.value)}
+              value={formData.hazardCategoryIdx ?? ''}
+              onChange={(e) => {
+                const selectedIdx = e.target.value as number;
+                handleChange('hazardCategoryIdx', selectedIdx);
+              }}
             >
-              {activeCategories.map((cat) => (
-                <MenuItem key={cat.id} value={cat.name}>
+              {activeCategories.map((cat, index) => (
+                <MenuItem
+                  key={cat.hazardCategoryIdx ?? `category-${index}`}
+                  value={cat.hazardCategoryIdx ?? ''}
+                >
                   {cat.name}
                 </MenuItem>
               ))}
             </Select>
-            {errors.category && (
+            {errors.hazardCategoryIdx && (
               <Typography variant="caption" sx={{ color: 'error.main', mt: 0.5, ml: 1.75 }}>
-                {errors.category}
+                {errors.hazardCategoryIdx}
               </Typography>
             )}
           </FormControl>
@@ -379,42 +371,6 @@ export default function EditHazardModal({
             error={!!errors.exposureRisk}
             helperText={errors.exposureRisk}
           />
-
-          {/* 관리기준 */}
-          <TextField
-            fullWidth
-            label={
-              <>
-                관리기준
-                <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
-                  *
-                </Typography>
-              </>
-            }
-            placeholder="관리기준을 입력하세요"
-            value={formData.managementStandard}
-            onChange={(e) => handleChange('managementStandard', e.target.value)}
-            error={!!errors.managementStandard}
-            helperText={errors.managementStandard}
-          />
-
-          {/* 관리대책 */}
-          <TextField
-            fullWidth
-            label={
-              <>
-                관리대책
-                <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
-                  *
-                </Typography>
-              </>
-            }
-            placeholder="관리대책을 입력하세요"
-            value={formData.managementMeasures}
-            onChange={(e) => handleChange('managementMeasures', e.target.value)}
-            error={!!errors.managementMeasures}
-            helperText={errors.managementMeasures}
-          />
         </Stack>
       </DialogContent>
 
@@ -424,8 +380,8 @@ export default function EditHazardModal({
         <FormControlLabel
           control={
             <Switch
-              checked={formData.status === 'active'}
-              onChange={(e) => handleChange('status', e.target.checked ? 'active' : 'inactive')}
+              checked={formData.status?.toUpperCase() === 'ACTIVE'}
+              onChange={(e) => handleChange('status', e.target.checked ? 'ACTIVE' : 'INACTIVE')}
               color="primary"
             />
           }
@@ -442,4 +398,3 @@ export default function EditHazardModal({
     </Dialog>
   );
 }
-

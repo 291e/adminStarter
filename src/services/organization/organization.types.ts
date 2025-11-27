@@ -50,7 +50,7 @@ export type Organization = {
   companyIdx: number;
   companyName: string;
   companyType?: CompanyType; // enum: OPERATOR, MEMBER, DISTRIBUTOR, AGENCY, DEALER, NON_MEMBER
-  companyCode?: string;
+
   businessNumber?: string;
   representativeName?: string;
   phone?: string; // 전화번호
@@ -84,23 +84,39 @@ export type GetOrganizationsResponse = BaseResponseDto<{
 // 조직 등록 요청 파라미터
 export type CreateOrganizationParams = {
   companyName: string;
-  companyCode?: string;
   businessNumber?: string;
   address?: string;
   phone?: string;
   email?: string;
   companyType: CompanyType;
+  businessType: number; // 0: 개인사업자, 1: 법인사업자
+  representativeName: string;
+  businessCategory: string;
+  businessItem: string;
+  serviceSettingIdxes?: number[]; // 구독 서비스 Index 목록
 };
 
 // 조직 등록 응답
 export type CreateOrganizationResponse = BaseResponseDto;
 
 // 조직 수정 요청 파라미터
-export type UpdateOrganizationParams = Partial<CreateOrganizationParams> & {
-  representativeName?: string; // 대표자명
-  businessType?: number; // 사업자 유형 (0: 법인 사업자, 1: 개인 사업자)
-  businessCategory?: string; // 업태
-  businessItem?: string; // 종목
+export type UpdateOrganizationParams = {
+  companyName?: string;
+  businessNumber?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  companyType?: CompanyType;
+  businessType?: number; // 0: 개인사업자, 1: 법인사업자
+  representativeName?: string;
+  businessCategory?: string;
+  businessItem?: string;
+  serviceSettingIdxes?: number[]; // 구독 서비스 Index 목록
+  isActive?: number; // 0: 비활성, 1: 활성
+  isAccidentFreeWorksite?: number; // 0: 아니오, 1: 예
+  accidentFreeStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  accidentFreeCertifiedAt?: string;
+  accidentFreeExpiresAt?: string;
 };
 
 // 조직 수정 응답
@@ -190,7 +206,7 @@ export type GetSubscriptionsParams = {
 
 // 구독 정보
 export type Subscription = {
-  subscriptionId: string;
+  subscriptionIdx: number;
   servicePlanId: string;
   servicePlanName: string;
   status: 'active' | 'cancelled' | 'expired';
@@ -206,7 +222,10 @@ export type GetSubscriptionsResponse = BaseResponseDto<{
 
 // 서비스 구독 요청
 export type SubscribeParams = {
-  servicePlanId: string;
+  companyIdx: number;
+  serviceSettingIdx: number; // 서비스 설정 Index (숫자)
+  billingKey?: string; // 결제 빌링키 (선택)
+  immediateCancel?: boolean; // 즉시 해지 여부 (기본값: false)
 };
 
 // 서비스 구독 응답
@@ -215,7 +234,7 @@ export type SubscribeResponse = BaseResponseDto<Subscription>;
 // 구독 취소 요청
 export type CancelSubscriptionParams = {
   companyIdx: number;
-  subscriptionId: string;
+  serviceSettingIdx: number;
 };
 
 // 서비스 업그레이드 요청 파라미터
@@ -237,6 +256,59 @@ export type CardActionParams = {
 
 // 카드 액션 응답
 export type CardActionResponse = BaseResponseDto;
+
+// 서비스 플랜 정보
+export type ServicePlan = {
+  servicePlanId: string;
+  planName: string;
+  price: number;
+  period: string; // '1개월', '3개월', '6개월', '12개월' 등
+  icon?: string;
+  isRecommended?: boolean;
+};
+
+// 서비스 플랜 목록 조회 응답
+export type GetServicePlansResponse = BaseResponseDto<{
+  plans: ServicePlan[];
+}>;
+
+// 현재 구독 정보 조회 응답
+export type GetCurrentSubscriptionResponse = BaseResponseDto<{
+  subscription: Subscription | null;
+  paymentInfo: {
+    serviceName: string;
+    payer: string;
+    billingAddress: string;
+    billingContact: string;
+    paymentMethod: string; // 카드 번호 마스킹 (예: '**** **** **** 5678')
+  };
+}>;
+
+// 등록된 카드 정보
+export type RegisteredCard = {
+  cardId: string;
+  cardType: 'visa' | 'mastercard' | 'amex' | 'other';
+  cardNumber: string; // 마스킹된 카드 번호 (예: '**** **** **** 5678')
+  isPrimary: boolean;
+  billingKey?: string; // 페이플 빌링키
+};
+
+// 등록된 카드 목록 조회 응답
+export type GetRegisteredCardsResponse = BaseResponseDto<{
+  cards: RegisteredCard[];
+}>;
+
+// 카드 등록 요청 파라미터 (페이플 콜백 후)
+export type RegisterCardParams = {
+  billingKey: string;
+  orderNo: string;
+  amount: string;
+  cardName: string;
+  cardNo: string;
+};
+
+// 카드 등록 응답
+export type RegisterCardResponse = BaseResponseDto<RegisteredCard>;
 
 // 무재해 인증 이력 항목
 export type AccidentFreeHistoryItem = {
@@ -270,7 +342,7 @@ export type UpdateAccidentFreeParams = {
 // 조직원 초대 요청
 export type InviteMemberParams = {
   email: string;
-  role?: string;
+  memberRole: string;
 };
 
 // 조직원 초대 응답

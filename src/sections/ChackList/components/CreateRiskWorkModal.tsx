@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -16,12 +16,12 @@ import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 
 import { Iconify } from 'src/components/iconify';
-import type { IndustryItem } from './IndustrySettingsModal';
+import type { IndustryItem } from 'src/services/checklist/checklist.types';
 
 // ----------------------------------------------------------------------
 
 export type RiskWorkFormData = {
-  industry: string;
+  industry: string; // industryIdx를 문자열로 변환한 값 또는 name
   highRiskWork: string;
 };
 
@@ -31,14 +31,6 @@ type Props = {
   onSave: (data: RiskWorkFormData) => void;
   industries?: IndustryItem[];
 };
-
-const DEFAULT_INDUSTRIES = [
-  { id: '1', name: '제조업', value: 'manufacturing', isActive: true },
-  { id: '2', name: '운수·창고·통신업', value: 'transport', isActive: true },
-  { id: '3', name: '임업', value: 'forestry', isActive: true },
-  { id: '4', name: '건물 등의 종합관리사업', value: 'building', isActive: true },
-  { id: '5', name: '위생 및 유사서비스업', value: 'sanitation', isActive: true },
-];
 
 export default function CreateRiskWorkModal({
   open,
@@ -53,23 +45,8 @@ export default function CreateRiskWorkModal({
 
   const [errors, setErrors] = useState<Partial<Record<keyof RiskWorkFormData, string>>>({});
 
-  // 모달이 열릴 때 업종 목록 가져오기
-  useEffect(() => {
-    if (open && industries.length === 0) {
-      // TODO: TanStack Query Hook(useQuery)으로 업종 목록 가져오기
-      // const { data } = useQuery({
-      //   queryKey: ['industries'],
-      //   queryFn: () => getIndustries(),
-      // });
-      // if (data) setIndustries(data);
-    }
-  }, [open, industries]);
-
-  // 활성화된 업종만 필터링 (업종이 없으면 임시 기본 데이터 사용)
-  const activeIndustries =
-    industries.length > 0
-      ? industries.filter((industry) => industry.isActive)
-      : DEFAULT_INDUSTRIES;
+  // 활성화된 업종만 필터링
+  const activeIndustries = industries.filter((industry) => industry.isActive);
 
   const handleChange = (field: keyof RiskWorkFormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -99,9 +76,6 @@ export default function CreateRiskWorkModal({
       return;
     }
 
-    // TODO: TanStack Query Hook(useMutation)으로 위험작업/상황 등록 (view.tsx의 handleSaveRiskWork에서 처리)
-    // 실제 API 호출은 view.tsx의 handleSaveRiskWork에서 수행됩니다.
-
     onSave(formData);
     handleClose();
   };
@@ -118,7 +92,7 @@ export default function CreateRiskWorkModal({
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
       <DialogTitle>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+        <Typography component="div" variant="h6" sx={{ fontWeight: 600 }}>
           위험작업/상황 등록
         </Typography>
         <IconButton
@@ -147,7 +121,7 @@ export default function CreateRiskWorkModal({
               onChange={(e) => handleChange('industry', e.target.value)}
             >
               {activeIndustries.map((industry) => (
-                <MenuItem key={industry.id} value={industry.value}>
+                <MenuItem key={industry.industryIdx ?? industry.name} value={industry.name}>
                   {industry.name}
                 </MenuItem>
               ))}
@@ -194,4 +168,3 @@ export default function CreateRiskWorkModal({
     </Dialog>
   );
 }
-

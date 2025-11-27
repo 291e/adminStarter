@@ -1,4 +1,4 @@
-import type { EducationReport } from 'src/_mock/_education-report';
+import type { EducationReport } from 'src/services/education-report/education-report.types';
 import { useMemo, useState, useCallback } from 'react';
 
 // ----------------------------------------------------------------------
@@ -99,7 +99,11 @@ export function useEducationReport(
   const onSelectAll = useCallback(
     (checked: boolean) => {
       if (checked) {
-        setSelectedIds(filteredAll.map((r) => r.id));
+        setSelectedIds(
+          filteredAll
+            .map((r) => r.id || r.educationReportId || String(r.memberIdx || ''))
+            .filter((id): id is string => !!id)
+        );
       } else {
         setSelectedIds([]);
       }

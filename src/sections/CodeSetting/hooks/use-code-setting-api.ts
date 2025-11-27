@@ -9,8 +9,6 @@ import {
   updateHazard,
   getHazardCategories,
   saveHazardCategories,
-  getCodeDates,
-  getHazardManagement,
 } from 'src/services/code-setting/code-setting.service';
 import type {
   GetCodesParams,
@@ -20,8 +18,6 @@ import type {
   CreateHazardParams,
   UpdateHazardParams,
   SaveHazardCategoriesParams,
-  GetCodeDatesParams,
-  GetHazardManagementParams,
 } from 'src/services/code-setting/code-setting.types';
 
 // ----------------------------------------------------------------------
@@ -42,9 +38,9 @@ export function useCodes(params: GetCodesParams) {
  */
 export function useCodeDetail(params: GetCodeDetailParams) {
   return useQuery({
-    queryKey: ['codeDetail', params.id],
+    queryKey: ['codeDetail', params.codeSettingIdx],
     queryFn: () => getCodeDetail(params),
-    enabled: !!params.id,
+    enabled: !!params.codeSettingIdx,
   });
 }
 
@@ -72,7 +68,9 @@ export function useUpdateMachine() {
     mutationFn: (params: UpdateMachineParams) => updateMachine(params),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['codes'] });
-      queryClient.invalidateQueries({ queryKey: ['codeDetail', variables.id] });
+      queryClient.invalidateQueries({
+        queryKey: ['codeDetail', variables.codeSettingIdx],
+      });
     },
   });
 }
@@ -101,7 +99,9 @@ export function useUpdateHazard() {
     mutationFn: (params: UpdateHazardParams) => updateHazard(params),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['codes'] });
-      queryClient.invalidateQueries({ queryKey: ['codeDetail', variables.id] });
+      queryClient.invalidateQueries({
+        queryKey: ['codeDetail', variables.codeSettingIdx],
+      });
     },
   });
 }
@@ -125,30 +125,11 @@ export function useSaveHazardCategories() {
   return useMutation({
     mutationFn: (params: SaveHazardCategoriesParams) => saveHazardCategories(params),
     onSuccess: () => {
+      // 카테고리 목록과 코드 목록 모두 무효화하여 최신 데이터 반영
       queryClient.invalidateQueries({ queryKey: ['hazardCategories'] });
+      queryClient.invalidateQueries({ queryKey: ['codes'] });
     },
   });
 }
 
-/**
- * 등록일/수정일 정보 조회 Hook
- */
-export function useCodeDates(params: GetCodeDatesParams) {
-  return useQuery({
-    queryKey: ['codeDates', params.id],
-    queryFn: () => getCodeDates(params),
-    enabled: !!params.id,
-  });
-}
-
-/**
- * 관리기준/관리대책 조회 Hook
- */
-export function useHazardManagement(params: GetHazardManagementParams) {
-  return useQuery({
-    queryKey: ['hazardManagement', params.id],
-    queryFn: () => getHazardManagement(params),
-    enabled: !!params.id,
-  });
-}
 

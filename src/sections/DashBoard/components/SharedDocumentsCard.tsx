@@ -7,6 +7,7 @@ import Chip from '@mui/material/Chip';
 import { Iconify } from 'src/components/iconify';
 import { useNavigate } from 'react-router';
 import { paths } from 'src/routes/paths';
+import { hexToRgba } from 'src/utils/color';
 import type { SharedDocument } from 'src/services/dashboard/dashboard.types';
 
 // ----------------------------------------------------------------------
@@ -197,10 +198,32 @@ export default function SharedDocumentsCard({
 
         {/* 테이블 바디 */}
         {rows.map((row) => {
-          const priorityConfig = PRIORITY_CONFIG[row.priority || ''] || PRIORITY_CONFIG.DEFAULT;
+          // priorityInformation에서 직접 정보 가져오기
+          const priorityInfo = row.priorityInformation;
+          const priorityLabel = priorityInfo?.labelType || '';
+
+          // priorityInformation이 있으면 해당 정보 사용, 없으면 기본값
+          let priorityConfig: { label: string; color: string; bgColor: string; variant: 'soft' };
+          if (priorityInfo && priorityInfo.color) {
+            // priorityInformation에서 직접 색상 정보 사용
+            const colorHex = priorityInfo.color;
+            // HEX 색상을 rgba로 변환 (투명도 0.16)
+            const bgColor = hexToRgba(colorHex, 0.16);
+
+            priorityConfig = {
+              label: priorityInfo.labelType || '중요도',
+              color: colorHex,
+              bgColor,
+              variant: 'soft',
+            };
+          } else {
+            // priorityInformation이 없는 경우 PRIORITY_CONFIG 사용
+            priorityConfig = PRIORITY_CONFIG[priorityLabel] || PRIORITY_CONFIG.DEFAULT;
+          }
+
           return (
             <Box
-              key={row.id}
+              key={row.sharedDocumentIdx}
               sx={{
                 display: 'flex',
                 borderBottom: '1px dashed',

@@ -21,12 +21,15 @@ export type CategoryItem = {
   id: string;
   name: string;
   isActive: boolean;
+  libraryCategoryIdx?: number | null;
+  order?: number | null;
+  description?: string | null;
 };
 
 type Props = {
   open: boolean;
   onClose: () => void;
-  onSave: (categories: CategoryItem[]) => void;
+  onSave: (categories: CategoryItem[]) => Promise<void> | void;
   initialCategories?: CategoryItem[];
 };
 
@@ -52,10 +55,16 @@ export default function CategorySettingsModal({
         id: `category-${Date.now()}`,
         name: newCategoryName.trim(),
         isActive: true,
+        libraryCategoryIdx: null,
+        order: categories.length + 1,
       };
       setCategories([...categories, newCategory]);
       setNewCategoryName('');
     }
+  };
+
+  const handleRenameCategory = (id: string, value: string) => {
+    setCategories((prev) => prev.map((cat) => (cat.id === id ? { ...cat, name: value } : cat)));
   };
 
   const handleDeleteCategory = (id: string) => {
@@ -68,9 +77,13 @@ export default function CategorySettingsModal({
     );
   };
 
-  const handleSave = () => {
-    onSave(categories);
-    onClose();
+  const handleSave = async () => {
+    try {
+      await onSave(categories);
+      onClose();
+    } catch (error) {
+      console.error('❌ [CategorySettingsModal] 저장 실패', error);
+    }
   };
 
   const handleClose = () => {
@@ -82,7 +95,7 @@ export default function CategorySettingsModal({
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
       <DialogTitle>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+        <Typography component="div" variant="h6" sx={{ fontWeight: 600 }}>
           카테고리 설정
         </Typography>
         <IconButton
@@ -106,9 +119,7 @@ export default function CategorySettingsModal({
               <TextField
                 fullWidth
                 value={category.name}
-                InputProps={{
-                  readOnly: true,
-                }}
+                onChange={(e) => handleRenameCategory(category.id, e.target.value)}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: 54,

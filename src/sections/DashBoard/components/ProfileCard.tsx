@@ -10,6 +10,30 @@ import { Iconify } from 'src/components/iconify';
 
 // ----------------------------------------------------------------------
 
+// 역할 한글 맵핑 함수
+const getRoleLabel = (role: string): string => {
+  if (!role) return '';
+
+  const roleUpper = role.toUpperCase();
+  const roleMap: { [key: string]: string } = {
+    OPERATOR_MANAGER: '조직 관리자',
+    MANAGEMENT_SUPERVISOR: '관리 감독자',
+    SAFETY_MANAGER: '안전보건 담당자',
+    WORKER: '근로자',
+    ADMIN: '조직 관리자',
+    MEMBER: '근로자',
+    // 소문자 키 (하위 호환성)
+    operator_manager: '조직 관리자',
+    management_supervisor: '관리 감독자',
+    safety_manager: '안전보건 담당자',
+    worker: '근로자',
+    admin: '조직 관리자',
+    member: '근로자',
+  };
+
+  return roleMap[roleUpper] || roleMap[role] || role;
+};
+
 type Props = {
   name: string;
   label: string;
@@ -19,6 +43,9 @@ type Props = {
 };
 
 export default function ProfileCard({ name, label, roles, educationRate, onViewDetail }: Props) {
+  // label을 한글로 변환
+  const labelKorean = getRoleLabel(label);
+
   return (
     <Box
       sx={{
@@ -87,7 +114,7 @@ export default function ProfileCard({ name, label, roles, educationRate, onViewD
             {name}
           </Typography>
           <Chip
-            label={label}
+            label={labelKorean}
             size="small"
             sx={{
               height: 24,
@@ -104,7 +131,6 @@ export default function ProfileCard({ name, label, roles, educationRate, onViewD
           component="ul"
           sx={{
             m: 0,
-            pl: { xs: 2, sm: 2.625 },
             fontSize: { xs: 13, sm: 14 },
             color: 'text.secondary',
             lineHeight: '22px',

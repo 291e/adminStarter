@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -21,7 +21,7 @@ import type { CategoryItem } from './CategorySettingsModal';
 // ----------------------------------------------------------------------
 
 export type HazardFormData = {
-  category: string;
+  hazardCategoryIdx?: number; // 카테고리 Index
   code: string;
   name: string;
   formAndType: string;
@@ -40,7 +40,7 @@ type Props = {
 
 export default function CreateHazardModal({ open, onClose, onSave, categories = [] }: Props) {
   const [formData, setFormData] = useState<HazardFormData>({
-    category: '',
+    hazardCategoryIdx: undefined,
     code: '',
     name: '',
     formAndType: '',
@@ -52,29 +52,10 @@ export default function CreateHazardModal({ open, onClose, onSave, categories = 
 
   const [errors, setErrors] = useState<Partial<Record<keyof HazardFormData, string>>>({});
 
-  // 모달이 열릴 때 카테고리 목록 가져오기
-  useEffect(() => {
-    if (open && categories.length === 0) {
-      // TODO: TanStack Query Hook(useQuery)으로 카테고리 목록 가져오기
-      // const { data } = useQuery({
-      //   queryKey: ['hazardCategories'],
-      //   queryFn: () => getHazardCategories(),
-      // });
-      // if (data) setCategories(data);
-    }
-  }, [open, categories]);
+  // 활성화된 카테고리만 필터링
+  const activeCategories = categories.filter((cat) => cat.isActive);
 
-  // 활성화된 카테고리만 필터링 (카테고리가 없으면 임시 기본 데이터 사용)
-  const activeCategories =
-    categories.length > 0
-      ? categories.filter((cat) => cat.isActive)
-      : [
-          { id: '1', name: '물리적 인자', isActive: true },
-          { id: '2', name: '생물학적 인자', isActive: true },
-          { id: '3', name: '인간공학적 인자', isActive: true },
-        ];
-
-  const handleChange = (field: keyof HazardFormData, value: string) => {
+  const handleChange = (field: keyof HazardFormData, value: string | number | undefined) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     // 에러 초기화
     if (errors[field]) {
@@ -85,8 +66,8 @@ export default function CreateHazardModal({ open, onClose, onSave, categories = 
   const validate = (): boolean => {
     const newErrors: Partial<Record<keyof HazardFormData, string>> = {};
 
-    if (!formData.category.trim()) {
-      newErrors.category = '카테고리를 선택해주세요.';
+    if (!formData.hazardCategoryIdx) {
+      newErrors.hazardCategoryIdx = '카테고리를 선택해주세요.';
     }
 
     if (!formData.code.trim()) {
@@ -145,7 +126,7 @@ export default function CreateHazardModal({ open, onClose, onSave, categories = 
 
   const handleClose = () => {
     setFormData({
-      category: '',
+      hazardCategoryIdx: undefined,
       code: '',
       name: '',
       formAndType: '',
@@ -161,7 +142,7 @@ export default function CreateHazardModal({ open, onClose, onSave, categories = 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
       <DialogTitle>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+        <Typography component="div" variant="h6" sx={{ fontWeight: 600 }}>
           유해인자 등록
         </Typography>
         <IconButton
@@ -181,7 +162,7 @@ export default function CreateHazardModal({ open, onClose, onSave, categories = 
       <DialogContent>
         <Stack spacing={3} sx={{ mt: 1, pb: 3 }}>
           {/* 카테고리 */}
-          <FormControl fullWidth error={!!errors.category}>
+          <FormControl fullWidth error={!!errors.hazardCategoryIdx}>
             <InputLabel id="category-label">
               카테고리
               <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
@@ -198,18 +179,24 @@ export default function CreateHazardModal({ open, onClose, onSave, categories = 
                   </Typography>
                 </>
               }
-              value={formData.category}
-              onChange={(e) => handleChange('category', e.target.value)}
+              value={formData.hazardCategoryIdx ?? ''}
+              onChange={(e) => {
+                const selectedIdx = e.target.value as number;
+                handleChange('hazardCategoryIdx', selectedIdx);
+              }}
             >
-              {activeCategories.map((cat) => (
-                <MenuItem key={cat.id} value={cat.name}>
+              {activeCategories.map((cat, index) => (
+                <MenuItem
+                  key={cat.hazardCategoryIdx ?? `category-${index}`}
+                  value={cat.hazardCategoryIdx ?? ''}
+                >
                   {cat.name}
                 </MenuItem>
               ))}
             </Select>
-            {errors.category && (
+            {errors.hazardCategoryIdx && (
               <Typography variant="caption" sx={{ color: 'error.main', mt: 0.5, ml: 1.75 }}>
-                {errors.category}
+                {errors.hazardCategoryIdx}
               </Typography>
             )}
           </FormControl>

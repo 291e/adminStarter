@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 
 import type { Theme, SxProps } from '@mui/material/styles';
 
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
+import Stack from '@mui/material/Stack';
+import CircularProgress from '@mui/material/CircularProgress';
+import Alert from '@mui/material/Alert';
 
 import { DashboardContent } from 'src/layouts/dashboard';
 import ServiceSettingBreadcrumbs from './components/Breadcrumbs';
@@ -13,7 +16,14 @@ import ServiceSettingPagination from './components/Pagination';
 import CreateServiceModal, { type ServiceFormData } from './components/CreateServiceModal';
 import EditServiceModal, { type ServiceEditFormData } from './components/EditServiceModal';
 import { useServiceSetting } from './hooks/use-service-setting';
-import { mockServiceSettings, type ServiceSetting } from 'src/_mock/_service-setting';
+import {
+  useServices,
+  useCreateService,
+  useUpdateService,
+  useDeactivateService,
+  useDeleteService,
+} from './hooks/use-service-setting-api';
+import type { ServiceSetting } from 'src/services/service-setting/service-setting.types';
 
 // ----------------------------------------------------------------------
 
@@ -24,154 +34,214 @@ type Props = {
 };
 
 export function ServiceSettingView({ title = '서비스 관리', description, sx }: Props) {
-  // TODO: TanStack Query Hook(useQuery)으로 서비스 목록 가져오기
-  // const { data: services, isLoading, error } = useQuery({
-  //   queryKey: ['serviceSettings', logic.filters],
-  //   queryFn: () => getServiceSettings({ filters: logic.filters }),
-  // });
-  // 목업 데이터 사용
-  const services = mockServiceSettings(20);
-  const logic = useServiceSetting(services);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedService, setSelectedService] = useState<ServiceSetting | null>(null);
 
-  const renderContent = () => (
-    <Box
-      sx={{
-        bgcolor: 'background.paper',
-        borderRadius: 2,
-        boxShadow: (theme) => theme.customShadows.card,
-        width: '100%',
-        overflow: 'hidden',
-      }}
-    >
-      <ServiceSettingFilters
-        status={logic.filters.status}
-        onChangeStatus={(status) => {
-          logic.onChangeStatus(status);
-          // TODO: 상태 필터 변경 시 TanStack Query로 서비스 목록 새로고침
-          // queryClient.invalidateQueries({ queryKey: ['serviceSettings'] });
-        }}
-        searchFilter={logic.filters.searchFilter}
-        onChangeSearchFilter={(filter) => {
-          logic.onChangeSearchFilter(filter);
-          // TODO: 검색 필터 변경 시 TanStack Query로 서비스 목록 새로고침
-          // queryClient.invalidateQueries({ queryKey: ['serviceSettings'] });
-        }}
-        searchValue={logic.filters.searchValue}
-        onChangeSearchValue={(value) => {
-          logic.onChangeSearchValue(value);
-          // TODO: 검색 값 변경 시 TanStack Query로 서비스 목록 새로고침
-          // queryClient.invalidateQueries({ queryKey: ['serviceSettings'] });
-        }}
-      />
+  // 필터 상태 (서버 사이드 필터링을 위해)
+  const [filters, setFilters] = useState({
+    status: undefined as 'ACTIVE' | 'INACTIVE' | undefined,
+    search: undefined as string | undefined,
+  });
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
-      <ServiceSettingTable
-        rows={logic.filtered}
-        onViewDetail={(row) => {
-          // TODO: 서비스 상세 페이지로 이동 또는 TanStack Query Hook(useQuery)으로 상세 정보 가져오기
-          // const { data: detail } = useQuery({
-          //   queryKey: ['serviceDetail', row.id],
-          //   queryFn: () => getServiceDetail(row.id),
-          // });
-          console.log('서비스 상세 보기:', row);
-        }}
-        onEdit={(row) => {
-          setSelectedService(row);
-          setEditModalOpen(true);
-          // TODO: TanStack Query Hook(useQuery)으로 서비스 상세 정보 가져오기 (수정 모달용)
-          // const { data: detail } = useQuery({
-          //   queryKey: ['serviceDetail', row.id],
-          //   queryFn: () => getServiceDetail(row.id),
-          // });
-        }}
-        onDeactivate={(row) => {
-          // TODO: TanStack Query Hook(useMutation)으로 서비스 비활성화
-          // const mutation = useMutation({
-          //   mutationFn: () => deactivateService(row.id),
-          //   onSuccess: () => {
-          //     queryClient.invalidateQueries({ queryKey: ['serviceSettings'] });
-          //   },
-          // });
-          // mutation.mutate();
-          console.log('서비스 비활성화:', row);
-        }}
-        onDelete={(row) => {
-          // TODO: TanStack Query Hook(useMutation)으로 서비스 삭제
-          // const mutation = useMutation({
-          //   mutationFn: () => deleteService(row.id),
-          //   onSuccess: () => {
-          //     queryClient.invalidateQueries({ queryKey: ['serviceSettings'] });
-          //   },
-          // });
-          // mutation.mutate();
-          console.log('서비스 삭제:', row);
-        }}
-      />
+  // 서비스 목록 조회
+  const servicesQuery = useServices({
+    page,
+    pageSize,
+    status: filters.status,
+    search: filters.search,
+  });
 
-      <ServiceSettingPagination
-        count={logic.total}
-        page={logic.page}
-        rowsPerPage={logic.rowsPerPage}
-        onChangePage={(page) => {
-          logic.onChangePage(page);
-          // TODO: 페이지 변경 시 TanStack Query로 서비스 목록 새로고침
-          // queryClient.invalidateQueries({ queryKey: ['serviceSettings'] });
+  const services = servicesQuery.data?.serviceSettingList ?? [];
+  const totalCount = servicesQuery.data?.totalCount ?? 0;
+
+  // 클라이언트 사이드 필터링 및 페이지네이션 (필요시)
+  const logic = useServiceSetting(services);
+
+  const createServiceMutation = useCreateService();
+  const updateServiceMutation = useUpdateService();
+  const deactivateServiceMutation = useDeactivateService();
+  const deleteServiceMutation = useDeleteService();
+
+  const renderContent = () => {
+    if (servicesQuery.isLoading) {
+      return (
+        <Stack alignItems="center" justifyContent="center" sx={{ py: 5 }}>
+          <CircularProgress />
+        </Stack>
+      );
+    }
+
+    if (servicesQuery.isError) {
+      return (
+        <Alert severity="error" sx={{ m: 2 }}>
+          서비스 데이터를 불러오는 중 오류가 발생했습니다.
+        </Alert>
+      );
+    }
+
+    return (
+      <Box
+        sx={{
+          bgcolor: 'background.paper',
+          borderRadius: 2,
+          boxShadow: (theme) => theme.customShadows.card,
+          width: '100%',
+          overflow: 'hidden',
         }}
-        onChangeRowsPerPage={(rowsPerPage) => {
-          logic.onChangeRowsPerPage(rowsPerPage);
-          // TODO: 페이지 크기 변경 시 TanStack Query로 서비스 목록 새로고침
-          // queryClient.invalidateQueries({ queryKey: ['serviceSettings'] });
-        }}
-      />
-    </Box>
-  );
+      >
+        <ServiceSettingFilters
+          status={logic.filters.status}
+          onChangeStatus={(status) => {
+            logic.onChangeStatus(status);
+            // '활성' -> 'ACTIVE', '비활성' -> 'INACTIVE', '전체' -> undefined
+            const statusValue =
+              status === 'all' || status === '전체'
+                ? undefined
+                : status === '활성'
+                  ? 'ACTIVE'
+                  : status === '비활성'
+                    ? 'INACTIVE'
+                    : (status as 'ACTIVE' | 'INACTIVE');
+            setFilters((prev) => ({ ...prev, status: statusValue }));
+            setPage(1);
+          }}
+          searchFilter={logic.filters.searchFilter}
+          onChangeSearchFilter={(filter) => {
+            logic.onChangeSearchFilter(filter);
+          }}
+          searchValue={logic.filters.searchValue}
+          onChangeSearchValue={(value) => {
+            logic.onChangeSearchValue(value);
+            setFilters((prev) => ({ ...prev, search: value || undefined }));
+            setPage(1);
+          }}
+        />
+
+        <ServiceSettingTable
+          rows={logic.filtered}
+          onViewDetail={(row) => {
+            if (import.meta.env.DEV) {
+              console.log('서비스 상세 보기:', row);
+            }
+          }}
+          onEdit={(row) => {
+            setSelectedService(row);
+            setEditModalOpen(true);
+          }}
+          onDeactivate={async (row) => {
+            if (!row.serviceSettingIdx) {
+              console.error('서비스 ID가 없습니다.');
+              return;
+            }
+            try {
+              await deactivateServiceMutation.mutateAsync({
+                serviceSettingIdx: row.serviceSettingIdx,
+              });
+              if (import.meta.env.DEV) {
+                console.log('서비스 비활성화 성공:', row);
+              }
+            } catch (error) {
+              console.error('서비스 비활성화 실패:', error);
+            }
+          }}
+          onDelete={async (row) => {
+            if (!row.serviceSettingIdx) {
+              console.error('서비스 ID가 없습니다.');
+              return;
+            }
+            if (window.confirm('정말 삭제하시겠습니까?')) {
+              try {
+                await deleteServiceMutation.mutateAsync({
+                  serviceSettingIdx: row.serviceSettingIdx,
+                });
+                if (import.meta.env.DEV) {
+                  console.log('서비스 삭제 성공:', row);
+                }
+              } catch (error) {
+                console.error('서비스 삭제 실패:', error);
+              }
+            }
+          }}
+        />
+
+        <ServiceSettingPagination
+          count={totalCount}
+          page={page - 1}
+          rowsPerPage={pageSize}
+          onChangePage={(newPage) => {
+            setPage(newPage + 1);
+          }}
+          onChangeRowsPerPage={(newRowsPerPage) => {
+            setPageSize(newRowsPerPage);
+            setPage(1);
+          }}
+        />
+      </Box>
+    );
+  };
 
   const handleCreate = () => {
     setCreateModalOpen(true);
   };
 
-  const handleSaveService = (data: ServiceFormData) => {
-    // TODO: TanStack Query Hook(useMutation)으로 서비스 등록
-    // const mutation = useMutation({
-    //   mutationFn: (formData: ServiceFormData) => createService({
-    //     serviceName: formData.serviceName,
-    //     servicePeriod: formData.servicePeriod,
-    //     memberCount: Number(formData.memberCount),
-    //     monthlyFee: Number(formData.monthlyFee),
-    //   }),
-    //   onSuccess: () => {
-    //     queryClient.invalidateQueries({ queryKey: ['serviceSettings'] });
-    //     setCreateModalOpen(false);
-    //   },
-    // });
-    // mutation.mutate(data);
-    console.log('서비스 등록:', data);
-  };
+  const handleSaveService = useCallback(
+    async (data: ServiceFormData) => {
+      try {
+        // servicePeriod를 숫자로 변환 (예: "1개월" -> 1, "3개월" -> 3)
+        const servicePeriodNumber = parseInt(data.servicePeriod.replace('개월', ''), 10) || 1;
 
-  const handleSaveEditService = (data: ServiceEditFormData) => {
-    if (!selectedService) return;
+        await createServiceMutation.mutateAsync({
+          serviceName: data.serviceName,
+          servicePeriod: servicePeriodNumber,
+          memberCount: Number(data.memberCount),
+          monthlyFee: Number(data.monthlyFee),
+        });
+        setCreateModalOpen(false);
+        if (import.meta.env.DEV) {
+          console.log('서비스 등록 성공:', data);
+        }
+      } catch (error) {
+        console.error('서비스 등록 실패:', error);
+      }
+    },
+    [createServiceMutation]
+  );
 
-    // TODO: TanStack Query Hook(useMutation)으로 서비스 수정
-    // const mutation = useMutation({
-    //   mutationFn: (formData: ServiceEditFormData) => updateService(selectedService.id, {
-    //     serviceName: formData.serviceName,
-    //     servicePeriod: formData.servicePeriod,
-    //     memberCount: Number(formData.memberCount),
-    //     monthlyFee: Number(formData.monthlyFee),
-    //     status: formData.status,
-    //   }),
-    //   onSuccess: () => {
-    //     queryClient.invalidateQueries({ queryKey: ['serviceSettings'] });
-    //     queryClient.invalidateQueries({ queryKey: ['serviceDetail', selectedService.id] });
-    //     setEditModalOpen(false);
-    //     setSelectedService(null);
-    //   },
-    // });
-    // mutation.mutate(data);
-    console.log('서비스 수정:', data);
-  };
+  const handleSaveEditService = useCallback(
+    async (data: ServiceEditFormData) => {
+      if (!selectedService?.serviceSettingIdx) {
+        console.error('서비스 ID가 없습니다.');
+        return;
+      }
+
+      try {
+        // servicePeriod를 숫자로 변환 (예: "1개월" -> 1, "3개월" -> 3)
+        const servicePeriodNumber = data.servicePeriod
+          ? parseInt(data.servicePeriod.replace('개월', ''), 10) || undefined
+          : undefined;
+
+        await updateServiceMutation.mutateAsync({
+          serviceSettingIdx: selectedService.serviceSettingIdx,
+          serviceName: data.serviceName,
+          servicePeriod: servicePeriodNumber,
+          memberCount: Number(data.memberCount),
+          monthlyFee: Number(data.monthlyFee),
+          status: data.status === 'active' ? 'ACTIVE' : 'INACTIVE',
+        });
+        setEditModalOpen(false);
+        setSelectedService(null);
+        if (import.meta.env.DEV) {
+          console.log('서비스 수정 성공:', data);
+        }
+      } catch (error) {
+        console.error('서비스 수정 실패:', error);
+      }
+    },
+    [selectedService, updateServiceMutation]
+  );
 
   return (
     <DashboardContent maxWidth="xl">

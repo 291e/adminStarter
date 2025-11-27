@@ -35,10 +35,10 @@ export default function EducationReportFilters({
           onChange={(e) => onChangeRole(e.target.value)}
         >
           <MenuItem value="all">전체</MenuItem>
-          <MenuItem value="조직관리자">조직관리자</MenuItem>
-          <MenuItem value="관리감독자">관리감독자</MenuItem>
-          <MenuItem value="안전보건 담당자">안전보건 담당자</MenuItem>
-          <MenuItem value="근로자">근로자</MenuItem>
+          <MenuItem value="OPERATOR_MANAGER">조직 관리자</MenuItem>
+          <MenuItem value="MANAGEMENT_SUPERVISOR">관리 감독자</MenuItem>
+          <MenuItem value="SAFETY_MANAGER">안전보건 담당자</MenuItem>
+          <MenuItem value="WORKER">근로자</MenuItem>
         </Select>
       </FormControl>
 

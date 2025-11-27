@@ -13,7 +13,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { fDateTime } from 'src/utils/format-time';
 import type { Organization, CompanyType } from 'src/services/organization/organization.types';
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
-import { useUpdateOrganization, useInviteMember } from '../../hooks/use-organization-api';
+import { useUpdateOrganization } from '../../hooks/use-organization-api';
 import { useQueryClient } from '@tanstack/react-query';
 
 import SubscriptionService from './SubscriptionService';
@@ -90,7 +90,6 @@ export default function OrganizationInfo({
 }: Props) {
   const queryClient = useQueryClient();
   const updateOrganizationMutation = useUpdateOrganization();
-  const inviteMemberMutation = useInviteMember();
   const [tabValue, setTabValue] = useState(0);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -175,7 +174,6 @@ export default function OrganizationInfo({
       const updateParams = {
         companyIdx: organizationId,
         companyName: formData.companyName,
-        companyCode: orgData.companyCode,
         businessNumber: formData.businessNumber || undefined,
         address: formData.address || undefined,
         phone: formData.representativePhone || undefined,
@@ -702,61 +700,13 @@ export default function OrganizationInfo({
       <InviteMemberModal
         open={inviteModalOpen}
         onClose={() => setInviteModalOpen(false)}
-        onSend={async (data) => {
-          try {
-            if (import.meta.env.DEV) {
-              console.log('📧 [조직원 초대]', { organizationId, data });
-            }
-
-            await inviteMemberMutation.mutateAsync({
-              companyIdx: organizationId,
-              email: data.email,
-              role: data.role,
-            });
-
-            queryClient.invalidateQueries({ queryKey: ['companyMembers', organizationId] });
-            setInviteModalOpen(false);
-
-            if (import.meta.env.DEV) {
-              console.log('✅ [조직원 초대 완료]');
-            }
-          } catch (error) {
-            console.error('❌ [조직원 초대 실패]', error);
-          }
-        }}
+        companyIdx={organizationId}
         organizationName={orgData.companyName}
       />
 
       {tabValue === 1 && <AccidentFreeWorkplace organizationId={organizationId.toString()} />}
 
-      {tabValue === 2 && (
-        <SubscriptionService
-          onUpgrade={(planId) => {
-            if (import.meta.env.DEV) {
-              console.log('📈 [서비스 업그레이드]', { organizationId, planId });
-            }
-            // TODO: 서비스 업그레이드 API 구현 필요
-          }}
-          onCancel={() => {
-            if (import.meta.env.DEV) {
-              console.log('❌ [서비스 취소]', { organizationId });
-            }
-            // TODO: 서비스 취소 API 구현 필요
-          }}
-          onAddCard={() => {
-            if (import.meta.env.DEV) {
-              console.log('💳 [카드 추가]', { organizationId });
-            }
-            // TODO: 카드 추가 모달 열기
-          }}
-          onCardMenuClick={(cardId, action) => {
-            if (import.meta.env.DEV) {
-              console.log('💳 [카드 액션]', { organizationId, cardId, action });
-            }
-            // TODO: 카드 액션 API 구현 필요
-          }}
-        />
-      )}
+      {tabValue === 2 && <SubscriptionService organizationId={organizationId.toString()} />}
     </Box>
   );
 }

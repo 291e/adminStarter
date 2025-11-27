@@ -4,6 +4,7 @@ import type { BaseResponseDto, BaseResponseHeader } from '../common';
 export type DocumentSignature = {
   id: string;
   documentId: string;
+  documentName?: string; // 문서 이름
   requestedAt: string;
   signatureStatus: 'PENDING' | 'SIGNED' | 'REJECTED';
   signatureType: 'APPROVAL' | 'REVIEW';
@@ -19,12 +20,21 @@ export type GetDocumentSignatureListResponse = {
   totalCount: number;
 };
 
+// 중요도 정보 (중첩 객체)
+export type PriorityInformation = {
+  priorityIdx: number;
+  labelType: string;
+  color: string;
+  isActive: number;
+};
+
 // 공유 문서 (실제 응답 구조)
 export type SharedDocument = {
-  id: string;
+  sharedDocumentIdx: number;
   documentName: string;
   documentWrittenAt: string;
-  priority: string | null; // 자유 문자열 (nullable)
+  priorityIdx: number;
+  priorityInformation: PriorityInformation | null;
   createAt: string;
   fileUrl: string;
   fileName: string;
@@ -56,10 +66,10 @@ export type GetSharedDocumentListResponse = {
 export type CreateSharedDocumentParams = {
   documentName: string;
   documentWrittenAt?: string; // YYYY-MM-DD
-  referenceType?: 'safety_system_document' | 'library_report' | 'safety_report' | 'custom';
+  referenceType?: 'SAFETY_SYSTEM_DOCUMENT' | 'LIBRARY_REPORT' | 'SAFETY_REPORT' | 'CUSTOM';
   referenceId?: string;
   priority?: string | null; // 자유 문자열 (nullable)
-  priorityId?: string; // 중요도 설정 ID
+  priorityIdx?: number; // 중요도 설정 Index
   isPublic?: number; // 0: 비공개, 1: 공개
   fileName?: string; // 파일명 (파일 업로드 후 설정)
   fileUrl?: string; // 파일 URL (파일 업로드 후 설정)
@@ -73,11 +83,11 @@ export type CreateSharedDocumentResponse = BaseResponseDto<SharedDocument>;
 
 // 공유 문서 수정 요청 (API 스펙에 맞게 수정)
 export type UpdateSharedDocumentParams = {
-  documentId: string;
+  sharedDocumentIdx: number; // 경로 파라미터
   documentName?: string;
   documentWrittenAt?: string; // YYYY-MM-DD
   priority?: string | null; // 자유 문자열 (nullable)
-  priorityId?: string; // 중요도 설정 ID
+  priorityIdx?: number; // 중요도 설정 Index
   isPublic?: number; // 0: 비공개, 1: 공개
   fileName?: string;
   fileUrl?: string;
@@ -91,13 +101,13 @@ export type UpdateSharedDocumentResponse = BaseResponseDto<SharedDocument>;
 
 // 공유 문서 삭제 요청
 export type DeleteSharedDocumentParams = {
-  documentId: string;
+  sharedDocumentIdx: number;
 };
 
 // 공유 문서 채팅방 공유 요청
 export type ShareDocumentToChatRoomParams = {
-  documentId: string;
-  chatRoomIdList: string[];
+  sharedDocumentIdx: number; // 경로 파라미터
+  chatRoomIdxList: number[]; // 채팅방 Index 목록
 };
 
 // 사고·위험 보고 통계 조회 요청
@@ -164,8 +174,7 @@ export type GetEducationCompletionRateResponse = {
 
 // 중요도 설정 (API 응답 구조에 맞게 수정)
 export type PrioritySetting = {
-  id: string; // API에서는 id 필드 사용
-  prioritySettingId?: string; // 호환성을 위해 유지 (id와 동일)
+  priorityIdx: number;
   color: string;
   labelType: string | null; // 자유 문자열 (nullable)
   isActive: number;
@@ -194,7 +203,7 @@ export type CreatePrioritySettingResponse = BaseResponseDto<PrioritySetting>;
 
 // 중요도 설정 수정 요청
 export type UpdatePrioritySettingParams = {
-  prioritySettingId: string;
+  priorityIdx: number; // 경로 파라미터
   color?: string;
   labelType?: string | null; // 자유 문자열 (nullable)
   isActive?: number;
@@ -206,5 +215,5 @@ export type UpdatePrioritySettingResponse = BaseResponseDto<PrioritySetting>;
 
 // 중요도 설정 삭제 요청
 export type DeletePrioritySettingParams = {
-  prioritySettingId: string;
+  priorityIdx: number;
 };

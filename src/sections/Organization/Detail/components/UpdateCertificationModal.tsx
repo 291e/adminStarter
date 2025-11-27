@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import dayjs from 'dayjs';
 
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -13,35 +14,77 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import type { Dayjs } from 'dayjs';
 
-import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
-import { Iconify } from 'src/components/iconify';
 import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
+import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
+import { Iconify } from 'src/components/iconify';
+
+import { useUpdateAccidentFree } from '../../hooks/use-organization-api';
+import { uploadFile } from 'src/services/system/system.service';
+import { CONFIG } from 'src/global-config';
 
 // ----------------------------------------------------------------------
 
 type Props = {
   open: boolean;
   onClose: () => void;
+  companyIdx: number;
+  defaultCertifiedAt?: string | null;
+  defaultExpiresAt?: string | null;
+  defaultStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | null;
+  defaultFileUrl?: string | null;
   onSave?: (data: { certificationDate: Dayjs | null; file: File | null }) => void;
+  onUpdated?: () => void;
 };
 
-export default function UpdateCertificationModal({ open, onClose, onSave }: Props) {
+export default function UpdateCertificationModal({
+  open,
+  onClose,
+  companyIdx,
+  defaultCertifiedAt,
+  defaultExpiresAt,
+  defaultStatus = 'APPROVED',
+  defaultFileUrl,
+  onSave,
+  onUpdated,
+}: Props) {
   const [certificationDate, setCertificationDate] = useState<Dayjs | null>(null);
   const [certificationFile, setCertificationFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [existingFileUrl, setExistingFileUrl] = useState<string | null>(null);
+  const [isRemovingFile, setIsRemovingFile] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const updateAccidentFreeMutation = useUpdateAccidentFree();
+
+  const normalizedDefaultFileUrl = useMemo(() => {
+    if (!defaultFileUrl) {
+      return null;
+    }
+    if (defaultFileUrl.startsWith('http://') || defaultFileUrl.startsWith('https://')) {
+      return defaultFileUrl;
+    }
+    const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
+    return `${baseUrl}${defaultFileUrl.startsWith('/') ? defaultFileUrl : `/${defaultFileUrl}`}`;
+  }, [defaultFileUrl]);
 
   useEffect(() => {
     if (open) {
-      // TODO: TanStack Query Hook(useQuery)으로 기존 인증 이력 정보 가져오기
-      setCertificationDate(null);
+      // 인증일자는 항상 오늘 날짜로 초기화
+      setCertificationDate(dayjs());
       setCertificationFile(null);
-      setPreviewUrl(null);
+      setPreviewUrl(
+        normalizedDefaultFileUrl && normalizedDefaultFileUrl.startsWith('data:')
+          ? normalizedDefaultFileUrl
+          : null
+      );
+      setExistingFileUrl(normalizedDefaultFileUrl);
+      setIsRemovingFile(false);
       setIsDragging(false);
     }
-  }, [open]);
+  }, [open, defaultCertifiedAt, normalizedDefaultFileUrl]);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -66,6 +109,8 @@ export default function UpdateCertificationModal({ open, onClose, onSave }: Prop
   const handleRemoveFile = () => {
     setCertificationFile(null);
     setPreviewUrl(null);
+    setExistingFileUrl(null);
+    setIsRemovingFile(true);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -98,42 +143,62 @@ export default function UpdateCertificationModal({ open, onClose, onSave }: Prop
     setIsDragging(false);
   };
 
-  const handleSave = () => {
-    // TODO: TanStack Query Hook(useMutation)으로 인증 이력 업데이트 API 호출
-    // const mutation = useMutation({
-    //   mutationFn: (data: { certificationDate: string; file: File | null }) =>
-    //     updateCertificationRecord(organizationId, data),
-    //   onSuccess: () => {
-    //     queryClient.invalidateQueries({ queryKey: ['certificationRecords', organizationId] });
-    //     // 성공 토스트 메시지 표시
-    //   },
-    //   onError: (error) => {
-    //     console.error('인증 이력 업데이트 실패:', error);
-    //     // 에러 토스트 메시지 표시
-    //   },
-    // });
-    // mutation.mutate({
-    //   certificationDate: certificationDate?.format('YYYY-MM-DD') || '',
-    //   file: certificationFile,
-    // });
-    onSave?.({ certificationDate, file: certificationFile });
-    handleClose();
+  const computedExpiresAt = useMemo(() => {
+    if (certificationDate) {
+      return certificationDate.add(1, 'year');
+    }
+    if (defaultExpiresAt) {
+      const expires = dayjs(defaultExpiresAt);
+      return expires.isValid() ? expires : null;
+    }
+    return null;
+  }, [certificationDate, defaultExpiresAt]);
+
+  const handleSave = async () => {
+    if (!companyIdx) {
+      console.error('companyIdx가 없어 무재해 인증 정보를 수정할 수 없습니다.');
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+
+      let accidentFreeFileUrl: string | null | undefined = existingFileUrl;
+
+      if (certificationFile) {
+        const uploadResponse = await uploadFile({ files: [certificationFile] });
+        const fileUrls = (uploadResponse as unknown as { fileUrls: string[] }).fileUrls;
+        if (!fileUrls || fileUrls.length === 0) {
+          throw new Error('파일 업로드에 실패했습니다.');
+        }
+        accidentFreeFileUrl = fileUrls[0];
+      } else if (isRemovingFile) {
+        accidentFreeFileUrl = null;
+      }
+
+      const params = {
+        accidentFreeStatus: defaultStatus ?? 'APPROVED',
+        accidentFreeCertifiedAt: certificationDate ? certificationDate.toISOString() : null,
+        accidentFreeExpiresAt: computedExpiresAt ? computedExpiresAt.toISOString() : null,
+        accidentFreeFileUrl: accidentFreeFileUrl ?? null,
+      } as const;
+
+      await updateAccidentFreeMutation.mutateAsync({
+        companyIdx,
+        ...params,
+      });
+
+      onSave?.({ certificationDate, file: certificationFile });
+      onUpdated?.();
+      handleClose();
+    } catch (error) {
+      console.error('무재해 인증 정보 수정 실패:', error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleDelete = () => {
-    // TODO: TanStack Query Hook(useMutation)으로 인증 파일 삭제 API 호출
-    // const deleteMutation = useMutation({
-    //   mutationFn: () => deleteCertificationFile(organizationId, recordId),
-    //   onSuccess: () => {
-    //     queryClient.invalidateQueries({ queryKey: ['certificationRecords', organizationId] });
-    //     // 성공 토스트 메시지 표시
-    //   },
-    //   onError: (error) => {
-    //     console.error('인증 파일 삭제 실패:', error);
-    //     // 에러 토스트 메시지 표시
-    //   },
-    // });
-    // deleteMutation.mutate();
     handleRemoveFile();
   };
 
@@ -141,6 +206,9 @@ export default function UpdateCertificationModal({ open, onClose, onSave }: Prop
     setCertificationDate(null);
     setCertificationFile(null);
     setPreviewUrl(null);
+    setExistingFileUrl(null);
+    setIsRemovingFile(false);
+    setIsSaving(false);
     setIsDragging(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -285,6 +353,11 @@ export default function UpdateCertificationModal({ open, onClose, onSave }: Prop
                     {certificationFile.name}
                   </Typography>
                 )}
+                {!certificationFile && existingFileUrl && (
+                  <Typography variant="body2" sx={{ mt: 2, color: 'primary.main' }}>
+                    {existingFileUrl.split('/').pop()}
+                  </Typography>
+                )}
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -335,8 +408,8 @@ export default function UpdateCertificationModal({ open, onClose, onSave }: Prop
             <DialogBtn variant="outlined" onClick={handleClose}>
               취소
             </DialogBtn>
-            <DialogBtn variant="contained" onClick={handleSave}>
-              {certificationFile ? '저장' : '등록'}
+            <DialogBtn variant="contained" onClick={handleSave} disabled={isSaving}>
+              {isSaving ? '저장 중...' : '저장'}
             </DialogBtn>
           </Stack>
         </DialogActions>

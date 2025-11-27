@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -15,6 +15,7 @@ import InputAdornment from '@mui/material/InputAdornment';
 
 import { Iconify } from 'src/components/iconify';
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
+import { useInviteMember } from '../../hooks/use-organization-api';
 
 // ----------------------------------------------------------------------
 
@@ -27,22 +28,24 @@ export type InviteMemberFormData = {
 type Props = {
   open: boolean;
   onClose: () => void;
-  onSend: (data: InviteMemberFormData) => void;
+  companyIdx: number;
+  onInvited?: () => void;
   organizationName?: string;
   roles?: { value: string; label: string }[];
 };
 
 const DEFAULT_ROLES = [
-  { value: 'organization_admin', label: '조직 관리자' },
-  { value: 'supervisor', label: '관리 감독자' },
-  { value: 'safety_manager', label: '안전보건 담당자' },
-  { value: 'worker', label: '근로자' },
+  { value: 'OPERATOR_MANAGER', label: '조직 관리자' },
+  { value: 'MANAGEMENT_SUPERVISOR', label: '관리 감독자' },
+  { value: 'SAFETY_MANAGER', label: '안전보건 담당자' },
+  { value: 'WORKER', label: '근로자' },
 ];
 
 export default function InviteMemberModal({
   open,
   onClose,
-  onSend,
+  companyIdx,
+  onInvited,
   organizationName = '이편한 자동화기술',
   roles = DEFAULT_ROLES,
 }: Props) {
@@ -52,6 +55,13 @@ export default function InviteMemberModal({
     email: '',
   });
   const [errors, setErrors] = useState<Partial<Record<keyof InviteMemberFormData, string>>>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const inviteMemberMutation = useInviteMember();
+  const isSubmitting = inviteMemberMutation.isPending;
+
+  useEffect(() => {
+    setFormData((prev) => ({ ...prev, organizationName }));
+  }, [organizationName]);
 
   const handleChange =
     (field: keyof InviteMemberFormData) =>
@@ -81,28 +91,38 @@ export default function InviteMemberModal({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!validate()) {
       return;
     }
 
-    // TODO: TanStack Query Hook(useMutation)으로 조직원 초대 API 호출
-    // const mutation = useMutation({
-    //   mutationFn: (data: InviteMemberFormData) => inviteMember(data),
-    //   onSuccess: () => {
-    //     queryClient.invalidateQueries({ queryKey: ['organization', organizationId, 'members'] });
-    //     // 성공 토스트 메시지 표시
-    //     handleClose();
-    //   },
-    //   onError: (error) => {
-    //     console.error('조직원 초대 실패:', error);
-    //     // 에러 토스트 메시지 표시
-    //   },
-    // });
-    // mutation.mutate(formData);
+    const email = formData.email.trim();
 
-    onSend(formData);
-    handleClose();
+    if (import.meta.env.DEV) {
+      console.log('📤 [InviteMemberModal] 조직원 초대 요청', {
+        companyIdx,
+        email,
+        memberRole: formData.role,
+      });
+    }
+
+    try {
+      await inviteMemberMutation.mutateAsync({
+        companyIdx,
+        email,
+        memberRole: formData.role,
+      });
+
+      if (import.meta.env.DEV) {
+        console.log('✅ [InviteMemberModal] 조직원 초대 성공');
+      }
+      setSubmitError(null);
+      onInvited?.();
+      handleClose();
+    } catch (error: any) {
+      console.error('❌ [InviteMemberModal] 조직원 초대 실패', error);
+      setSubmitError('조직원 초대에 실패했습니다. 잠시 후 다시 시도해주세요.');
+    }
   };
 
   const handleClose = () => {
@@ -112,6 +132,7 @@ export default function InviteMemberModal({
       email: '',
     });
     setErrors({});
+    setSubmitError(null);
     onClose();
   };
 
@@ -232,10 +253,20 @@ export default function InviteMemberModal({
           <DialogBtn variant="outlined" onClick={handleClose} sx={{ minHeight: 36, fontSize: 14 }}>
             취소
           </DialogBtn>
-          <DialogBtn variant="contained" onClick={handleSend} sx={{ minHeight: 36, fontSize: 14 }}>
-            발송
+          <DialogBtn
+            variant="contained"
+            onClick={handleSend}
+            disabled={isSubmitting}
+            sx={{ minHeight: 36, fontSize: 14 }}
+          >
+            {isSubmitting ? '발송 중...' : '발송'}
           </DialogBtn>
         </Stack>
+        {submitError && (
+          <Typography variant="caption" color="error" sx={{ pr: 3, pb: 2 }}>
+            {submitError}
+          </Typography>
+        )}
       </DialogActions>
     </Dialog>
   );
