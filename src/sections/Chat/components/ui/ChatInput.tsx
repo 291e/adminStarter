@@ -69,14 +69,32 @@ export default function ChatInput({ value = '', onChange, onSend, isEmergency = 
           bgcolor: isEmergency ? 'white' : 'grey.100',
           borderRadius: 9999,
           px: 2,
-          py: 0.125,
-          color: isEmergency ? 'white' : 'text.primary',
+          py: 1.25, // 상하 padding 증가
+          color: isEmergency ? 'text.primary' : 'text.primary',
+          minHeight: 44, // 최소 높이 증가 (커서가 잘리지 않도록)
+          display: 'flex',
+          alignItems: 'center',
           '&::placeholder': {
-            color: isEmergency ? 'rgba(255, 255, 255, 0.7)' : 'text.disabled',
+            color: isEmergency ? 'text.disabled' : 'text.disabled',
+            opacity: 1,
+          },
+          '& .MuiInputBase-input': {
+            py: 0,
+            lineHeight: 1.5, // line-height 명시적으로 설정
+            minHeight: '1.5em', // 최소 높이 설정
+            '&::placeholder': {
+              opacity: 1,
+            },
+          },
+          '&:focus-within': {
+            outline: 'none',
+            '& .MuiInputBase-input': {
+              caretColor: isEmergency ? 'text.primary' : 'text.primary',
+            },
           },
         }}
       />
-      <IconButton size="small" color="primary" onClick={onSend} sx={{ bgcolor: 'white' }}>
+      <IconButton size="small" onClick={onSend} sx={{ bgcolor: 'white' }}>
         <Iconify icon={'solar:plain-2-bold' as any} width={24} />
       </IconButton>
     </Box>

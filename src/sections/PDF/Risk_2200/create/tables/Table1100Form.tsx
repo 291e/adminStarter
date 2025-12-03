@@ -226,6 +226,9 @@ export default function Table1100Form({
                         height: 'auto',
                         maxWidth: 100,
                       },
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
                     }}
                   />
                 </td>
@@ -241,6 +244,9 @@ export default function Table1100Form({
                         height: 'auto',
                         maxWidth: 160,
                       },
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
                     }}
                   />
                 </td>
@@ -256,6 +262,9 @@ export default function Table1100Form({
                         height: 'auto',
                         maxWidth: 80,
                       },
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
                     }}
                   />
                 </td>
@@ -271,11 +280,20 @@ export default function Table1100Form({
                         height: 'auto',
                         maxWidth: 110,
                       },
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      display: 'flex',
                     }}
                   />
                 </td>
                 <td>
-                  <Box sx={{ display: 'flex', justifyContent: 'center', px: 1, maxWidth: 30 }}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'center',
+                      px: 1,
+                    }}
+                  >
                     <IconButton
                       size="small"
                       sx={{

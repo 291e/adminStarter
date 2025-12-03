@@ -9,23 +9,29 @@ type ChatMessage = {
   sender: string;
   message: string;
   timestamp: string;
+  dateLabel?: string;
+  avatarUrl?: string;
   isOwn?: boolean;
 };
 
 type Props = {
   messages: ChatMessage[];
   emergencyStats?: { month: number; count: number };
+  conversationDate?: string;
   messageInput?: string;
   onMessageInputChange?: (value: string) => void;
   onSendMessage?: () => void;
+  roomId?: string | number;
 };
 
 export default function EmergencyChatView({
   messages,
   emergencyStats,
+  conversationDate,
   messageInput,
   onMessageInputChange,
   onSendMessage,
+  roomId,
 }: Props) {
   return (
     <Box
@@ -42,7 +48,7 @@ export default function EmergencyChatView({
       {emergencyStats && (
         <EmergencyStatsHeader month={emergencyStats.month} count={emergencyStats.count} />
       )}
-      <MessageList messages={messages} />
+      <MessageList messages={messages} conversationDate={conversationDate} roomId={roomId} />
       <ChatInput
         isEmergency
         value={messageInput}

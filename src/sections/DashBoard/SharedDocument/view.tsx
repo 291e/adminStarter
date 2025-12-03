@@ -63,16 +63,6 @@ export function SharedDocumentView({ title = '공유 문서함', description, sx
   const createPrioritySettingMutation = useCreatePrioritySetting();
   const updatePrioritySettingMutation = useUpdatePrioritySetting();
 
-  // 디버깅: API 응답 로그
-  if (import.meta.env.DEV) {
-    if (sharedDocumentsData) {
-      console.log('📚 SharedDocuments API Response:', sharedDocumentsData);
-    }
-    if (sharedDocumentsError) {
-      console.error('❌ SharedDocuments API Error:', sharedDocumentsError);
-    }
-  }
-
   // Mutation hooks
   const createDocumentMutation = useCreateSharedDocument();
   const updateDocumentMutation = useUpdateSharedDocument();
@@ -289,14 +279,16 @@ export function SharedDocumentView({ title = '공유 문서함', description, sx
     setShareToChatModalOpen(true);
   };
 
-  const handleShareToChatConfirm = async (roomId: string, documentId: string) => {
+  const handleShareToChatConfirm = async (chatRoomIdxList: number[], documentId: string) => {
     try {
       await shareToChatMutation.mutateAsync({
         sharedDocumentIdx: Number(documentId),
-        chatRoomIdxList: [Number(roomId)],
+        chatRoomIdxList,
       });
       setShareToChatModalOpen(false);
       setSelectedDocumentForShare(null);
+      // 채팅방 목록 쿼리 무효화하여 최신 데이터 반영
+      queryClient.invalidateQueries({ queryKey: ['chatRooms'] });
     } catch (error) {
       console.error('❌ 채팅방 공유 실패:', error);
     }

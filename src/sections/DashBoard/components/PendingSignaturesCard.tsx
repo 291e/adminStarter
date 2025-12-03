@@ -14,7 +14,7 @@ type Props = {
   page: number;
   totalPages: number;
   onPageChange: (page: number) => void;
-  onViewDocument?: (id: string) => void;
+  onViewDocument?: (id: string, isSafetySystemDocumentIdx?: boolean) => void;
 };
 
 export default function PendingSignaturesCard({
@@ -65,93 +65,132 @@ export default function PendingSignaturesCard({
             // 고유한 key 생성 (id가 없거나 중복될 수 있으므로 index도 포함)
             const rowKey = row.id || `document-${index}`;
             return (
-            <Box
-              key={rowKey}
-              sx={{
-                bgcolor: 'background.default',
-                border: '1px solid',
-                borderColor: 'grey.100',
-                borderRadius: 1.5,
-                p: 1,
-                display: 'flex',
-                flexDirection: { xs: 'column', sm: 'row' },
-                alignItems: { xs: 'stretch', sm: 'center' },
-              }}
-            >
               <Box
+                key={rowKey}
                 sx={{
-                  flex: 1,
+                  bgcolor: 'background.default',
+                  border: '1px solid',
+                  borderColor: 'grey.100',
+                  borderRadius: 1.5,
+                  p: 1,
                   display: 'flex',
                   flexDirection: { xs: 'column', sm: 'row' },
-                  gap: { xs: 1, sm: 2 },
-                  alignItems: { xs: 'flex-start', sm: 'center' },
-                  justifyContent: 'space-between',
-                  minHeight: 56,
+                  alignItems: { xs: 'stretch', sm: 'center' },
                 }}
               >
-                <Typography
-                  variant="body2"
+                <Box
                   sx={{
                     flex: 1,
-                    fontSize: { xs: 13, sm: 14 },
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: { xs: 'normal', sm: 'nowrap' },
-                    maxWidth: 140,
+                    display: 'flex',
+                    flexDirection: { xs: 'column', sm: 'row' },
+                    gap: { xs: 1, sm: 2 },
+                    alignItems: { xs: 'flex-start', sm: 'center' },
+                    justifyContent: 'space-between',
+                    minHeight: 56,
                   }}
                 >
-                  {row.documentName || row.documentId || '문서명 없음'}
-                </Typography>
-                <Typography variant="body2" sx={{ maxWidth: '100%', fontSize: { xs: 13, sm: 14 } }}>
-                  {row.targetMemberName}
-                </Typography>
-                <Box sx={{ width: { xs: '100%', sm: 80 } }}>
-                  <Typography variant="body2" sx={{ fontSize: { xs: 13, sm: 14 } }}>
-                    {row.requestedAt
-                      ? new Date(row.requestedAt).toLocaleDateString('ko-KR', {
-                          year: 'numeric',
-                          month: '2-digit',
-                          day: '2-digit',
-                        })
-                      : ''}
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      flex: 1,
+                      fontSize: { xs: 13, sm: 14 },
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: { xs: 'normal', sm: 'nowrap' },
+                      maxWidth: 140,
+                    }}
+                  >
+                    {row.documentName || row.documentId || '문서명 없음'}
                   </Typography>
                   <Typography
-                    variant="caption"
-                    sx={{ color: 'text.secondary', fontSize: { xs: 11, sm: 12 } }}
+                    variant="body2"
+                    sx={{ maxWidth: '100%', fontSize: { xs: 13, sm: 14 } }}
                   >
-                    {row.requestedAt
-                      ? new Date(row.requestedAt).toLocaleTimeString('ko-KR', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          hour12: true,
-                        })
-                      : ''}
+                    {row.targetMemberName}
                   </Typography>
+                  <Box sx={{ width: { xs: '100%', sm: 80 } }}>
+                    <Typography variant="body2" sx={{ fontSize: { xs: 13, sm: 14 } }}>
+                      {row.requestedAt
+                        ? new Date(row.requestedAt).toLocaleDateString('ko-KR', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                          })
+                        : ''}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{ color: 'text.secondary', fontSize: { xs: 11, sm: 12 } }}
+                    >
+                      {row.requestedAt
+                        ? new Date(row.requestedAt).toLocaleTimeString('ko-KR', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: true,
+                          })
+                        : ''}
+                    </Typography>
+                  </Box>
+                </Box>
+                <Box sx={{ pl: 2 }}>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => {
+                      // sharedDocumentIdx 우선 사용
+                      let documentId: string | null = null;
+                      let isSafetySystemDocumentIdx = false;
+
+                      // 1. sharedDocumentIdx 우선 확인
+                      const sharedDocumentIdx = (row as any).sharedDocumentIdx;
+                      if (sharedDocumentIdx !== null && sharedDocumentIdx !== undefined) {
+                        documentId = String(sharedDocumentIdx);
+                        isSafetySystemDocumentIdx = false;
+                      }
+                      // 2. safetySystemDocumentInformation.safetySystemDocumentIdx 확인
+                      else if (
+                        (row as any).safetySystemDocumentInformation?.safetySystemDocumentIdx
+                      ) {
+                        const safetySystemDocumentIdx = (row as any).safetySystemDocumentInformation
+                          .safetySystemDocumentIdx;
+                        documentId = String(safetySystemDocumentIdx);
+                        isSafetySystemDocumentIdx = true;
+                      }
+                      // 3. row.id 확인
+                      else if (row.id) {
+                        documentId = String(row.id);
+                        isSafetySystemDocumentIdx = false;
+                      }
+
+                      if (documentId) {
+                        const idx = Number(documentId);
+                        if (!Number.isNaN(idx) && idx > 0) {
+                          onViewDocument?.(documentId, isSafetySystemDocumentIdx);
+                        } else {
+                          console.warn('⚠️ Invalid document ID:', documentId, row);
+                        }
+                      } else {
+                        console.warn('⚠️ Document ID not found:', row);
+                      }
+                    }}
+                    sx={{
+                      minHeight: { xs: 32, sm: 36 },
+                      fontSize: { xs: 12, sm: 14 },
+                      fontWeight: 700,
+
+                      width: { xs: '100%', sm: 'auto' },
+                      borderColor: '#2563E9',
+                      color: '#2563E9',
+                      '&:hover': {
+                        borderColor: '#2563E9',
+                        bgcolor: 'rgba(37, 99, 233, 0.04)',
+                      },
+                    }}
+                  >
+                    문서보기
+                  </Button>
                 </Box>
               </Box>
-              <Box sx={{ pl: 2 }}>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={() => onViewDocument?.(row.id)}
-                  sx={{
-                    minHeight: { xs: 32, sm: 36 },
-                    fontSize: { xs: 12, sm: 14 },
-                    fontWeight: 700,
-
-                    width: { xs: '100%', sm: 'auto' },
-                    borderColor: '#2563E9',
-                    color: '#2563E9',
-                    '&:hover': {
-                      borderColor: '#2563E9',
-                      bgcolor: 'rgba(37, 99, 233, 0.04)',
-                    },
-                  }}
-                >
-                  문서보기
-                </Button>
-              </Box>
-            </Box>
             );
           })}
         </Box>

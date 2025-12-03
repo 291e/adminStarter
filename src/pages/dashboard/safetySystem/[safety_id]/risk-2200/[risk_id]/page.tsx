@@ -2,7 +2,8 @@ import { useParams, useLocation } from 'react-router';
 import { CONFIG } from 'src/global-config';
 
 import { Risk_2200View } from 'src/sections/PDF/Risk_2200/[risk_id]/view';
-import type { SafetySystem, SafetySystemItem } from 'src/_mock/_safety-system';
+import type { SafetySystem } from 'src/_mock/_safety-system';
+import type { SafetySystemItem } from 'src/services/safety-system/safety-system.types';
 
 // ----------------------------------------------------------------------
 

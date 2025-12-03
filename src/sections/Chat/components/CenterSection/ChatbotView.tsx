@@ -8,21 +8,27 @@ type ChatMessage = {
   sender: string;
   message: string;
   timestamp: string;
+  dateLabel?: string;
+  avatarUrl?: string;
   isOwn?: boolean;
 };
 
 type Props = {
   messages: ChatMessage[];
+  conversationDate?: string;
   messageInput?: string;
   onMessageInputChange?: (value: string) => void;
   onSendMessage?: () => void;
+  roomId?: string | number;
 };
 
 export default function ChatbotView({
   messages,
+  conversationDate,
   messageInput,
   onMessageInputChange,
   onSendMessage,
+  roomId,
 }: Props) {
   // TODO: 챗봇 API 연동
   // - Firebase Realtime Database는 사용하지 않음
@@ -49,7 +55,7 @@ export default function ChatbotView({
         minHeight: { xs: 400, lg: 500 },
       }}
     >
-      <MessageList messages={messages} />
+      <MessageList messages={messages} conversationDate={conversationDate} roomId={roomId} />
       <ChatInput value={messageInput} onChange={onMessageInputChange} onSend={onSendMessage} />
     </Box>
   );

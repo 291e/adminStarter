@@ -8,23 +8,20 @@ import Chip from '@mui/material/Chip';
 import Avatar from '@mui/material/Avatar';
 
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
-import type { ChatRoom } from 'src/_mock/_chat';
+import { useRemoveParticipants } from 'src/sections/Chat/hooks/use-chat-api';
+import { useQueryClient } from '@tanstack/react-query';
+import type { ChatRoomDto, ChatParticipantDto } from 'src/services/chat/chat.types';
 import warningIcon from 'src/assets/icons/safeyoui/warning.svg';
 
 // ----------------------------------------------------------------------
 
-type Participant = {
-  id?: string;
-  name: string;
-  role?: string;
-};
 
 type Props = {
   open: boolean;
   onClose: () => void;
   onConfirm: (participantIds: string[]) => void;
-  room?: ChatRoom | null;
-  participants: Participant[];
+  room?: ChatRoomDto | null;
+  participants: ChatParticipantDto[];
   selectedParticipantIds: string[];
 };
 
@@ -37,8 +34,8 @@ export default function RemoveParticipantModal({
   selectedParticipantIds,
 }: Props) {
   // 선택된 참가자 이름 가져오기
-  const getParticipantId = (participant: Participant, idx: number) =>
-    participant.id || `participant-${idx}`;
+  const getParticipantId = (participant: ChatParticipantDto, idx: number) =>
+    participant.memberIdx?.toString() || `participant-${idx}`;
 
   const selectedParticipants = participants.filter((participant, idx) =>
     selectedParticipantIds.includes(getParticipantId(participant, idx))
@@ -46,45 +43,61 @@ export default function RemoveParticipantModal({
 
   // 대화 상대가 1명일 경우 상대방 프로필 정보 표시
   // 일반 채팅(1대1)이거나 필터링된 참가자가 1명일 경우
-  const isSingleParticipant = participants.length === 1 || room?.type === 'normal';
+  const isSingleParticipant = participants.length === 1 || room?.type === 'NORMAL';
   // 대화 상대가 1명일 경우 첫 번째 선택된 참가자만 표시
   // 일반 채팅의 경우 선택된 참가자가 없어도 첫 번째 참가자를 표시
   const displayParticipant = isSingleParticipant
     ? selectedParticipants[0] || participants[0]
     : null;
 
-  const handleConfirm = () => {
-    if (!room) return;
+  const queryClient = useQueryClient();
+  const removeParticipantsMutation = useRemoveParticipants();
 
-    // TODO: TanStack Query Hook(useMutation)으로 채팅방에서 참가자 내보내기 API 호출
-    // 채팅방 타입에 따라 다른 API 엔드포인트 사용
-    // const mutation = useMutation({
-    //   mutationFn: (data: { roomId: string; participantIds: string[]; roomType: string }) => {
-    //     if (data.roomType === 'chatbot') {
-    //       // 챗봇 채팅: 내보내기 불가능하거나 특별한 처리
-    //       return Promise.reject(new Error('챗봇 채팅에서는 참가자를 내보낼 수 없습니다.'));
-    //     } else if (data.roomType === 'emergency') {
-    //       // 사고 발생 현황 채팅: 응급 담당자 내보내기
-    //       return removeEmergencyParticipants(data.roomId, data.participantIds);
-    //     } else {
-    //       // 일반 채팅/그룹 채팅: 일반 참가자 내보내기
-    //       return removeChatParticipants(data.roomId, data.participantIds);
-    //     }
-    //   },
-    //   onSuccess: () => {
-    //     queryClient.invalidateQueries({ queryKey: ['chatRoom', room.id, 'participants'] });
-    //     // 성공 토스트 메시지 표시
-    //     onClose();
-    //   },
-    //   onError: (error) => {
-    //     console.error('참가자 내보내기 실패:', error);
-    //     // 에러 토스트 메시지 표시
-    //   },
-    // });
-    // mutation.mutate({ roomId: room.id, participantIds: selectedParticipantIds, roomType: room.type || 'normal' });
+  const handleConfirm = async () => {
+    if (!room?.chatRoomIdx || selectedParticipantIds.length === 0) return;
 
-    onConfirm(selectedParticipantIds);
-    onClose();
+    // 챗봇 채팅에서는 내보내기 불가
+    if (room.type === 'CHATBOT') {
+      console.error('챗봇 채팅에서는 참가자를 내보낼 수 없습니다.');
+      return;
+    }
+
+    try {
+      // participantIds를 memberIndexes로 변환
+      const memberIndexes = selectedParticipantIds
+        .map((id) => {
+          // id가 memberIdx 문자열인 경우
+          const parsed = Number(id);
+          if (!Number.isNaN(parsed)) return parsed;
+
+          // participants에서 memberIdx로 찾기
+          const participant = participants.find(
+            (p) => p.memberIdx?.toString() === id || p.memberIdx === Number(id)
+          );
+          return participant?.memberIdx ? Number(participant.memberIdx) : null;
+        })
+        .filter((idx): idx is number => idx !== null && !Number.isNaN(idx));
+
+      if (memberIndexes.length === 0) {
+        console.error('유효한 참가자 인덱스를 찾을 수 없습니다.');
+        return;
+      }
+
+      await removeParticipantsMutation.mutateAsync({
+        chatRoomIdx: room.chatRoomIdx,
+        memberIndexes,
+      });
+
+      // 쿼리 무효화
+      queryClient.invalidateQueries({ queryKey: ['chatParticipants', room.chatRoomIdx] });
+      queryClient.invalidateQueries({ queryKey: ['chatRooms'] });
+      queryClient.invalidateQueries({ queryKey: ['chatRoom', room.chatRoomIdx] });
+
+      onConfirm(selectedParticipantIds);
+      onClose();
+    } catch (error) {
+      console.error('참가자 내보내기 실패:', error);
+    }
   };
 
   return (
@@ -160,7 +173,7 @@ export default function RemoveParticipantModal({
               >
                 {displayParticipant.name}
               </Typography>
-              {displayParticipant.role && (
+              {(displayParticipant as any).role && (
                 <Typography
                   variant="body2"
                   sx={{
@@ -170,7 +183,7 @@ export default function RemoveParticipantModal({
                     color: 'text.disabled',
                   }}
                 >
-                  {displayParticipant.role}
+                  {(displayParticipant as any).role}
                 </Typography>
               )}
             </Stack>

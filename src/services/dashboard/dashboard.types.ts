@@ -2,8 +2,9 @@ import type { BaseResponseDto, BaseResponseHeader } from '../common';
 
 // 서명 대기 문서 (실제 응답 구조)
 export type DocumentSignature = {
-  id: string;
-  documentId: string;
+  id?: string;
+  documentId?: string;
+  sharedDocumentIdx?: number; // 공유 문서 인덱스
   documentName?: string; // 문서 이름
   requestedAt: string;
   signatureStatus: 'PENDING' | 'SIGNED' | 'REJECTED';
@@ -216,4 +217,65 @@ export type UpdatePrioritySettingResponse = BaseResponseDto<PrioritySetting>;
 // 중요도 설정 삭제 요청
 export type DeletePrioritySettingParams = {
   priorityIdx: number;
+};
+
+// 공유 문서 상세 조회 요청
+export type GetSharedDocumentDetailParams = {
+  sharedDocumentIdx: number;
+};
+
+// 원본 문서 정보 (공유 문서 상세 조회 응답)
+export type OriginalDocument = {
+  safetySystemDocumentIdx: number;
+  safetySystemItemIdx: number;
+  documentName: string;
+  organizationName: string;
+  tableData?: string | any; // JSON string 또는 파싱된 객체
+  approvalStep?: number | null; // 결재 단계 (0: 없음, 1: 승인만, 2: 작성+승인, 3: 작성+검토+승인)
+  status?: 'COMPLETED' | 'DRAFT' | 'IN_PROGRESS' | 'PENDING' | string;
+  approvalList?: Array<{
+    documentApprovalIdx: number;
+    safetySystemDocumentIdx: number; // 문서 ID (documentIdx에서 변경됨)
+    targetMemberIdx: number;
+    memberName?: string;
+    memberEmail?: string;
+    approvalStep: number; // 1: 승인, 2: 작성, 3: 검토
+    approvalOrder?: number;
+    approvalType: 'SEQUENTIAL' | 'PARALLEL';
+    approvalStatus: 'APPROVED' | 'REJECTED' | 'PENDING';
+    signatureData?: string | null;
+    approvedAt?: string | null;
+    createAt: string;
+    updateAt?: string;
+    deletedAt?: string | null;
+    description?: string | null;
+  }>;
+  [key: string]: any; // 기타 필드 허용
+};
+
+// 공유 문서 상세 정보
+export type SharedDocumentDetail = {
+  sharedDocumentIdx: number;
+  documentName: string;
+  referenceType: string; // 'SAFETY_SYSTEM_DOCUMENT' | 'LIBRARY_REPORT' | 'SAFETY_REPORT' | 'CUSTOM'
+  referenceId: string;
+  originalDocument?: OriginalDocument | null;
+};
+
+// 공유 문서 상세 조회 응답
+export type GetSharedDocumentDetailResponse = {
+  header: BaseResponseHeader;
+  sharedDocument: SharedDocumentDetail;
+};
+
+// 안전 시스템 문서 상세 조회 요청
+export type GetSafetySystemDocumentDetailParams = {
+  safetySystemDocumentIdx: number;
+};
+
+// 안전 시스템 문서 상세 조회 응답
+export type GetSafetySystemDocumentDetailResponse = {
+  header: BaseResponseHeader;
+  sharedDocument: SharedDocumentDetail | null; // 공유 문서 정보 (있는 경우)
+  originalDocument: OriginalDocument;
 };

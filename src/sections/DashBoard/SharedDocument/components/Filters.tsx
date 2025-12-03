@@ -12,6 +12,7 @@ import type { Dayjs } from 'dayjs';
 
 import { Iconify } from 'src/components/iconify';
 import type { PrioritySetting } from 'src/services/dashboard/dashboard.types';
+import { getPriorityLabel } from '../constants/priority';
 
 type Props = {
   priority: string; // 중요도 labelType (자유 문자열)
@@ -88,7 +89,7 @@ export default function SharedDocumentFilters({
                     color: 'text.primary',
                   }}
                 >
-                  {selectedSetting?.labelType || selected}
+                  {getPriorityLabel(selectedSetting?.labelType || selected)}
                 </Typography>
               );
             }}
@@ -122,7 +123,7 @@ export default function SharedDocumentFilters({
             </MenuItem>
             {activePrioritySettings.map((setting) => (
               <MenuItem key={setting.priorityIdx} value={setting.labelType || ''}>
-                {setting.labelType || '중요도'}
+                {getPriorityLabel(setting.labelType)}
               </MenuItem>
             ))}
           </Select>

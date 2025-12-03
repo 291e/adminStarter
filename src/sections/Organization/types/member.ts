@@ -13,16 +13,16 @@ export type Member = {
   memberPhone: string;
   memberAddress: string;
   memberAddressDetail: string;
-  memberMemo: string | null;
   createAt: string;
   updateAt: string;
-  duplicateSigninKey: string | null;
   lastSigninDate: string | null;
   companyIdx: number;
   companyBranchIdx: number | null;
   memberNameOrg: string | null;
   memberLang: string;
-  deviceToken: string | null;
+  position?: string; // 직급 (과장, 대리 등)
+  department?: string; // 소속 (생산 1팀, 영업 2팀 등)
+  workType?: 'PRODUCTION' | 'OFFICE' | null; // 직종 (생산직/사무직)
   deviceGubun: string | null;
   memberlat: number | null;
   memberlng: number | null;

@@ -53,12 +53,29 @@ export default function AccidentFreeWorksiteModal({
   // 파일 URL을 전체 URL로 변환하는 헬퍼 함수
   const getFullFileUrl = (url: string | null | undefined): string | null => {
     if (!url) return null;
+    // 잘못된 형식: data:image/png;base64,data/admin/... 같은 경우 처리
+    if (
+      url.startsWith('data:image/png;base64,data/admin/') ||
+      url.startsWith('data:image/png;base64,/data/admin/')
+    ) {
+      // base64 접두사를 제거하고 URL로 처리
+      const cleanUrl = url.replace(/^data:image\/png;base64,/, '');
+      const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
+      const path = cleanUrl.startsWith('/') ? cleanUrl : `/${cleanUrl}`;
+      return `${baseUrl}${path}`;
+    }
     if (url.startsWith('http://') || url.startsWith('https://')) {
       return url;
     }
+    // base64 데이터 URL인 경우 그대로 반환 (실제 base64 데이터인 경우)
+    if (url.startsWith('data:image/') && !url.includes('data/admin/')) {
+      return url;
+    }
     // 상대 경로인 경우 CONFIG.serverUrl과 결합
+    // data/admin/로 시작하는 경우도 처리
     const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
-    return `${baseUrl}${url.startsWith('/') ? url : `/${url}`}`;
+    const path = url.startsWith('/') ? url : `/${url}`;
+    return `${baseUrl}${path}`;
   };
 
   useEffect(() => {
@@ -153,16 +170,18 @@ export default function AccidentFreeWorksiteModal({
         }
 
         const uploadResponse = await uploadFile({ files: [certificationFile] });
-        // axios interceptor가 body를 flatten하므로 직접 접근
-        const fileUrls = (uploadResponse as unknown as { fileUrls: string[] }).fileUrls;
+        // axios 인터셉터에서 평탄화되므로 직접 접근
+        // 실제 응답 구조: { files: [{ fileUrl: string, ... }], header: {...} }
+        const uploadedFiles = (uploadResponse as any).files || [];
+        const fileUrl = uploadedFiles[0]?.fileUrl || (uploadResponse as any).fileUrls?.[0];
 
-        if (!fileUrls || fileUrls.length === 0) {
-          console.error('❌ 파일 업로드 실패: fileUrls가 없습니다.');
+        if (!fileUrl) {
+          console.error('❌ 파일 업로드 실패: fileUrl이 없습니다.');
           setIsUploading(false);
           return;
         }
 
-        accidentFreeFileUrl = fileUrls[0];
+        accidentFreeFileUrl = fileUrl;
         if (import.meta.env.DEV) {
           console.log('✅ 파일 업로드 완료:', accidentFreeFileUrl);
         }

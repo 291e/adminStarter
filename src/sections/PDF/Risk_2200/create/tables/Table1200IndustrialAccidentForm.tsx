@@ -126,19 +126,13 @@ export default function Table1200IndustrialAccidentForm({
     lineHeight: '24px',
   };
 
-  const hasInvestigationMembers = row.investigationTeam.length > 0;
-  const displayedInvestigationTeam = hasInvestigationMembers
-    ? row.investigationTeam
-    : [{ department: '', name: '' }];
+  const displayedInvestigationTeam = row.investigationTeam;
 
   const innerCellStyle: React.CSSProperties = {
     border: '1px solid #dfe3e8',
   };
 
-  const hasHumanDamage = row.humanDamage.length > 0;
-  const displayedHumanDamage = hasHumanDamage
-    ? row.humanDamage
-    : [{ department: '', name: '', position: '', injury: '' }];
+  const displayedHumanDamage = row.humanDamage;
 
   const handleAddImages = (files?: FileList | File[]) => {
     if (!files) return;
@@ -311,7 +305,10 @@ export default function Table1200IndustrialAccidentForm({
 
             {/* 사고조사반 */}
             <tr>
-              <th style={headerCellStyle}>
+              <th
+                style={{ ...headerCellStyle, cursor: 'pointer' }}
+                onClick={() => setSelectModalMode('investigation')}
+              >
                 <Box
                   sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}
                 >
@@ -333,7 +330,10 @@ export default function Table1200IndustrialAccidentForm({
                     <Button
                       variant="contained"
                       size="small"
-                      onClick={() => setSelectModalMode('investigation')}
+                      onClick={() => {
+                        // 항상 새 항목 추가 (플레이스홀더는 displayedInvestigationTeam에만 있고 실제 row.investigationTeam에는 없음)
+                        onInvestigationTeamAdd({ department: '', name: '' });
+                      }}
                       sx={{
                         minHeight: 30,
                         fontSize: 13,
@@ -368,155 +368,136 @@ export default function Table1200IndustrialAccidentForm({
                       </tr>
                     </thead>
                     <tbody>
-                      {displayedInvestigationTeam.map((member, index) => {
-                        const isPlaceholder = !hasInvestigationMembers;
-                        return (
-                          <tr
-                            key={index}
-                            draggable
-                            onDragStart={() =>
-                              !isPlaceholder && handleInvestigationDragStart(index)
-                            }
-                            onDragOver={(e) =>
-                              !isPlaceholder && handleInvestigationDragOver(e, index)
-                            }
-                            onDrop={(e) => !isPlaceholder && handleInvestigationDrop(e, index)}
-                            onDragEnd={() => {
-                              setDraggedInvestigationIndex(null);
-                              setDragOverInvestigationIndex(null);
-                            }}
+                      {displayedInvestigationTeam.map((member, index) => (
+                        <tr
+                          key={index}
+                          draggable
+                          onDragStart={() => handleInvestigationDragStart(index)}
+                          onDragOver={(e) => handleInvestigationDragOver(e, index)}
+                          onDrop={(e) => handleInvestigationDrop(e, index)}
+                          onDragEnd={() => {
+                            setDraggedInvestigationIndex(null);
+                            setDragOverInvestigationIndex(null);
+                          }}
+                          style={{
+                            opacity: draggedInvestigationIndex === index ? 0.5 : 1,
+                            backgroundColor:
+                              dragOverInvestigationIndex === index &&
+                              draggedInvestigationIndex !== index
+                                ? theme.vars.palette.action.hover
+                                : 'transparent',
+                            cursor: 'move',
+                          }}
+                        >
+                          <td style={{ ...bodyCellStyle, padding: 8, ...innerCellStyle }}>
+                            <TextField
+                              size="small"
+                              value={member.department}
+                              onChange={(e) => {
+                                const newTeam = [...row.investigationTeam];
+                                newTeam[index] = { ...member, department: e.target.value };
+                                onRowChange('investigationTeam', newTeam);
+                              }}
+                              fullWidth
+                              sx={{
+                                '& .MuiOutlinedInput-root': {
+                                  fontSize: 15,
+                                  height: 'auto',
+                                },
+                              }}
+                            />
+                          </td>
+                          <td style={{ ...bodyCellStyle, padding: 8, ...innerCellStyle }}>
+                            <TextField
+                              size="small"
+                              value={member.name}
+                              onChange={(e) => {
+                                const newTeam = [...row.investigationTeam];
+                                newTeam[index] = { ...member, name: e.target.value };
+                                onRowChange('investigationTeam', newTeam);
+                              }}
+                              fullWidth
+                              sx={{
+                                '& .MuiOutlinedInput-root': {
+                                  fontSize: 15,
+                                  height: 'auto',
+                                },
+                              }}
+                            />
+                          </td>
+                          <td
                             style={{
-                              opacity: draggedInvestigationIndex === index ? 0.5 : 1,
-                              backgroundColor:
-                                dragOverInvestigationIndex === index &&
-                                draggedInvestigationIndex !== index
-                                  ? theme.vars.palette.action.hover
-                                  : 'transparent',
-                              cursor: isPlaceholder ? 'default' : 'move',
+                              ...bodyCellStyle,
+                              padding: 0,
+                              ...innerCellStyle,
+                              minWidth: 100,
+                              maxWidth: 100,
                             }}
                           >
-                            <td style={{ ...bodyCellStyle, padding: 8, ...innerCellStyle }}>
-                              <TextField
-                                size="small"
-                                value={isPlaceholder ? '' : member.department}
-                                onChange={
-                                  isPlaceholder
-                                    ? undefined
-                                    : (e) => {
-                                        const newTeam = [...row.investigationTeam];
-                                        newTeam[index] = { ...member, department: e.target.value };
-                                        onRowChange('investigationTeam', newTeam);
-                                      }
-                                }
-                                fullWidth
-                                disabled={isPlaceholder}
-                                sx={{
-                                  '& .MuiOutlinedInput-root': {
-                                    fontSize: 15,
-                                    height: 'auto',
-                                  },
-                                }}
-                              />
-                            </td>
-                            <td style={{ ...bodyCellStyle, padding: 8, ...innerCellStyle }}>
-                              <TextField
-                                size="small"
-                                value={isPlaceholder ? '' : member.name}
-                                onChange={
-                                  isPlaceholder
-                                    ? undefined
-                                    : (e) => {
-                                        const newTeam = [...row.investigationTeam];
-                                        newTeam[index] = { ...member, name: e.target.value };
-                                        onRowChange('investigationTeam', newTeam);
-                                      }
-                                }
-                                fullWidth
-                                disabled={isPlaceholder}
-                                sx={{
-                                  '& .MuiOutlinedInput-root': {
-                                    fontSize: 15,
-                                    height: 'auto',
-                                  },
-                                }}
-                              />
-                            </td>
-                            <td
-                              style={{
-                                ...bodyCellStyle,
-                                padding: 0,
-                                ...innerCellStyle,
+                            <Box
+                              sx={{
+                                p: 1,
+                                display: 'flex',
+                                justifyContent: 'center',
                                 minWidth: 100,
                                 maxWidth: 100,
                               }}
                             >
-                              <Box
+                              <IconButton
+                                size="small"
                                 sx={{
-                                  p: 1,
-                                  display: 'flex',
-                                  justifyContent: 'center',
-                                  minWidth: 100,
-                                  maxWidth: 100,
+                                  p: 0.625,
+                                  cursor: 'grab',
+                                  '&:active': {
+                                    cursor: 'grabbing',
+                                  },
                                 }}
                               >
-                                <IconButton
-                                  size="small"
-                                  sx={{
-                                    p: 0.625,
-                                    cursor: isPlaceholder ? 'default' : 'grab',
-                                    '&:active': {
-                                      cursor: 'grabbing',
-                                    },
-                                  }}
-                                  disabled={isPlaceholder}
-                                >
-                                  <Iconify icon="custom:drag-dots-fill" width={20} />
-                                </IconButton>
-                              </Box>
-                            </td>
-                            <td
-                              style={{
-                                ...bodyCellStyle,
-                                padding: 0,
-                                ...innerCellStyle,
+                                <Iconify icon="custom:drag-dots-fill" width={20} />
+                              </IconButton>
+                            </Box>
+                          </td>
+                          <td
+                            style={{
+                              ...bodyCellStyle,
+                              padding: 0,
+                              ...innerCellStyle,
+                              minWidth: 100,
+                              maxWidth: 100,
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                p: 1,
+                                display: 'flex',
+                                justifyContent: 'center',
                                 minWidth: 100,
                                 maxWidth: 100,
                               }}
                             >
-                              <Box
+                              <Button
+                                variant="contained"
+                                size="small"
+                                onClick={() => onInvestigationTeamDelete(index)}
                                 sx={{
-                                  p: 1,
-                                  display: 'flex',
-                                  justifyContent: 'center',
-                                  minWidth: 100,
-                                  maxWidth: 100,
-                                }}
-                              >
-                                <Button
-                                  variant="contained"
-                                  size="small"
-                                  onClick={() => !isPlaceholder && onInvestigationTeamDelete(index)}
-                                  sx={{
-                                    minHeight: 30,
-                                    fontSize: 13,
-                                    fontWeight: 700,
-                                    px: 1,
-                                    py: 0.5,
+                                  minHeight: 30,
+                                  fontSize: 13,
+                                  fontWeight: 700,
+                                  px: 1,
+                                  py: 0.5,
+                                  bgcolor: 'action.disabledBackground',
+                                  color: 'action.disabled',
+                                  '&:hover': {
                                     bgcolor: 'action.disabledBackground',
-                                    color: 'action.disabled',
-                                    '&:hover': {
-                                      bgcolor: 'action.disabledBackground',
-                                    },
-                                  }}
-                                  disabled={isPlaceholder}
-                                >
-                                  삭제
-                                </Button>
-                              </Box>
-                            </td>
-                          </tr>
-                        );
-                      })}
+                                  },
+                                }}
+                              >
+                                삭제
+                              </Button>
+                            </Box>
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </Box>
@@ -525,7 +506,10 @@ export default function Table1200IndustrialAccidentForm({
 
             {/* 인적피해 */}
             <tr>
-              <th style={headerCellStyle}>
+              <th
+                style={{ ...headerCellStyle, cursor: 'pointer' }}
+                onClick={() => setSelectModalMode('humanDamage')}
+              >
                 <Box
                   sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}
                 >
@@ -547,7 +531,10 @@ export default function Table1200IndustrialAccidentForm({
                     <Button
                       variant="contained"
                       size="small"
-                      onClick={() => setSelectModalMode('humanDamage')}
+                      onClick={() => {
+                        // 항상 새 항목 추가 (플레이스홀더는 displayedHumanDamage에만 있고 실제 row.humanDamage에는 없음)
+                        onHumanDamageAdd({ department: '', name: '', position: '', injury: '' });
+                      }}
                       sx={{
                         minHeight: 30,
                         fontSize: 13,
@@ -586,184 +573,157 @@ export default function Table1200IndustrialAccidentForm({
                       </tr>
                     </thead>
                     <tbody>
-                      {displayedHumanDamage.map((damage, index) => {
-                        const isPlaceholder = !hasHumanDamage;
-                        return (
-                          <tr
-                            key={index}
-                            draggable
-                            onDragStart={() => !isPlaceholder && handleHumanDamageDragStart(index)}
-                            onDragOver={(e) =>
-                              !isPlaceholder && handleHumanDamageDragOver(e, index)
-                            }
-                            onDrop={(e) => !isPlaceholder && handleHumanDamageDrop(e, index)}
-                            onDragEnd={() => {
-                              setDraggedHumanDamageIndex(null);
-                              setDragOverHumanDamageIndex(null);
-                            }}
+                      {displayedHumanDamage.map((damage, index) => (
+                        <tr
+                          key={index}
+                          draggable
+                          onDragStart={() => handleHumanDamageDragStart(index)}
+                          onDragOver={(e) => handleHumanDamageDragOver(e, index)}
+                          onDrop={(e) => handleHumanDamageDrop(e, index)}
+                          onDragEnd={() => {
+                            setDraggedHumanDamageIndex(null);
+                            setDragOverHumanDamageIndex(null);
+                          }}
+                          style={{
+                            opacity: draggedHumanDamageIndex === index ? 0.5 : 1,
+                            backgroundColor:
+                              dragOverHumanDamageIndex === index &&
+                              draggedHumanDamageIndex !== index
+                                ? theme.vars.palette.action.hover
+                                : 'transparent',
+                            cursor: 'move',
+                          }}
+                        >
+                          <td style={{ ...bodyCellStyle, padding: 8, ...innerCellStyle }}>
+                            <TextField
+                              size="small"
+                              value={damage.department}
+                              onChange={(e) => {
+                                const newDamage = [...row.humanDamage];
+                                newDamage[index] = {
+                                  ...damage,
+                                  department: e.target.value,
+                                };
+                                onRowChange('humanDamage', newDamage);
+                              }}
+                              fullWidth
+                              sx={{
+                                '& .MuiOutlinedInput-root': {
+                                  fontSize: 15,
+                                  height: 'auto',
+                                },
+                              }}
+                            />
+                          </td>
+                          <td style={{ ...bodyCellStyle, padding: 8, ...innerCellStyle }}>
+                            <TextField
+                              size="small"
+                              value={damage.name}
+                              onChange={(e) => {
+                                const newDamage = [...row.humanDamage];
+                                newDamage[index] = { ...damage, name: e.target.value };
+                                onRowChange('humanDamage', newDamage);
+                              }}
+                              fullWidth
+                              sx={{
+                                '& .MuiOutlinedInput-root': {
+                                  fontSize: 15,
+                                  height: 'auto',
+                                },
+                              }}
+                            />
+                          </td>
+                          <td style={{ ...bodyCellStyle, padding: 8, ...innerCellStyle }}>
+                            <TextField
+                              size="small"
+                              value={damage.position}
+                              onChange={(e) => {
+                                const newDamage = [...row.humanDamage];
+                                newDamage[index] = { ...damage, position: e.target.value };
+                                onRowChange('humanDamage', newDamage);
+                              }}
+                              fullWidth
+                              sx={{
+                                '& .MuiOutlinedInput-root': {
+                                  fontSize: 15,
+                                  height: 'auto',
+                                },
+                              }}
+                            />
+                          </td>
+                          <td style={{ ...bodyCellStyle, padding: 8, ...innerCellStyle }}>
+                            <TextField
+                              size="small"
+                              value={damage.injury}
+                              onChange={(e) => {
+                                const newDamage = [...row.humanDamage];
+                                newDamage[index] = { ...damage, injury: e.target.value };
+                                onRowChange('humanDamage', newDamage);
+                              }}
+                              fullWidth
+                              sx={{
+                                '& .MuiOutlinedInput-root': {
+                                  fontSize: 15,
+                                  height: 'auto',
+                                },
+                              }}
+                            />
+                          </td>
+                          <td
                             style={{
-                              opacity: draggedHumanDamageIndex === index ? 0.5 : 1,
-                              backgroundColor:
-                                dragOverHumanDamageIndex === index &&
-                                draggedHumanDamageIndex !== index
-                                  ? theme.vars.palette.action.hover
-                                  : 'transparent',
-                              cursor: isPlaceholder ? 'default' : 'move',
+                              ...bodyCellStyle,
+                              padding: 0,
+                              ...innerCellStyle,
+                              width: 100,
                             }}
                           >
-                            <td style={{ ...bodyCellStyle, padding: 8, ...innerCellStyle }}>
-                              <TextField
+                            <Box sx={{ p: 1, display: 'flex', justifyContent: 'center' }}>
+                              <IconButton
                                 size="small"
-                                value={isPlaceholder ? '' : damage.department}
-                                onChange={
-                                  isPlaceholder
-                                    ? undefined
-                                    : (e) => {
-                                        const newDamage = [...row.humanDamage];
-                                        newDamage[index] = {
-                                          ...damage,
-                                          department: e.target.value,
-                                        };
-                                        onRowChange('humanDamage', newDamage);
-                                      }
-                                }
-                                fullWidth
-                                disabled={isPlaceholder}
                                 sx={{
-                                  '& .MuiOutlinedInput-root': {
-                                    fontSize: 15,
-                                    height: 'auto',
+                                  p: 0.625,
+                                  cursor: 'grab',
+                                  '&:active': {
+                                    cursor: 'grabbing',
                                   },
                                 }}
-                              />
-                            </td>
-                            <td style={{ ...bodyCellStyle, padding: 8, ...innerCellStyle }}>
-                              <TextField
+                              >
+                                <Iconify icon="custom:drag-dots-fill" width={20} />
+                              </IconButton>
+                            </Box>
+                          </td>
+                          <td
+                            style={{
+                              ...bodyCellStyle,
+                              padding: 0,
+                              ...innerCellStyle,
+                              width: 100,
+                            }}
+                          >
+                            <Box sx={{ p: 1, display: 'flex', justifyContent: 'center' }}>
+                              <Button
+                                variant="contained"
                                 size="small"
-                                value={isPlaceholder ? '' : damage.name}
-                                onChange={
-                                  isPlaceholder
-                                    ? undefined
-                                    : (e) => {
-                                        const newDamage = [...row.humanDamage];
-                                        newDamage[index] = { ...damage, name: e.target.value };
-                                        onRowChange('humanDamage', newDamage);
-                                      }
-                                }
-                                fullWidth
-                                disabled={isPlaceholder}
+                                onClick={() => onHumanDamageDelete(index)}
                                 sx={{
-                                  '& .MuiOutlinedInput-root': {
-                                    fontSize: 15,
-                                    height: 'auto',
-                                  },
-                                }}
-                              />
-                            </td>
-                            <td style={{ ...bodyCellStyle, padding: 8, ...innerCellStyle }}>
-                              <TextField
-                                size="small"
-                                value={isPlaceholder ? '' : damage.position}
-                                onChange={
-                                  isPlaceholder
-                                    ? undefined
-                                    : (e) => {
-                                        const newDamage = [...row.humanDamage];
-                                        newDamage[index] = { ...damage, position: e.target.value };
-                                        onRowChange('humanDamage', newDamage);
-                                      }
-                                }
-                                fullWidth
-                                disabled={isPlaceholder}
-                                sx={{
-                                  '& .MuiOutlinedInput-root': {
-                                    fontSize: 15,
-                                    height: 'auto',
-                                  },
-                                }}
-                              />
-                            </td>
-                            <td style={{ ...bodyCellStyle, padding: 8, ...innerCellStyle }}>
-                              <TextField
-                                size="small"
-                                value={isPlaceholder ? '' : damage.injury}
-                                onChange={
-                                  isPlaceholder
-                                    ? undefined
-                                    : (e) => {
-                                        const newDamage = [...row.humanDamage];
-                                        newDamage[index] = { ...damage, injury: e.target.value };
-                                        onRowChange('humanDamage', newDamage);
-                                      }
-                                }
-                                fullWidth
-                                disabled={isPlaceholder}
-                                sx={{
-                                  '& .MuiOutlinedInput-root': {
-                                    fontSize: 15,
-                                    height: 'auto',
-                                  },
-                                }}
-                              />
-                            </td>
-                            <td
-                              style={{
-                                ...bodyCellStyle,
-                                padding: 0,
-                                ...innerCellStyle,
-                                width: 100,
-                              }}
-                            >
-                              <Box sx={{ p: 1, display: 'flex', justifyContent: 'center' }}>
-                                <IconButton
-                                  size="small"
-                                  sx={{
-                                    p: 0.625,
-                                    cursor: isPlaceholder ? 'default' : 'grab',
-                                    '&:active': {
-                                      cursor: 'grabbing',
-                                    },
-                                  }}
-                                  disabled={isPlaceholder}
-                                >
-                                  <Iconify icon="custom:drag-dots-fill" width={20} />
-                                </IconButton>
-                              </Box>
-                            </td>
-                            <td
-                              style={{
-                                ...bodyCellStyle,
-                                padding: 0,
-                                ...innerCellStyle,
-                                width: 100,
-                              }}
-                            >
-                              <Box sx={{ p: 1, display: 'flex', justifyContent: 'center' }}>
-                                <Button
-                                  variant="contained"
-                                  size="small"
-                                  onClick={() => !isPlaceholder && onHumanDamageDelete(index)}
-                                  sx={{
-                                    minHeight: 30,
-                                    fontSize: 13,
-                                    fontWeight: 700,
-                                    px: 1,
-                                    py: 0.5,
+                                  minHeight: 30,
+                                  fontSize: 13,
+                                  fontWeight: 700,
+                                  px: 1,
+                                  py: 0.5,
+                                  bgcolor: 'action.disabledBackground',
+                                  color: 'action.disabled',
+                                  '&:hover': {
                                     bgcolor: 'action.disabledBackground',
-                                    color: 'action.disabled',
-                                    '&:hover': {
-                                      bgcolor: 'action.disabledBackground',
-                                    },
-                                  }}
-                                  disabled={isPlaceholder}
-                                >
-                                  삭제
-                                </Button>
-                              </Box>
-                            </td>
-                          </tr>
-                        );
-                      })}
+                                  },
+                                }}
+                              >
+                                삭제
+                              </Button>
+                            </Box>
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </Box>

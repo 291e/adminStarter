@@ -10,7 +10,6 @@ import { dashboardRoutes } from './dashboard';
 
 import { AuthSplitLayout } from 'src/layouts/auth-split';
 import { SplashScreen } from 'src/components/loading-screen';
-import { GuestGuard } from 'src/auth/guard';
 
 // ----------------------------------------------------------------------
 
@@ -23,24 +22,22 @@ export const routesSection: RouteObject[] = [
     element: <Navigate to={CONFIG.auth.redirectPath} replace />,
   },
 
-  // Admin
+  // Admin - 초대 페이지는 인증 여부와 관계없이 접근 가능
   {
     path: '/',
     children: [
       {
         path: 'invitation',
         element: (
-          <GuestGuard>
-            <Suspense fallback={<SplashScreen />}>
-              <AuthSplitLayout
-                slotProps={{
-                  section: { title: '초대 링크 검증' },
-                }}
-              >
-                <InvitationPage />
-              </AuthSplitLayout>
-            </Suspense>
-          </GuestGuard>
+          <Suspense fallback={<SplashScreen />}>
+            <AuthSplitLayout
+              slotProps={{
+                section: { title: '초대 링크 검증' },
+              }}
+            >
+              <InvitationPage />
+            </AuthSplitLayout>
+          </Suspense>
         ),
       },
     ],

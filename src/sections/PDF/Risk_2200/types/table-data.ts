@@ -203,6 +203,7 @@ export type Table2400MinimumEducationRow = {
 export type InvestigationTeamMember = {
   department: string; // 소속
   name: string; // 성명
+  memberIdx?: number; // 멤버 인덱스 (결재 대상자 등록용, 선택적)
 };
 
 export type HumanDamage = {

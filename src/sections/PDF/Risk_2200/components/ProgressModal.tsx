@@ -19,22 +19,13 @@ import Stack from '@mui/material/Stack';
 import Pagination from '@mui/material/Pagination';
 import Divider from '@mui/material/Divider';
 
+import { sendNotification } from 'src/services/safety-system/safety-system.service';
+import type { DocumentSignatureInfo } from 'src/services/safety-system/safety-system.types';
+
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
 import Badge from 'src/components/safeyoui/badge';
 
 // ----------------------------------------------------------------------
-
-export type SignatureTarget = {
-  id: string;
-  name: string;
-  position: string;
-  department: string;
-  role: string;
-  type: 'approval' | 'signature'; // 결재, 서명
-  status: 'completed' | 'incomplete'; // 완료, 미완료
-  completedAt?: string; // 완료일 (완료인 경우)
-  avatar?: string;
-};
 
 type Props = {
   open: boolean;
@@ -43,109 +34,8 @@ type Props = {
   writtenAt?: string;
   approvalDeadline?: string;
   documentId?: string;
+  signatureList?: DocumentSignatureInfo[]; // 결재 서명 목록
 };
-
-// TODO: TanStack Query Hook(useQuery)으로 서명 대상 목록 조회
-// 임시 목업 데이터
-const mockSignatureTargets: SignatureTarget[] = [
-  {
-    id: '1',
-    name: '김안전',
-    position: '과장',
-    department: '생산 1팀',
-    role: '최고 관리자',
-    type: 'approval',
-    status: 'completed',
-    completedAt: '2025-10-27',
-  },
-  {
-    id: '2',
-    name: '이영희',
-    position: '팀장',
-    department: '생산 1팀',
-    role: '조직 관리자',
-    type: 'signature',
-    status: 'completed',
-    completedAt: '2025-10-27',
-  },
-  {
-    id: '3',
-    name: '박지민',
-    position: '사원',
-    department: '생산 1팀',
-    role: '관리 감독자',
-    type: 'signature',
-    status: 'completed',
-    completedAt: '2025-10-27',
-  },
-  {
-    id: '4',
-    name: '최은주',
-    position: '부장',
-    department: '생산 1팀',
-    role: '안전보건 담당자',
-    type: 'approval',
-    status: 'completed',
-    completedAt: '2025-10-27',
-  },
-  {
-    id: '5',
-    name: '정민수',
-    position: '인턴',
-    department: '생산 1팀',
-    role: '근로자',
-    type: 'signature',
-    status: 'completed',
-    completedAt: '2025-10-27',
-  },
-  {
-    id: '6',
-    name: '정민수',
-    position: '인턴',
-    department: '생산 1팀',
-    role: '근로자',
-    type: 'signature',
-    status: 'incomplete',
-  },
-  {
-    id: '7',
-    name: '정민수',
-    position: '인턴',
-    department: '생산 1팀',
-    role: '근로자',
-    type: 'signature',
-    status: 'incomplete',
-  },
-  {
-    id: '8',
-    name: '정민수',
-    position: '인턴',
-    department: '생산 1팀',
-    role: '근로자',
-    type: 'signature',
-    status: 'incomplete',
-  },
-  {
-    id: '9',
-    name: '정민수',
-    position: '인턴',
-    department: '생산 1팀',
-    role: '근로자',
-    type: 'signature',
-    status: 'completed',
-    completedAt: '2025-10-27',
-  },
-  {
-    id: '10',
-    name: '정민수',
-    position: '인턴',
-    department: '생산 1팀',
-    role: '근로자',
-    type: 'signature',
-    status: 'completed',
-    completedAt: '2025-10-27',
-  },
-];
 
 const ROWS_PER_PAGE = 10;
 
@@ -156,17 +46,48 @@ export default function ProgressModal({
   writtenAt,
   approvalDeadline,
   documentId,
+  signatureList = [],
 }: Props) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [page, setPage] = useState(1);
 
-  // TODO: TanStack Query Hook(useQuery)으로 서명 대상 목록 조회
-  // const { data: signatureTargets } = useQuery({
-  //   queryKey: ['signatureTargets', documentId],
-  //   queryFn: () => getSignatureTargets(documentId!),
-  //   enabled: open && !!documentId,
-  // });
-  const signatureTargets = useMemo(() => mockSignatureTargets, []);
+  // approvalStep에 따라 역할 결정
+  const getRoleByStep = (step: number) => {
+    switch (step) {
+      case 1:
+        return '승인자';
+      case 2:
+        return '작성자';
+      case 3:
+        return '검토자';
+      default:
+        return '결재자';
+    }
+  };
+
+  // signatureList를 UI 타입으로 변환
+  const signatureTargets = useMemo(
+    () =>
+      signatureList.map((sig) => {
+        const status: 'completed' | 'incomplete' =
+          sig.approvalStatus === 'APPROVED' ? 'completed' : 'incomplete';
+        return {
+          id: `${sig.documentApprovalIdx}`,
+          targetMemberIdx: sig.targetMemberIdx,
+          name: sig.memberName,
+          position: '', // API에서 제공되지 않음
+          department: '', // API에서 제공되지 않음
+          role: getRoleByStep(sig.approvalStep),
+          type: 'approval' as const, // signatureList는 모두 결재 관련
+          status,
+          completedAt: sig.approvedAt ? sig.approvedAt.split('T')[0] : undefined,
+          avatar: undefined,
+          approvalStep: sig.approvalStep,
+          approvalOrder: sig.approvalOrder,
+        };
+      }),
+    [signatureList]
+  );
 
   const paginatedTargets = useMemo(() => {
     const startIndex = (page - 1) * ROWS_PER_PAGE;
@@ -216,33 +137,30 @@ export default function ProgressModal({
     setPage(value);
   };
 
-  const handleSendNotification = () => {
-    // TODO: TanStack Query Hook(useMutation)으로 알림 발송
-    // 알림 발송 로직:
-    //
-    // 1. 결재 요청 -> 순차 요청&자동알림
-    //    - 관리자 A 결재 완료 -> 관리자 B 알림
-    //    - 관리자 B 결재 완료 -> 관리자 C 알림
-    //    - 관리자 C 결재 완료 -> 문서 최종 완료 + 알림
-    //
-    // 2. 서명 요청 -> 동시 요청&자동알림
-    //    - 전원 서명 완료 -> 작성자에게 알림
-    //
-    // 3. 결재 마감일 자동 알림
-    //    - 결재 마감일 15일 전 자동 알림
-    //    - 결재 마감일 일주일 전 자동 알림
-    //    - 결재 마감일 하루 전 자동 알림
-    //
-    // const mutation = useMutation({
-    //   mutationFn: (data: { documentId: string; targetIds: string[] }) => sendNotification(data),
-    //   onSuccess: () => {
-    //     queryClient.invalidateQueries({ queryKey: ['signatureTargets', documentId] });
-    //     onClose();
-    //   },
-    // });
-    // mutation.mutate({ documentId: documentId!, targetIds: selectedIds });
-    console.log('알림 발송', { documentId, targetIds: selectedIds });
-    onClose();
+  const handleSendNotification = async () => {
+    if (!documentId || selectedIds.length === 0) return;
+
+    try {
+      // 선택된 대상자의 memberIdx 추출
+      const targetMemberIndexList = selectedIds
+        .map((id) => {
+          const target = signatureTargets.find((t) => t.id === id);
+          return target?.targetMemberIdx;
+        })
+        .filter((idx): idx is number => idx !== undefined);
+
+      // 알림 발송
+      await sendNotification(Number(documentId), {
+        notificationType: 'signature_request',
+        targetMemberIndexList,
+      });
+
+      // 성공 시 모달 닫기
+      handleClose();
+    } catch (error) {
+      console.error('알림 발송 실패:', error);
+      // TODO: 에러 토스트 표시
+    }
   };
 
   const handleClose = () => {
@@ -251,7 +169,7 @@ export default function ProgressModal({
     onClose();
   };
 
-  const getRoleLabel = (role: string) => role;
+  const getRoleLabel = (role?: string) => role || '';
 
   const getTypeLabel = (type: 'approval' | 'signature') => (type === 'approval' ? '결재' : '서명');
 
@@ -400,13 +318,13 @@ export default function ProgressModal({
                     </TableCell>
                     <TableCell sx={{ p: 2 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <Avatar sx={{ width: 40, height: 40 }}>{target.name[0]}</Avatar>
+                        <Avatar sx={{ width: 40, height: 40 }}>{target.name?.[0] || '?'}</Avatar>
                         <Box>
                           <Typography variant="body2" sx={{ color: 'text.primary' }}>
-                            {target.name}
+                            {target.name || `사용자 ${target.targetMemberIdx}`}
                           </Typography>
                           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                            {target.position}
+                            {target.position || ''}
                           </Typography>
                         </Box>
                       </Box>

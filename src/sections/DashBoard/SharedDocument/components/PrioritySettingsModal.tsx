@@ -82,18 +82,6 @@ export default function PrioritySettingsModal({
     // priorityIdx를 id로 사용 (문자열로 변환)
     const id = String(setting.priorityIdx);
 
-    // 디버깅: 변환 과정 확인
-    if (import.meta.env.DEV) {
-      console.log('🔄 convertPrioritySettingToItem:', {
-        setting,
-        priorityIdx: setting.priorityIdx,
-        color: setting.color,
-        colorName,
-        id,
-        colorMatched: COLOR_VALUES[colorName]?.toLowerCase() === settingColorLower,
-      });
-    }
-
     return {
       id, // priorityIdx를 문자열로 변환하여 사용
       color: colorName,
@@ -110,11 +98,6 @@ export default function PrioritySettingsModal({
     // 실제 API 응답: body.data.prioritySettingList
     // 인터셉터 평탄화 후: data.prioritySettingList 또는 data.data.prioritySettingList
     const data = prioritySettingsData as any;
-
-    // 디버깅: API 응답 구조 확인
-    if (import.meta.env.DEV) {
-      console.log('📋 PrioritySettings API Response:', data);
-    }
 
     let priorityList: PrioritySetting[] = [];
 

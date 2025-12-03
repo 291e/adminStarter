@@ -4,7 +4,6 @@ import { paths } from 'src/routes/paths';
 
 import { CONFIG } from 'src/global-config';
 
-import { Label } from 'src/components/label';
 import { SvgColor } from 'src/components/svg-color';
 
 // ----------------------------------------------------------------------
@@ -87,7 +86,7 @@ export const navData: NavSectionProps['data'] = [
       {
         title: '안전보건체계 관리',
         path: paths.dashboard.safetySystem.root,
-        icon: ICONS.lock,
+        icon: ICONS.file,
       },
       {
         title: '설정 및 관리',
@@ -95,12 +94,13 @@ export const navData: NavSectionProps['data'] = [
         icon: ICONS.lock,
         children: [
           { title: '서비스 관리', path: paths.dashboard.systemSetting.serviceSetting },
-          { title: '코드 관리', path: paths.dashboard.systemSetting.codeSetting },
-          { title: 'API 관리', path: paths.dashboard.systemSetting.apiSetting },
+          { title: '문서 설정 관리', path: paths.dashboard.systemSetting.documentSetting },
           {
             title: '업종별 체크리스트',
             path: paths.dashboard.systemSetting.industryChecklistSetting,
           },
+          { title: '코드 관리', path: paths.dashboard.systemSetting.codeSetting },
+          { title: 'API 관리', path: paths.dashboard.systemSetting.apiSetting },
         ],
       },
     ],

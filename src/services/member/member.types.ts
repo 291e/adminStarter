@@ -2,7 +2,7 @@
 
 import type { BaseResponseDto } from '../common';
 
-export type MemberStatus = 'active' | 'inactive' | 'pending';
+export type MemberStatus = 'ACTIVE' | 'INACTIVE';
 
 export type SearchingKey =
   | 'memberId'
@@ -33,36 +33,57 @@ export type GetMembersParams = {
 
 // 회원 정보
 export type Member = {
-  memberIndex: number;
+  memberIdx: number;
+  memberStatus: MemberStatus;
+  memberRole: 'OPERATOR_MANAGER' | 'MANAGEMENT_SUPERVISOR' | 'SAFETY_MANAGER' | 'WORKER';
+  workType: 'PRODUCTION' | 'OFFICE' | null;
+  memberThumbnail: string | null;
   memberId: string;
   memberEmail: string;
   memberName: string;
+  memberNameOrg: string | null;
   memberPhone: string;
-  memberAddress: string;
-  memberAddressDetail?: string;
-  isSuperAdmin?: boolean;
-  status: MemberStatus;
+  memberAddress: string | null;
+  memberAddressDetail: string | null;
+  memberLang: string | null;
+  lastSigninAt: string | null;
+  joinedAt: string | null;
+  companyIdx: number | null;
+  companyBranchIdx: number | null;
+  deviceGubun: string | null;
+  fcmToken: string | null;
+  isPushEnabled: number; // 0 or 1
+  memberlat: number | null;
+  memberlng: number | null;
+  lastLocationUpdateAt: string | null;
   createAt: string;
-  // ... 기타 필드
+  updateAt: string;
+  deletedAt: string | null;
+  position: string | null; // 직급 (과장, 대리 등)
+  department: string | null; // 소속 (생산 1팀, 영업 2팀 등)
+  isSuperAdmin?: boolean; // 슈퍼어드민 여부
 };
 
 // 회원 생성 요청
 export type CreateMemberDto = {
-  memberId: string;
-  password: string;
-  memberName: string;
-  memberEmail: string;
-  memberPhone: string;
+  memberId: string; // 필수
+  password: string; // 필수, maxLength: 100
+  memberStatus?: 'ACTIVE' | 'INACTIVE';
+  memberRole?: 'OPERATOR_MANAGER' | 'MANAGEMENT_SUPERVISOR' | 'SAFETY_MANAGER' | 'WORKER';
+  memberThumbnail?: string; // 썸네일 이미지 경로
+  memberEmail?: string;
+  memberName?: string;
+  memberPhone?: string;
   memberAddress?: string;
   memberAddressDetail?: string;
+  memberMemo?: string; // 메모
   companyIdx?: number;
-  branchIdx?: number;
-  role?: string;
+  companyBranchIdx?: number;
 };
 
 // 회원 생성 응답
 export type CreateMemberResponse = BaseResponseDto<{
-  memberIndex: number;
+  memberIdx: number;
   memberId: string;
 }>;
 
@@ -79,12 +100,19 @@ export type GetMyInfoResponse = BaseResponseDto<Member>;
 
 // 내 정보 수정 요청
 export type UpdateMyInfoDto = {
+  memberThumbnail?: string; // 썸네일 이미지 경로
   memberName?: string;
-  memberEmail?: string;
+  memberNameOrg?: string; // 원어이름
   memberPhone?: string;
   memberAddress?: string;
   memberAddressDetail?: string;
-  password?: string;
+  memberMemo?: string; // 메모
+  memberLang?: string; // 언어
+  memberlat?: number; // 위치 정보 위도
+  memberlng?: number; // 위치 정보 경도
+  lastLocationUpdateAt?: string; // 위치 정보 마지막 업데이트 시간
+  newPassword?: string; // 새 패스워드, minLength: 4, maxLength: 25
+  currentPassword?: string; // 현재 패스워드 (패스워드 변경 시 필수)
 };
 
 // 내 정보 수정 응답
@@ -92,13 +120,20 @@ export type UpdateMyInfoResponse = BaseResponseDto<Member>;
 
 // 회원 수정 요청
 export type UpdateMemberDto = {
+  memberId: string; // 필수
   memberName?: string;
   memberEmail?: string;
   memberPhone?: string;
   memberAddress?: string;
   memberAddressDetail?: string;
-  status?: MemberStatus;
-  role?: string;
+  position?: string; // 직급 (과장, 대리 등)
+  department?: string; // 소속 (생산 1팀, 영업 2팀 등)
+  memberStatus?: 'ACTIVE' | 'INACTIVE';
+  memberRole?: 'OPERATOR_MANAGER' | 'MANAGEMENT_SUPERVISOR' | 'SAFETY_MANAGER' | 'WORKER';
+  memberThumbnail?: string; // 썸네일 이미지 경로
+  password?: string; // maxLength: 100
+  companyIdx?: number;
+  companyBranchIdx?: number;
 };
 
 // 회원 수정 응답

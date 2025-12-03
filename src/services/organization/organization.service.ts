@@ -31,6 +31,8 @@ import type {
   UpdateAccidentFreeParams,
   InviteMemberParams,
   InviteMemberResponse,
+  VerifyInvitationCodeParams,
+  VerifyInvitationCodeResponse,
   AcceptInvitationParams,
   AcceptInvitationResponse,
   GetCompanyMembersParams,
@@ -294,6 +296,24 @@ export async function inviteMember(
   const response = await axiosInstance.post<InviteMemberResponse>(
     `${endpoints.company.invite}/${companyIdx}/invite`,
     params
+  );
+  return response.data;
+}
+
+/**
+ * 초대 코드 검증
+ * GET /companies/invite/verify?code={코드}
+ */
+export async function verifyInvitationCode(
+  params: VerifyInvitationCodeParams
+): Promise<VerifyInvitationCodeResponse> {
+  const response = await axiosInstance.get<VerifyInvitationCodeResponse>(
+    endpoints.company.inviteVerify,
+    {
+      params: {
+        code: params.code,
+      },
+    }
   );
   return response.data;
 }

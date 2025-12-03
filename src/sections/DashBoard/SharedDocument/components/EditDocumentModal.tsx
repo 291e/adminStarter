@@ -17,6 +17,7 @@ import Switch from '@mui/material/Switch';
 import { Iconify } from 'src/components/iconify';
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
 import type { SharedDocument as ApiSharedDocument } from 'src/services/dashboard/dashboard.types';
+import { getPriorityLabel } from '../constants/priority';
 
 // ----------------------------------------------------------------------
 
@@ -320,7 +321,7 @@ export default function EditDocumentModal({
                   </MenuItem>
                   {priorities.map((priority) => {
                     // labelType을 우선적으로 사용, 없으면 label 사용
-                    const displayLabel = priority.labelType || priority.label || '중요도';
+                    const displayLabel = getPriorityLabel(priority.labelType || priority.label);
 
                     return (
                       <MenuItem key={priority.id} value={priority.id}>

@@ -14,6 +14,7 @@ import AccidentReportCard from './components/AccidentReportCard';
 import PendingSignaturesCard from './components/PendingSignaturesCard';
 import SharedDocumentsCard from './components/SharedDocumentsCard';
 import EducationDetailModal from './components/EducationDetailModal';
+import SharedDocumentDetailModal from 'src/sections/Chat/components/SharedDocumentDetailModal';
 
 import {
   usePendingSignatures,
@@ -42,6 +43,10 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
   const [pendingPage, setPendingPage] = useState(1);
   const [sharedPage, setSharedPage] = useState(1);
   const [educationDetailModalOpen, setEducationDetailModalOpen] = useState(false);
+  const [selectedSharedDocumentIdx, setSelectedSharedDocumentIdx] = useState<number | null>(null);
+  const [selectedSafetySystemDocumentIdx, setSelectedSafetySystemDocumentIdx] = useState<
+    number | null
+  >(null);
 
   const navigate = useNavigate();
   // 기간 계산 (periodType과 periodValue에 따라 startDate, endDate 계산)
@@ -130,6 +135,10 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
         console.warn('⚠️ PendingSignatures: Invalid response structure', pendingSignaturesData);
       }
       return [];
+    }
+    // 디버깅: 실제 데이터 구조 확인
+    if (import.meta.env.DEV && pendingSignaturesData.documentSignatureList.length > 0) {
+      console.log('📋 DocumentSignature sample:', pendingSignaturesData.documentSignatureList[0]);
     }
     return pendingSignaturesData.documentSignatureList;
   }, [pendingSignaturesData]);
@@ -220,23 +229,30 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
     navigate(paths.dashboard.operation.riskReport);
   };
 
-  const handleViewDocument = (id: string) => {
-    // documentId 형식: safetyIdx-itemNumber-documentNumber (예: "1-2-2165")
-    // 또는 단순히 risk_id일 수 있음
-    // documentId를 risk_id로 사용하고, safety_id는 documentId에서 추출
-    const parts = id.split('-');
-    if (parts.length >= 3) {
-      // safetyIdx-itemNumber-documentNumber 형식
-      const safetyId = parts[0]; // safetyIdx
-      const riskId = id; // 전체 documentId를 risk_id로 사용
-      // 문서 수정 페이지로 이동
-      navigate(`/dashboard/safety-system/${safetyId}/risk-2200/${riskId}/edit`);
-    } else {
-      // documentId가 다른 형식이거나, API를 통해 safety_id를 가져와야 할 수 있음
-      // 일단 documentId를 그대로 사용
-      console.warn('⚠️ Document ID format not recognized:', id);
-      // TODO: API 호출로 문서 상세 정보 가져오기 및 safety_id 확인
+  const handleViewDocument = (id: string, isSafetySystemDocumentIdx = false) => {
+    if (!id) {
+      console.warn('⚠️ Document ID is undefined or empty');
+      return;
     }
+    const documentIdx = Number(id);
+    if (!Number.isNaN(documentIdx) && documentIdx > 0) {
+      if (isSafetySystemDocumentIdx) {
+        // safetySystemDocumentIdx인 경우
+        setSelectedSafetySystemDocumentIdx(documentIdx);
+        setSelectedSharedDocumentIdx(null);
+      } else {
+        // sharedDocumentIdx인 경우
+        setSelectedSharedDocumentIdx(documentIdx);
+        setSelectedSafetySystemDocumentIdx(null);
+      }
+    } else {
+      console.warn('⚠️ Invalid document ID:', id);
+    }
+  };
+
+  const handleCloseDocumentModal = () => {
+    setSelectedSharedDocumentIdx(null);
+    setSelectedSafetySystemDocumentIdx(null);
   };
 
   const handleViewAll = () => {
@@ -381,6 +397,16 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
               : null
         }
       />
+
+      {/* 공유 문서 상세 모달 */}
+      {(selectedSharedDocumentIdx || selectedSafetySystemDocumentIdx) && (
+        <SharedDocumentDetailModal
+          open={!!(selectedSharedDocumentIdx || selectedSafetySystemDocumentIdx)}
+          onClose={handleCloseDocumentModal}
+          sharedDocumentIdx={selectedSharedDocumentIdx}
+          safetySystemDocumentIdx={selectedSafetySystemDocumentIdx}
+        />
+      )}
     </DashboardContent>
   );
 }

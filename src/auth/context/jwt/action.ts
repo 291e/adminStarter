@@ -1,5 +1,13 @@
 import { signIn as signInApi, signUp as signUpApi } from 'src/services/sign/sign.service';
 
+import {
+  signInWithCustomToken,
+  setPersistence,
+  browserLocalPersistence,
+  signOut as firebaseSignOut,
+} from 'firebase/auth';
+import { auth } from 'src/config/firebase';
+
 import { setSession } from './utils';
 import { JWT_STORAGE_KEY } from './constant';
 
@@ -45,6 +53,13 @@ export const signInWithPassword = async ({ email, password }: SignInParams): Pro
       resAny.data?.accessToken ||
       resAny.accessToken;
 
+    const firebaseToken =
+      resAny.body?.data?.firebaseToken ||
+      resAny.body?.data?.body?.data?.firebaseToken ||
+      resAny.body?.firebaseToken ||
+      resAny.data?.firebaseToken ||
+      resAny.firebaseToken;
+
     if (!accessToken) {
       console.error('❌ Response structure:', res);
       console.error('❌ Available paths:', {
@@ -58,6 +73,19 @@ export const signInWithPassword = async ({ email, password }: SignInParams): Pro
     }
 
     setSession(accessToken);
+
+    if (firebaseToken) {
+      try {
+        await setPersistence(auth, browserLocalPersistence);
+        await signInWithCustomToken(auth, firebaseToken);
+      } catch (firebaseError) {
+        console.error('Firebase 커스텀 토큰 로그인 실패:', firebaseError);
+      }
+    } else {
+      console.warn(
+        'Firebase 토큰을 응답에서 찾을 수 없습니다. 실시간 채팅 기능이 제한될 수 있습니다.'
+      );
+    }
   } catch (error) {
     console.error('Error during sign in:', error);
     throw error;
@@ -117,7 +145,12 @@ export const signUp = async ({
  *************************************** */
 export const signOut = async (): Promise<void> => {
   try {
-    await setSession(null);
+    await Promise.all([
+      setSession(null),
+      firebaseSignOut(auth).catch((error) => {
+        console.error('Firebase sign out failed:', error);
+      }),
+    ]);
   } catch (error) {
     console.error('Error during sign out:', error);
     throw error;

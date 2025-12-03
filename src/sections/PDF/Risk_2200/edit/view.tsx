@@ -1,6 +1,8 @@
 import type { Theme, SxProps } from '@mui/material/styles';
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+// import { useSnackbar } from 'notistack'; // TODO: notistack 설치 필요
 import dayjs, { type Dayjs } from 'dayjs';
 
 import Box from '@mui/material/Box';
@@ -9,8 +11,17 @@ import Typography from '@mui/material/Typography';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import type { SafetySystem, SafetySystemItem } from 'src/_mock/_safety-system';
+import { useQuery } from '@tanstack/react-query';
+import type { SafetySystem } from 'src/_mock/_safety-system';
+import type { SafetySystemItem } from 'src/services/safety-system/safety-system.types';
 import { getTableDataByDocument, FIXED_MINIMUM_EDUCATION_ROWS } from 'src/_mock/_safety-system';
+import {
+  updateSafetySystemDocument,
+  getSafetySystemItem,
+  createDocumentApproval,
+  addApprovalSignature,
+} from 'src/services/safety-system/safety-system.service';
+import { uploadFile } from 'src/services/system/system.service';
 import type {
   Table1100Row,
   Table1200IndustrialAccidentRow,
@@ -36,7 +47,7 @@ import EditApprovalSection, {
 } from './components/EditApprovalSection';
 import SignatureModal from './components/SignatureModal';
 import EditFooterButtons from './components/EditFooterButtons';
-import InvestigationTeamSelectModal from '../create/tables/modal/InvestigationTeamSelectModal';
+import SelectApprovalMemberModal from 'src/sections/Chat/components/SelectApprovalMemberModal';
 import Table1100Form from '../create/tables/Table1100Form';
 import Table1200IndustrialAccidentForm from '../create/tables/Table1200IndustrialAccidentForm';
 import Table1200NearMissForm from '../create/tables/Table1200NearMissForm';
@@ -168,6 +179,7 @@ export function Risk_2200EditView({
 }: Props) {
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const { risk_id } = useParams<{ risk_id: string }>();
   const state = location.state as
     | {
@@ -175,6 +187,7 @@ export function Risk_2200EditView({
         item?: SafetySystemItem;
         isGuide?: boolean;
         documentType?: 'industrial-accident' | 'near-miss' | 'tbm' | 'education';
+        document?: { safetySystemDocumentIdx?: number };
       }
     | undefined;
 
@@ -182,6 +195,50 @@ export function Risk_2200EditView({
   const system = propSystem || state?.system;
   const item = propItem || state?.item;
   const documentType = propDocumentType || state?.documentType;
+
+  // safetySystemDocumentIdx 추출 (risk_id는 safetySystemDocumentIdx 문자열)
+  const safetySystemDocumentIdx =
+    state?.document?.safetySystemDocumentIdx || (risk_id ? Number(risk_id) : null);
+
+  // 문서 상세 정보 조회 (아이템 상세 정보에서 documentList를 가져와서 해당 문서 찾기)
+  const { data: itemDetailResponse } = useQuery({
+    queryKey: ['safety-system-item', item?.safetySystemItemIdx],
+    queryFn: async () => {
+      if (!item?.safetySystemItemIdx) {
+        return null;
+      }
+      try {
+        const response = await getSafetySystemItem(item.safetySystemItemIdx);
+
+        // axios 인터셉터에서 body.data를 평탄화
+        const itemData =
+          (response as any).item ||
+          (response as any).body?.data?.item ||
+          (response as any).body?.item;
+        const documentList =
+          (response as any).documentList ||
+          (response as any).body?.data?.documentList ||
+          (response as any).body?.documentList ||
+          [];
+
+        if (!itemData) return null;
+
+        return {
+          ...itemData,
+          documentList,
+        } as SafetySystemItem;
+      } catch (error) {
+        console.error('아이템 상세 정보 조회 실패:', error);
+        return null;
+      }
+    },
+    enabled: !!item?.safetySystemItemIdx,
+  });
+
+  // 현재 편집 중인 문서 찾기
+  const currentDocument = itemDetailResponse?.documentList?.find(
+    (doc) => doc.safetySystemDocumentIdx === safetySystemDocumentIdx
+  );
 
   // documentType 자동 추론을 위한 state
   const [inferredDocumentType, setInferredDocumentType] = useState<
@@ -397,9 +454,38 @@ export function Risk_2200EditView({
     approver: '승인',
   };
 
+  // const { enqueueSnackbar } = useSnackbar(); // TODO: notistack 설치 필요
+  const enqueueSnackbar = (
+    message: string,
+    options?: { variant?: 'success' | 'error' | 'warning' | 'info' }
+  ) => {
+    // 임시로 alert 사용
+    if (options?.variant === 'error') {
+      alert(`오류: ${message}`);
+    } else {
+      alert(message);
+    }
+  };
+
   const [approvalSignatures, setApprovalSignatures] = useState<ApprovalSignature[]>([
     { type: 'writer' }, // 기본적으로 작성만 있음
   ]);
+
+  // approvalStep 계산: 1(승인만), 2(작성+승인), 3(작성+검토+승인)
+  const getApprovalStep = useCallback((signatures: ApprovalSignature[]): number => {
+    const hasWriter = signatures.some((s) => s.type === 'writer');
+    const hasApprover = signatures.some((s) => s.type === 'approver');
+    const hasReviewer = signatures.some((s) => s.type === 'reviewer');
+
+    if (hasWriter && hasReviewer && hasApprover) return 3; // 작성+검토+승인
+    if (hasWriter && hasApprover) return 2; // 작성+승인
+    if (hasApprover) return 1; // 승인만
+    return 1; // 기본값
+  }, []);
+
+  // 현재 approvalStep 계산 (UI에서는 실제 signatures를 기반으로 계산)
+  // 문서 저장 시에는 originalApprovalStep을 사용하지만, UI에서는 동적으로 변경 가능
+  const currentApprovalStep = getApprovalStep(approvalSignatures);
   const [approvalMemberModal, setApprovalMemberModal] = useState<{
     open: boolean;
     type: ApprovalSignature['type'] | null;
@@ -409,31 +495,189 @@ export function Risk_2200EditView({
     type: ApprovalType | null;
   }>({ open: false, type: null });
 
-  // 등록일, 수정일 (TODO: API에서 가져오기)
-  const [registeredAt] = useState<string>('');
-  const [modifiedAt] = useState<string>('');
+  // 등록일, 수정일
+  const registeredAt = currentDocument?.createAt
+    ? typeof currentDocument.createAt === 'string'
+      ? currentDocument.createAt.split('T')[0]
+      : new Date(currentDocument.createAt).toISOString().split('T')[0]
+    : '';
+  const modifiedAt = currentDocument?.updateAt
+    ? typeof currentDocument.updateAt === 'string'
+      ? currentDocument.updateAt.split('T')[0]
+      : new Date(currentDocument.updateAt).toISOString().split('T')[0]
+    : '';
+
+  // 기존 문서 데이터에서 approvalStep과 signatureList 로드하여 approvalSignatures 초기화
+  useEffect(() => {
+    if (!currentDocument) return;
+
+    // approvalStep이 있으면 그에 맞게 서명 구조 생성
+    const docApprovalStep = (currentDocument as any).approvalStep;
+
+    // approvalList에서 기존 결재 대상자 정보 가져오기
+    const approvalList = (currentDocument as any).approvalList || [];
+
+    if (docApprovalStep && typeof docApprovalStep === 'number') {
+      const newSignatures: ApprovalSignature[] = [];
+
+      // approvalStep에 따라 서명 구조 생성
+      if (docApprovalStep >= 2) {
+        // 작성자 추가 (approvalStep 2 이상)
+        newSignatures.push({ type: 'writer' });
+      }
+      if (docApprovalStep >= 3) {
+        // 검토자 추가 (approvalStep 3)
+        newSignatures.push({ type: 'reviewer' });
+      }
+      // 승인자 추가 (approvalStep 1 이상)
+      newSignatures.push({ type: 'approver' });
+
+      // approvalList에서 기존 데이터로 채우기
+      if (approvalList.length > 0) {
+        approvalList.forEach((approval: any) => {
+          // approvalStep에 따라 type 매핑: 1(승인), 2(작성), 3(검토)
+          let type: ApprovalType = 'approver';
+          if (approval.approvalStep === 2) type = 'writer';
+          else if (approval.approvalStep === 3) type = 'reviewer';
+          else if (approval.approvalStep === 1) type = 'approver';
+
+          // 해당 타입의 서명 찾아서 업데이트
+          const existingIndex = newSignatures.findIndex((s) => s.type === type);
+          if (existingIndex >= 0) {
+            newSignatures[existingIndex] = {
+              type,
+              name: approval.memberName,
+              date: approval.approvedAt ? dayjs(approval.approvedAt).format('YY. M. D') : undefined,
+              signature: approval.signatureData,
+              memberIdx: approval.targetMemberIdx,
+              documentApprovalIdx: approval.documentApprovalIdx, // API에서 사용할 ID 저장
+            };
+          }
+        });
+      } else if (currentDocument.signatureList && currentDocument.signatureList.length > 0) {
+        // approvalList가 없지만 signatureList가 있으면 기존 로직 사용
+        currentDocument.signatureList.forEach((sig) => {
+          // approvalStep에 따라 type 매핑: 1(승인), 2(작성), 3(검토)
+          let type: ApprovalType = 'approver';
+          if (sig.approvalStep === 2) type = 'writer';
+          else if (sig.approvalStep === 3) type = 'reviewer';
+          else if (sig.approvalStep === 1) type = 'approver';
+
+          // 해당 타입의 서명 찾아서 업데이트
+          const existingIndex = newSignatures.findIndex((s) => s.type === type);
+          if (existingIndex >= 0) {
+            newSignatures[existingIndex] = {
+              type,
+              name: sig.memberName,
+              date: sig.approvedAt ? dayjs(sig.approvedAt).format('YY. M. D') : undefined,
+              signature: sig.signatureData,
+              memberIdx: sig.targetMemberIdx,
+            };
+          }
+        });
+      }
+
+      setApprovalSignatures(newSignatures);
+    } else if (currentDocument.signatureList && currentDocument.signatureList.length > 0) {
+      // approvalStep이 없지만 signatureList가 있으면 기존 로직 사용
+      const loadedSignatures: ApprovalSignature[] = currentDocument.signatureList.map((sig) => {
+        // approvalStep에 따라 type 매핑: 1(승인), 2(작성), 3(검토)
+        let type: ApprovalType = 'approver';
+        if (sig.approvalStep === 2) type = 'writer';
+        else if (sig.approvalStep === 3) type = 'reviewer';
+        else if (sig.approvalStep === 1) type = 'approver';
+
+        return {
+          type,
+          name: sig.memberName,
+          date: sig.approvedAt ? dayjs(sig.approvedAt).format('YY. M. D') : undefined,
+          signature: sig.signatureData,
+          memberIdx: sig.targetMemberIdx,
+        };
+      });
+
+      if (loadedSignatures.length > 0) {
+        setApprovalSignatures(loadedSignatures);
+      }
+    }
+  }, [currentDocument]);
 
   // 기존 문서 데이터 로드
   useEffect(() => {
-    if (extractedInfo) {
-      // TODO: TanStack Query Hook(useQuery)으로 문서 상세 정보 가져오기
-      // const { data: documentDetail } = useQuery({
-      //   queryKey: ['risk2200DocumentDetail', risk_id],
-      //   queryFn: () => getRisk2200DocumentDetail(risk_id!),
-      //   enabled: !!risk_id,
-      // });
-      // if (documentDetail) {
-      //   if (documentDetail.documentDate) setDocumentDate(dayjs(documentDetail.documentDate));
-      //   if (documentDetail.approvalDeadline) setApprovalDeadline(dayjs(documentDetail.approvalDeadline));
-      //   // 테이블 데이터 설정
-      //   if (is1100Series && documentDetail.tableData?.type === '1100') {
-      //     setTable1100Rows(documentDetail.tableData.rows);
-      //   }
-      //   // ... 다른 시리즈도 동일하게 처리
-      //   return;
-      // }
+    if (!currentDocument) return;
 
-      // 목업 데이터 사용
+    // documentDate 설정 (createAt 사용)
+    if (currentDocument.createAt) {
+      const createAtDate =
+        typeof currentDocument.createAt === 'string'
+          ? currentDocument.createAt
+          : new Date(currentDocument.createAt).toISOString();
+      setDocumentDate(dayjs(createAtDate));
+    }
+
+    // approvalDeadline 설정
+    if (currentDocument.approvalDeadline) {
+      setApprovalDeadline(dayjs(currentDocument.approvalDeadline));
+    }
+
+    // tableData 파싱 및 설정
+    let parsedTableData: any = null;
+    if (currentDocument.tableData) {
+      try {
+        parsedTableData =
+          typeof currentDocument.tableData === 'string'
+            ? JSON.parse(currentDocument.tableData)
+            : currentDocument.tableData;
+      } catch (error) {
+        console.error('tableData 파싱 실패:', error);
+      }
+    }
+
+    if (parsedTableData) {
+      const tableType = parsedTableData.tableType;
+
+      // documentType 자동 추론
+      if (tableType === '1200-industrial') {
+        setInferredDocumentType('industrial-accident');
+      } else if (tableType === '1200-near-miss') {
+        setInferredDocumentType('near-miss');
+      } else if (tableType === '2400-tbm') {
+        setInferredDocumentType('tbm');
+      } else if (tableType === '2400-education') {
+        setInferredDocumentType('education');
+      }
+
+      // tableType에 따라 데이터 설정
+      if (tableType === '1100' && parsedTableData.rows) {
+        setTable1100Rows(parsedTableData.rows as Table1100Row[]);
+      } else if (tableType === '1300' && parsedTableData.rows) {
+        setTable1300Rows(parsedTableData.rows as Table1300Row[]);
+      } else if (tableType === '1400' && parsedTableData.data) {
+        setTable1400Data(parsedTableData.data as Table1400Data);
+      } else if (tableType === '1500' && parsedTableData.rows) {
+        setTable1500Rows(parsedTableData.rows as Table1500Row[]);
+      } else if (tableType === '2100' && parsedTableData.data) {
+        setTable2100Data(parsedTableData.data as Table2100Data);
+      } else if (tableType === '2200' && parsedTableData.rows) {
+        setTable2200Rows(parsedTableData.rows as Table2200Row[]);
+      } else if (tableType === '2300' && parsedTableData.rows) {
+        setTable2300Rows(parsedTableData.rows as Table2300Row[]);
+      } else if (tableType === '1200-industrial' && parsedTableData.row) {
+        setTable1200IndustrialAccidentRow(parsedTableData.row as Table1200IndustrialAccidentRow);
+      } else if (tableType === '1200-near-miss' && parsedTableData.row) {
+        setTable1200NearMissRow(parsedTableData.row as Table1200NearMissRow);
+      } else if (tableType === '2400-tbm' && parsedTableData.data) {
+        setTable2400TBMData(parsedTableData.data as Table2400TBMData);
+      } else if (tableType === '2400-education') {
+        if (parsedTableData.rows) {
+          setTable2400EducationRows(parsedTableData.rows as Table2400EducationRow[]);
+        }
+        if (parsedTableData.minimumEducationRows) {
+          setTable2400MinimumEducationRows(parsedTableData.minimumEducationRows);
+        }
+      }
+    } else if (extractedInfo) {
+      // API 데이터가 없으면 목업 데이터 사용 (fallback)
       const tableData = getTableDataByDocument(
         extractedInfo.safetyIdx,
         extractedInfo.itemNumber,
@@ -468,7 +712,6 @@ export function Risk_2200EditView({
         } else if (tableData.type === '2300') {
           setTable2300Rows(tableData.rows as Table2300Row[]);
         } else if (tableData.type === '1200-industrial') {
-          // 1200-industrial은 rows 배열이지만 첫 번째 항목만 사용
           if (tableData.rows && tableData.rows.length > 0) {
             setTable1200IndustrialAccidentRow(tableData.rows[0]);
           }
@@ -484,7 +727,7 @@ export function Risk_2200EditView({
         }
       }
     }
-  }, [extractedInfo]);
+  }, [currentDocument, extractedInfo]);
 
   const handleRiskAssessmentSave = (data: RiskAssessmentData) => {
     setRiskAssessmentData(data);
@@ -951,53 +1194,164 @@ export function Risk_2200EditView({
     ]);
   }, []);
 
-  const handleSave = useCallback(() => {
-    // TODO: TanStack Query Hook(useMutation)으로 문서 수정
-    // const mutation = useMutation({
-    //   mutationFn: (formData: Risk2200UpdateParams) => updateRisk2200Document(risk_id!, formData),
-    //   onSuccess: () => {
-    //     queryClient.invalidateQueries({ queryKey: ['risk2200Documents'] });
-    //     // 상세 페이지로 이동
-    //   },
-    // });
-    let data;
-    if (is1100Series) {
-      data = { documentDate, approvalDeadline, rows: table1100Rows };
-    } else if (is1200IndustrialAccident) {
-      data = { documentDate, approvalDeadline, row: table1200IndustrialAccidentRow };
-    } else if (is1200NearMiss) {
-      data = { documentDate, approvalDeadline, row: table1200NearMissRow };
-    } else if (is1300Series) {
-      data = { documentDate, approvalDeadline, rows: table1300Rows };
-    } else if (is1400Series) {
-      data = { documentDate, approvalDeadline, data: table1400Data };
-    } else if (is1500Series) {
-      data = { documentDate, approvalDeadline, rows: table1500Rows };
-    } else if (is2100Series) {
-      data = { documentDate, approvalDeadline, data: table2100Data };
-    } else if (is2200Series) {
-      data = { documentDate, approvalDeadline, rows: table2200Rows };
-    } else if (is2300Series) {
-      data = { documentDate, approvalDeadline, rows: table2300Rows };
-    } else if (is2400TBM) {
-      data = { documentDate, approvalDeadline, data: table2400TBMData };
-    } else if (is2400Education) {
-      data = { documentDate, approvalDeadline, rows: table2400EducationRows };
-    } else {
-      data = { documentDate, approvalDeadline, rows: table1100Rows };
-    }
-    // mutation.mutate({ ...data, safetyIdx, itemNumber });
-    console.log('수정:', data);
-    if (safetyId && risk_id) {
-      navigate(`/dashboard/safety-system/${safetyId}/risk-2200`, {
-        state: { system, item },
+  // 문서 수정 Mutation
+  const updateDocumentMutation = useMutation({
+    mutationFn: ({ docIdx, params }: { docIdx: number; params: any }) =>
+      updateSafetySystemDocument(docIdx, params),
+    onSuccess: () => {
+      // 아이템 상세 정보 쿼리 무효화하여 문서 목록 갱신
+      if (item?.safetySystemItemIdx) {
+        queryClient.invalidateQueries({
+          queryKey: ['safety-system-item', item.safetySystemItemIdx],
+        });
+      }
+      // 리스트 페이지로 이동
+      if (safetyId) {
+        navigate(`/dashboard/safety-system/${safetyId}/risk-2200`, {
+          state: { system, item },
+        });
+      } else {
+        navigate(-1);
+      }
+    },
+    onError: (error: any) => {
+      const errorMessage =
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '문서 수정에 실패했습니다.';
+      console.error('문서 수정 실패:', errorMessage);
+      alert(errorMessage); // TODO: Snackbar로 교체
+    },
+  });
+
+  // 결재 대상자 등록 API Mutation
+  const createApprovalMutation = useMutation({
+    mutationFn: async ({
+      docIdx,
+      approvalTargetList,
+    }: {
+      docIdx: number;
+      approvalTargetList: Array<{
+        targetMemberIdx: number;
+        approvalStep: number;
+        approvalOrder?: number;
+      }>;
+    }) => {
+      await createDocumentApproval(docIdx, {
+        approvalType: 'sequential', // 순차 결재
+        approvalTargetList,
       });
-    } else {
-      navigate(-1);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['safety-system-item'] });
+    },
+    onError: (error: any) => {
+      enqueueSnackbar(error?.message || '결재 대상자 등록에 실패했습니다.', { variant: 'error' });
+    },
+  });
+
+  const handleSave = useCallback(async () => {
+    // 필수 값 검증
+    if (!safetySystemDocumentIdx) {
+      enqueueSnackbar('문서 ID가 없습니다.', { variant: 'error' });
+      return;
     }
+
+    // 현재 approvalStep 사용 (UI에서 변경된 값 반영)
+    const approvalStep = currentApprovalStep;
+
+    // 기존 approvalList 확인 (이미 등록된 대상자 필터링용)
+    const existingApprovalList = (currentDocument as any)?.approvalList || [];
+    const existingMemberIndices = new Set(
+      existingApprovalList.map((approval: any) => approval.targetMemberIdx)
+    );
+
+    // 결재 대상자 목록 구성 (memberIdx가 있고, 아직 등록되지 않은 서명만)
+    const approvalTargetList = approvalSignatures
+      .filter(
+        (sig) =>
+          sig.memberIdx !== undefined &&
+          !sig.documentApprovalIdx && // documentApprovalIdx가 없으면 새로 등록해야 함
+          !existingMemberIndices.has(sig.memberIdx!) // 기존 approvalList에 없으면 새로 등록해야 함
+      )
+      .map((sig) => {
+        // approvalStep 매핑: writer(2), reviewer(3), approver(1)
+        let step = 1; // 기본값: 승인
+        if (sig.type === 'writer') step = 2;
+        else if (sig.type === 'reviewer') step = 3;
+        else if (sig.type === 'approver') step = 1;
+
+        return {
+          targetMemberIdx: sig.memberIdx!,
+          approvalStep: step,
+        };
+      });
+
+    // 새로 등록할 결재 대상자가 있으면 등록 API 호출
+    if (approvalTargetList.length > 0) {
+      try {
+        await createApprovalMutation.mutateAsync({
+          docIdx: safetySystemDocumentIdx,
+          approvalTargetList,
+        });
+      } catch {
+        // 에러는 mutation의 onError에서 처리됨
+        return;
+      }
+    }
+
+    // 테이블 데이터 구성
+    let tableData: any;
+
+    if (is1100Series) {
+      tableData = { tableType: '1100', rows: table1100Rows };
+    } else if (is1200IndustrialAccident) {
+      tableData = { tableType: '1200-industrial', row: table1200IndustrialAccidentRow };
+    } else if (is1200NearMiss) {
+      tableData = { tableType: '1200-near-miss', row: table1200NearMissRow };
+    } else if (is1300Series) {
+      tableData = { tableType: '1300', rows: table1300Rows };
+    } else if (is1400Series) {
+      tableData = { tableType: '1400', data: table1400Data };
+    } else if (is1500Series) {
+      tableData = { tableType: '1500', rows: table1500Rows };
+    } else if (is2100Series) {
+      tableData = { tableType: '2100', data: table2100Data };
+    } else if (is2200Series) {
+      tableData = { tableType: '2200', rows: table2200Rows };
+    } else if (is2300Series) {
+      tableData = { tableType: '2300', rows: table2300Rows };
+    } else if (is2400TBM) {
+      tableData = { tableType: '2400-tbm', data: table2400TBMData };
+    } else if (is2400Education) {
+      tableData = {
+        tableType: '2400-education',
+        rows: table2400EducationRows,
+        minimumEducationRows: table2400MinimumEducationRows,
+      };
+    } else {
+      tableData = { tableType: '1100', rows: table1100Rows };
+    }
+
+    // API 요청 데이터 구성
+    const requestData = {
+      approvalDeadline: approvalDeadline ? approvalDeadline.format('YYYY-MM-DD') : undefined,
+      tableData: JSON.stringify(tableData),
+      approvalStep, // approvalStep 포함
+    };
+
+    updateDocumentMutation.mutate({
+      docIdx: safetySystemDocumentIdx,
+      params: requestData,
+    });
   }, [
-    documentDate,
+    safetySystemDocumentIdx,
+    approvalSignatures,
+    currentApprovalStep,
+    createApprovalMutation,
+    enqueueSnackbar,
     approvalDeadline,
+    currentDocument,
     table1100Rows,
     table1200IndustrialAccidentRow,
     table1200NearMissRow,
@@ -1009,6 +1363,7 @@ export function Risk_2200EditView({
     table2300Rows,
     table2400TBMData,
     table2400EducationRows,
+    table2400MinimumEducationRows,
     is1100Series,
     is1200IndustrialAccident,
     is1200NearMiss,
@@ -1020,11 +1375,7 @@ export function Risk_2200EditView({
     is2300Series,
     is2400TBM,
     is2400Education,
-    navigate,
-    safetyId,
-    risk_id,
-    system,
-    item,
+    updateDocumentMutation,
   ]);
 
   const handleTemporarySave = useCallback(() => {
@@ -1108,15 +1459,36 @@ export function Risk_2200EditView({
   }, []);
 
   const handleAddSignature = useCallback(() => {
-    const hasApprover = approvalSignatures.some((s) => s.type === 'approver');
+    const hasWriter = approvalSignatures.some((s) => s.type === 'writer');
     const hasReviewer = approvalSignatures.some((s) => s.type === 'reviewer');
+    const hasApprover = approvalSignatures.some((s) => s.type === 'approver');
 
-    if (!hasApprover) {
-      setApprovalSignatures([...approvalSignatures, { type: 'approver' }]);
-    } else if (!hasReviewer) {
-      setApprovalSignatures([...approvalSignatures, { type: 'reviewer' }]);
+    // approvalStep에 따라 다음 단계로 증가시키며 서명 추가
+    if (currentApprovalStep === 1) {
+      // 승인만 → 작성+승인: 작성자 추가
+      if (!hasWriter) {
+        setApprovalSignatures([...approvalSignatures, { type: 'writer' }]);
+      } else if (!hasApprover) {
+        setApprovalSignatures([...approvalSignatures, { type: 'approver' }]);
+      }
+    } else if (currentApprovalStep === 2) {
+      // 작성+승인 → 작성+검토+승인: 검토자 추가
+      if (!hasReviewer) {
+        setApprovalSignatures([...approvalSignatures, { type: 'reviewer' }]);
+      } else if (!hasApprover) {
+        setApprovalSignatures([...approvalSignatures, { type: 'approver' }]);
+      }
+    } else if (currentApprovalStep === 3) {
+      // 작성+검토+승인: 순서대로 추가
+      if (!hasWriter) {
+        setApprovalSignatures([...approvalSignatures, { type: 'writer' }]);
+      } else if (!hasReviewer) {
+        setApprovalSignatures([...approvalSignatures, { type: 'reviewer' }]);
+      } else if (!hasApprover) {
+        setApprovalSignatures([...approvalSignatures, { type: 'approver' }]);
+      }
     }
-  }, [approvalSignatures]);
+  }, [approvalSignatures, currentApprovalStep]);
 
   const ensureSignatureEntry = useCallback((type: ApprovalType) => {
     setApprovalSignatures((prev) => {
@@ -1154,27 +1526,25 @@ export function Risk_2200EditView({
   }, []);
 
   const handleApprovalMemberConfirm = useCallback(
-    (members: InvestigationTeamMember[]) => {
+    (memberIdx: number, memberName: string) => {
       if (!approvalMemberModal.type) {
         handleCloseApprovalMemberModal();
         return;
       }
-      const selectedMember = members[0];
-      if (selectedMember) {
-        const formattedDate = dayjs().format('YY. M. D');
-        setApprovalSignatures((prev) => {
-          const exists = prev.some((s) => s.type === approvalMemberModal.type);
-          const nextSignature = {
-            type: approvalMemberModal.type,
-            name: selectedMember.name,
-            date: formattedDate,
-          } as ApprovalSignature;
-          if (exists) {
-            return prev.map((s) => (s.type === approvalMemberModal.type ? nextSignature : s));
-          }
-          return [...prev, nextSignature];
-        });
-      }
+      const formattedDate = dayjs().format('YY. M. D');
+      setApprovalSignatures((prev) => {
+        const exists = prev.some((s) => s.type === approvalMemberModal.type);
+        const nextSignature = {
+          type: approvalMemberModal.type,
+          name: memberName,
+          date: formattedDate,
+          memberIdx,
+        } as ApprovalSignature;
+        if (exists) {
+          return prev.map((s) => (s.type === approvalMemberModal.type ? nextSignature : s));
+        }
+        return [...prev, nextSignature];
+      });
       handleCloseApprovalMemberModal();
     },
     [approvalMemberModal.type, handleCloseApprovalMemberModal]
@@ -1184,27 +1554,84 @@ export function Risk_2200EditView({
     setSignatureModal({ open: false, type: null });
   }, []);
 
+  // 결재 서명 등록 API Mutation
+  const addSignatureMutation = useMutation({
+    mutationFn: async ({ docIdx, signatureData }: { docIdx: number; signatureData: string }) => {
+      // base64 데이터 URL에서 실제 base64 부분만 추출
+      const base64Data = signatureData.includes(',') ? signatureData.split(',')[1] : signatureData;
+      await addApprovalSignature(docIdx, {
+        signatureData: base64Data,
+        approvalStatus: 'APPROVED',
+      });
+    },
+    onSuccess: () => {
+      enqueueSnackbar('서명이 등록되었습니다.', { variant: 'success' });
+      queryClient.invalidateQueries({ queryKey: ['safety-system-item'] });
+    },
+    onError: (error: any) => {
+      enqueueSnackbar(error?.message || '서명 등록에 실패했습니다.', { variant: 'error' });
+    },
+  });
+
   const handleSignatureConfirm = useCallback(
-    (signatureDataUrl: string) => {
-      if (!signatureModal.type) {
+    async (signatureDataUrl: string) => {
+      if (!signatureModal.type || !safetySystemDocumentIdx) {
         handleCloseSignatureModal();
         return;
       }
-      const formattedDate = dayjs().format('YY. M. D');
-      setApprovalSignatures((prev) =>
-        prev.map((signature) =>
-          signature.type === signatureModal.type
-            ? {
-                ...signature,
-                signature: signatureDataUrl,
-                date: formattedDate,
-              }
-            : signature
-        )
-      );
-      handleCloseSignatureModal();
+
+      try {
+        // base64 데이터를 File 객체로 변환
+        const base64Data = signatureDataUrl.includes(',')
+          ? signatureDataUrl.split(',')[1]
+          : signatureDataUrl;
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'image/png' });
+        const file = new File([blob], `signature_${signatureModal.type}_${Date.now()}.png`, {
+          type: 'image/png',
+        });
+
+        // 파일 업로드 API 호출
+        const uploadResponse = await uploadFile({ files: [file] });
+        // axios 인터셉터에서 평탄화되므로 직접 접근
+        // 실제 응답 구조: { files: [{ fileUrl: string, ... }], header: {...} }
+        const uploadedFiles = (uploadResponse as any).files || [];
+        const signatureUrl = uploadedFiles[0]?.fileUrl || (uploadResponse as any).fileUrls?.[0];
+
+        if (!signatureUrl) {
+          throw new Error('파일 업로드에 실패했습니다.');
+        }
+
+        // 서명 등록 API 호출 (업로드된 URL 전송)
+        await addSignatureMutation.mutateAsync({
+          docIdx: safetySystemDocumentIdx,
+          signatureData: signatureUrl,
+        });
+
+        // UI 업데이트 (URL 사용)
+        const formattedDate = dayjs().format('YY. M. D');
+        setApprovalSignatures((prev) =>
+          prev.map((signature) =>
+            signature.type === signatureModal.type
+              ? {
+                  ...signature,
+                  signature: signatureUrl, // 업로드된 URL 사용
+                  date: formattedDate,
+                }
+              : signature
+          )
+        );
+        handleCloseSignatureModal();
+      } catch (error: any) {
+        enqueueSnackbar(error?.message || '서명 등록에 실패했습니다.', { variant: 'error' });
+      }
     },
-    [handleCloseSignatureModal, signatureModal.type]
+    [handleCloseSignatureModal, signatureModal.type, safetySystemDocumentIdx, addSignatureMutation]
   );
 
   const activeSignature = signatureModal.type
@@ -1320,6 +1747,7 @@ export function Risk_2200EditView({
               {/* 결재란 */}
               <EditApprovalSection
                 signatures={approvalSignatures}
+                approvalStep={currentApprovalStep}
                 onAddSignature={handleAddSignature}
                 onRemoveSignature={handleRemoveSignature}
                 onSelectMember={handleOpenApprovalMemberModal}
@@ -1440,11 +1868,14 @@ export function Risk_2200EditView({
             initialData={riskAssessmentData}
           />
         )}
-        <InvestigationTeamSelectModal
-          open={approvalMemberModal.open}
-          onClose={handleCloseApprovalMemberModal}
-          onConfirm={handleApprovalMemberConfirm}
-        />
+        {approvalMemberModal.type && (
+          <SelectApprovalMemberModal
+            open={approvalMemberModal.open}
+            onClose={handleCloseApprovalMemberModal}
+            onConfirm={handleApprovalMemberConfirm}
+            approvalType={approvalMemberModal.type}
+          />
+        )}
         <SignatureModal
           open={signatureModal.open}
           onClose={handleCloseSignatureModal}

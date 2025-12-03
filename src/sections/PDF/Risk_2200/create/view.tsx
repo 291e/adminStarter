@@ -1,6 +1,7 @@
 import type { Theme, SxProps } from '@mui/material/styles';
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs, { type Dayjs } from 'dayjs';
 
 import Box from '@mui/material/Box';
@@ -9,8 +10,11 @@ import Typography from '@mui/material/Typography';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import type { SafetySystem, SafetySystemItem } from 'src/_mock/_safety-system';
+import type { SafetySystem } from 'src/_mock/_safety-system';
+import type { SafetySystemItem } from 'src/services/safety-system/safety-system.types';
 import { getTableDataByDocument, FIXED_MINIMUM_EDUCATION_ROWS } from 'src/_mock/_safety-system';
+import { createSafetySystemDocument } from 'src/services/safety-system/safety-system.service';
+import { useMyInfo } from 'src/sections/Chat/hooks/use-my-info';
 import type {
   Table1100Row,
   Table1200IndustrialAccidentRow,
@@ -151,6 +155,8 @@ const initialTable1400Data: Table1400Data = {
 export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx }: Props) {
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
+  const { data: myInfoData } = useMyInfo();
   const state = location.state as
     | {
         system: SafetySystem;
@@ -197,8 +203,8 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
       accidentTime: '',
       accidentLocation: '',
       accidentType: '',
-      investigationTeam: [],
-      humanDamage: [],
+      investigationTeam: [{ department: '', name: '' }],
+      humanDamage: [{ department: '', name: '', position: '', injury: '' }],
       materialDamage: '',
       accidentContent: '',
       riskAssessmentBefore: {
@@ -916,66 +922,111 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
     ]);
   }, []);
 
+  // 문서 등록 Mutation
+  const createDocumentMutation = useMutation({
+    mutationFn: createSafetySystemDocument,
+    onSuccess: () => {
+      // 아이템 상세 정보 쿼리 무효화하여 문서 목록 갱신
+      if (state?.item?.safetySystemItemIdx) {
+        queryClient.invalidateQueries({
+          queryKey: ['safety-system-item', state.item.safetySystemItemIdx],
+        });
+      }
+      // 리스트 페이지로 이동
+      if (safetyId) {
+        navigate(`/dashboard/safety-system/${safetyId}/risk-2200`, {
+          state: { system: state?.system, item: state?.item },
+        });
+      } else {
+        navigate(-1);
+      }
+    },
+    onError: (error: any) => {
+      const errorMessage =
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '문서 등록에 실패했습니다.';
+      console.error('문서 등록 실패:', errorMessage);
+      alert(errorMessage); // TODO: Snackbar로 교체
+    },
+  });
+
   const handleSave = useCallback(() => {
-    // TODO: TanStack Query Hook(useMutation)으로 문서 등록
-    // const mutation = useMutation({
-    //   mutationFn: (formData: Risk2200CreateParams) => createRisk2200Document(formData),
-    //   onSuccess: () => {
-    //     queryClient.invalidateQueries({ queryKey: ['risk2200Documents'] });
-    //     // 리스트 페이지로 이동
-    //   },
-    // });
-    // 등록 로직
-    let data;
+    // 필수 값 검증
+    if (!state?.item?.safetySystemItemIdx) {
+      alert('아이템 정보가 없습니다.'); // TODO: Snackbar로 교체
+      return;
+    }
+
+    // 테이블 데이터 구성 및 documentName 생성
+    let tableData: any;
+    let documentName: string;
+
+    // safetyIdx와 itemNumber로 문서명 생성 (예: "1-1 위험요인파악")
+    const documentPrefix = `${safetyIdx}-${itemNumber}`;
+
     if (is1100Series) {
-      data = { documentDate, approvalDeadline, rows: table1100Rows };
+      tableData = { tableType: '1100', rows: table1100Rows };
+      documentName = `${documentPrefix} 위험요인파악`;
     } else if (is1200IndustrialAccident) {
-      // TODO: TanStack Query Hook(useMutation)으로 이미지 업로드
-      // const imageUrls = await uploadImages(table1200IndustrialAccidentRow.investigationImages);
-      // data = {
-      //   documentDate,
-      //   approvalDeadline,
-      //   row: {
-      //     ...table1200IndustrialAccidentRow,
-      //     investigationImages: imageUrls,
-      //   },
-      // };
-      data = { documentDate, approvalDeadline, row: table1200IndustrialAccidentRow };
+      tableData = { tableType: '1200-industrial', row: table1200IndustrialAccidentRow };
+      documentName = `${documentPrefix} 산업재해 및 아차사고`;
     } else if (is1200NearMiss) {
-      // TODO: TanStack Query Hook(useMutation)으로 아차사고 이미지 업로드
-      data = { documentDate, approvalDeadline, row: table1200NearMissRow };
+      tableData = { tableType: '1200-near-miss', row: table1200NearMissRow };
+      documentName = `${documentPrefix} 산업재해 및 아차사고`;
     } else if (is1300Series) {
-      data = { documentDate, approvalDeadline, rows: table1300Rows };
+      tableData = { tableType: '1300', rows: table1300Rows };
+      documentName = `${documentPrefix} 위험 기계·기구·설비`;
     } else if (is1400Series) {
-      data = { documentDate, approvalDeadline, data: table1400Data };
+      tableData = { tableType: '1400', data: table1400Data };
+      documentName = `${documentPrefix} 유해인자`;
     } else if (is1500Series) {
-      data = { documentDate, approvalDeadline, rows: table1500Rows };
+      tableData = { tableType: '1500', rows: table1500Rows };
+      documentName = `${documentPrefix} 위험장소 및 작업형태별 위험요인`;
     } else if (is2100Series) {
-      data = { documentDate, approvalDeadline, data: table2100Data };
+      tableData = { tableType: '2100', data: table2100Data };
+      documentName = `${documentPrefix} 위험요인별 위험성 평가`;
     } else if (is2200Series) {
-      data = { documentDate, approvalDeadline, rows: table2200Rows };
+      tableData = { tableType: '2200', rows: table2200Rows };
+      documentName = `${documentPrefix} 위험요인 제거·대체 및 통제 등록`;
     } else if (is2300Series) {
-      data = { documentDate, approvalDeadline, rows: table2300Rows };
+      tableData = { tableType: '2300', rows: table2300Rows };
+      documentName = `${documentPrefix} 감소 대책 수립·이행`;
     } else if (is2400TBM) {
-      data = { documentDate, approvalDeadline, data: table2400TBMData };
+      tableData = { tableType: '2400-tbm', data: table2400TBMData };
+      documentName = `${documentPrefix} 교육훈련`;
     } else if (is2400Education) {
-      data = { documentDate, approvalDeadline, rows: table2400EducationRows };
+      tableData = {
+        tableType: '2400-education',
+        rows: table2400EducationRows,
+        minimumEducationRows: table2400MinimumEducationRows,
+      };
+      documentName = `${documentPrefix} 교육훈련`;
     } else {
-      data = { documentDate, approvalDeadline, rows: table1100Rows };
+      tableData = { tableType: '1100', rows: table1100Rows };
+      documentName = `${documentPrefix} ${state.item?.itemName || '문서'}`;
     }
-    // mutation.mutate({ ...data, safetyIdx, itemNumber });
-    console.log('등록:', data);
-    if (safetyId) {
-      // 리스트 페이지로 이동 시 system과 item 정보를 함께 전달하여 문서 타입별 필터링
-      navigate(`/dashboard/safety-system/${safetyId}/risk-2200`, {
-        state: { system: state?.system, item: state?.item },
-      });
-    } else {
-      navigate(-1);
-    }
+
+    // organizationName 가져오기 (memberCompanyInformation.companyName)
+    const organizationName =
+      (myInfoData as any)?.memberCompanyInformation?.companyName ||
+      (myInfoData as any)?.companyName ||
+      '이편한자동화기술'; // 기본값
+
+    // API 요청 데이터 구성
+    const requestData = {
+      safetySystemItemIdx: state.item.safetySystemItemIdx,
+      organizationName,
+      documentName,
+      tableData: JSON.stringify(tableData),
+      // approvalDeadline은 API 스펙에 없으므로 제외 (나중에 수정 API로 업데이트 가능)
+    };
+
+    createDocumentMutation.mutate(requestData);
   }, [
-    documentDate,
-    approvalDeadline,
+    state,
+    safetyIdx,
+    itemNumber,
     table1100Rows,
     table1200IndustrialAccidentRow,
     table1200NearMissRow,
@@ -987,6 +1038,7 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
     table2300Rows,
     table2400TBMData,
     table2400EducationRows,
+    table2400MinimumEducationRows,
     is1100Series,
     is1200IndustrialAccident,
     is1200NearMiss,
@@ -998,10 +1050,10 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
     is2300Series,
     is2400TBM,
     is2400Education,
-    navigate,
     safetyId,
-    state?.system,
-    state?.item,
+    navigate,
+    createDocumentMutation,
+    myInfoData,
   ]);
 
   const handleTemporarySave = useCallback(() => {

@@ -1,178 +1,163 @@
-// 채팅 API 타입 정의
-
 import type { BaseResponseDto } from '../common';
 
 // ----------------------------------------------------------------------
 
-// 채팅방 타입
-export type ChatRoomType = 'normal' | 'group' | 'chatbot' | 'emergency';
+export type ChatRoomType = 'NORMAL' | 'GROUP' | 'EMERGENCY' | 'CHATBOT';
 
-// 채팅방 정보
-export type ChatRoom = {
-  id: string;
+// 채팅방 정보 DTO
+export type ChatRoomDto = {
+  chatRoomIdx: number;
+  chatRoomId: string; // Firebase Realtime Database ID (UUID)
   name: string;
   type: ChatRoomType;
+  isGroup: number; // 0 or 1
+  createdAt?: string;
+  updatedAt?: string;
   lastMessage?: string;
-  lastMessageTime?: string;
+  lastMessageAt?: string;
+  lastSenderMemberIdx?: number;
   unreadCount?: number;
-  // ... 기타 필드
+  participants?: ChatParticipantDto[];
 };
 
-// 채팅방 목록 조회 요청 파라미터
+// 참가자 정보 DTO
+export type ChatParticipantDto = {
+  memberIdx: number;
+  name: string;
+  profileImage?: string;
+  unreadCount?: number;
+  joinedAt?: string | number;
+  lastSeen?: string | number;
+  online?: number;
+  customRoomName?: string; // 참가자별 커스텀 채팅방 이름
+  // 기타 필요한 필드
+};
+
+// ==========================================
+// API Request/Response Types
+// ==========================================
+
+// GET /safeyoui/api/chat/rooms
 export type GetChatRoomsParams = {
-  userId?: string;
-};
-
-// 채팅방 목록 조회 응답
-export type GetChatRoomsResponse = BaseResponseDto<{
-  rooms: ChatRoom[];
-}>;
-
-// 메시지 정보
-export type Message = {
-  id: string;
-  roomId: string;
-  senderId: string;
-  senderName: string;
-  content: string;
-  timestamp: string;
-  attachments?: string[];
-  // ... 기타 필드
-};
-
-// 메시지 목록 조회 요청 파라미터
-export type GetMessagesParams = {
-  roomId: string;
   page?: number;
   pageSize?: number;
 };
 
-// 메시지 목록 조회 응답
-export type GetMessagesResponse = BaseResponseDto<{
-  messages: Message[];
-  total: number;
+export type GetChatRoomsResponse = BaseResponseDto<{
+  chatRoomList: ChatRoomDto[];
+  totalCount: number;
 }>;
 
-// 참가자 정보
-export type Participant = {
-  id: string;
-  name: string;
-  email?: string;
-  avatar?: string;
-  // ... 기타 필드
-};
-
-// 채팅방 생성 요청
+// POST /safeyoui/api/chat/rooms
 export type CreateChatRoomParams = {
-  name: string;
-  memberIndexes?: number[];
+  memberIndexes: number[]; // 상대방 참가자 Index 배열
 };
 
-// 채팅방 생성 응답
 export type CreateChatRoomResponse = BaseResponseDto<{
+  chatRoomIdx: number;
   chatRoomId: string;
-  name: string;
 }>;
 
-// 채팅방 정보 조회 요청
+// GET /safeyoui/api/chat/rooms/{chatRoomIdx}
 export type GetChatRoomParams = {
-  chatRoomId: string;
+  chatRoomIdx: number;
 };
 
-// 채팅방 정보 조회 응답
-export type GetChatRoomResponse = BaseResponseDto<ChatRoom>;
+export type GetChatRoomResponse = BaseResponseDto<ChatRoomDto>;
 
-// 채팅방 이름 변경 요청
+// PUT /safeyoui/api/chat/rooms/{chatRoomIdx}
 export type UpdateChatRoomParams = {
-  chatRoomId: string;
+  chatRoomIdx: number;
   name: string;
 };
 
-// 채팅방 이름 변경 응답
-export type UpdateChatRoomResponse = BaseResponseDto<ChatRoom>;
+export type UpdateChatRoomResponse = BaseResponseDto<{
+  chatRoomIdx: number;
+  name: string;
+}>;
 
-// 참가자 목록 조회 요청 파라미터
+// GET /safeyoui/api/chat/rooms/{chatRoomIdx}/participants
 export type GetParticipantsParams = {
-  chatRoomId: string;
+  chatRoomIdx: number;
 };
 
-// 참가자 목록 조회 응답
 export type GetParticipantsResponse = BaseResponseDto<{
-  participants: Participant[];
+  participants: ChatParticipantDto[];
 }>;
 
-// 메시지 전송 요청 파라미터
-export type SendMessageParams = {
-  roomId: string;
-  content: string;
-  attachments?: string[];
-};
-
-// 메시지 전송 응답
-export type SendMessageResponse = BaseResponseDto<{
-  message: Message;
-}>;
-
-// 참가자 초대 요청 파라미터
+// POST /safeyoui/api/chat/rooms/{chatRoomIdx}/participants
 export type InviteParticipantsParams = {
-  chatRoomId: string;
+  chatRoomIdx: number;
   memberIndexes: number[];
 };
 
-// 참가자 초대 응답
-export type InviteParticipantsResponse = BaseResponseDto;
+export type InviteParticipantsResponse = BaseResponseDto<void>;
 
-// 참가자 내보내기 요청 파라미터
+// DELETE /safeyoui/api/chat/rooms/{chatRoomIdx}/participants
 export type RemoveParticipantsParams = {
-  chatRoomId: string;
+  chatRoomIdx: number;
   memberIndexes: number[];
 };
 
-// 참가자 내보내기 응답
-export type RemoveParticipantsResponse = BaseResponseDto;
+export type RemoveParticipantsResponse = BaseResponseDto<void>;
 
-// 응급 통계 정보
-export type EmergencyStats = {
-  month: number;
-  year: number;
-  count: number;
+// DELETE /safeyoui/api/chat/rooms/{chatRoomIdx}/leave
+export type LeaveChatRoomParams = {
+  chatRoomIdx: number;
 };
 
-// 메시지 백업 요청
+export type LeaveChatRoomResponse = BaseResponseDto<void>;
+
+// POST /safeyoui/api/chat/messages/backup
 export type BackupMessageParams = {
+  id: string; // Message UUID
   chatRoomId: string;
-  messageIds?: string[];
+  senderMemberIdx: number;
+  message: string;
+  messageType: string; // 'TEXT', 'IMAGE', 'FILE', 'SYSTEM'
+  signalType?: string | null;
+  attachments?: string[] | null;
+  timestamp: string;
 };
 
-// 공유 문서 채팅방 공유 요청
+export type BackupMessageResponse = BaseResponseDto<void>;
+
+// POST /safeyoui/api/chat/rooms/{chatRoomIdx}/share-document
 export type ShareDocumentParams = {
-  chatRoomId: string;
-  chatRoomIdList: string[];
+  chatRoomIdx: number;
+  documentId: string; // or relevant info
+  // 공유할 문서 정보 등 정의 필요. 현재는 swagger 기반 추론.
+  // swagger.json에 share-document body가 정의되어 있다면 확인 필요.
+  // 임시로 any로 두고 나중에 수정하거나 swagger 확인.
+  [key: string]: any;
 };
 
-// 마지막 읽은 시간 업데이트 요청
+export type ShareDocumentResponse = BaseResponseDto<void>;
+
+// PATCH /safeyoui/api/chat/rooms/{chatRoomIdx}/read
 export type UpdateLastReadAtParams = {
-  chatRoomId: string;
+  chatRoomIdx: number;
+  timestamp: string; // ISO string or timestamp string
 };
 
-// 안 읽은 메시지 수 조회 요청
+export type UpdateLastReadAtResponse = BaseResponseDto<void>;
+
+// GET /safeyoui/api/chat/rooms/{chatRoomIdx}/unread-count
 export type GetUnreadCountParams = {
-  chatRoomId: string;
+  chatRoomIdx: number;
 };
 
-// 안 읽은 메시지 수 조회 응답
 export type GetUnreadCountResponse = BaseResponseDto<{
   unreadCount: number;
 }>;
 
-// 응급 통계 조회 요청 파라미터
+// POST /safeyoui/api/chat/rooms/{chatRoomIdx}/statistics
 export type GetEmergencyStatisticsParams = {
-  chatRoomId: string;
+  chatRoomIdx: number;
   startDate?: string;
   endDate?: string;
 };
 
-// 응급 통계 조회 응답
 export type GetEmergencyStatisticsResponse = BaseResponseDto<{
   statistics: Array<{
     month: number;
@@ -181,40 +166,29 @@ export type GetEmergencyStatisticsResponse = BaseResponseDto<{
   }>;
 }>;
 
-// 기존 호환성을 위한 타입 (deprecated)
-export type GetEmergencyStatsParams = {
-  roomId: string;
+// GET /safeyoui/api/chat/rooms/{chatRoomIdx}/attachments
+export type GetAttachmentsParams = {
+  chatRoomIdx: number;
 };
-export type GetEmergencyStatsResponse = BaseResponseDto<EmergencyStats>;
 
-// 첨부 파일 정보
-export type Attachment = {
+export type ChatAttachmentDto = {
   id: string;
   name: string;
   url: string;
   type: string;
-  size: number;
-  // ... 기타 필드
+  createdAt: string;
 };
 
-// 첨부 파일 목록 조회 요청 파라미터
-export type GetAttachmentsParams = {
-  chatRoomId: string;
-};
-
-// 첨부 파일 목록 조회 응답
 export type GetAttachmentsResponse = BaseResponseDto<{
-  attachments: Attachment[];
+  attachments: ChatAttachmentDto[];
 }>;
 
-// 사고 발생 현황 채팅방 자동 생성/참가 요청
+// POST /safeyoui/api/chat/emergency-rooms/{companyIdx}/join
 export type CreateOrJoinEmergencyRoomParams = {
   companyIdx: number;
 };
 
-// 사고 발생 현황 채팅방 자동 생성/참가 응답
 export type CreateOrJoinEmergencyRoomResponse = BaseResponseDto<{
+  chatRoomIdx: number;
   chatRoomId: string;
-  name: string;
 }>;
-

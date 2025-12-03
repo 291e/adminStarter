@@ -8,21 +8,31 @@ type ChatMessage = {
   sender: string;
   message: string;
   timestamp: string;
+  dateLabel?: string;
+  avatarUrl?: string;
   isOwn?: boolean;
+  messageType?: 'TEXT' | 'IMAGE' | 'FILE' | 'SYSTEM';
+  sharedDocumentIdx?: number;
 };
 
 type Props = {
   messages: ChatMessage[];
+  conversationDate?: string;
   messageInput?: string;
   onMessageInputChange?: (value: string) => void;
   onSendMessage?: () => void;
+  roomId?: string | number;
+  onFileMessageClick?: (sharedDocumentIdx: number) => void;
 };
 
 export default function NormalChatView({
   messages,
+  conversationDate,
   messageInput,
   onMessageInputChange,
   onSendMessage,
+  roomId,
+  onFileMessageClick,
 }: Props) {
   return (
     <Box
@@ -36,7 +46,12 @@ export default function NormalChatView({
         minHeight: { xs: 400, lg: 500 },
       }}
     >
-      <MessageList messages={messages} />
+      <MessageList
+        messages={messages}
+        conversationDate={conversationDate}
+        roomId={roomId}
+        onFileMessageClick={onFileMessageClick}
+      />
       <ChatInput
         value={messageInput}
         onChange={onMessageInputChange}

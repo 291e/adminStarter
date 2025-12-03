@@ -21,7 +21,7 @@ import type {
   SharedDocument as ApiSharedDocument,
   PrioritySetting,
 } from 'src/services/dashboard/dashboard.types';
-import { PRIORITY_CONFIG, STATUS_CONFIG } from '../constants/priority';
+import { PRIORITY_CONFIG, STATUS_CONFIG, getPriorityLabel } from '../constants/priority';
 
 // ----------------------------------------------------------------------
 
@@ -108,7 +108,7 @@ export default function SharedDocumentTable({
               const bgColor = hexToRgba(colorHex, 0.16);
 
               priorityConfig = {
-                label: priorityInfo.labelType || '중요도',
+                label: getPriorityLabel(priorityInfo.labelType),
                 color: colorHex,
                 bgColor,
               };

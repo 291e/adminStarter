@@ -14,25 +14,11 @@ import { Iconify } from 'src/components/iconify';
 import { CustomPopover } from 'src/components/custom-popover';
 import RenameChatRoomModal from './RenameChatRoomModal';
 import LeaveChatRoomModal from './LeaveChatRoomModal';
-
-type ChatRoom = {
-  id: string;
-  name: string;
-  type?: 'chatbot' | 'emergency' | 'normal' | 'group';
-  isGroup?: boolean;
-  organizationName?: string;
-  members?: string[];
-};
-
-type Participant = {
-  name: string;
-  role?: string;
-  avatar?: string;
-};
+import type { ChatRoomDto, ChatParticipantDto } from 'src/services/chat/chat.types';
 
 type Props = {
-  room: ChatRoom;
-  participants?: Participant[];
+  room: ChatRoomDto;
+  participants?: ChatParticipantDto[];
   onRoomNameChange?: (newName: string) => void;
   onLeaveRoom?: () => void;
 };
@@ -80,12 +66,11 @@ export default function ChatHeader({
     handleCloseLeaveModal();
   };
 
-  const isGroupChat = room.isGroup || room.type === 'group';
-  const isChatbot = room.type === 'chatbot';
+  const isChatbot = room.type === 'CHATBOT';
 
   // Avatar 표시 로직
   const renderAvatar = () => {
-    if (room.type === 'emergency') {
+    if (room.type === 'EMERGENCY') {
       return (
         <Avatar
           sx={{
@@ -103,13 +88,21 @@ export default function ChatHeader({
     // 1명일 때: 단일 Avatar
     if (participants.length <= 1) {
       const participant = participants[0];
+      const displayName = participant?.name || room.name || '';
+      // 이름이 숫자 문자열이거나 유효하지 않으면 아이콘만 표시
+      const isValidName =
+        displayName && displayName.trim() !== '' && !/^\d+$/.test(displayName.trim());
+      const firstChar = isValidName ? displayName[0] : null;
+      const profileImage = participant?.profileImage;
+      const hasProfileImage = profileImage && profileImage.trim() !== '';
+
       return (
-        <Avatar sx={{ width: 40, height: 40 }}>
-          {participant?.avatar ? (
-            <img src={participant.avatar} alt={participant.name} />
-          ) : (
-            participant?.name?.[0] || room.name[0]
-          )}
+        <Avatar
+          sx={{ width: 40, height: 40 }}
+          src={hasProfileImage ? profileImage : undefined}
+          alt={participant?.name || room.name}
+        >
+          {!hasProfileImage && (firstChar || <Iconify icon="solar:user-rounded-bold" width={24} />)}
         </Avatar>
       );
     }
@@ -145,27 +138,36 @@ export default function ChatHeader({
             overflow: 'visible',
           }}
         >
-          {displayParticipants.map((participant, index) => (
-            <Avatar
-              key={participant.name || index}
-              sx={{
-                width: 32,
-                height: 32,
-                border: '2px solid',
-                borderColor: 'background.paper',
-                position: 'relative',
-                zIndex: displayParticipants.length - index,
-                marginRight: index < displayParticipants.length - 1 ? '-12px' : 0,
-                flexShrink: 0,
-              }}
-            >
-              {participant.avatar ? (
-                <img src={participant.avatar} alt={participant.name} />
-              ) : (
-                participant.name?.[0] || ''
-              )}
-            </Avatar>
-          ))}
+          {displayParticipants.map((participant, index) => {
+            // 이름이 숫자 문자열이거나 유효하지 않으면 아이콘만 표시
+            const isValidName =
+              participant.name &&
+              participant.name.trim() !== '' &&
+              !/^\d+$/.test(participant.name.trim());
+            const firstChar = isValidName ? participant.name[0] : null;
+            const profileImage = participant.profileImage;
+            const hasProfileImage = profileImage && profileImage.trim() !== '';
+            return (
+              <Avatar
+                key={participant.name || index}
+                src={hasProfileImage ? profileImage : undefined}
+                alt={participant.name || ''}
+                sx={{
+                  width: 32,
+                  height: 32,
+                  border: '2px solid',
+                  borderColor: 'background.paper',
+                  position: 'relative',
+                  zIndex: displayParticipants.length - index,
+                  marginRight: index < displayParticipants.length - 1 ? '-12px' : 0,
+                  flexShrink: 0,
+                }}
+              >
+                {!hasProfileImage &&
+                  (firstChar || <Iconify icon="solar:user-rounded-bold" width={20} />)}
+              </Avatar>
+            );
+          })}
           {remainingCount > 0 && (
             <Avatar
               sx={{
@@ -213,7 +215,7 @@ export default function ChatHeader({
             <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
               {room.name}
             </Typography>
-            {isGroupChat && (
+            {!isChatbot && room.type !== 'EMERGENCY' && (
               <IconButton
                 size="small"
                 onClick={handleOpenRenameModal}
@@ -231,11 +233,11 @@ export default function ChatHeader({
             )}
           </Stack>
           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            {room.type === 'emergency' ? room.organizationName || '이편한자동화기술 물류팀' : ''}
+            {room.type === 'EMERGENCY' ? room.name || '이편한자동화기술 물류팀' : ''}
           </Typography>
         </Box>
       </Stack>
-      {room.type !== 'emergency' && !isChatbot && (
+      {room.type !== 'EMERGENCY' && !isChatbot && (
         <>
           <IconButton size="small" onClick={onOpen}>
             <Iconify icon="eva:more-vertical-fill" width={20} />
@@ -256,7 +258,7 @@ export default function ChatHeader({
       )}
 
       {/* 채팅방 이름 변경 모달 */}
-      {isGroupChat && (
+      {!isChatbot && room.type !== 'EMERGENCY' && (
         <RenameChatRoomModal
           open={renameModalOpen}
           onClose={handleCloseRenameModal}

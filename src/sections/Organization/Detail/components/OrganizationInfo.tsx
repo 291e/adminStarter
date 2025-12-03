@@ -149,13 +149,6 @@ export default function OrganizationInfo({
         division: orgData.companyType || '', // 구분 (OPERATOR, MEMBER 등)
       };
 
-      if (import.meta.env.DEV) {
-        console.log('🔄 [OrganizationInfo] formData 초기화', {
-          orgData,
-          newFormData,
-        });
-      }
-
       setFormData(newFormData);
     }
   }, [orgData]);

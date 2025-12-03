@@ -23,9 +23,7 @@ const RiskReportPage = lazy(() => import('src/pages/dashboard/operation/riskRepo
 const RiskReportCreatePage = lazy(
   () => import('src/pages/dashboard/operation/riskReport/create/page')
 );
-const RiskReportEditPage = lazy(
-  () => import('src/pages/dashboard/operation/riskReport/edit/page')
-);
+const RiskReportEditPage = lazy(() => import('src/pages/dashboard/operation/riskReport/edit/page'));
 const SafetyReportPage = lazy(() => import('src/pages/dashboard/operation/safetyReport/page'));
 const EducationReportPage = lazy(
   () => import('src/pages/dashboard/operation/educationReport/page')
@@ -53,6 +51,9 @@ const CodeSettingPage = lazy(() => import('src/pages/dashboard/systemSetting/cod
 const ApiSettingPage = lazy(() => import('src/pages/dashboard/systemSetting/apiSetting/page'));
 const IndustryChecklistSettingPage = lazy(
   () => import('src/pages/dashboard/systemSetting/industryChecklist/page')
+);
+const DocumentSettingPage = lazy(
+  () => import('src/pages/dashboard/systemSetting/documentSetting/page')
 );
 // ----------------------------------------------------------------------
 
@@ -131,6 +132,7 @@ export const dashboardRoutes: RouteObject[] = [
           { path: 'code-setting', element: <CodeSettingPage /> },
           { path: 'api-setting', element: <ApiSettingPage /> },
           { path: 'industry-checklist-setting', element: <IndustryChecklistSettingPage /> },
+          { path: 'document-setting', element: <DocumentSettingPage /> },
         ],
       },
     ],

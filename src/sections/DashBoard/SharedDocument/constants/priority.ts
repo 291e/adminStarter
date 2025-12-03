@@ -1,6 +1,29 @@
 // ----------------------------------------------------------------------
 
 /**
+ * 중요도 labelType을 한글로 변환
+ * @param labelType - 중요도 labelType (예: 'urgent', 'important', 'normal', 'reference', 'custom' 또는 한글 문자열)
+ * @param fallback - labelType이 없을 때 사용할 기본값
+ * @returns 한글로 변환된 중요도 라벨
+ */
+export function getPriorityLabel(labelType: string | null | undefined, fallback?: string): string {
+  if (!labelType) {
+    return fallback || '중요도';
+  }
+
+  const labelTypeMap: Record<string, string> = {
+    urgent: '긴급',
+    important: '중요',
+    normal: '보통',
+    reference: '참고',
+    custom: labelType, // custom인 경우 labelType 자체를 사용 (이미 한글일 수 있음)
+  };
+
+  // labelType이 맵핑에 있으면 한글 변환, 없으면 원본 사용 (이미 한글일 수 있음)
+  return labelTypeMap[labelType.toLowerCase()] || labelType;
+}
+
+/**
  * 중요도 설정 (기본값, PRIORITY_CONFIG에 없는 경우 사용)
  */
 export const PRIORITY_CONFIG: Record<string, { label: string; color: string; bgColor: string }> = {

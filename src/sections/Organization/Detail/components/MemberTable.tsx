@@ -46,33 +46,33 @@ const getRoleLabel = (memberRole: string): string => {
   return roleMap[roleUpper] || roleMap[memberRole] || memberRole;
 };
 
-// 직종 매핑 함수 (실제로는 멤버 데이터에 직종 정보가 있어야 함)
+// 직종 매핑 함수
 const getJobType = (member: Member): string => {
-  // 임시로 랜덤하게 반환 (실제로는 멤버 데이터에 직종 필드가 있어야 함)
-  const jobTypes = ['생산직', '사무직', '관리직'];
-  return jobTypes[member.memberIdx % jobTypes.length];
+  if (!member.workType) return '-';
+  const workTypeMap: { [key: string]: string } = {
+    PRODUCTION: '생산직',
+    OFFICE: '사무직',
+  };
+  return workTypeMap[member.workType] || member.workType;
 };
 
-// 국적 매핑 함수 (실제로는 멤버 데이터에 국적 정보가 있어야 함)
+// 국적 매핑 함수
 const getNationality = (member: Member): string => {
-  // 임시로 랜덤하게 반환 (실제로는 멤버 데이터에 국적 필드가 있어야 함)
-  const nationalities = ['대한민국', '우즈베키스탄', '베트남', '필리핀'];
-  return nationalities[member.memberIdx % nationalities.length];
+  const nationalityMap: { [key: string]: string } = {
+    ko: '대한민국',
+    zh: '중국',
+    vi: '베트남',
+    en: '영어',
+    ne: '네팔',
+  };
+  return nationalityMap[member.memberLang] || member.memberLang || '-';
 };
 
-// 직급 매핑 함수 (실제로는 멤버 데이터에 직급 정보가 있어야 함)
-const getPosition = (member: Member): string => {
-  // 임시로 랜덤하게 반환 (실제로는 멤버 데이터에 직급 필드가 있어야 함)
-  const positions = ['과장', '팀장', '사원', '부장', '인턴'];
-  return positions[member.memberIdx % positions.length];
-};
+// 직급 매핑 함수
+const getPosition = (member: Member): string => member.position || '-';
 
-// 소속 매핑 함수 (실제로는 멤버 데이터에 소속 정보가 있어야 함)
-const getDepartment = (member: Member): string => {
-  // 임시로 랜덤하게 반환 (실제로는 멤버 데이터에 소속 필드가 있어야 함)
-  const departments = ['생산 1팀', '생산 2팀', '관리팀', '안전팀'];
-  return departments[member.memberIdx % departments.length];
-};
+// 소속 매핑 함수
+const getDepartment = (member: Member): string => member.department || '-';
 
 export default function MemberTable({ organizationId, rows: initialRows, onEdit }: Props) {
   // TODO: TanStack Query Hook(useQuery)으로 조직원 초대로 초대받아 회원가입한 멤버 목록 조회
@@ -116,7 +116,7 @@ export default function MemberTable({ organizationId, rows: initialRows, onEdit 
               상태
             </TableCell>
             <TableCell align="center" sx={{ bgcolor: 'grey.100', minWidth: 68 }}>
-              액션
+              &nbsp;
             </TableCell>
           </TableRow>
         </TableHead>

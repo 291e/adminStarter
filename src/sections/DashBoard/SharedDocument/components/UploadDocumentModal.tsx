@@ -18,6 +18,7 @@ import Button from '@mui/material/Button';
 import { Iconify } from 'src/components/iconify';
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
 import { COLOR_VALUES } from '../constants/colors';
+import { getPriorityLabel } from '../constants/priority';
 
 // ----------------------------------------------------------------------
 
@@ -225,7 +226,7 @@ export default function UploadDocumentModal({ open, onClose, onSave, priorities 
                 </MenuItem>
                 {priorities.map((priority) => {
                   // labelType을 우선적으로 사용, 없으면 label 사용
-                  const displayLabel = priority.labelType || priority.label || '중요도';
+                  const displayLabel = getPriorityLabel(priority.labelType || priority.label);
                   // color가 HEX 코드인 경우 그대로 사용, 아니면 COLOR_VALUES에서 찾기
                   const colorHex = priority.color.startsWith('#')
                     ? priority.color

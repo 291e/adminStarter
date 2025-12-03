@@ -9,15 +9,11 @@ import IconButton from '@mui/material/IconButton';
 
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
-
-type Attachment = {
-  name: string;
-  type: 'image' | 'pdf' | 'txt' | string;
-  date: string;
-};
+import { fDate } from 'src/utils/format-time';
+import type { ChatAttachmentDto } from 'src/services/chat/chat.types';
 
 type Props = {
-  attachments: Attachment[];
+  attachments: ChatAttachmentDto[];
 };
 
 export default function AttachmentList({ attachments }: Props) {
@@ -90,7 +86,7 @@ export default function AttachmentList({ attachments }: Props) {
                       {file.name}
                     </Typography>
                     <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                      {file.date}
+                      {file.createdAt ? fDate(file.createdAt, 'YYYY년 M월 D일') : ''}
                     </Typography>
                   </Box>
                 </Stack>

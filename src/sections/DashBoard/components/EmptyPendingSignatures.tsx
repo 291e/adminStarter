@@ -3,7 +3,7 @@ import type { BoxProps } from '@mui/material/Box';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 
-import { MotivationIllustration } from 'src/assets/illustrations';
+import UploadIllustration from 'src/assets/illustrations/upload-illustration';
 
 // ----------------------------------------------------------------------
 
@@ -27,7 +27,7 @@ export default function EmptyPendingSignatures({ sx, ...other }: EmptyPendingSig
       ]}
       {...other}
     >
-      <MotivationIllustration sx={{ width: 240, maxWidth: '100%' }} />
+      <UploadIllustration sx={{ width: 240, maxWidth: '100%' }} />
 
       <Box>
         <Typography variant="h6" sx={{ mb: 0.5 }}>

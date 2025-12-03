@@ -6,24 +6,27 @@ import dayjs from 'dayjs';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Divider from '@mui/material/Divider';
+import CircularProgress from '@mui/material/CircularProgress';
 
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useNavigate } from 'react-router';
-import type { SafetySystem, SafetySystemItem } from 'src/_mock/_safety-system';
+import { useQuery } from '@tanstack/react-query';
+import { getSafetySystemItem } from 'src/services/safety-system/safety-system.service';
+import type {
+  SafetySystem,
+  SafetySystemItem,
+} from 'src/services/safety-system/safety-system.types';
 
 import Risk_2200Breadcrumbs from './components/Breadcrumbs';
 import Risk_2200Filters from './components/Filters';
-import Risk_2200Table from './components/Table';
+import Risk_2200Table, { type Risk_2200Row } from './components/Table';
 import Risk_2200Pagination from './components/Pagination';
 import RiskAssessmentSettingModal, {
   type RiskAssessmentData,
 } from './components/RiskAssessmentSettingModal';
+import PDFDownloadModal from './components/PDFDownloadModal';
 import { useRisk_2200 } from './hooks/use-risk-2200';
-import {
-  mockSafetySystemDocuments,
-  getDocumentsByItem,
-  getTableDataByDocument,
-} from 'src/_mock/_safety-system';
+import { getTableDataByDocument } from 'src/_mock/_safety-system';
 import { downloadDocumentPDF } from './utils/download-pdf';
 
 // ----------------------------------------------------------------------
@@ -42,51 +45,86 @@ export function Risk_2200View({ safetyId, title = 'Blank', description, sx }: Pr
     | { system: SafetySystem; item?: SafetySystemItem; isGuide?: boolean }
     | undefined;
   const [riskAssessmentModalOpen, setRiskAssessmentModalOpen] = useState(false);
+  const [pdfDownloadModalOpen, setPdfDownloadModalOpen] = useState(false);
 
-  // TODO: TanStack Query Hook(useQuery)으로 문서 목록 가져오기
-  // const { data: documents, isLoading } = useQuery({
-  //   queryKey: ['risk2200Documents', state?.system?.safetyIdx, state?.item?.itemNumber, logic.filterType, logic.searchField, logic.searchValue],
-  //   queryFn: () => getRisk2200Documents({
-  //     safetyIdx: state?.system?.safetyIdx,
-  //     itemNumber: state?.item?.itemNumber,
-  //     filterType: logic.filterType,
-  //     searchField: logic.searchField,
-  //     searchValue: logic.searchValue,
-  //     page: logic.page,
-  //     pageSize: logic.rowsPerPage,
-  //   }),
-  // });
-  // 목업 데이터 사용
-  const adapt = (docs: ReturnType<typeof getDocumentsByItem>) =>
-    docs.map((d, index) => ({
-      id: `${d.safetyIdx}-${d.itemNumber}-${String(d.documentNumber).padStart(3, '0')}`,
-      sequence: d.sequence,
-      registeredAt: d.registeredAt,
-      registeredTime: d.registeredTime,
-      organizationName: d.organizationName,
-      documentName: d.documentName,
-      writtenAt: d.writtenAt,
-      approvalDeadline: d.approvalDeadline,
-      completionRate: d.completionRate,
-      // TODO: API에서 상태와 게시 여부 가져오기
-      status: (['draft', 'in_progress', 'completed'] as const)[index % 3],
-      published: index % 2 === 0,
-    }));
+  // 아이템 상세 정보 조회 (문서 목록 포함)
+  const { data: itemDetailResponse, isLoading: isItemLoading } = useQuery({
+    queryKey: ['safety-system-item', state?.item?.safetySystemItemIdx],
+    queryFn: async () => {
+      if (!state?.item?.safetySystemItemIdx) {
+        return null;
+      }
+      try {
+        const response = await getSafetySystemItem(state.item.safetySystemItemIdx);
 
-  const rows = state?.item
-    ? adapt(getDocumentsByItem(state.system.safetyIdx, state.item.itemNumber))
-    : adapt(mockSafetySystemDocuments.slice(0, 20) as any);
+        // axios 인터셉터에서 body.data를 평탄화하므로
+        // BaseResponseDto<{ item: SafetySystemItem, documentList: SafetySystemDocument[] }> 구조에서
+        // 인터셉터를 거치면 { item: SafetySystemItem, documentList: SafetySystemDocument[], header: ... } 형태가 됨
+        const item =
+          (response as any).item ||
+          (response as any).body?.data?.item ||
+          (response as any).body?.item;
+        const documentList =
+          (response as any).documentList ||
+          (response as any).body?.data?.documentList ||
+          (response as any).body?.documentList ||
+          [];
+
+        // item과 documentList를 합쳐서 반환
+        if (!item) return null;
+
+        return {
+          ...item,
+          documentList, // documentList를 item에 포함
+        } as SafetySystemItem;
+      } catch (error) {
+        console.error('아이템 상세 정보 조회 실패:', error);
+        return null;
+      }
+    },
+    enabled: !!state?.item?.safetySystemItemIdx,
+  });
+
+  // itemDetail을 itemDetailResponse로 변경
+  const itemDetail = itemDetailResponse;
+
+  // 문서 목록을 UI 구조에 맞게 변환
+  const adapt = (docs: SafetySystemItem['documentList']): Risk_2200Row[] => {
+    if (!docs) return [];
+    return docs.map((doc, index): Risk_2200Row => {
+      const createAtStr =
+        typeof doc.createAt === 'string' ? doc.createAt : new Date(doc.createAt).toISOString();
+      const updateAtStr =
+        typeof doc.updateAt === 'string' ? doc.updateAt : new Date(doc.updateAt).toISOString();
+
+      return {
+        ...doc, // SafetySystemDocument의 모든 필드 포함
+        id: `${doc.safetySystemDocumentIdx}`,
+        sequence: index + 1,
+        registeredAt: createAtStr.split('T')[0],
+        registeredTime: createAtStr.split('T')[1]?.split('.')[0] || '',
+        writtenAt: updateAtStr.split('T')[0], // 작성일 (updateAt)
+        published: doc.isPublished === 1,
+        // approvalProgress와 signatureList는 doc에서 직접 가져옴 (이미 SafetySystemDocument에 포함됨)
+      };
+    });
+  };
+
+  // 아이템 상세 정보에서 문서 목록 가져오기
+  const documentList = itemDetail?.documentList || state?.item?.documentList || [];
+  const rows = adapt(documentList);
   const logic = useRisk_2200(rows);
 
   // 제목/브레드크럼 텍스트 계산
-  const computedTitle = state?.item?.documentName || state?.system?.systemName || title;
+  const computedTitle =
+    state?.item?.itemName || state?.item?.documentName || state?.system?.systemName || title;
   const breadcrumbItems = state
     ? [
-        { label: '대시보드', href: '/' },
-        { label: '안전보건체계 관리', href: '/dashboard/safety-system' },
+        { label: '대시보드', href: '/admin/dashboard' },
+        { label: '안전보건체계 관리', href: '/admin/dashboard/safety-system' },
         { label: computedTitle },
       ]
-    : [{ label: '대시보드', href: '/' }, { label: title }];
+    : [{ label: '대시보드', href: '/admin/dashboard' }, { label: title }];
 
   const handleCreate = () => {
     if (safetyId) {
@@ -157,18 +195,15 @@ export function Risk_2200View({ safetyId, title = 'Blank', description, sx }: Pr
     console.log('삭제:', id);
   };
 
-  const handleDownloadPDF = async (id: string) => {
+  const handleDownloadPDF = async (id: string, safetySystemItemIdx?: number) => {
     if (safetyId) {
+      setPdfDownloadModalOpen(true);
       try {
-        // TODO: TanStack Query Hook(useQuery)으로 문서 상세 정보 가져오기 (PDF 다운로드용)
-        // const { data: documentDetail } = useQuery({
-        //   queryKey: ['risk2200DocumentDetail', id],
-        //   queryFn: () => getRisk2200DocumentDetail(id),
-        //   enabled: !!id,
-        // });
-        await downloadDocumentPDF(id, safetyId);
+        await downloadDocumentPDF(id, safetyId, safetySystemItemIdx);
       } catch (error) {
         console.error('PDF 다운로드 실패:', error);
+      } finally {
+        setPdfDownloadModalOpen(false);
       }
     }
   };
@@ -304,72 +339,78 @@ export function Risk_2200View({ safetyId, title = 'Blank', description, sx }: Pr
       />
 
       <Box sx={[(theme) => ({ mt: 2, width: 1 }), ...(Array.isArray(sx) ? sx : [sx])]}>
-        <Box
-          sx={{
-            bgcolor: 'background.paper',
-            borderRadius: 2,
-            boxShadow: 3,
-            width: '100%',
-            mt: 2,
-          }}
-        >
-          <Risk_2200Filters
-            dateFilterType={logic.dateFilterType}
-            startDate={logic.startDate ? dayjs(logic.startDate) : null}
-            endDate={logic.endDate ? dayjs(logic.endDate) : null}
-            searchValue={logic.searchValue}
-            onChangeDateFilterType={(value) => {
-              logic.onChangeDateFilterType(value);
-              // TODO: 검색일 구분 변경 시 TanStack Query로 문서 목록 새로고침
-              // queryClient.invalidateQueries({ queryKey: ['risk2200Documents'] });
+        {isItemLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <Box
+            sx={{
+              bgcolor: 'background.paper',
+              borderRadius: 2,
+              boxShadow: 3,
+              width: '100%',
+              mt: 2,
             }}
-            onChangeStartDate={(date) => {
-              logic.onChangeStartDate(date);
-              // TODO: 시작일 변경 시 TanStack Query로 문서 목록 새로고침
-              // queryClient.invalidateQueries({ queryKey: ['risk2200Documents'] });
-            }}
-            onChangeEndDate={(date) => {
-              logic.onChangeEndDate(date);
-              // TODO: 종료일 변경 시 TanStack Query로 문서 목록 새로고침
-              // queryClient.invalidateQueries({ queryKey: ['risk2200Documents'] });
-            }}
-            onChangeSearchValue={(value) => {
-              logic.onChangeSearchValue(value);
-              // TODO: 검색어 변경 시 TanStack Query로 문서 목록 새로고침
-              // queryClient.invalidateQueries({ queryKey: ['risk2200Documents'] });
-            }}
-          />
+          >
+            <Risk_2200Filters
+              dateFilterType={logic.dateFilterType}
+              startDate={logic.startDate ? dayjs(logic.startDate) : null}
+              endDate={logic.endDate ? dayjs(logic.endDate) : null}
+              searchValue={logic.searchValue}
+              onChangeDateFilterType={(value) => {
+                logic.onChangeDateFilterType(value);
+                // TODO: 검색일 구분 변경 시 TanStack Query로 문서 목록 새로고침
+                // queryClient.invalidateQueries({ queryKey: ['risk2200Documents'] });
+              }}
+              onChangeStartDate={(date) => {
+                logic.onChangeStartDate(date);
+                // TODO: 시작일 변경 시 TanStack Query로 문서 목록 새로고침
+                // queryClient.invalidateQueries({ queryKey: ['risk2200Documents'] });
+              }}
+              onChangeEndDate={(date) => {
+                logic.onChangeEndDate(date);
+                // TODO: 종료일 변경 시 TanStack Query로 문서 목록 새로고침
+                // queryClient.invalidateQueries({ queryKey: ['risk2200Documents'] });
+              }}
+              onChangeSearchValue={(value) => {
+                logic.onChangeSearchValue(value);
+                // TODO: 검색어 변경 시 TanStack Query로 문서 목록 새로고침
+                // queryClient.invalidateQueries({ queryKey: ['risk2200Documents'] });
+              }}
+            />
 
-          <Risk_2200Table
-            rows={logic.filtered}
-            selectedIds={logic.selectedIds}
-            onSelectAll={logic.onSelectAll}
-            onSelectRow={logic.onSelectRow}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            onDownloadPDF={handleDownloadPDF}
-            onCopy={handleCopy}
-            onTogglePublish={handleTogglePublish}
-          />
+            <Risk_2200Table
+              rows={logic.filtered}
+              selectedIds={logic.selectedIds}
+              onSelectAll={logic.onSelectAll}
+              onSelectRow={logic.onSelectRow}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              onDownloadPDF={handleDownloadPDF}
+              onCopy={handleCopy}
+              onTogglePublish={handleTogglePublish}
+            />
 
-          <Divider sx={{ mt: 2, mb: 1 }} />
+            <Divider sx={{ mt: 2, mb: 1 }} />
 
-          <Risk_2200Pagination
-            count={logic.total}
-            page={logic.page}
-            rowsPerPage={logic.rowsPerPage}
-            onChangePage={(page) => {
-              logic.onChangePage(page);
-              // TODO: 페이지 변경 시 TanStack Query로 문서 목록 새로고침
-              // queryClient.invalidateQueries({ queryKey: ['risk2200Documents'] });
-            }}
-            onChangeRowsPerPage={(rowsPerPage) => {
-              logic.onChangeRowsPerPage(rowsPerPage);
-              // TODO: 페이지 크기 변경 시 TanStack Query로 문서 목록 새로고침
-              // queryClient.invalidateQueries({ queryKey: ['risk2200Documents'] });
-            }}
-          />
-        </Box>
+            <Risk_2200Pagination
+              count={logic.total}
+              page={logic.page}
+              rowsPerPage={logic.rowsPerPage}
+              onChangePage={(page) => {
+                logic.onChangePage(page);
+                // TODO: 페이지 변경 시 TanStack Query로 문서 목록 새로고침
+                // queryClient.invalidateQueries({ queryKey: ['risk2200Documents'] });
+              }}
+              onChangeRowsPerPage={(rowsPerPage) => {
+                logic.onChangeRowsPerPage(rowsPerPage);
+                // TODO: 페이지 크기 변경 시 TanStack Query로 문서 목록 새로고침
+                // queryClient.invalidateQueries({ queryKey: ['risk2200Documents'] });
+              }}
+            />
+          </Box>
+        )}
       </Box>
 
       {/* 위험성 평가 설정 모달 */}
@@ -378,6 +419,9 @@ export function Risk_2200View({ safetyId, title = 'Blank', description, sx }: Pr
         onClose={() => setRiskAssessmentModalOpen(false)}
         onSave={handleRiskAssessmentSave}
       />
+
+      {/* PDF 다운로드 로딩 모달 */}
+      <PDFDownloadModal open={pdfDownloadModalOpen} />
     </DashboardContent>
   );
 }

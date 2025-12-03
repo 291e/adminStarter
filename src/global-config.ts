@@ -20,6 +20,7 @@ export type ConfigValue = {
     apiKey: string;
     projectId: string;
     authDomain: string;
+    databaseURL: string;
     storageBucket: string;
     measurementId: string;
     messagingSenderId: string;
@@ -32,7 +33,7 @@ export type ConfigValue = {
 // ----------------------------------------------------------------------
 
 export const CONFIG: ConfigValue = {
-  appName: 'Minimal UI',
+  appName: '안전해유 어드민',
   appVersion: packageJson.version,
   serverUrl: import.meta.env.VITE_SERVER_URL ?? '',
   assetsDir: import.meta.env.VITE_ASSETS_DIR ?? '',
@@ -56,6 +57,7 @@ export const CONFIG: ConfigValue = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY ?? '',
     authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ?? '',
     projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID ?? '',
+    databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL ?? '',
     storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ?? '',
     messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID ?? '',
     appId: import.meta.env.VITE_FIREBASE_APPID ?? '',

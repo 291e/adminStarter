@@ -29,12 +29,12 @@ const axiosInstance = axios.create({
 axiosInstance.interceptors.request.use(
   (config) => {
     // 토큰 추가
-  const token = localStorage.getItem('accessToken');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
 
-  return config;
+    return config;
   },
   (error) => {
     console.error('❌ Request Error:', error);
@@ -65,9 +65,6 @@ axiosInstance.interceptors.response.use(
     // 디버깅: 성공 응답 로그
     if (import.meta.env.DEV) {
       console.log('✅ API Response:', {
-        method: response.config.method?.toUpperCase(),
-        url: response.config.url,
-        status: response.status,
         data: response.data,
       });
     }
@@ -153,6 +150,7 @@ export const endpoints = {
     cards: '/companies',
     accidentFree: '/companies',
     invite: '/companies',
+    inviteVerify: '/companies/invite/verify',
     inviteAccept: '/companies/invite/accept',
     members: '/companies',
   },
@@ -203,6 +201,7 @@ export const endpoints = {
   dashboard: {
     documentSignatures: '/dashboard/document-signatures',
     sharedDocuments: '/dashboard/shared-documents',
+    safetySystemDocuments: '/dashboard/safety-system-documents',
     riskReportStatistics: '/dashboard/risk-report-statistics',
     memberProfile: '/dashboard/member-profile',
     educationCompletionRate: '/dashboard/education-completion-rate',
@@ -210,10 +209,10 @@ export const endpoints = {
   },
   // Safety System
   safetySystem: {
+    systems: '/safety-system/systems',
     documents: '/safety-system/documents',
     items: '/safety-system/items',
     chemicals: '/safety-system/chemicals',
-    casNumbers: '/safety-system/cas-numbers',
   },
   // Legacy (기존 호환성 유지)
   auth: {

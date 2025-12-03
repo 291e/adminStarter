@@ -6,7 +6,7 @@ import Typography from '@mui/material/Typography';
 
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
 import warningIcon from 'src/assets/icons/safeyoui/warning.svg';
-import type { ChatRoom } from 'src/_mock/_chat';
+import type { ChatRoomDto } from 'src/services/chat/chat.types';
 
 // ----------------------------------------------------------------------
 
@@ -14,7 +14,7 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onConfirm: () => void;
-  room: ChatRoom | null;
+  room: ChatRoomDto | null;
 };
 
 export default function LeaveChatRoomModal({ open, onClose, onConfirm, room }: Props) {

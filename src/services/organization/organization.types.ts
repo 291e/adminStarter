@@ -351,13 +351,30 @@ export type InviteMemberResponse = BaseResponseDto<{
   invitationCode: string;
 }>;
 
+// 초대 코드 검증 요청
+export type VerifyInvitationCodeParams = {
+  code: string;
+};
+
+// 초대 코드 검증 응답
+export type VerifyInvitationCodeResponse = BaseResponseDto<{
+  isValid: boolean;
+  invitation: {
+    companyName: string;
+    invitedEmail: string;
+    memberRole: string;
+    expiresAt: string;
+  } | null;
+}>;
+
 // 초대 수락 요청
 export type AcceptInvitationParams = {
-  link?: string;
-  code?: string;
-  password: string;
+  code: string;
+  memberId: string;
   memberName: string;
-  memberNameOrg: string;
+  password: string;
+  memberPhone?: string;
+  [key: string]: any; // 추가 필드 허용
 };
 
 // 초대 수락 응답

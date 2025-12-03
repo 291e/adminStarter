@@ -1,5 +1,5 @@
-import type { SafetySystem } from 'src/_mock/_safety-system';
-import { useMemo, useState, useCallback } from 'react';
+import type { SafetySystem } from 'src/services/safety-system/safety-system.types';
+import { useMemo } from 'react';
 
 // ----------------------------------------------------------------------
 

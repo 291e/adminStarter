@@ -16,6 +16,8 @@ import { Logo } from 'src/components/logo';
 import { useSettingsContext } from 'src/components/settings';
 
 import { useMockedUser } from 'src/auth/hooks';
+import { useMyInfo } from 'src/sections/Chat/hooks/use-my-info';
+import { useMemo } from 'react';
 
 import { NavMobile } from './nav-mobile';
 import { VerticalDivider } from './content';
@@ -58,6 +60,7 @@ export function DashboardLayout({
   const theme = useTheme();
 
   const { user } = useMockedUser();
+  const { data: myInfo } = useMyInfo();
 
   const settings = useSettingsContext();
 
@@ -65,7 +68,23 @@ export function DashboardLayout({
 
   const { value: open, onFalse: onClose, onTrue: onOpen } = useBoolean();
 
-  const navData = slotProps?.nav?.data ?? dashboardNavData;
+  // isSuperAdmin이 true인 경우에만 "설정 및 관리" 메뉴 표시
+  const filteredNavData = useMemo(() => {
+    const baseNavData = slotProps?.nav?.data ?? dashboardNavData;
+    const isSuperAdmin = myInfo?.isSuperAdmin === true;
+
+    if (isSuperAdmin) {
+      return baseNavData;
+    }
+
+    // "설정 및 관리" 메뉴 필터링
+    return baseNavData.map((section) => ({
+      ...section,
+      items: section.items.filter((item) => item.title !== '설정 및 관리'),
+    }));
+  }, [slotProps?.nav?.data, myInfo?.isSuperAdmin]);
+
+  const navData = filteredNavData;
 
   const isNavMini = settings.state.navLayout === 'mini';
   const isNavHorizontal = settings.state.navLayout === 'horizontal';

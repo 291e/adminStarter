@@ -5,12 +5,15 @@ import ApprovalSection from './ApprovalSection';
 
 // ----------------------------------------------------------------------
 
+import type { SafetySystemDocument } from 'src/services/safety-system/safety-system.types';
+
 type Props = {
   formattedDate: string;
   onAddSignature?: () => void;
   title?: string; // 커스텀 제목
   approvalVariant?: 'default' | 'four'; // 결재 테이블 형태
   riskId?: string; // 문서 ID
+  currentDocument?: SafetySystemDocument; // 현재 문서 정보
 };
 
 export default function DocumentHeader({
@@ -19,6 +22,7 @@ export default function DocumentHeader({
   title,
   approvalVariant = 'default',
   riskId,
+  currentDocument,
 }: Props) {
   const displayTitle = title || '위험요인 제거·대체 및 통제 등록';
 
@@ -72,6 +76,7 @@ export default function DocumentHeader({
         onAddSignature={onAddSignature}
         is2100Series={approvalVariant === 'four'}
         riskId={riskId}
+        currentDocument={currentDocument}
       />
     </Box>
   );

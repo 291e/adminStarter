@@ -2,23 +2,16 @@ import Box from '@mui/material/Box';
 
 import ParticipantList from './ParticipantList';
 import AttachmentList from './AttachmentList';
-import type { ChatRoom } from 'src/_mock/_chat';
-
-type Participant = {
-  name: string;
-  role?: string;
-};
-
-type Attachment = {
-  name: string;
-  type: 'image' | 'pdf' | 'txt' | string;
-  date: string;
-};
+import type {
+  ChatRoomDto,
+  ChatParticipantDto,
+  ChatAttachmentDto,
+} from 'src/services/chat/chat.types';
 
 type Props = {
-  room?: ChatRoom | null;
-  participants: Participant[];
-  attachments: Attachment[];
+  room?: ChatRoomDto | null;
+  participants: ChatParticipantDto[];
+  attachments: ChatAttachmentDto[];
   onInvite?: () => void;
   onRemove?: (participantIds: string[]) => void;
 };
@@ -44,10 +37,13 @@ export default function RightSection({
         overflow: 'hidden',
       }}
     >
-      <ParticipantList room={room} participants={participants} onInvite={onInvite} onRemove={onRemove} />
+      <ParticipantList
+        room={room}
+        participants={participants}
+        onInvite={onInvite}
+        onRemove={onRemove}
+      />
       <AttachmentList attachments={attachments} />
     </Box>
   );
 }
-
-

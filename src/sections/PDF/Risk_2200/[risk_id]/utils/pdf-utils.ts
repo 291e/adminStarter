@@ -3,7 +3,19 @@ import html2canvas from 'html2canvas';
 
 // ----------------------------------------------------------------------
 
-export async function generatePDF(element: HTMLElement, filename: string): Promise<void> {
+/**
+ * PDF 생성 함수
+ * @param element - PDF로 변환할 HTML 요소
+ * @param filename - 저장할 파일명
+ * @param options - 옵션 (quality: 이미지 품질 0.1~1.0, scale: 해상도 배율 1~3)
+ */
+export async function generatePDF(
+  element: HTMLElement,
+  filename: string,
+  options?: { quality?: number; scale?: number }
+): Promise<void> {
+  const { quality = 0.75, scale = 2 } = options || {};
+
   try {
     // PDF 생성 시 "서명 추가" 버튼 숨기기
     const signatureButtons = element.querySelectorAll('button');
@@ -16,9 +28,9 @@ export async function generatePDF(element: HTMLElement, filename: string): Promi
       }
     });
 
-    // PNG signature 오류 방지를 위한 추가 옵션 (더 높은 해상도)
+    // 해상도 및 품질 조정 (scale: 2로 낮춤, 충분한 품질 유지)
     const canvas = await html2canvas(element, {
-      scale: 3, // 해상도 향상 (2 → 3)
+      scale, // 해상도 (기본값: 2, 3에서 낮춤)
       useCORS: true,
       logging: false,
       allowTaint: true,
@@ -33,14 +45,21 @@ export async function generatePDF(element: HTMLElement, filename: string): Promi
       throw new Error('Canvas가 유효하지 않습니다.');
     }
 
-    const imgData = canvas.toDataURL('image/png');
+    // JPEG 형식으로 변환하여 용량 대폭 감소 (PNG 대비 약 70~80% 감소)
+    const imgData = canvas.toDataURL('image/jpeg', quality);
 
-    // PNG 데이터 유효성 검사
+    // 이미지 데이터 유효성 검사
     if (!imgData || imgData === 'data:,') {
-      throw new Error('PNG 이미지 데이터를 생성할 수 없습니다.');
+      throw new Error('이미지 데이터를 생성할 수 없습니다.');
     }
 
-    const pdf = new jsPDF('p', 'mm', 'a4');
+    // PDF 생성 (압축 활성화)
+    const pdf = new jsPDF({
+      orientation: 'p',
+      unit: 'mm',
+      format: 'a4',
+      compress: true, // PDF 압축 활성화
+    });
 
     // A4 크기 (mm)
     const pageWidth = 210; // A4 width in mm
@@ -59,8 +78,8 @@ export async function generatePDF(element: HTMLElement, filename: string): Promi
     // 첫 페이지에 사용 가능한 높이 (위 여백 제외)
     const firstPageAvailableHeight = pageHeight - marginTop;
 
-    // 첫 페이지에 이미지 추가
-    pdf.addImage(imgData, 'PNG', marginLeft, marginTop, availableWidth, imgHeight);
+    // 첫 페이지에 이미지 추가 (JPEG 형식)
+    pdf.addImage(imgData, 'JPEG', marginLeft, marginTop, availableWidth, imgHeight);
 
     // 이미지가 첫 페이지를 넘어가는 경우 추가 페이지 생성
     let remainingHeight = imgHeight - firstPageAvailableHeight;
@@ -95,8 +114,9 @@ export async function generatePDF(element: HTMLElement, filename: string): Promi
           tempCanvas.height
         );
 
-        const tempImgData = tempCanvas.toDataURL('image/png');
-        pdf.addImage(tempImgData, 'PNG', marginLeft, 0, availableWidth, pageImageHeight);
+        // JPEG 형식으로 변환하여 용량 감소
+        const tempImgData = tempCanvas.toDataURL('image/jpeg', quality);
+        pdf.addImage(tempImgData, 'JPEG', marginLeft, 0, availableWidth, pageImageHeight);
       }
 
       sourceYOffset += pageImageHeight;

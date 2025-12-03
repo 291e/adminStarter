@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -10,35 +11,47 @@ import TextField from '@mui/material/TextField';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import FormControl from '@mui/material/FormControl';
-import Button from '@mui/material/Button';
 import Switch from '@mui/material/Switch';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
+import CircularProgress from '@mui/material/CircularProgress';
 
 import { Iconify } from 'src/components/iconify';
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
+import { getPrioritySettingList } from 'src/services/dashboard/dashboard.service';
+import { publishDocument } from 'src/services/safety-system/safety-system.service';
+import type { PrioritySetting } from 'src/services/dashboard/dashboard.types';
 
 // ----------------------------------------------------------------------
+
+/**
+ * 중요도 labelType을 한글로 변환
+ */
+const getPriorityLabel = (priority: PrioritySetting): string => {
+  if (!priority.labelType) {
+    return `중요도 ${priority.priorityIdx}`;
+  }
+
+  const labelTypeMap: Record<string, string> = {
+    urgent: '긴급',
+    important: '중요',
+    normal: '보통',
+    reference: '참고',
+    custom: priority.labelType, // custom인 경우 labelType 자체를 사용 (이미 한글일 수 있음)
+  };
+
+  // labelType이 맵핑에 있으면 한글 변환, 없으면 원본 사용
+  return labelTypeMap[priority.labelType.toLowerCase()] || priority.labelType;
+};
 
 type Props = {
   open: boolean;
   onClose: () => void;
-  onConfirm: (data: {
-    documentName: string;
-    importance: string;
-    isPublic: boolean;
-    file?: File;
-  }) => void;
+  onConfirm?: () => void; // 선택적, API 성공 후 호출
   documentName?: string;
-  documentId?: string;
+  documentId?: string; // safetySystemDocumentIdx
 };
-
-const IMPORTANCE_OPTIONS = [
-  { value: 'high', label: '중요' },
-  { value: 'medium', label: '보통' },
-  { value: 'low', label: '낮음' },
-];
 
 export default function PublishModal({
   open,
@@ -47,56 +60,91 @@ export default function PublishModal({
   documentName: initialDocumentName,
   documentId,
 }: Props) {
+  const queryClient = useQueryClient();
   const [documentName, setDocumentName] = useState(initialDocumentName || '');
-  const [importance, setImportance] = useState('high');
-  const [isPublic, setIsPublic] = useState(false); // 기본값: 비공개
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [priorityIdx, setPriorityIdx] = useState<number | ''>('');
+  const [isPublished, setIsPublished] = useState(false); // 기본값: 미게시
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-    }
-  };
+  // 중요도 설정 목록 조회
+  const { data: prioritySettingsResponse, isLoading: isLoadingPriorities } = useQuery({
+    queryKey: ['priority-settings'],
+    queryFn: async () => {
+      const response = await getPrioritySettingList();
+      // axios 인터셉터에서 평탄화되므로 직접 접근
+      return (
+        (response as any).prioritySettingList ||
+        (response as any).body?.data?.prioritySettingList ||
+        []
+      );
+    },
+  });
+
+  // 활성화된 중요도 설정만 필터링
+  const activePriorities: PrioritySetting[] = (prioritySettingsResponse || []).filter(
+    (p: PrioritySetting) => p.isActive === 1
+  );
+
+  // 문서 게시 API Mutation
+  const publishMutation = useMutation({
+    mutationFn: async (params: {
+      safetySystemDocumentIdx: number;
+      priorityIdx: number;
+      isPublished: number;
+      documentName?: string;
+    }) => {
+      await publishDocument(params.safetySystemDocumentIdx, {
+        priorityIdx: params.priorityIdx,
+        isPublished: params.isPublished,
+        documentName: params.documentName || undefined,
+      });
+    },
+    onSuccess: () => {
+      // 관련 쿼리 무효화
+      queryClient.invalidateQueries({ queryKey: ['safety-system-item'] });
+      queryClient.invalidateQueries({ queryKey: ['priority-settings'] });
+      onConfirm?.();
+      handleClose();
+    },
+    onError: (error: any) => {
+      console.error('문서 게시 실패:', error);
+      alert(error?.response?.data?.message || '문서 게시에 실패했습니다.');
+    },
+  });
 
   const handleConfirm = () => {
-    // TODO: TanStack Query Hook(useMutation)으로 문서 게시
-    // const mutation = useMutation({
-    //   mutationFn: (data: {
-    //     documentId: string;
-    //     documentName: string;
-    //     importance: string;
-    //     isPublic: boolean;
-    //     file?: File;
-    //   }) => publishDocument(data),
-    //   onSuccess: () => {
-    //     queryClient.invalidateQueries({ queryKey: ['risk2200Documents'] });
-    //     onClose();
-    //   },
-    // });
-    // mutation.mutate({
-    //   documentId: documentId!,
-    //   documentName,
-    //   importance,
-    //   isPublic,
-    //   file: selectedFile || undefined,
-    // });
-    onConfirm({
-      documentName,
-      importance,
-      isPublic,
-      file: selectedFile || undefined,
+    if (!documentId) {
+      alert('문서 ID가 없습니다.');
+      return;
+    }
+
+    if (priorityIdx === '') {
+      alert('중요도를 선택해주세요.');
+      return;
+    }
+
+    publishMutation.mutate({
+      safetySystemDocumentIdx: Number(documentId),
+      priorityIdx: Number(priorityIdx),
+      isPublished: isPublished ? 1 : 0,
+      documentName: documentName || undefined,
     });
-    handleClose();
   };
 
   const handleClose = () => {
     setDocumentName(initialDocumentName || '');
-    setImportance('high');
-    setIsPublic(false);
-    setSelectedFile(null);
+    setPriorityIdx('');
+    setIsPublished(false);
     onClose();
   };
+
+  // 모달이 열릴 때 초기값 설정
+  useEffect(() => {
+    if (open) {
+      setDocumentName(initialDocumentName || '');
+      setPriorityIdx('');
+      setIsPublished(false);
+    }
+  }, [open, initialDocumentName]);
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
@@ -164,62 +212,42 @@ export default function PublishModal({
               중요도
             </Typography>
             <FormControl fullWidth>
-              <Select
-                value={importance}
-                onChange={(e) => setImportance(e.target.value)}
-                sx={{
-                  fontSize: 15,
-                  lineHeight: '24px',
-                }}
-              >
-                {IMPORTANCE_OPTIONS.map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
-                    {option.label}
+              {isLoadingPriorities ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                  <CircularProgress size={24} />
+                </Box>
+              ) : (
+                <Select
+                  value={priorityIdx}
+                  onChange={(e) => setPriorityIdx(e.target.value as number | '')}
+                  displayEmpty
+                  sx={{
+                    fontSize: 15,
+                    lineHeight: '24px',
+                  }}
+                >
+                  <MenuItem value="" disabled>
+                    중요도를 선택하세요
                   </MenuItem>
-                ))}
-              </Select>
+                  {activePriorities.map((priority) => (
+                    <MenuItem key={priority.priorityIdx} value={priority.priorityIdx}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box
+                          sx={{
+                            width: 12,
+                            height: 12,
+                            borderRadius: '50%',
+                            bgcolor: priority.color,
+                          }}
+                        />
+                        <Typography>{getPriorityLabel(priority)}</Typography>
+                      </Box>
+                    </MenuItem>
+                  ))}
+                </Select>
+              )}
             </FormControl>
           </Box>
-
-          {/* 파일 첨부 */}
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Typography
-              variant="subtitle2"
-              sx={{
-                fontSize: 14,
-                fontWeight: 600,
-                lineHeight: '22px',
-                color: 'text.primary',
-              }}
-            >
-              파일 첨부
-            </Typography>
-            <Button
-              variant="contained"
-              component="label"
-              startIcon={<Iconify icon={'eva:cloud-upload-fill' as any} width={20} />}
-              sx={{
-                minHeight: 36,
-                fontSize: 14,
-                fontWeight: 700,
-                px: 1.5,
-                py: 0.75,
-              }}
-            >
-              업로드
-              <input
-                type="file"
-                hidden
-                onChange={handleFileChange}
-                accept=".pdf,.doc,.docx,.xls,.xlsx"
-              />
-            </Button>
-          </Box>
-          {selectedFile && (
-            <Typography variant="caption" sx={{ color: 'text.secondary', ml: 1 }}>
-              선택된 파일: {selectedFile.name}
-            </Typography>
-          )}
 
           {/* 공개 여부 */}
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
@@ -237,8 +265,8 @@ export default function PublishModal({
             <FormControlLabel
               control={
                 <Switch
-                  checked={isPublic}
-                  onChange={(e) => setIsPublic(e.target.checked)}
+                  checked={isPublished}
+                  onChange={(e) => setIsPublished(e.target.checked)}
                   sx={{
                     '& .MuiSwitch-switchBase.Mui-checked': {
                       color: 'primary.main',
@@ -258,7 +286,7 @@ export default function PublishModal({
                     color: 'text.secondary',
                   }}
                 >
-                  {isPublic ? '공개' : '비공개'}
+                  {isPublished ? '게시' : '미게시'}
                 </Typography>
               }
             />
@@ -267,11 +295,15 @@ export default function PublishModal({
       </DialogContent>
 
       <DialogActions sx={{ justifyContent: 'flex-end', px: 3, pb: 3 }}>
-        <DialogBtn variant="outlined" onClick={handleClose}>
+        <DialogBtn variant="outlined" onClick={handleClose} disabled={publishMutation.isPending}>
           닫기
         </DialogBtn>
-        <DialogBtn variant="contained" onClick={handleConfirm}>
-          게시
+        <DialogBtn
+          variant="contained"
+          onClick={handleConfirm}
+          disabled={publishMutation.isPending || priorityIdx === ''}
+        >
+          {publishMutation.isPending ? '게시 중...' : '게시'}
         </DialogBtn>
       </DialogActions>
     </Dialog>

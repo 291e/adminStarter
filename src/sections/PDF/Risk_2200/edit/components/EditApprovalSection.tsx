@@ -1,9 +1,10 @@
+import { useMemo } from 'react';
+
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
-import IconButton from '@mui/material/IconButton';
 
-import { Iconify } from 'src/components/iconify';
+import { CONFIG } from 'src/global-config';
 
 // ----------------------------------------------------------------------
 
@@ -14,17 +15,19 @@ export type ApprovalSignature = {
   name?: string;
   date?: string;
   signature?: string; // 서명 이미지 또는 base64
+  memberIdx?: number; // 대상자 memberIdx (API 연동용)
+  documentApprovalIdx?: number; // 결재 등록 ID (이미 등록된 경우)
 };
 
 type Props = {
   signatures: ApprovalSignature[];
+  approvalStep?: number; // 1: 승인만, 2: 작성+승인, 3: 작성+검토+승인
   onAddSignature: () => void;
   onRemoveSignature: (type: ApprovalType) => void;
   onSelectMember: (type: ApprovalType) => void;
   onRequestSignature: (type: ApprovalType) => void;
 };
 
-const COLUMN_ORDER: ApprovalType[] = ['writer', 'reviewer', 'approver'];
 const TYPE_LABEL: Record<ApprovalType, string> = {
   writer: '작성',
   reviewer: '검토',
@@ -33,16 +36,46 @@ const TYPE_LABEL: Record<ApprovalType, string> = {
 
 export default function EditApprovalSection({
   signatures,
+  approvalStep = 1,
   onAddSignature,
   onRemoveSignature,
   onSelectMember,
   onRequestSignature,
 }: Props) {
-  const getSignature = (type: ApprovalType) => signatures.find((item) => item.type === type);
+  // approvalStep에 따라 표시할 타입 결정
+  // approvalStep 1: 승인만
+  // approvalStep 2: 작성 + 승인
+  // approvalStep 3: 작성 + 검토 + 승인
+  const displayTypes = useMemo(() => {
+    const types: ApprovalType[] = [];
+    if (approvalStep >= 2) {
+      // 작성자 추가 (approvalStep 2 이상)
+      types.push('writer');
+    }
+    if (approvalStep >= 3) {
+      // 검토자 추가 (approvalStep 3)
+      types.push('reviewer');
+    }
+    // 승인자 추가 (approvalStep 1 이상)
+    if (approvalStep >= 1) {
+      types.push('approver');
+    }
+    return types;
+  }, [approvalStep]);
 
-  const displayTypes = COLUMN_ORDER.filter((type) => !!getSignature(type));
   const columnCount = displayTypes.length;
-  const canAddSignature = columnCount < COLUMN_ORDER.length;
+  // approvalStep에 따라 추가 가능한 서명 결정
+  // approvalStep이 3이 아니면 무조건 서명 추가 버튼 표시
+  // approvalStep이 3이면 모든 타입이 있을 때만 버튼 숨김
+  const canAddSignature = useMemo(() => {
+    if (approvalStep !== 3) {
+      // approvalStep이 3이 아니면 무조건 표시
+      return true;
+    }
+    // approvalStep이 3이면 모든 타입이 있는지 확인
+    const getSignature = (type: ApprovalType) => signatures.find((item) => item.type === type);
+    return !getSignature('writer') || !getSignature('reviewer') || !getSignature('approver');
+  }, [signatures, approvalStep]);
   const tableWidth = 47 + columnCount * 98;
   const hasAllSteps = columnCount === 3;
 
@@ -53,9 +86,43 @@ export default function EditApprovalSection({
     return TYPE_LABEL[type];
   };
 
+  const getSignature = (type: ApprovalType) => signatures.find((item) => item.type === type);
+
+  // 파일 URL을 전체 URL로 변환하는 헬퍼 함수
+  const getFullFileUrl = (url: string | null | undefined): string | null => {
+    if (!url) return null;
+    // 잘못된 형식: data:image/png;base64,data/admin/... 같은 경우 처리
+    if (
+      url.startsWith('data:image/png;base64,data/admin/') ||
+      url.startsWith('data:image/png;base64,/data/admin/')
+    ) {
+      // base64 접두사를 제거하고 URL로 처리
+      const cleanUrl = url.replace(/^data:image\/png;base64,/, '');
+      const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
+      const path = cleanUrl.startsWith('/') ? cleanUrl : `/${cleanUrl}`;
+      return `${baseUrl}${path}`;
+    }
+    // 이미 전체 URL인 경우 (http:// 또는 https://로 시작)
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    // base64 데이터 URL인 경우 그대로 반환 (실제 base64 데이터인 경우)
+    if (url.startsWith('data:image/') && !url.includes('data/admin/')) {
+      return url;
+    }
+    // 상대 경로인 경우 CONFIG.serverUrl과 결합
+    // data/admin/로 시작하는 경우도 처리
+    const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
+    const path = url.startsWith('/') ? url : `/${url}`;
+    return `${baseUrl}${path}`;
+  };
+
   const renderSignatureArea = (type: ApprovalType) => {
     const signature = getSignature(type);
     if (signature?.signature) {
+      const imageUrl = getFullFileUrl(signature.signature);
+      if (!imageUrl) return null;
+
       return (
         <Box
           component="button"
@@ -70,7 +137,7 @@ export default function EditApprovalSection({
         >
           <Box
             component="img"
-            src={signature.signature}
+            src={imageUrl}
             alt={`${TYPE_LABEL[type]} 서명`}
             sx={{
               width: 90,
@@ -82,23 +149,38 @@ export default function EditApprovalSection({
         </Box>
       );
     }
+    // 서명이 없을 때: 대상자가 선택되어 있으면 서명 등록, 없으면 대상자 선택
     return (
       <Button
         variant="outlined"
         size="small"
-        onClick={() => onRequestSignature(type)}
+        onClick={() => {
+          if (signature?.name) {
+            // 대상자가 선택되어 있으면 서명 등록 모달 열기
+            onRequestSignature(type);
+          } else {
+            // 대상자가 없으면 대상자 선택 모달 열기
+            onSelectMember(type);
+          }
+        }}
+        disabled={!!signature?.signature}
         sx={{
           width: 90,
           height: 40,
           borderRadius: 1,
           fontSize: 14,
           fontWeight: 600,
-          color: 'text.primary',
+          color: signature?.name ? 'text.primary' : 'text.secondary',
           borderColor: 'rgba(145,158,171,0.2)',
-          '&:hover': { borderColor: 'text.primary' },
+          '&:hover': { borderColor: signature?.name ? 'text.primary' : 'rgba(145,158,171,0.2)' },
+          '&:disabled': {
+            borderColor: 'rgba(145,158,171,0.2)',
+            color: 'text.secondary',
+            cursor: 'not-allowed',
+          },
         }}
       >
-        서명등록
+        {signature?.name ? '서명등록' : '대상자 선택'}
       </Button>
     );
   };
@@ -129,6 +211,10 @@ export default function EditApprovalSection({
 
     return (
       <Box
+        component="button"
+        type="button"
+        onClick={() => onSelectMember(type)}
+        disabled={!!signature?.signature}
         sx={{
           border: '1px solid',
           borderColor: 'rgba(145,158,171,0.2)',
@@ -138,17 +224,35 @@ export default function EditApprovalSection({
           minHeight: 30,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          justifyContent: 'center',
           gap: 0.5,
+          width: '100%',
+          background: 'none',
+          cursor: signature?.signature ? 'not-allowed' : 'pointer',
+          '&:hover': {
+            borderColor: signature?.signature ? 'rgba(145,158,171,0.2)' : 'text.primary',
+          },
+          '&:disabled': {
+            cursor: 'not-allowed',
+            opacity: 0.6,
+          },
         }}
       >
-        <Box sx={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
           <Typography
             sx={{
               fontSize: 14,
               fontWeight: 600,
               lineHeight: '20px',
               color: 'text.primary',
+              textAlign: 'center',
             }}
           >
             {signature.name}
@@ -165,17 +269,6 @@ export default function EditApprovalSection({
             </Typography>
           )}
         </Box>
-        {type !== 'writer' && (
-          <IconButton
-            size="small"
-            onClick={() => onRemoveSignature(type)}
-            sx={{
-              p: 0.5,
-            }}
-          >
-            <Iconify icon="mingcute:close-line" width={16} />
-          </IconButton>
-        )}
       </Box>
     );
   };

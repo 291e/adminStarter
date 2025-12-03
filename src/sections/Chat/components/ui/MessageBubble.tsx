@@ -8,9 +8,29 @@ type Props = {
   message: string;
   timestamp: string;
   isOwn: boolean;
+  avatarUrl?: string;
+  messageType?: 'TEXT' | 'IMAGE' | 'FILE' | 'SYSTEM';
+  sharedDocumentIdx?: number;
+  onFileClick?: (sharedDocumentIdx: number) => void;
 };
 
-export default function MessageBubble({ sender, message, timestamp, isOwn }: Props) {
+export default function MessageBubble({
+  sender,
+  message,
+  timestamp,
+  isOwn,
+  avatarUrl,
+  messageType,
+  sharedDocumentIdx,
+  onFileClick,
+}: Props) {
+  const handleFileClick = () => {
+    if (messageType === 'FILE' && sharedDocumentIdx && onFileClick) {
+      onFileClick(sharedDocumentIdx);
+    }
+  };
+
+  const isFileMessage = messageType === 'FILE' && sharedDocumentIdx;
   if (isOwn) {
     // 내 메시지
     return (
@@ -31,7 +51,14 @@ export default function MessageBubble({ sender, message, timestamp, isOwn }: Pro
             borderRadius: '12px 0px 12px 12px',
             bgcolor: 'primary.main',
             color: 'primary.contrastText',
+            ...(isFileMessage && {
+              cursor: 'pointer',
+              '&:hover': {
+                bgcolor: 'primary.dark',
+              },
+            }),
           }}
+          onClick={isFileMessage ? handleFileClick : undefined}
         >
           <Typography variant="body2" sx={{ fontSize: 14, lineHeight: '22px' }}>
             {message}
@@ -44,7 +71,9 @@ export default function MessageBubble({ sender, message, timestamp, isOwn }: Pro
   // 상대방 메시지
   return (
     <Stack direction="row" spacing={0.5} sx={{ alignItems: 'flex-start' }}>
-      <Avatar sx={{ width: 40, height: 40 }}>{sender[0]}</Avatar>
+      <Avatar src={avatarUrl} sx={{ width: 40, height: 40 }}>
+        {sender?.[0] ?? '?'}
+      </Avatar>
       <Stack spacing={0.5} sx={{ flex: 1, minWidth: 0 }}>
         <Typography variant="caption" sx={{ fontSize: 12, fontWeight: 400 }}>
           {sender}
@@ -58,7 +87,14 @@ export default function MessageBubble({ sender, message, timestamp, isOwn }: Pro
               borderRadius: '0px 12px 12px 12px',
               bgcolor: 'grey.200',
               color: 'text.primary',
+              ...(isFileMessage && {
+                cursor: 'pointer',
+                '&:hover': {
+                  bgcolor: 'grey.300',
+                },
+              }),
             }}
+            onClick={isFileMessage ? handleFileClick : undefined}
           >
             <Typography variant="body2" sx={{ fontSize: 14, lineHeight: '22px' }}>
               {message}

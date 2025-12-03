@@ -14,31 +14,20 @@ import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 import RemoveParticipantModal from './RemoveParticipantModal';
 import InviteParticipantModal from './InviteParticipantModal';
-import { useAuthContext } from 'src/auth/hooks/use-auth-context';
-import type { ChatRoom } from 'src/_mock/_chat';
-
-type Participant = {
-  id?: string;
-  name: string;
-  role?: string;
-};
+import type { ChatRoomDto, ChatParticipantDto } from 'src/services/chat/chat.types';
 
 type Props = {
-  room?: ChatRoom | null;
-  participants: Participant[];
+  room?: ChatRoomDto | null;
+  participants: ChatParticipantDto[];
   onInvite?: () => void;
   onRemove?: (participantIds: string[]) => void;
 };
 
 export default function ParticipantList({ room, participants, onInvite, onRemove }: Props) {
-  const { user } = useAuthContext();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [removeModalOpen, setRemoveModalOpen] = useState(false);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
-
-  // 현재 사용자 이름 (displayName 또는 name 사용)
-  const currentUserName = user?.displayName || user?.name || '';
 
   // 실제 사람 이름인지 확인하는 함수 ("외", "명" 같은 텍스트 제외)
   const isValidParticipantName = (name: string): boolean => {
@@ -86,52 +75,15 @@ export default function ParticipantList({ room, participants, onInvite, onRemove
   //   enabled: !!room,
   // });
 
-  // 임시: 채팅방 타입에 따라 필터링 (실제로는 API에서 받아온 데이터 사용)
-  const filteredParticipants = (() => {
-    // 본인 제외 및 유효한 참가자 이름만 필터링하는 함수
-    const excludeCurrentUser = (list: Participant[]) =>
-      list.filter(
-        (p) => isValidParticipantName(p.name) && p.name !== currentUserName && p.id !== user?.id
-      );
-
-    if (!room) return excludeCurrentUser(participants);
-    if (room.type === 'chatbot') {
-      // 챗봇 채팅: 챗봇만 표시 (본인 제외)
-      return excludeCurrentUser(
-        participants.filter((p) => p.name === '챗봇' || p.role === 'chatbot')
-      );
-    } else if (room.type === 'emergency') {
-      // 사고 발생 현황 채팅: 응급 담당자들만 표시 (조직 관리자, 관리 감독자, 안전보건 담당자) (본인 제외)
-      return excludeCurrentUser(
-        participants.filter(
-          (p) =>
-            p.role === '안전보건 담당자' ||
-            p.role === '관리 감독자' ||
-            p.role === '조직 관리자' ||
-            p.role === 'CEO' ||
-            p.role === 'CTO'
-        )
-      );
-    } else if (room.type === 'normal') {
-      // 일반 채팅(1대1): 채팅방 이름과 일치하는 참가자만 표시 (본인 제외)
-      const matchedParticipant = participants.find(
-        (p) => p.name === room.name && p.name !== currentUserName && p.id !== user?.id
-      );
-      return matchedParticipant
-        ? [matchedParticipant]
-        : excludeCurrentUser(participants).slice(0, 1);
-    } else {
-      // 그룹 채팅: 모든 참가자 표시 (본인 제외)
-      return excludeCurrentUser(participants);
-    }
-  })();
+  // view.tsx에서 이미 본인을 제외한 participants를 전달받으므로, 추가 필터링 없이 사용
+  // 유효한 참가자 이름만 필터링 (필요시)
+  const filteredParticipants = participants.filter((p) => isValidParticipantName(p.name));
 
   // 사고 발생 현황 또는 챗봇 채팅인지 확인 (체크박스, 내보내기, 초대하기 버튼 숨김)
-  const isEmergencyOrChatbot = room?.type === 'emergency' || room?.type === 'chatbot';
+  const isEmergencyOrChatbot = room?.type === 'EMERGENCY' || room?.type === 'CHATBOT';
 
-  // 대화 상대가 1명일 때 프로필 형태로 표시 (일반 채팅 1대1 또는 챗봇)
-  const isSingleParticipant =
-    filteredParticipants.length === 1 && (room?.type === 'normal' || room?.type === 'chatbot');
+  // 대화 상대가 1명일 때 프로필 형태로 표시 (참가자 수에 따라 결정)
+  const isSingleParticipant = filteredParticipants.length === 1;
 
   const handleToggleSelect = (participantId: string) => {
     setSelectedIds((prev) =>
@@ -172,8 +124,8 @@ export default function ParticipantList({ room, participants, onInvite, onRemove
     handleCloseInviteModal();
   };
 
-  const getParticipantId = (participant: Participant, idx: number) =>
-    participant.id || `participant-${idx}`;
+  const getParticipantId = (participant: ChatParticipantDto, idx: number) =>
+    participant.memberIdx?.toString() || `participant-${idx}`;
 
   return (
     <Box
@@ -258,6 +210,13 @@ export default function ParticipantList({ room, participants, onInvite, onRemove
               }}
             >
               <Avatar
+                src={
+                  filteredParticipants[0].profileImage &&
+                  filteredParticipants[0].profileImage.trim() !== ''
+                    ? filteredParticipants[0].profileImage
+                    : undefined
+                }
+                alt={filteredParticipants[0].name}
                 sx={{
                   width: 64,
                   height: 64,
@@ -265,7 +224,17 @@ export default function ParticipantList({ room, participants, onInvite, onRemove
                   mb: 0.5,
                 }}
               >
-                {filteredParticipants[0].name[0]}
+                {(!filteredParticipants[0].profileImage ||
+                  filteredParticipants[0].profileImage.trim() === '') &&
+                  (() => {
+                    const name = filteredParticipants[0].name || '';
+                    const isValidName = name.trim() !== '' && !/^\d+$/.test(name.trim());
+                    return isValidName && name[0] ? (
+                      name[0]
+                    ) : (
+                      <Iconify icon="solar:user-rounded-bold" width={32} />
+                    );
+                  })()}
               </Avatar>
               <Stack spacing={0.5} alignItems="center">
                 <Typography
@@ -280,20 +249,7 @@ export default function ParticipantList({ room, participants, onInvite, onRemove
                 >
                   {filteredParticipants[0].name}
                 </Typography>
-                {filteredParticipants[0].role && (
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      fontSize: 14,
-                      fontWeight: 400,
-                      lineHeight: '22px',
-                      textAlign: 'center',
-                      color: 'text.disabled',
-                    }}
-                  >
-                    {filteredParticipants[0].role}
-                  </Typography>
-                )}
+                {/* TODO: role 필드가 ChatParticipantDto에 없으므로 필요시 추가 */}
               </Stack>
             </Box>
           ) : (
@@ -330,8 +286,25 @@ export default function ParticipantList({ room, participants, onInvite, onRemove
                         />
                       </Box>
                     )}
-                    <Avatar sx={{ width: 40, height: 40, bgcolor: 'grey.300' }}>
-                      {participant.name[0]}
+                    <Avatar
+                      src={
+                        participant.profileImage && participant.profileImage.trim() !== ''
+                          ? participant.profileImage
+                          : undefined
+                      }
+                      alt={participant.name}
+                      sx={{ width: 40, height: 40, bgcolor: 'grey.300' }}
+                    >
+                      {(!participant.profileImage || participant.profileImage.trim() === '') &&
+                        (() => {
+                          const name = participant.name || '';
+                          const isValidName = name.trim() !== '' && !/^\d+$/.test(name.trim());
+                          return isValidName && name[0] ? (
+                            name[0]
+                          ) : (
+                            <Iconify icon="solar:user-rounded-bold" width={24} />
+                          );
+                        })()}
                     </Avatar>
                     <Stack spacing={0.5} sx={{ flex: 1, minWidth: 0 }}>
                       <Typography
@@ -346,17 +319,7 @@ export default function ParticipantList({ room, participants, onInvite, onRemove
                       >
                         {participant.name}
                       </Typography>
-                      {participant.role && (
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            fontSize: 14,
-                            color: 'text.secondary',
-                          }}
-                        >
-                          {participant.role}
-                        </Typography>
-                      )}
+                      {/* TODO: role 필드가 ChatParticipantDto에 없으므로 필요시 추가 */}
                     </Stack>
                   </ListItem>
                 );

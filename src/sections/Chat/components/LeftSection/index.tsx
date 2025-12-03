@@ -17,83 +17,141 @@ import ListItemText from '@mui/material/ListItemText';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 import { useAuthContext } from 'src/auth/hooks/use-auth-context';
+import { useMyInfo } from 'src/sections/Chat/hooks/use-my-info';
 import CreateChatRoomModal from './CreateChatRoomModal';
-
-type ChatRoom = {
-  id: string;
-  name: string;
-  lastMessage: string;
-  lastMessageTime: string;
-  unreadCount?: number;
-  avatar?: string;
-  isGroup?: boolean;
-  members?: string[];
-  type?: 'chatbot' | 'emergency' | 'normal' | 'group';
-};
+import type { ChatRoomDto, ChatParticipantDto } from 'src/services/chat/chat.types';
 
 type Props = {
-  rooms: ChatRoom[];
+  rooms: ChatRoomDto[];
   selectedRoomId: string | null;
-  onSelectRoom: (room: ChatRoom) => void;
+  onSelectRoom: (room: ChatRoomDto) => void;
+  onCreateRoom?: (roomName: string, memberIndexes: number[]) => void;
 };
 
-export default function LeftSection({ rooms, selectedRoomId, onSelectRoom }: Props) {
+export default function LeftSection({ rooms, selectedRoomId, onSelectRoom, onCreateRoom }: Props) {
   const { user } = useAuthContext();
+  const { data: myInfoData } = useMyInfo();
   const [searchQuery, setSearchQuery] = useState('');
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const normalChatExpanded = useBoolean(true);
   const groupChatExpanded = useBoolean(true);
 
-  // 현재 사용자 이름 (displayName 또는 name 사용)
-  const currentUserName = user?.displayName || user?.name || '';
+  // 현재 사용자 memberIdx 추출 (여러 후보 필드에서 시도)
+  const currentUserMemberIdx =
+    (myInfoData as any)?.memberIdx ||
+    (myInfoData as any)?.memberIndex ||
+    (myInfoData as any)?.member?.memberIdx ||
+    (myInfoData as any)?.member?.memberIndex ||
+    user?.memberIdx ||
+    user?.memberIndex ||
+    user?.member?.memberIdx ||
+    user?.member?.memberIndex ||
+    user?.companyMember?.memberIdx ||
+    user?.companyMember?.memberIndex ||
+    null;
 
-  const filteredRooms = rooms.filter((room) =>
-    room.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredRooms = rooms
+    .map((room) => {
+      const lastMessageTime = room.lastMessageAt
+        ? new Date(room.lastMessageAt).toLocaleTimeString('ko-KR', {
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+        : '';
+      return {
+        ...room,
+        lastMessageTime,
+      };
+    })
+    .filter((room) => room.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
-  // 일반 채팅 목록: 본인과의 채팅방 제외
-  const normalRooms = filteredRooms.filter(
-    (room) =>
-      !room.isGroup &&
-      room.type !== 'chatbot' &&
-      room.type !== 'emergency' &&
-      room.name !== currentUserName
-  );
+  // participants 배열에서 현재 사용자를 제외한 상대방 수로 일반/그룹 채팅 구분
+  // 상대방 1명 = 일반 채팅 (나 포함 2명)
+  // 상대방 2명 이상 = 그룹 채팅 (나 포함 3명 이상)
+  const getOtherParticipants = (participants?: ChatParticipantDto[]) => {
+    if (!participants || !Array.isArray(participants)) return [];
+    if (currentUserMemberIdx === null || currentUserMemberIdx === undefined) return participants;
 
-  // 그룹 채팅 목록: members 배열에 본인이 포함된 경우 제외
-  const groupRooms = filteredRooms.filter(
-    (room) =>
-      room.isGroup && (!room.members || !room.members.some((member) => member === currentUserName))
-  );
+    const currentIdx = Number(currentUserMemberIdx);
+    if (Number.isNaN(currentIdx)) return participants;
 
-  // 그룹 채팅 멤버 목록에서 본인과 "외 N명" 같은 텍스트를 제외하는 함수
-  const getFilteredMembers = (members?: string[]): string[] => {
-    if (!members) return [];
-    return members.filter(
-      (member) =>
-        member !== currentUserName &&
-        !member.includes('외') &&
-        !member.includes('명') &&
-        member.trim() !== ''
+    return participants.filter((p) => {
+      const participantIdx = Number(p.memberIdx ?? (p as any)?.memberIndex);
+      return !Number.isNaN(participantIdx) && participantIdx !== currentIdx;
+    });
+  };
+
+  // 일반 채팅 목록: 상대방이 1명인 경우 (나 포함 2명)
+  const normalRooms = filteredRooms.filter((room) => {
+    if (room.type === 'CHATBOT' || room.type === 'EMERGENCY') return false;
+    const otherParticipants = getOtherParticipants(room.participants);
+    return otherParticipants.length === 1;
+  });
+
+  // 그룹 채팅 목록: 상대방이 2명 이상인 경우 (나 포함 3명 이상)
+  const groupRooms = filteredRooms.filter((room) => {
+    if (room.type === 'CHATBOT' || room.type === 'EMERGENCY') return false;
+    const otherParticipants = getOtherParticipants(room.participants);
+    return otherParticipants.length >= 2;
+  });
+
+  // participants 배열에서 현재 사용자를 제외한 상대방 목록 반환
+  const getFilteredParticipants = (participants?: ChatParticipantDto[]) =>
+    getOtherParticipants(participants);
+
+  // 챗봇방은 항상 표시 (API 응답에 없어도)
+  const chatbotRoom: ChatRoomDto = {
+    chatRoomIdx: 0,
+    chatRoomId: 'chatbot',
+    name: '챗봇',
+    type: 'CHATBOT',
+    isGroup: 0,
+    lastMessage: '',
+    lastMessageAt: '',
+  };
+
+  const emergencyRoom = filteredRooms.find((r) => r.type === 'EMERGENCY');
+
+  // Avatar 렌더링 헬퍼 함수 (프로필 이미지가 있으면 사용, 없으면 아이콘)
+  const renderAvatar = (participant: ChatParticipantDto, size: number = 40) => {
+    if (participant.profileImage) {
+      return (
+        <Avatar
+          sx={{ width: size, height: size }}
+          src={participant.profileImage}
+          alt={participant.name}
+        >
+          {participant.name?.[0] || '?'}
+        </Avatar>
+      );
+    }
+    return (
+      <Avatar sx={{ width: size, height: size }}>
+        <Iconify icon="solar:user-rounded-bold" width={size * 0.6} />
+      </Avatar>
     );
   };
 
-  const chatbotRoom = filteredRooms.find((r) => r.type === 'chatbot');
-  const emergencyRoom = filteredRooms.find((r) => r.type === 'emergency');
-
   // 그룹 채팅 Avatar 렌더링 함수 (Figma 디자인에 맞춰 멤버 수에 따라 다르게 표시)
-  const renderGroupAvatar = (members?: string[]) => {
-    const filteredMembers = getFilteredMembers(members);
-    const memberCount = filteredMembers.length;
+  const renderGroupAvatar = (participants?: ChatParticipantDto[]) => {
+    const filteredParticipants = getFilteredParticipants(participants);
+    const participantCount = filteredParticipants.length;
 
     // 1명일 때: 단일 Avatar
-    if (memberCount <= 1) {
-      const member = filteredMembers[0];
-      return <Avatar sx={{ width: 40, height: 40 }}>{member?.[0] || '?'}</Avatar>;
+    if (participantCount <= 1) {
+      const participant = filteredParticipants[0];
+      if (!participant) {
+        return (
+          <Avatar sx={{ width: 40, height: 40 }}>
+            <Iconify icon="solar:user-rounded-bold" width={24} />
+          </Avatar>
+        );
+      }
+      return renderAvatar(participant, 40);
     }
 
     // 2명일 때: 2개 Avatar 겹쳐서 (왼쪽/오른쪽)
-    if (memberCount === 2) {
+    if (participantCount === 2) {
       return (
         <Box
           sx={{
@@ -102,40 +160,38 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom }: Pro
             height: 40,
           }}
         >
-          <Avatar
-            sx={{
-              width: 25,
-              height: 25,
-              border: '1px solid',
-              borderColor: 'background.paper',
-              position: 'absolute',
-              left: 0,
-              top: '15%',
-              bottom: '15%',
-            }}
-          >
-            {filteredMembers[0]?.[0] || ''}
-          </Avatar>
-          <Avatar
-            sx={{
-              width: 25,
-              height: 25,
-              border: '1px solid',
-              borderColor: 'background.paper',
-              position: 'absolute',
-              right: 0,
-              top: '15%',
-              bottom: '15%',
-            }}
-          >
-            {filteredMembers[1]?.[0] || ''}
-          </Avatar>
+          {filteredParticipants[0] && (
+            <Box
+              sx={{
+                position: 'absolute',
+                left: 0,
+                top: '15%',
+                width: 25,
+                height: 25,
+              }}
+            >
+              {renderAvatar(filteredParticipants[0], 25)}
+            </Box>
+          )}
+          {filteredParticipants[1] && (
+            <Box
+              sx={{
+                position: 'absolute',
+                right: 0,
+                top: '15%',
+                width: 25,
+                height: 25,
+              }}
+            >
+              {renderAvatar(filteredParticipants[1], 25)}
+            </Box>
+          )}
         </Box>
       );
     }
 
-    // 3명일 때: 3개 Avatar 겹쳐서 (왼쪽/중앙/오른쪽)
-    if (memberCount === 3) {
+    // 3명일 때: 3개 Avatar 삼각형 배치 (위쪽 중앙, 아래쪽 왼쪽, 아래쪽 오른쪽)
+    if (participantCount === 3) {
       return (
         <Box
           sx={{
@@ -144,49 +200,51 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom }: Pro
             height: 40,
           }}
         >
-          <Avatar
-            sx={{
-              width: 20,
-              height: 20,
-              border: '1px solid',
-              borderColor: 'background.paper',
-              position: 'absolute',
-              left: 0,
-              top: '20%',
-              bottom: '20%',
-            }}
-          >
-            {filteredMembers[0]?.[0] || ''}
-          </Avatar>
-          <Avatar
-            sx={{
-              width: 20,
-              height: 20,
-              border: '1px solid',
-              borderColor: 'background.paper',
-              position: 'absolute',
-              left: '50%',
-              top: '20%',
-              bottom: '20%',
-              transform: 'translateX(-50%)',
-            }}
-          >
-            {filteredMembers[1]?.[0] || ''}
-          </Avatar>
-          <Avatar
-            sx={{
-              width: 20,
-              height: 20,
-              border: '1px solid',
-              borderColor: 'background.paper',
-              position: 'absolute',
-              right: 0,
-              top: '20%',
-              bottom: '20%',
-            }}
-          >
-            {filteredMembers[2]?.[0] || ''}
-          </Avatar>
+          {/* 위쪽 중앙 */}
+          {filteredParticipants[0] && (
+            <Box
+              sx={{
+                position: 'absolute',
+                left: '50%',
+                top: 0,
+                transform: 'translateX(-50%)',
+                width: 20,
+                height: 20,
+              }}
+            >
+              {renderAvatar(filteredParticipants[0], 20)}
+            </Box>
+          )}
+          {/* 아래쪽 왼쪽 */}
+          {filteredParticipants[1] && (
+            <Box
+              sx={{
+                position: 'absolute',
+                left: 0,
+                bottom: 0,
+                width: 20,
+                height: 20,
+                transform: 'translateX(-7.5%)',
+              }}
+            >
+              {renderAvatar(filteredParticipants[1], 20)}
+            </Box>
+          )}
+          {/* 아래쪽 오른쪽 */}
+          {filteredParticipants[2] && (
+            <Box
+              sx={{
+                position: 'absolute',
+                right: 0,
+                bottom: 0,
+                width: 20,
+                transform: 'translateX(7.5%)',
+                height: 20,
+              }}
+            >
+              {renderAvatar(filteredParticipants[2], 20)}
+            </Box>
+          )}
         </Box>
       );
     }
@@ -201,61 +259,61 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom }: Pro
         }}
       >
         {/* 왼쪽 위 */}
-        <Avatar
-          sx={{
-            width: 20,
-            height: 20,
-            border: '1px solid',
-            borderColor: 'background.paper',
-            position: 'absolute',
-            left: 0,
-            top: 0,
-          }}
-        >
-          {filteredMembers[0]?.[0] || ''}
-        </Avatar>
+        {filteredParticipants[0] && (
+          <Box
+            sx={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              width: 20,
+              height: 20,
+            }}
+          >
+            {renderAvatar(filteredParticipants[0], 20)}
+          </Box>
+        )}
         {/* 오른쪽 위 */}
-        <Avatar
-          sx={{
-            width: 20,
-            height: 20,
-            border: '1px solid',
-            borderColor: 'background.paper',
-            position: 'absolute',
-            right: 0,
-            top: 0,
-          }}
-        >
-          {filteredMembers[1]?.[0] || ''}
-        </Avatar>
+        {filteredParticipants[1] && (
+          <Box
+            sx={{
+              position: 'absolute',
+              right: 0,
+              top: 0,
+              width: 20,
+              height: 20,
+            }}
+          >
+            {renderAvatar(filteredParticipants[1], 20)}
+          </Box>
+        )}
         {/* 왼쪽 아래 */}
-        <Avatar
-          sx={{
-            width: 20,
-            height: 20,
-            border: '1px solid',
-            borderColor: 'background.paper',
-            position: 'absolute',
-            left: 0,
-            bottom: 0,
-          }}
-        >
-          {filteredMembers[2]?.[0] || ''}
-        </Avatar>
+        {filteredParticipants[2] && (
+          <Box
+            sx={{
+              position: 'absolute',
+              left: 0,
+              bottom: 0,
+              width: 20,
+              height: 20,
+            }}
+          >
+            {renderAvatar(filteredParticipants[2], 20)}
+          </Box>
+        )}
         {/* 오른쪽 아래 */}
-        <Avatar
-          sx={{
-            width: 20,
-            height: 20,
-            border: '1px solid',
-            borderColor: 'background.paper',
-            position: 'absolute',
-            right: 0,
-            bottom: 0,
-          }}
-        >
-          {filteredMembers[3]?.[0] || ''}
-        </Avatar>
+        {filteredParticipants[3] && (
+          <Box
+            sx={{
+              position: 'absolute',
+              right: 0,
+              bottom: 0,
+              width: 20,
+              height: 20,
+            }}
+          >
+            {renderAvatar(filteredParticipants[3], 20)}
+          </Box>
+        )}
       </Box>
     );
   };
@@ -312,11 +370,7 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom }: Pro
           onChange={(e) => setSearchQuery(e.target.value)}
           InputProps={{
             startAdornment: (
-              <Iconify
-                icon={'solar:magnifer-bold' as any}
-                width={24}
-                sx={{ mr: 1, color: 'text.disabled' }}
-              />
+              <Iconify icon="eva:search-fill" width={20} sx={{ color: 'text.disabled', mr: 1 }} />
             ),
           }}
         />
@@ -324,27 +378,25 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom }: Pro
 
       <Scrollbar sx={{ flex: 1 }}>
         <Box sx={{ pb: 1 }}>
-          {/* 챗봇 */}
-          {chatbotRoom && (
-            <ListItem disablePadding>
-              <ListItemButton
-                selected={selectedRoomId === 'chatbot'}
-                onClick={() => onSelectRoom(chatbotRoom)}
-                sx={{ px: 2.5, py: 1.5 }}
-              >
-                <ListItemAvatar>
-                  <Avatar sx={{ width: 40, height: 40 }} />
-                </ListItemAvatar>
-                <ListItemText
-                  primary="챗봇"
-                  primaryTypographyProps={{
-                    fontSize: 16,
-                    fontWeight: 600,
-                  }}
-                />
-              </ListItemButton>
-            </ListItem>
-          )}
+          {/* 챗봇 - 항상 표시 */}
+          <ListItem disablePadding>
+            <ListItemButton
+              selected={selectedRoomId === 'chatbot'}
+              onClick={() => onSelectRoom(chatbotRoom)}
+              sx={{ px: 2.5, py: 1.5 }}
+            >
+              <ListItemAvatar>
+                <Avatar sx={{ width: 40, height: 40 }} />
+              </ListItemAvatar>
+              <ListItemText
+                primary="챗봇"
+                primaryTypographyProps={{
+                  fontSize: 16,
+                  fontWeight: 600,
+                }}
+              />
+            </ListItemButton>
+          </ListItem>
 
           {/* 응급 채팅 */}
           {emergencyRoom && (
@@ -388,10 +440,15 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom }: Pro
                   }}
                 />
                 <Stack direction="column" alignItems="flex-end" spacing={0.5} sx={{ minWidth: 68 }}>
-                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                    {emergencyRoom.lastMessageTime}
-                  </Typography>
-                  {emergencyRoom.unreadCount && <UnreadBadge count={emergencyRoom.unreadCount} />}
+                  {emergencyRoom.lastMessageTime ? (
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      {emergencyRoom.lastMessageTime}
+                    </Typography>
+                  ) : null}
+                  {typeof emergencyRoom.unreadCount === 'number' &&
+                    emergencyRoom.unreadCount > 0 && (
+                      <UnreadBadge count={emergencyRoom.unreadCount} />
+                    )}
                 </Stack>
               </ListItemButton>
             </ListItem>
@@ -438,44 +495,58 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom }: Pro
               </Box>
               {normalChatExpanded.value && (
                 <List disablePadding>
-                  {normalRooms.map((room) => (
-                    <ListItem key={room.id} disablePadding>
-                      <ListItemButton
-                        selected={selectedRoomId === room.id}
-                        onClick={() => onSelectRoom(room)}
-                        sx={{ px: 2.5, py: 1.5 }}
-                      >
-                        <ListItemAvatar>
-                          <Avatar sx={{ width: 40, height: 40 }}>
-                            {room.avatar || room.name[0]}
-                          </Avatar>
-                        </ListItemAvatar>
-                        <ListItemText
-                          primary={room.name}
-                          secondary={room.lastMessage}
-                          primaryTypographyProps={{
-                            fontSize: 14,
-                            fontWeight: 600,
-                          }}
-                          secondaryTypographyProps={{
-                            fontSize: 12,
-                            color: 'text.secondary',
-                          }}
-                        />
-                        <Stack
-                          direction="column"
-                          alignItems="flex-end"
-                          spacing={0.5}
-                          sx={{ minWidth: 68, ml: 1.5 }}
+                  {normalRooms.map((room) => {
+                    // 일반 채팅: 상대방 1명의 정보 가져오기 (아바타용)
+                    const otherParticipants = getFilteredParticipants(room.participants);
+                    const otherParticipant = otherParticipants[0];
+
+                    return (
+                      <ListItem key={room.chatRoomId || room.name} disablePadding>
+                        <ListItemButton
+                          selected={selectedRoomId === room.chatRoomId}
+                          onClick={() => onSelectRoom(room)}
+                          sx={{ px: 2.5, py: 1.5 }}
                         >
-                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                            {room.lastMessageTime}
-                          </Typography>
-                          {room.unreadCount && <UnreadBadge count={room.unreadCount} />}
-                        </Stack>
-                      </ListItemButton>
-                    </ListItem>
-                  ))}
+                          <ListItemAvatar>
+                            {otherParticipant ? (
+                              renderAvatar(otherParticipant, 40)
+                            ) : (
+                              <Avatar sx={{ width: 40, height: 40 }}>
+                                <Iconify icon="solar:user-rounded-bold" width={24} />
+                              </Avatar>
+                            )}
+                          </ListItemAvatar>
+                          <ListItemText
+                            primary={room.name}
+                            secondary={room.lastMessage}
+                            primaryTypographyProps={{
+                              fontSize: 14,
+                              fontWeight: 600,
+                            }}
+                            secondaryTypographyProps={{
+                              fontSize: 12,
+                              color: 'text.secondary',
+                            }}
+                          />
+                          <Stack
+                            direction="column"
+                            alignItems="flex-end"
+                            spacing={0.5}
+                            sx={{ minWidth: 68, ml: 1.5 }}
+                          >
+                            {room.lastMessageTime ? (
+                              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                {room.lastMessageTime}
+                              </Typography>
+                            ) : null}
+                            {typeof room.unreadCount === 'number' && room.unreadCount > 0 && (
+                              <UnreadBadge count={room.unreadCount} />
+                            )}
+                          </Stack>
+                        </ListItemButton>
+                      </ListItem>
+                    );
+                  })}
                 </List>
               )}
             </>
@@ -523,27 +594,17 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom }: Pro
               {groupChatExpanded.value && (
                 <List disablePadding>
                   {groupRooms.map((room) => (
-                    <ListItem key={room.id} disablePadding>
+                    <ListItem key={room.chatRoomId || room.name} disablePadding>
                       <ListItemButton
-                        selected={selectedRoomId === room.id}
+                        selected={selectedRoomId === room.chatRoomId}
                         onClick={() => onSelectRoom(room)}
                         sx={{ px: 2.5, py: 1.5 }}
                       >
-                        <ListItemAvatar>{renderGroupAvatar(room.members)}</ListItemAvatar>
+                        <ListItemAvatar>{renderGroupAvatar(room.participants)}</ListItemAvatar>
                         <ListItemText
                           primary={
                             <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: 14 }}>
-                              {(() => {
-                                const filteredMembers = getFilteredMembers(room.members);
-                                const displayMembers = filteredMembers.slice(0, 3);
-                                const remainingCount = filteredMembers.length - 3;
-                                return (
-                                  <>
-                                    {displayMembers.join(', ')}
-                                    {remainingCount > 0 && ` 외 ${remainingCount}명`}
-                                  </>
-                                );
-                              })()}
+                              {room.name}
                             </Typography>
                           }
                           secondary={room.lastMessage}
@@ -558,10 +619,14 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom }: Pro
                           spacing={0.5}
                           sx={{ minWidth: 68, ml: 1.5 }}
                         >
-                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                            {room.lastMessageTime}
-                          </Typography>
-                          {room.unreadCount && <UnreadBadge count={room.unreadCount} />}
+                          {room.lastMessageTime ? (
+                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                              {room.lastMessageTime}
+                            </Typography>
+                          ) : null}
+                          {typeof room.unreadCount === 'number' && room.unreadCount > 0 && (
+                            <UnreadBadge count={room.unreadCount} />
+                          )}
                         </Stack>
                       </ListItemButton>
                     </ListItem>
@@ -578,9 +643,12 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom }: Pro
         open={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
         onConfirm={(roomName, userIds) => {
-          // TODO: TanStack Query Hook(useMutation)으로 채팅방 생성 API 호출
-          // 생성 성공 후 채팅방 목록 갱신 및 새 채팅방 선택
-          console.log('채팅방 생성:', roomName, userIds);
+          // userIds is string[], convert to number[] if your API expects number[]
+          // The prompt's API: POST /safeyoui/api/chat/rooms -> CreateChatRoomParams { memberIndexes: number[] }
+          const memberIndexes = userIds.map((id) => Number(id));
+          if (onCreateRoom) {
+            onCreateRoom(roomName, memberIndexes);
+          }
           setCreateModalOpen(false);
         }}
       />

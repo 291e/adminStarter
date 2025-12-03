@@ -1,4 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
+import dayjs from 'dayjs';
+import type { Dayjs } from 'dayjs';
+import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
+import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
+dayjs.extend(isSameOrAfter);
+dayjs.extend(isSameOrBefore);
 
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -16,19 +22,41 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Paper from '@mui/material/Paper';
 import TextField from '@mui/material/TextField';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
 import Pagination from '@mui/material/Pagination';
-import FormHelperText from '@mui/material/FormHelperText';
+import CircularProgress from '@mui/material/CircularProgress';
 
 import { Iconify } from 'src/components/iconify';
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 
-import {
-  getEducationDetail,
-  updateEducationRecord,
-} from 'src/services/education-report/education-report.service';
-import type { UpdateEducationRecordParams } from 'src/services/education-report/education-report.types';
+import { getEducationDetail } from 'src/services/education-report/education-report.service';
 import { useUserProfile } from '../hooks/use-dashboard-api';
+
+// 역할 한글 맵핑 함수
+const getRoleLabel = (role: string): string => {
+  if (!role) return '';
+
+  const roleUpper = role.toUpperCase();
+  const roleMap: { [key: string]: string } = {
+    OPERATOR_MANAGER: '조직 관리자',
+    MANAGEMENT_SUPERVISOR: '관리 감독자',
+    SAFETY_MANAGER: '안전보건 담당자',
+    WORKER: '근로자',
+    ADMIN: '조직 관리자',
+    MEMBER: '근로자',
+    // 소문자 키 (하위 호환성)
+    operator_manager: '조직 관리자',
+    management_supervisor: '관리 감독자',
+    safety_manager: '안전보건 담당자',
+    worker: '근로자',
+    admin: '조직 관리자',
+    member: '근로자',
+  };
+
+  return roleMap[roleUpper] || roleMap[role] || role;
+};
 
 // ----------------------------------------------------------------------
 
@@ -48,10 +76,9 @@ type Props = {
 };
 
 export default function EducationDetailModal({ open, onClose, onSave, user }: Props) {
-  const queryClient = useQueryClient();
   const [mandatoryPage, setMandatoryPage] = useState(1);
   const [regularPage, setRegularPage] = useState(1);
-  const [fileNames, setFileNames] = useState<{ [key: string]: string }>({});
+  const [selectedYearRange, setSelectedYearRange] = useState('current');
 
   const rowsPerPage = 5;
 
@@ -61,14 +88,6 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
 
   // 사용자 프로필 정보 조회 (조직 정보 포함)
   const { data: profileData } = useUserProfile();
-
-  // 디버깅: memberIdx 확인
-  useEffect(() => {
-    if (import.meta.env.DEV) {
-      console.log('🔍 EducationDetailModal - user:', user);
-      console.log('🔍 EducationDetailModal - memberIdx:', memberIdx);
-    }
-  }, [user, memberIdx]);
 
   // 교육 상세 현황 조회
   const {
@@ -86,19 +105,11 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
     enabled: open && !!memberIdx && !isNaN(memberIdx),
   });
 
-  // 파일명 저장 Mutation
-  const saveFileNameMutation = useMutation({
-    mutationFn: (params: UpdateEducationRecordParams) => updateEducationRecord(params),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['educationDetail', memberIdx] });
-    },
-  });
-
   useEffect(() => {
     if (open) {
       setMandatoryPage(1);
       setRegularPage(1);
-      setFileNames({});
+      setSelectedYearRange('current');
     }
   }, [open, user]);
 
@@ -132,11 +143,6 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
     }
 
     const detail = educationDetailData.body as any;
-
-    // 디버깅: 실제 응답 구조 확인
-    if (import.meta.env.DEV) {
-      console.log('🔍 Education Detail Structure:', detail);
-    }
 
     // 실제 응답 구조:
     // educationRecordList: 교육 기록 배열
@@ -188,54 +194,77 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
     return false;
   }, [profileData]);
 
-  const handleFileNameChange = (recordId: string, value: string) => {
-    setFileNames((prev) => ({ ...prev, [recordId]: value }));
-  };
+  // joinDate를 dayjs로 변환
+  const joinDateDayjs = user?.joinDate ? dayjs(user.joinDate) : null;
 
-  const handleSave = async () => {
-    try {
-      // 변경된 파일명들을 저장
-      const updates = Object.entries(fileNames)
-        .filter(([recordId, fileName]) => fileName.trim() !== '')
-        .map(([recordId, fileName]) => ({
-          educationRecordIdx: recordId,
-          fileName: fileName.trim(),
-        }));
-
-      // 각 교육 기록의 파일명 업데이트
-      await Promise.all(
-        updates.map((update) =>
-          saveFileNameMutation.mutateAsync({
-            educationRecordIdx: update.educationRecordIdx,
-            fileName: update.fileName,
-          })
-        )
-      );
-
-      if (onSave) {
-        onSave();
-      }
-    } catch (error) {
-      console.error('❌ Error saving file names:', error);
+  // 연도 옵션 계산
+  const yearOptions = useMemo(() => {
+    if (!joinDateDayjs) {
+      return [{ value: 'current', label: '현재' }];
     }
+    return [
+      { value: 'current', label: '현재' },
+      { value: 'year-1', label: '1년차' },
+      { value: 'year-2', label: '2년차' },
+      { value: 'year-3', label: '3년차' },
+    ];
+  }, [joinDateDayjs]);
+
+  // 선택된 연도 범위 계산
+  type YearRange = { start: Dayjs | null; end: Dayjs | null };
+
+  const selectedDateRange = useMemo<YearRange>(() => {
+    if (!joinDateDayjs || selectedYearRange === 'current') {
+      return { start: null, end: null };
+    }
+    const yearNumber = Number(selectedYearRange.split('-')[1]) || 1;
+    const start = joinDateDayjs.startOf('day').add(yearNumber - 1, 'year');
+    const end = joinDateDayjs.startOf('day').add(yearNumber, 'year').subtract(1, 'day');
+    return { start, end };
+  }, [joinDateDayjs, selectedYearRange]);
+
+  // 레코드 필터링 함수
+  const filterRecordsByRange = (records: any[]) => {
+    if (!selectedDateRange.start || !selectedDateRange.end) {
+      return records;
+    }
+    return records.filter((record) => {
+      if (!record.educationDate) return false;
+      const date = dayjs(record.educationDate);
+      return (
+        date.isSameOrAfter(selectedDateRange.start, 'day') &&
+        date.isSameOrBefore(selectedDateRange.end, 'day')
+      );
+    });
   };
+
+  // 필터링된 레코드
+  const filteredMandatoryRecords = filterRecordsByRange(educationDetail.mandatoryEducation);
+  const filteredRegularRecords = filterRecordsByRange(educationDetail.regularEducation);
+
+  // 필터링된 레코드의 총 시간 계산
+  const mandatoryTotal = filteredMandatoryRecords.reduce(
+    (sum, record) => sum + (record.educationTime || 0),
+    0
+  );
+  const regularTotal = filteredRegularRecords.reduce(
+    (sum, record) => sum + (record.educationTime || 0),
+    0
+  );
+  const totalTime = mandatoryTotal + regularTotal;
 
   // 페이지네이션 계산
-  const mandatoryStartIndex = (mandatoryPage - 1) * rowsPerPage;
-  const mandatoryEndIndex = mandatoryStartIndex + rowsPerPage;
-  const mandatoryDisplayed = educationDetail.mandatoryEducation.slice(
-    mandatoryStartIndex,
-    mandatoryEndIndex
-  );
-  const mandatoryTotalPages = Math.ceil(educationDetail.mandatoryEducation.length / rowsPerPage);
+  const mandatoryTotalPages = Math.ceil(filteredMandatoryRecords.length / rowsPerPage);
+  const regularTotalPages = Math.ceil(filteredRegularRecords.length / rowsPerPage);
 
-  const regularStartIndex = (regularPage - 1) * rowsPerPage;
-  const regularEndIndex = regularStartIndex + rowsPerPage;
-  const regularDisplayed = educationDetail.regularEducation.slice(
-    regularStartIndex,
-    regularEndIndex
+  const mandatoryPaginated = filteredMandatoryRecords.slice(
+    (mandatoryPage - 1) * rowsPerPage,
+    mandatoryPage * rowsPerPage
   );
-  const regularTotalPages = Math.ceil(educationDetail.regularEducation.length / rowsPerPage);
+  const regularPaginated = filteredRegularRecords.slice(
+    (regularPage - 1) * rowsPerPage,
+    regularPage * rowsPerPage
+  );
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -247,10 +276,13 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
 
       <DialogContent sx={{ pb: 3, px: 0 }}>
         {isLoading && (
-          <Box sx={{ p: 3, textAlign: 'center' }}>
-            <Typography variant="body2" color="text.secondary">
-              데이터를 불러오는 중...
-            </Typography>
+          <Box sx={{ py: 8 }}>
+            <Stack alignItems="center" justifyContent="center">
+              <CircularProgress />
+              <Typography variant="body2" sx={{ mt: 2 }}>
+                교육 상세 정보를 불러오는 중...
+              </Typography>
+            </Stack>
           </Box>
         )}
         {educationError && (
@@ -314,7 +346,7 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
                       역할
                     </Typography>
                     <Typography variant="body2" sx={{ fontSize: 14 }}>
-                      {user?.role || '-'}
+                      {getRoleLabel(user?.role || '') || '-'}
                     </Typography>
                   </Stack>
                 </Stack>
@@ -325,19 +357,48 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
             <Stack spacing={5} sx={{ px: 3 }}>
               {/* 의무교육 이수 */}
               <Stack spacing={2.5}>
-                <Stack spacing={1.25}>
+                <Stack
+                  spacing={1.25}
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  flexWrap="wrap"
+                  gap={2}
+                >
                   <Typography variant="h6" sx={{ fontSize: 18, fontWeight: 600 }}>
                     교육 기록
                   </Typography>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Typography variant="body2" sx={{ fontSize: 14, fontWeight: 500 }}>
+                      기간 필터
+                    </Typography>
+                    <Select
+                      size="small"
+                      value={selectedYearRange}
+                      onChange={(e) => {
+                        setSelectedYearRange(e.target.value);
+                        setMandatoryPage(1);
+                        setRegularPage(1);
+                      }}
+                      sx={{ minWidth: 120 }}
+                    >
+                      {yearOptions.map((option) => (
+                        <MenuItem key={option.value} value={option.value}>
+                          {option.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </Stack>
                   <Typography
                     variant="subtitle2"
                     sx={{
                       fontSize: 14,
                       fontWeight: 600,
                       color: 'primary.darker',
+                      width: '100%',
                     }}
                   >
-                    의무교육 이수: {educationDetail.mandatoryTotal}분
+                    의무교육 이수: {mandatoryTotal}분
                   </Typography>
                 </Stack>
 
@@ -411,48 +472,56 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {mandatoryDisplayed.map((record: any) => (
-                        <TableRow
-                          key={record.id}
-                          sx={{ borderBottom: '1px dashed', borderColor: 'divider' }}
-                        >
-                          <TableCell sx={{ fontSize: 14 }}>{record.method || '온라인'}</TableCell>
-                          <TableCell sx={{ fontSize: 14 }}>{record.educationName}</TableCell>
-                          <TableCell align="center" sx={{ fontSize: 14 }}>
-                            {record.educationTime}
-                          </TableCell>
-                          <TableCell sx={{ fontSize: 14 }}>
-                            {record.educationDate
-                              ? new Date(record.educationDate).toLocaleDateString('ko-KR', {
-                                  year: 'numeric',
-                                  month: '2-digit',
-                                  day: '2-digit',
-                                })
-                              : ''}
-                          </TableCell>
-                          <TableCell>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <TextField
-                                value={fileNames[record.id] || record.fileName || ''}
-                                onChange={(e) => handleFileNameChange(record.id, e.target.value)}
-                                placeholder="파일명을 입력해주세요."
-                                size="small"
-                                sx={{
-                                  flex: 1,
-                                  '& .MuiInputBase-input': {
+                      {mandatoryPaginated.map((record: any) => {
+                        const recordId =
+                          record.educationRecordIdx ||
+                          record.id ||
+                          record.educationRecordId ||
+                          String(record.memberIdx || '');
+                        const currentFileName = record.fileName || '';
+
+                        return (
+                          <TableRow
+                            key={recordId}
+                            sx={{ borderBottom: '1px dashed', borderColor: 'divider' }}
+                          >
+                            <TableCell sx={{ fontSize: 14 }}>
+                              {record.method || record.educationMethod || '-'}
+                            </TableCell>
+                            <TableCell sx={{ fontSize: 14 }}>
+                              {record.educationName || '-'}
+                            </TableCell>
+                            <TableCell align="center" sx={{ fontSize: 14 }}>
+                              {record.educationTime || record.educationHours || 0}
+                            </TableCell>
+                            <TableCell sx={{ fontSize: 14 }}>
+                              {record.educationDate || '-'}
+                            </TableCell>
+                            <TableCell>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Typography
+                                  sx={{
+                                    flex: 1,
                                     fontSize: 14,
-                                    py: 1,
-                                    textDecoration: 'underline',
-                                  },
-                                }}
-                              />
-                              <IconButton size="small" sx={{ width: 22, height: 22 }}>
-                                <Iconify icon="solar:download-bold" width={22} />
-                              </IconButton>
-                            </Box>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                                    color: currentFileName ? 'text.primary' : 'text.secondary',
+                                  }}
+                                >
+                                  {currentFileName || '파일이 없습니다.'}
+                                </Typography>
+                                {record.fileUrl && (
+                                  <IconButton
+                                    size="small"
+                                    sx={{ width: 22, height: 22 }}
+                                    onClick={() => window.open(record.fileUrl, '_blank')}
+                                  >
+                                    <Iconify icon="solar:download-bold" width={22} />
+                                  </IconButton>
+                                )}
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </TableContainer>
@@ -465,7 +534,8 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
                       onChange={(_, page) => {
                         setMandatoryPage(page);
                       }}
-                      color="primary"
+                      color="standard"
+                      size="small"
                     />
                   </Box>
                 )}
@@ -481,7 +551,7 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
                     color: 'primary.darker',
                   }}
                 >
-                  정기교육 이수: {educationDetail.regularTotal}분
+                  정기교육 이수: {regularTotal}분
                 </Typography>
 
                 <TableContainer
@@ -554,48 +624,56 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {regularDisplayed.map((record: any) => (
-                        <TableRow
-                          key={record.id}
-                          sx={{ borderBottom: '1px dashed', borderColor: 'divider' }}
-                        >
-                          <TableCell sx={{ fontSize: 14 }}>{record.method || '온라인'}</TableCell>
-                          <TableCell sx={{ fontSize: 14 }}>{record.educationName}</TableCell>
-                          <TableCell align="center" sx={{ fontSize: 14 }}>
-                            {record.educationTime}
-                          </TableCell>
-                          <TableCell sx={{ fontSize: 14 }}>
-                            {record.educationDate
-                              ? new Date(record.educationDate).toLocaleDateString('ko-KR', {
-                                  year: 'numeric',
-                                  month: '2-digit',
-                                  day: '2-digit',
-                                })
-                              : ''}
-                          </TableCell>
-                          <TableCell>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <TextField
-                                value={fileNames[record.id] || record.fileName || ''}
-                                onChange={(e) => handleFileNameChange(record.id, e.target.value)}
-                                placeholder="파일명을 입력해주세요."
-                                size="small"
-                                sx={{
-                                  flex: 1,
-                                  '& .MuiInputBase-input': {
+                      {regularPaginated.map((record: any) => {
+                        const recordId =
+                          record.educationRecordIdx ||
+                          record.id ||
+                          record.educationRecordId ||
+                          String(record.memberIdx || '');
+                        const currentFileName = record.fileName || '';
+
+                        return (
+                          <TableRow
+                            key={recordId}
+                            sx={{ borderBottom: '1px dashed', borderColor: 'divider' }}
+                          >
+                            <TableCell sx={{ fontSize: 14 }}>
+                              {record.method || record.educationMethod || '-'}
+                            </TableCell>
+                            <TableCell sx={{ fontSize: 14 }}>
+                              {record.educationName || '-'}
+                            </TableCell>
+                            <TableCell align="center" sx={{ fontSize: 14 }}>
+                              {record.educationTime || record.educationHours || 0}
+                            </TableCell>
+                            <TableCell sx={{ fontSize: 14 }}>
+                              {record.educationDate || '-'}
+                            </TableCell>
+                            <TableCell>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Typography
+                                  sx={{
+                                    flex: 1,
                                     fontSize: 14,
-                                    py: 1,
-                                    textDecoration: 'underline',
-                                  },
-                                }}
-                              />
-                              <IconButton size="small" sx={{ width: 22, height: 22 }}>
-                                <Iconify icon="solar:download-bold" width={22} />
-                              </IconButton>
-                            </Box>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                                    color: currentFileName ? 'text.primary' : 'text.secondary',
+                                  }}
+                                >
+                                  {currentFileName || '파일명이 없습니다.'}
+                                </Typography>
+                                {record.fileUrl && (
+                                  <IconButton
+                                    size="small"
+                                    sx={{ width: 22, height: 22 }}
+                                    onClick={() => window.open(record.fileUrl, '_blank')}
+                                  >
+                                    <Iconify icon="solar:download-bold" width={22} />
+                                  </IconButton>
+                                )}
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </TableContainer>
@@ -608,99 +686,89 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
                       onChange={(_, page) => {
                         setRegularPage(page);
                       }}
-                      color="primary"
+                      color="standard"
+                      size="small"
                     />
                   </Box>
                 )}
               </Stack>
 
-              {/* 이수 시간 요약 - Figma 디자인에 맞게 변경 */}
-              <Stack spacing={3} sx={{ pt: 2 }}>
-                {/* 현재 이수시간 */}
-                <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-end' }}>
-                  <TextField
-                    label="현재 이수시간"
-                    value={educationDetail.totalTime}
-                    disabled
-                    fullWidth
-                    size="medium"
-                    sx={{
-                      '& .MuiInputBase-input': {
-                        fontSize: 15,
-                        lineHeight: '24px',
-                        py: 2,
-                      },
-                      '& .MuiInputLabel-root': {
-                        fontSize: 12,
-                        lineHeight: '18px',
-                      },
-                    }}
-                  />
-                  <Typography
-                    variant="subtitle2"
-                    sx={{
-                      fontSize: 14,
-                      fontWeight: 600,
-                      lineHeight: '22px',
-                      mb: 2,
-                      minWidth: 'fit-content',
-                    }}
-                  >
-                    분
-                  </Typography>
-                </Box>
-
-                {/* 이수 기준시간 */}
-                <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-end' }}>
-                  <TextField
-                    label="이수 기준시간"
-                    value={educationDetail.standardTime}
-                    disabled
-                    fullWidth
-                    size="medium"
-                    sx={{
-                      '& .MuiInputBase-input': {
-                        fontSize: 15,
-                        lineHeight: '24px',
-                        py: 2,
-                      },
-                      '& .MuiInputLabel-root': {
-                        fontSize: 12,
-                        lineHeight: '18px',
-                      },
-                    }}
-                  />
-                  <Typography
-                    variant="subtitle2"
-                    sx={{
-                      fontSize: 14,
-                      fontWeight: 600,
-                      lineHeight: '22px',
-                      mb: 2,
-                      minWidth: 'fit-content',
-                    }}
-                  >
-                    분
-                  </Typography>
-                </Box>
-
-                {/* Helper Text - 무재해 사업장인 경우에만 표시 */}
+              {/* 이수 시간 요약 */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'flex-end',
+                  gap: 3,
+                  pb: 2,
+                }}
+              >
+                <Stack spacing={3} sx={{ minWidth: 300 }}>
+                  <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                    <TextField
+                      label="총 이수시간"
+                      value={totalTime}
+                      disabled
+                      size="small"
+                      sx={{
+                        flex: 1,
+                        '& .MuiInputBase-input': {
+                          fontSize: 15,
+                          fontWeight: 400,
+                        },
+                      }}
+                    />
+                    <Typography variant="subtitle2" sx={{ fontSize: 14, fontWeight: 600, mb: 0.5 }}>
+                      분
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                    <TextField
+                      label="이수 기준시간"
+                      value={educationDetail.standardTime || 0}
+                      disabled
+                      size="small"
+                      sx={{
+                        flex: 1,
+                        '& .MuiInputBase-input': {
+                          fontSize: 15,
+                          fontWeight: 400,
+                        },
+                      }}
+                    />
+                    <Typography variant="subtitle2" sx={{ fontSize: 14, fontWeight: 600, mb: 0.5 }}>
+                      분
+                    </Typography>
+                  </Box>
+                </Stack>
                 {isAccidentFreeWorksite && (
-                  <FormHelperText
+                  <Box
                     sx={{
                       display: 'flex',
-                      alignItems: 'center',
                       gap: 0.5,
-                      fontSize: 12,
-                      lineHeight: '18px',
-                      color: 'text.secondary',
+                      alignItems: 'center',
+                      pb: 2,
+                      pt: 3,
+                      px: 2.5,
                     }}
                   >
-                    <Iconify icon="solar:info-circle-bold" width={16} sx={{ opacity: 0.4 }} />
-                    무재해 사업장 감면 혜택이 적용되었습니다.
-                  </FormHelperText>
+                    <Iconify
+                      icon="solar:info-circle-bold"
+                      width={16}
+                      sx={{ color: 'text.secondary' }}
+                    />
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        fontSize: 12,
+                        color: 'text.secondary',
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      무재해 사업장 감면 혜택이 적용되었습니다.
+                    </Typography>
+                  </Box>
                 )}
-              </Stack>
+              </Box>
             </Stack>
           </Stack>
         )}
@@ -711,14 +779,6 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
         <Stack direction="row" spacing={1.5}>
           <DialogBtn variant="outlined" onClick={onClose} sx={{ minHeight: 36, fontSize: 14 }}>
             닫기
-          </DialogBtn>
-          <DialogBtn
-            variant="contained"
-            onClick={handleSave}
-            disabled={saveFileNameMutation.isPending}
-            sx={{ minHeight: 36, fontSize: 14 }}
-          >
-            {saveFileNameMutation.isPending ? '저장 중...' : '저장'}
           </DialogBtn>
         </Stack>
       </DialogActions>

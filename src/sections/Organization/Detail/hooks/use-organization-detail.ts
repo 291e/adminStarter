@@ -90,22 +90,21 @@ export function useOrganizationDetail(
         memberPhone: member.memberPhone || '',
         memberAddress: member.memberAddress || '',
         memberAddressDetail: member.memberAddressDetail || '',
-        memberMemo: member.memberMemo || null,
+
         createAt: member.createAt || '',
         updateAt: member.updateAt || '',
-        duplicateSigninKey: member.duplicateSigninKey || null,
+
         lastSigninDate: member.lastSigninAt || null,
         companyIdx: member.companyIdx || companyIdx || 0,
         companyBranchIdx: member.companyBranchIdx || null,
         memberNameOrg: member.memberNameOrg || null,
         memberLang: member.memberLang || 'ko',
-        deviceToken: member.deviceToken || null,
+        position: member.position || undefined,
+        department: member.department || undefined,
+        workType: member.workType || undefined,
         deviceGubun: member.deviceGubun || null,
         memberlat: member.memberlat || null,
         memberlng: member.memberlng || null,
-        lastLocationUpdateAt: member.lastLocationUpdateAt || null,
-        loginAttempts: member.loginAttempts || 0,
-        loginBlockedUntil: member.loginBlockedUntil || null,
         accidentFreeYear: null,
         order: page * rowsPerPage + index + 1, // 순번 추가
       })) as (Member & { order: number })[];
@@ -129,22 +128,19 @@ export function useOrganizationDetail(
       memberPhone: member.memberPhone || member.phone || '',
       memberAddress: member.memberAddress || '',
       memberAddressDetail: member.memberAddressDetail || '',
-      memberMemo: null,
       createAt: member.createAt || '',
       updateAt: member.updateAt || '',
-      duplicateSigninKey: null,
       lastSigninDate: member.lastSigninDate || null,
       companyIdx: member.companyIdx || companyIdx || 0,
       companyBranchIdx: member.companyBranchIdx || null,
       memberNameOrg: member.memberNameOrg || null,
       memberLang: member.memberLang || 'ko',
-      deviceToken: null,
+      position: member.position || undefined,
+      department: member.department || undefined,
+      workType: member.workType || undefined,
       deviceGubun: null,
       memberlat: null,
       memberlng: null,
-      lastLocationUpdateAt: null,
-      loginAttempts: 0,
-      loginBlockedUntil: null,
       accidentFreeYear: null,
       order: page * rowsPerPage + index + 1, // 순번 추가
     })) as (Member & { order: number })[];
@@ -235,23 +231,6 @@ export function useOrganizationDetail(
     setRowsPerPage(rows);
     setPage(0);
   }, []);
-
-  // 디버깅
-  if (import.meta.env.DEV) {
-    const responseData = membersData as any;
-    console.log('🔍 [useOrganizationDetail]', {
-      companyIdx,
-      filters,
-      page,
-      rowsPerPage,
-      apiParams,
-      companyMemberListLength: companyMemberList?.length,
-      membersCount: members.length,
-      total: companyMemberList ? companyMemberList.length : responseData?.total,
-      isLoading,
-      isError,
-    });
-  }
 
   const responseData = membersData as any;
   return {

@@ -12,6 +12,10 @@ import type {
   UpdateSharedDocumentResponse,
   DeleteSharedDocumentParams,
   ShareDocumentToChatRoomParams,
+  GetSharedDocumentDetailParams,
+  GetSharedDocumentDetailResponse,
+  GetSafetySystemDocumentDetailParams,
+  GetSafetySystemDocumentDetailResponse,
   GetRiskReportStatisticsParams,
   GetRiskReportStatisticsResponse,
   GetMemberProfileResponse,
@@ -113,6 +117,32 @@ export async function shareDocumentToChatRoom(
   await axiosInstance.post(`${endpoints.dashboard.sharedDocuments}/${sharedDocumentIdx}/share`, {
     chatRoomIdxList,
   });
+}
+
+/**
+ * 공유 문서 상세 조회
+ * GET /dashboard/shared-documents/{sharedDocumentIdx}
+ */
+export async function getSharedDocumentDetail(
+  params: GetSharedDocumentDetailParams
+): Promise<GetSharedDocumentDetailResponse> {
+  const response = await axiosInstance.get<GetSharedDocumentDetailResponse>(
+    `${endpoints.dashboard.sharedDocuments}/${params.sharedDocumentIdx}`
+  );
+  return response.data;
+}
+
+/**
+ * 안전 시스템 문서 상세 조회
+ * GET /dashboard/safety-system-documents/{safetySystemDocumentIdx}
+ */
+export async function getSafetySystemDocumentDetail(
+  params: GetSafetySystemDocumentDetailParams
+): Promise<GetSafetySystemDocumentDetailResponse> {
+  const response = await axiosInstance.get<GetSafetySystemDocumentDetailResponse>(
+    `${endpoints.dashboard.safetySystemDocuments}/${params.safetySystemDocumentIdx}`
+  );
+  return response.data;
 }
 
 /**

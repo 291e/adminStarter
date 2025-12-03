@@ -3,44 +3,53 @@ import axiosInstance from 'src/lib/axios';
 import { endpoints } from 'src/lib/axios';
 
 import type {
-  GetSafetySystemDocumentListParams,
-  SafetySystemDocumentListResponseDto,
-  GetSafetySystemDocumentParams,
-  SafetySystemDocumentDetailResponseDto,
+  SafetySystemListResponseDto,
+  UpdateSafetySystemDto,
+  SafetySystemItemDetailResponseDto,
   CreateSafetySystemDocumentDto,
-  CreateSafetySystemDocumentResponse,
-  UpdateSafetySystemDocumentParams,
-  UpdateSafetySystemDocumentResponse,
-  DeleteSafetySystemDocumentParams,
-  SaveDraftSafetySystemDocumentParams,
-  SaveDraftSafetySystemDocumentResponse,
-  GetItemInfoResponse,
-  GetDocumentApprovalInfoResponse,
-  CreateDocumentApprovalParams,
-  CreateDocumentSignatureParams,
-  GetApprovalProgressResponse,
-  GetSignatureProgressResponse,
-  GetSignatureStatusResponse,
-  AddSignatureParams,
-  SendNotificationParams,
-  PublishDocumentParams,
-  GetChemicalListResponse,
-  GetCasNoListResponse,
-  ProcessActionParams,
+  CreateSafetySystemDocumentResponseDto,
+  UpdateSafetySystemDocumentDto,
+  CreateDocumentApprovalDto,
+  AddApprovalSignatureDto,
+  SendNotificationDto,
+  PublishDocumentDto,
+  GetChemicalListParams,
+  ChemicalListResponseDto,
 } from './safety-system.types';
 
 // ----------------------------------------------------------------------
 
 /**
- * 문서 목록 조회
- * GET /safety-system/documents
+ * 시스템 목록 조회
+ * GET /safety-system/systems
  */
-export async function getSafetySystemDocumentList(
-  params?: GetSafetySystemDocumentListParams
-): Promise<SafetySystemDocumentListResponseDto> {
-  const response = await axiosInstance.get<SafetySystemDocumentListResponseDto>(
-    endpoints.safetySystem.documents,
-    { params }
+export async function getSafetySystemList(): Promise<SafetySystemListResponseDto> {
+  const response = await axiosInstance.get<SafetySystemListResponseDto>(
+    endpoints.safetySystem.systems
+  );
+  return response.data;
+}
+
+/**
+ * 시스템 수정
+ * PUT /safety-system/systems/{safetyIdx}
+ */
+export async function updateSafetySystem(
+  safetyIdx: number,
+  params: UpdateSafetySystemDto
+): Promise<void> {
+  await axiosInstance.put(`${endpoints.safetySystem.systems}/${safetyIdx}`, params);
+}
+
+/**
+ * 아이템 상세 정보 조회
+ * GET /safety-system/items/{safetySystemItemIdx}
+ */
+export async function getSafetySystemItem(
+  safetySystemItemIdx: number
+): Promise<SafetySystemItemDetailResponseDto> {
+  const response = await axiosInstance.get<SafetySystemItemDetailResponseDto>(
+    `${endpoints.safetySystem.items}/${safetySystemItemIdx}`
   );
   return response.data;
 }
@@ -51,8 +60,8 @@ export async function getSafetySystemDocumentList(
  */
 export async function createSafetySystemDocument(
   params: CreateSafetySystemDocumentDto
-): Promise<CreateSafetySystemDocumentResponse> {
-  const response = await axiosInstance.post<CreateSafetySystemDocumentResponse>(
+): Promise<CreateSafetySystemDocumentResponseDto> {
+  const response = await axiosInstance.post<CreateSafetySystemDocumentResponseDto>(
     endpoints.safetySystem.documents,
     params
   );
@@ -60,202 +69,96 @@ export async function createSafetySystemDocument(
 }
 
 /**
- * 문서 상세 정보 조회
- * GET /safety-system/documents/{documentId}
- */
-export async function getSafetySystemDocument(
-  params: GetSafetySystemDocumentParams
-): Promise<SafetySystemDocumentDetailResponseDto> {
-  const response = await axiosInstance.get<SafetySystemDocumentDetailResponseDto>(
-    `${endpoints.safetySystem.documents}/${params.documentId}`
-  );
-  return response.data;
-}
-
-/**
  * 문서 수정
- * PUT /safety-system/documents/{documentId}
+ * PATCH /safety-system/documents/{safetySystemDocumentIdx}
  */
 export async function updateSafetySystemDocument(
-  params: UpdateSafetySystemDocumentParams
-): Promise<UpdateSafetySystemDocumentResponse> {
-  const response = await axiosInstance.put<UpdateSafetySystemDocumentResponse>(
-    `${endpoints.safetySystem.documents}/${params.documentId}`,
+  safetySystemDocumentIdx: number,
+  params: UpdateSafetySystemDocumentDto
+): Promise<void> {
+  await axiosInstance.patch(
+    `${endpoints.safetySystem.documents}/${safetySystemDocumentIdx}`,
     params
   );
-  return response.data;
 }
 
 /**
  * 문서 삭제
- * DELETE /safety-system/documents/{documentId}
+ * DELETE /safety-system/documents/{safetySystemDocumentIdx}
  */
-export async function deleteSafetySystemDocument(
-  params: DeleteSafetySystemDocumentParams
-): Promise<void> {
-  await axiosInstance.delete(`${endpoints.safetySystem.documents}/${params.documentId}`);
+export async function deleteSafetySystemDocument(safetySystemDocumentIdx: number): Promise<void> {
+  await axiosInstance.delete(`${endpoints.safetySystem.documents}/${safetySystemDocumentIdx}`);
 }
 
 /**
- * 문서 임시 저장
- * POST /safety-system/documents/draft
- */
-export async function saveDraftSafetySystemDocument(
-  params: SaveDraftSafetySystemDocumentParams
-): Promise<SaveDraftSafetySystemDocumentResponse> {
-  const response = await axiosInstance.post<SaveDraftSafetySystemDocumentResponse>(
-    `${endpoints.safetySystem.documents}/draft`,
-    params
-  );
-  return response.data;
-}
-
-/**
- * Item 정보 조회
- * GET /safety-system/items
- */
-export async function getItemInfo(): Promise<GetItemInfoResponse> {
-  const response = await axiosInstance.get<GetItemInfoResponse>(endpoints.safetySystem.items);
-  return response.data;
-}
-
-/**
- * 결재 정보 조회
- * GET /safety-system/documents/{documentId}/approvals
- */
-export async function getDocumentApprovalInfo(
-  documentId: string
-): Promise<GetDocumentApprovalInfoResponse> {
-  const response = await axiosInstance.get<GetDocumentApprovalInfoResponse>(
-    `${endpoints.safetySystem.documents}/${documentId}/approvals`
-  );
-  return response.data;
-}
-
-/**
- * 문서 결재 대상자 등록
- * POST /safety-system/documents/{documentId}/approvals
+ * 문서 결재 대상자 등록 (서명 포함)
+ * POST /safety-system/documents/{safetySystemDocumentIdx}/approvals
+ * approvalStep과 memberIdx를 함께 지정하여 결재자(서명자)를 등록합니다.
+ * approvalStep: 1(승인), 2(작성), 3(검토)
  */
 export async function createDocumentApproval(
-  params: CreateDocumentApprovalParams
+  safetySystemDocumentIdx: number,
+  params: CreateDocumentApprovalDto
 ): Promise<void> {
   await axiosInstance.post(
-    `${endpoints.safetySystem.documents}/${params.documentId}/approvals`,
-    { memberIndexes: params.memberIndexes }
+    `${endpoints.safetySystem.documents}/${safetySystemDocumentIdx}/approvals`,
+    params
   );
 }
 
 /**
- * 문서 서명 대상자 등록
- * POST /safety-system/documents/{documentId}/signatures
+ * 결재 서명 등록
+ * POST /safety-system/documents/{safetySystemDocumentIdx}/approvals/signature
+ * 결재자가 자신의 결재에 서명을 등록합니다. 서명 등록 시 결재 상태가 승인/반려로 변경됩니다.
  */
-export async function createDocumentSignature(
-  params: CreateDocumentSignatureParams
+export async function addApprovalSignature(
+  safetySystemDocumentIdx: number,
+  params: AddApprovalSignatureDto
 ): Promise<void> {
   await axiosInstance.post(
-    `${endpoints.safetySystem.documents}/${params.documentId}/signatures`,
-    { memberIndexes: params.memberIndexes }
-  );
-}
-
-/**
- * 결재 진행률 조회
- * GET /safety-system/documents/{documentId}/approval-progress
- */
-export async function getApprovalProgress(
-  documentId: string
-): Promise<GetApprovalProgressResponse> {
-  const response = await axiosInstance.get<GetApprovalProgressResponse>(
-    `${endpoints.safetySystem.documents}/${documentId}/approval-progress`
-  );
-  return response.data;
-}
-
-/**
- * 서명 진행률 조회
- * GET /safety-system/documents/{documentId}/signature-progress
- */
-export async function getSignatureProgress(
-  documentId: string
-): Promise<GetSignatureProgressResponse> {
-  const response = await axiosInstance.get<GetSignatureProgressResponse>(
-    `${endpoints.safetySystem.documents}/${documentId}/signature-progress`
-  );
-  return response.data;
-}
-
-/**
- * 서명 상태 조회
- * GET /safety-system/documents/{documentId}/signature-status
- */
-export async function getSignatureStatus(
-  documentId: string
-): Promise<GetSignatureStatusResponse> {
-  const response = await axiosInstance.get<GetSignatureStatusResponse>(
-    `${endpoints.safetySystem.documents}/${documentId}/signature-status`
-  );
-  return response.data;
-}
-
-/**
- * 서명 추가
- * POST /safety-system/documents/{documentId}/signatures/add
- */
-export async function addSignature(params: AddSignatureParams): Promise<void> {
-  await axiosInstance.post(
-    `${endpoints.safetySystem.documents}/${params.documentId}/signatures/add`,
-    { memberIndexes: params.memberIndexes }
+    `${endpoints.safetySystem.documents}/${safetySystemDocumentIdx}/approvals/signature`,
+    params
   );
 }
 
 /**
  * 알림 발송
- * POST /safety-system/documents/{documentId}/notifications
+ * POST /safety-system/documents/{safetySystemDocumentIdx}/notifications
  */
-export async function sendNotification(params: SendNotificationParams): Promise<void> {
+export async function sendNotification(
+  safetySystemDocumentIdx: number,
+  params: SendNotificationDto
+): Promise<void> {
   await axiosInstance.post(
-    `${endpoints.safetySystem.documents}/${params.documentId}/notifications`,
-    { notificationType: params.notificationType }
+    `${endpoints.safetySystem.documents}/${safetySystemDocumentIdx}/notifications`,
+    params
   );
 }
 
 /**
  * 문서 게시 (공유 문서함 연동)
- * POST /safety-system/documents/{documentId}/publish
+ * POST /safety-system/documents/{safetySystemDocumentIdx}/publish
  */
-export async function publishDocument(params: PublishDocumentParams): Promise<void> {
+export async function publishDocument(
+  safetySystemDocumentIdx: number,
+  params: PublishDocumentDto
+): Promise<void> {
   await axiosInstance.post(
-    `${endpoints.safetySystem.documents}/${params.documentId}/publish`
+    `${endpoints.safetySystem.documents}/${safetySystemDocumentIdx}/publish`,
+    params
   );
 }
 
 /**
- * 화학물질 목록 조회
+ * 화학물질 목록 조회 (한국산업안전보건공단 API)
  * GET /safety-system/chemicals
  */
-export async function getChemicalList(): Promise<GetChemicalListResponse> {
-  const response = await axiosInstance.get<GetChemicalListResponse>(
-    endpoints.safetySystem.chemicals
+export async function getChemicalList(
+  params: GetChemicalListParams
+): Promise<ChemicalListResponseDto> {
+  const response = await axiosInstance.get<ChemicalListResponseDto>(
+    endpoints.safetySystem.chemicals,
+    { params }
   );
   return response.data;
 }
-
-/**
- * CAS No 목록 조회
- * GET /safety-system/cas-numbers
- */
-export async function getCasNoList(): Promise<GetCasNoListResponse> {
-  const response = await axiosInstance.get<GetCasNoListResponse>(
-    endpoints.safetySystem.casNumbers
-  );
-  return response.data;
-}
-
-/**
- * 액션 처리 (엑셀 내보내기, 인쇄 등)
- * POST /safety-system/documents/actions
- */
-export async function processAction(params: ProcessActionParams): Promise<void> {
-  await axiosInstance.post(`${endpoints.safetySystem.documents}/actions`, params);
-}
-

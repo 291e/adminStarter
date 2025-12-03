@@ -1,16 +1,23 @@
 import type { Theme, SxProps } from '@mui/material/styles';
-import { useRef, useEffect, useState, useCallback } from 'react';
-import { useNavigate, useSearchParams } from 'react-router';
+import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import { useNavigate, useSearchParams, useParams } from 'react-router';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import Box from '@mui/material/Box';
+import CircularProgress from '@mui/material/CircularProgress';
+import Typography from '@mui/material/Typography';
 
 import { DashboardContent } from 'src/layouts/dashboard';
+import { getItem, type SafetySystem } from 'src/_mock/_safety-system';
+import type {
+  SafetySystemItem,
+  SafetySystemDocument,
+} from 'src/services/safety-system/safety-system.types';
 import {
-  getTableDataByDocument,
-  getItem,
-  type SafetySystem,
-  type SafetySystemItem,
-} from 'src/_mock/_safety-system';
+  getSafetySystemItem,
+  addApprovalSignature,
+} from 'src/services/safety-system/safety-system.service';
+import { uploadFile } from 'src/services/system/system.service';
 
 import DetailHeader from './components/Header';
 import DocumentHeader from './components/DocumentHeader';
@@ -20,6 +27,7 @@ import { generatePDF } from './utils/pdf-utils';
 import { getRiskAssessmentTableData } from './data/table-data';
 import type { DefaultTableRow } from './tables/Default';
 import SignatureModal from '../edit/components/SignatureModal';
+import PDFDownloadModal from '../components/PDFDownloadModal';
 
 // ----------------------------------------------------------------------
 
@@ -37,13 +45,15 @@ export function Risk_2200View({
   riskId,
   safetyId,
   system,
-  item,
+  item: propItem,
   title = 'Blank',
   description,
   sx,
 }: Props) {
   const pdfRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const { risk_id } = useParams<{ risk_id: string }>();
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const currentDate = new Date();
   const days = ['일', '월', '화', '수', '목', '금', '토'];
@@ -52,20 +62,81 @@ export function Risk_2200View({
     '0'
   )}.${String(currentDate.getDate()).padStart(2, '0')} (${days[currentDate.getDay()]})`;
 
+  // riskId 또는 risk_id에서 safetySystemDocumentIdx 추출
+  const safetySystemDocumentIdx = riskId ? Number(riskId) : risk_id ? Number(risk_id) : null;
+
+  // item이 없으면 system에서 찾기 (타입 변환 필요)
+  const item = propItem || (system?.items?.[0] as SafetySystemItem | undefined);
+
+  // safetySystemItemIdx 추출 (타입 가드 사용)
+  const safetySystemItemIdx = useMemo(() => {
+    if (!item) return null;
+    // services 타입인지 확인
+    if ('safetySystemItemIdx' in item) {
+      return (item as SafetySystemItem).safetySystemItemIdx;
+    }
+    // _mock 타입인 경우 (itemNumber와 safetyIdx로 조회 필요)
+    // 하지만 API를 사용하려면 safetySystemItemIdx가 필요하므로 null 반환
+    return null;
+  }, [item]);
+
+  // 문서 상세 정보 조회 (아이템 상세 정보에서 documentList를 가져와서 해당 문서 찾기)
+  const {
+    data: itemDetailResponse,
+    isLoading: isLoadingDocument,
+    error: documentError,
+  } = useQuery({
+    queryKey: ['safety-system-item', safetySystemItemIdx],
+    queryFn: async () => {
+      if (!safetySystemItemIdx) {
+        return null;
+      }
+      try {
+        const response = await getSafetySystemItem(safetySystemItemIdx);
+
+        // axios 인터셉터에서 body.data를 평탄화
+        const itemData =
+          (response as any).item ||
+          (response as any).body?.data?.item ||
+          (response as any).body?.item;
+        const documentList =
+          (response as any).documentList ||
+          (response as any).body?.data?.documentList ||
+          (response as any).body?.documentList ||
+          [];
+
+        if (!itemData) return null;
+
+        return {
+          ...itemData,
+          documentList,
+        } as SafetySystemItem;
+      } catch (error) {
+        console.error('아이템 상세 정보 조회 실패:', error);
+        return null;
+      }
+    },
+    enabled: !!safetySystemItemIdx,
+  });
+
+  // 현재 문서 찾기
+  const currentDocument = itemDetailResponse?.documentList?.find(
+    (doc) => doc.safetySystemDocumentIdx === safetySystemDocumentIdx
+  ) as SafetySystemDocument | undefined;
+
   const handleDownloadPDF = async () => {
     const element = pdfRef.current;
     if (!element) return;
 
-    // TODO: TanStack Query Hook(useQuery)으로 문서 정보 가져오기 (PDF 파일명 생성용)
-    // const { data: documentInfo } = useQuery({
-    //   queryKey: ['risk2200DocumentInfo', riskId],
-    //   queryFn: () => getRisk2200DocumentInfo(riskId!),
-    //   enabled: !!riskId,
-    // });
-    const filename = riskId
-      ? `위험요인_제거·대체_및_통제_등록_${riskId}_${formattedDate.replace(/[\s:]/g, '_')}.pdf`
-      : `위험요인_제거·대체_및_통제_등록_${formattedDate.replace(/[\s:]/g, '_')}.pdf`;
-    await generatePDF(element, filename);
+    setPdfDownloadModalOpen(true);
+    try {
+      // 문서명을 사용하여 PDF 파일명 생성
+      const documentName = currentDocument?.documentName || '문서';
+      const filename = `${documentName}_${formattedDate.replace(/[\s:]/g, '_')}.pdf`;
+      await generatePDF(element, filename);
+    } finally {
+      setPdfDownloadModalOpen(false);
+    }
   };
 
   // 자동 PDF 다운로드 (URL 파라미터로 트리거)
@@ -113,6 +184,9 @@ export function Risk_2200View({
     type: 'writer' | 'reviewer' | 'approver' | null;
   }>({ open: false, type: null });
 
+  // PDF 다운로드 모달 상태
+  const [pdfDownloadModalOpen, setPdfDownloadModalOpen] = useState(false);
+
   const handleAddSignature = useCallback(() => {
     // 서명 패드 모달 열기 (작성자 서명)
     setSignatureModal({ open: true, type: 'writer' });
@@ -122,28 +196,70 @@ export function Risk_2200View({
     setSignatureModal({ open: false, type: null });
   }, []);
 
-  const handleConfirmSignature = useCallback(
-    (signatureDataUrl: string) => {
-      // TODO: TanStack Query Hook(useMutation)으로 서명 추가
-      // const mutation = useMutation({
-      //   mutationFn: (signatureData: Risk2200SignatureParams) => addRisk2200Signature(signatureData),
-      //   onSuccess: () => {
-      //     queryClient.invalidateQueries({ queryKey: ['risk2200ApprovalInfo', riskId] });
-      //   },
-      // });
-      // mutation.mutate({
-      //   riskId: riskId!,
-      //   signatureType: signatureModal.type!,
-      //   signature: signatureDataUrl,
-      // });
-      console.log('서명 저장:', {
-        riskId,
-        type: signatureModal.type,
-        signature: signatureDataUrl.substring(0, 50) + '...',
+  // 결재 서명 등록 API Mutation
+  const addSignatureMutation = useMutation({
+    mutationFn: async ({ docIdx, signatureData }: { docIdx: number; signatureData: string }) => {
+      // signatureData는 이미 업로드된 URL
+      await addApprovalSignature(docIdx, {
+        signatureData,
+        approvalStatus: 'APPROVED',
       });
-      handleCloseSignatureModal();
     },
-    [riskId, signatureModal.type, handleCloseSignatureModal]
+    onSuccess: () => {
+      alert('서명이 등록되었습니다.');
+      queryClient.invalidateQueries({ queryKey: ['safety-system-item'] });
+    },
+    onError: (error: any) => {
+      alert(error?.message || '서명 등록에 실패했습니다.');
+    },
+  });
+
+  const handleConfirmSignature = useCallback(
+    async (signatureDataUrl: string) => {
+      if (!signatureModal.type || !safetySystemDocumentIdx) {
+        handleCloseSignatureModal();
+        return;
+      }
+
+      try {
+        // base64 데이터를 File 객체로 변환
+        const base64Data = signatureDataUrl.includes(',')
+          ? signatureDataUrl.split(',')[1]
+          : signatureDataUrl.replace(/^data:image\/png;base64,/, '');
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'image/png' });
+        const file = new File([blob], `signature_${signatureModal.type}_${Date.now()}.png`, {
+          type: 'image/png',
+        });
+
+        // 파일 업로드 API 호출
+        const uploadResponse = await uploadFile({ files: [file] });
+        // axios 인터셉터에서 평탄화되므로 직접 접근
+        // 실제 응답 구조: { files: [{ fileUrl: string, ... }], header: {...} }
+        const uploadedFiles = (uploadResponse as any).files || [];
+        const signatureUrl = uploadedFiles[0]?.fileUrl || (uploadResponse as any).fileUrls?.[0];
+
+        if (!signatureUrl) {
+          throw new Error('파일 업로드에 실패했습니다.');
+        }
+
+        // 서명 등록 API 호출 (업로드된 URL 전송)
+        await addSignatureMutation.mutateAsync({
+          docIdx: safetySystemDocumentIdx,
+          signatureData: signatureUrl,
+        });
+        handleCloseSignatureModal();
+      } catch (error) {
+        // 에러는 mutation의 onError에서 처리됨
+        console.error('서명 업로드 실패:', error);
+      }
+    },
+    [signatureModal.type, safetySystemDocumentIdx, addSignatureMutation, handleCloseSignatureModal]
   );
 
   // riskId에서 문서 정보 추출 (형식: safetyIdx-itemNumber-documentNumber)
@@ -161,20 +277,21 @@ export function Risk_2200View({
       })()
     : null;
 
-  // TODO: TanStack Query Hook(useQuery)으로 문서 상세 정보 가져오기
-  // const { data: documentDetail } = useQuery({
-  //   queryKey: ['risk2200DocumentDetail', riskId],
-  //   queryFn: () => getRisk2200DocumentDetail(riskId!),
-  //   enabled: !!riskId,
-  // });
-  // 목업 데이터 사용
-  const documentTableData = extractedInfo
-    ? getTableDataByDocument(
-        extractedInfo.safetyIdx,
-        extractedInfo.itemNumber,
-        extractedInfo.documentNumber
-      )
-    : null;
+  // 문서 테이블 데이터 파싱 (currentDocument의 tableData 사용)
+  const documentTableData = useMemo(() => {
+    if (!currentDocument?.tableData) return null;
+
+    try {
+      const parsed =
+        typeof currentDocument.tableData === 'string'
+          ? JSON.parse(currentDocument.tableData)
+          : currentDocument.tableData;
+      return parsed;
+    } catch (error) {
+      console.error('tableData 파싱 실패:', error);
+      return null;
+    }
+  }, [currentDocument?.tableData]);
 
   // safetyIdx와 itemNumber 추출 (item/system이 없으면 riskId에서 추출)
   const safetyIdx = item?.safetyIdx || system?.safetyIdx || extractedInfo?.safetyIdx;
@@ -208,19 +325,37 @@ export function Risk_2200View({
   // 2400번대 문서 여부 확인 (safetyIdx=2, itemNumber=4)
   const is2400Series = safetyIdx === 2 && itemNumber === 4;
   // 2400번대 TBM 일지 여부 확인
-  const is2400TBM = is2400Series && documentTableData?.type === '2400-tbm';
+  const is2400TBM = is2400Series && documentTableData?.tableType === '2400-tbm';
   // 2400번대 연간 교육 계획 여부 확인
-  const is2400Education = is2400Series && documentTableData?.type === '2400-education';
+  const is2400Education = is2400Series && documentTableData?.tableType === '2400-education';
 
-  // TODO: TanStack Query Hook(useQuery)으로 item 정보 가져오기
-  // const { data: itemInfo } = useQuery({
-  //   queryKey: ['risk2200ItemInfo', safetyIdx, itemNumber],
-  //   queryFn: () => getRisk2200ItemInfo({ safetyIdx, itemNumber }),
-  //   enabled: !!safetyIdx && !!itemNumber && !item,
-  // });
-  // 목업 데이터 사용
+  // resolvedItem은 API에서 가져온 item 또는 propItem 사용
   const resolvedItem =
-    item || (safetyIdx && itemNumber ? getItem(safetyIdx, itemNumber) : undefined);
+    itemDetailResponse ||
+    (item && 'safetySystemItemIdx' in item ? item : undefined) ||
+    (safetyIdx && itemNumber ? getItem(safetyIdx, itemNumber) : undefined);
+
+  // 로딩 상태
+  if (isLoadingDocument) {
+    return (
+      <DashboardContent maxWidth="xl">
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
+          <CircularProgress />
+        </Box>
+      </DashboardContent>
+    );
+  }
+
+  // 에러 상태
+  if (documentError) {
+    return (
+      <DashboardContent maxWidth="xl">
+        <Box sx={{ py: 4, textAlign: 'center' }}>
+          <Typography color="error">문서를 불러오는 중 오류가 발생했습니다.</Typography>
+        </Box>
+      </DashboardContent>
+    );
+  }
 
   return (
     <>
@@ -238,7 +373,12 @@ export function Risk_2200View({
         >
           <DetailHeader
             title={
-              resolvedItem?.documentName || system?.systemName || '위험요인 제거·대체 및 통제 등록'
+              currentDocument?.documentName ||
+              (resolvedItem && 'itemName' in resolvedItem
+                ? resolvedItem.itemName
+                : resolvedItem?.documentName) ||
+              system?.systemName ||
+              '위험요인 제거·대체 및 통제 등록'
             }
             onBack={handleBack}
             onSampleView={handleSampleView}
@@ -266,7 +406,7 @@ export function Risk_2200View({
               title={
                 is1100Series
                   ? '위험요인 파악'
-                  : is1200Series && documentTableData?.type === '1200-industrial'
+                  : is1200Series && documentTableData?.tableType === '1200-industrial'
                     ? '사고조사 보고서'
                     : is1200Series
                       ? '아차 사고 조사표'
@@ -304,51 +444,52 @@ export function Risk_2200View({
               }
               onAddSignature={handleAddSignature}
               riskId={riskId}
+              currentDocument={currentDocument}
             />
 
             {(() => {
               // 문서 테이블 데이터가 있으면 사용, 없으면 기본값
-              if (is1100Series && documentTableData?.type === '1100') {
+              if (is1100Series && documentTableData?.tableType === '1100') {
                 const TableComp = tableRegistry['1-1-1100'] as any;
                 return <TableComp rows={documentTableData.rows} />;
               }
-              if (is2100Series && documentTableData?.type === '2100') {
+              if (is2100Series && documentTableData?.tableType === '2100') {
                 const TableComp = tableRegistry['2-1-2100'] as any;
                 return <TableComp data={documentTableData.data} />;
               }
-              if (is1200Series && documentTableData?.type === '1200-industrial') {
+              if (is1200Series && documentTableData?.tableType === '1200-industrial') {
                 const TableComp = tableRegistry['1-2-1200-industrial'] as any;
                 return <TableComp row={documentTableData.rows[0]} />;
               }
-              if (is1200Series && documentTableData?.type === '1200-near-miss') {
+              if (is1200Series && documentTableData?.tableType === '1200-near-miss') {
                 const TableComp = tableRegistry['1-2-1200'] as any;
                 return <TableComp row={documentTableData.row} />;
               }
-              if (is1500Series && documentTableData?.type === '1500') {
+              if (is1500Series && documentTableData?.tableType === '1500') {
                 const TableComp = tableRegistry['1-5-1500'] as any;
                 return <TableComp rows={documentTableData.rows} />;
               }
-              if (is1400Series && documentTableData?.type === '1400') {
+              if (is1400Series && documentTableData?.tableType === '1400') {
                 const TableComp = tableRegistry['1-4-1400'] as any;
                 return <TableComp data={documentTableData.data} />;
               }
-              if (is1300Series && documentTableData?.type === '1300') {
+              if (is1300Series && documentTableData?.tableType === '1300') {
                 const TableComp = tableRegistry['1-3-1300'] as any;
                 return <TableComp rows={documentTableData.rows} />;
               }
-              if (is2300Series && documentTableData?.type === '2300') {
+              if (is2300Series && documentTableData?.tableType === '2300') {
                 const TableComp = tableRegistry['2-3-2300'] as any;
                 return <TableComp rows={documentTableData.rows} />;
               }
-              if (is2200Series && documentTableData?.type === '2200') {
+              if (is2200Series && documentTableData?.tableType === '2200') {
                 const TableComp = tableRegistry['2-2'] as any;
                 return <TableComp data={documentTableData.rows} />;
               }
-              if (is2400TBM && documentTableData?.type === '2400-tbm') {
+              if (is2400TBM && documentTableData?.tableType === '2400-tbm') {
                 const TableComp = tableRegistry['2-4-2400-tbm'] as any;
                 return <TableComp data={documentTableData.data} />;
               }
-              if (is2400Education && documentTableData?.type === '2400-education') {
+              if (is2400Education && documentTableData?.tableType === '2400-education') {
                 const TableComp = tableRegistry['2-4-2400-education'] as any;
                 return (
                   <TableComp
@@ -425,6 +566,9 @@ export function Risk_2200View({
                 : '결재자'
         }
       />
+
+      {/* PDF 다운로드 로딩 모달 */}
+      <PDFDownloadModal open={pdfDownloadModalOpen} />
     </>
   );
 }

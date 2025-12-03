@@ -20,24 +20,18 @@ import { Iconify } from 'src/components/iconify';
 import Badge from 'src/components/safeyoui/badge';
 import ProgressModal from './ProgressModal';
 import PublishModal from './PublishModal';
+import type { SafetySystemDocument } from 'src/services/safety-system/safety-system.types';
 
 // ----------------------------------------------------------------------
 
-export type Risk_2200Row = {
-  id: string;
-  sequence: number;
-  registeredAt: string;
-  registeredTime: string;
-  organizationName: string;
-  documentName: string;
-  writtenAt: string;
-  approvalDeadline: string;
-  completionRate: {
-    removal: number; // 제거·대체 완료율 (0-100)
-    engineering: number; // 공학적 통제 완료율 (0-100)
-  };
-  status: 'draft' | 'in_progress' | 'completed'; // 상태: 임시저장, 진행중, 완료
-  published: boolean; // 게시 여부
+// UI 표시를 위한 확장 타입 (SafetySystemDocument 기반)
+export type Risk_2200Row = SafetySystemDocument & {
+  id: string; // safetySystemDocumentIdx를 문자열로 변환
+  sequence: number; // 순번
+  registeredAt: string; // 등록일 (createAt에서 파싱)
+  registeredTime: string; // 등록 시간 (createAt에서 파싱)
+  writtenAt: string; // 작성일 (updateAt에서 파싱)
+  published: boolean; // 게시 여부 (isPublished === 1)
 };
 
 type Props = {
@@ -47,7 +41,7 @@ type Props = {
   onSelectRow: (id: string) => void;
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
-  onDownloadPDF?: (id: string) => void;
+  onDownloadPDF?: (id: string, safetySystemItemIdx?: number) => void;
   onCopy?: (id: string) => void;
   onTogglePublish?: (id: string, published: boolean) => void;
   onViewProgress?: (id: string) => void;
@@ -111,60 +105,40 @@ export default function Risk_2200Table({
     setSelectedPublishRow(null);
   };
 
-  const handleConfirmPublish = (data: {
-    documentName: string;
-    importance: string;
-    isPublic: boolean;
-    file?: File;
-  }) => {
-    // TODO: TanStack Query Hook(useMutation)으로 문서 게시
-    // const mutation = useMutation({
-    //   mutationFn: (data: {
-    //     documentId: string;
-    //     documentName: string;
-    //     importance: string;
-    //     isPublic: boolean;
-    //     file?: File;
-    //   }) => publishDocument(data),
-    //   onSuccess: () => {
-    //     queryClient.invalidateQueries({ queryKey: ['risk2200Documents'] });
-    //     if (onTogglePublish) {
-    //       onTogglePublish(selectedPublishRow!.id, true);
-    //     }
-    //     handleClosePublishModal();
-    //   },
-    // });
-    // mutation.mutate({
-    //   documentId: selectedPublishRow!.id,
-    //   ...data,
-    // });
+  const handlePublishSuccess = () => {
+    // 게시 성공 후 목록 새로고침을 위해 onTogglePublish 호출 (선택적)
     if (selectedPublishRow && onTogglePublish) {
       onTogglePublish(selectedPublishRow.id, true);
     }
-    handleClosePublishModal();
   };
 
-  const getStatusLabel = (status: Risk_2200Row['status']) => {
+  const getStatusLabel = (status: SafetySystemDocument['status']) => {
     switch (status) {
-      case 'draft':
-        return '임시저장';
-      case 'in_progress':
-        return '진행중';
-      case 'completed':
+      case 'COMPLETED':
         return '완료';
+      case 'DRAFT':
+        return '작성중';
+      case 'IN_PROGRESS':
+        return '진행중';
+      case 'PENDING':
+        return '대기중';
       default:
-        return '';
+        return status || '';
     }
   };
 
-  const getStatusVariant = (status: Risk_2200Row['status']): 'default' | 'info' | 'completed' => {
+  const getStatusVariant = (
+    status: SafetySystemDocument['status']
+  ): 'default' | 'info' | 'warning' | 'error' | 'success' => {
     switch (status) {
-      case 'draft':
-        return 'default';
-      case 'in_progress':
+      case 'COMPLETED':
+        return 'success';
+      case 'DRAFT':
+        return 'warning';
+      case 'IN_PROGRESS':
         return 'info';
-      case 'completed':
-        return 'completed';
+      case 'PENDING':
+        return 'default';
       default:
         return 'default';
     }
@@ -461,12 +435,12 @@ export default function Risk_2200Table({
                       variant="caption"
                       sx={{ color: 'text.secondary', textAlign: 'right', display: 'block' }}
                     >
-                      {row.completionRate.removal}%
+                      {row.approvalProgress ? `${row.approvalProgress}%` : '0%'}
                     </Typography>
                     <LinearProgress
                       variant="determinate"
-                      value={row.completionRate.removal}
-                      color="warning"
+                      value={typeof row.approvalProgress === 'number' ? row.approvalProgress : 0}
+                      color={row.approvalProgress === 100 ? 'success' : 'warning'}
                       sx={{
                         height: 6,
                         borderRadius: 1,
@@ -481,7 +455,7 @@ export default function Risk_2200Table({
                       variant="caption"
                       sx={{ color: 'text.secondary', mt: 0.5, display: 'block' }}
                     >
-                      {row.completionRate.removal} / 100
+                      {typeof row.approvalProgress === 'number' ? row.approvalProgress : 0} / 100
                     </Typography>
                   </Box>
                 </TableCell>
@@ -495,7 +469,7 @@ export default function Risk_2200Table({
                   <Tooltip title="PDF 다운로드">
                     <IconButton
                       size="small"
-                      onClick={() => onDownloadPDF?.(row.id)}
+                      onClick={() => onDownloadPDF?.(row.id, row.safetySystemItemIdx)}
                       sx={{
                         color: 'text.secondary',
                         '&:hover': {
@@ -513,14 +487,10 @@ export default function Risk_2200Table({
                     <IconButton
                       size="small"
                       onClick={() => handleOpenPublishModal(row)}
-                      disabled={row.status === 'completed'}
                       sx={{
                         color: row.published ? 'primary.main' : 'text.secondary',
                         '&:hover': {
                           bgcolor: 'action.hover',
-                        },
-                        '&:disabled': {
-                          color: 'text.disabled',
                         },
                       }}
                     >
@@ -563,18 +533,13 @@ export default function Risk_2200Table({
                     }}
                   >
                     {onEdit && (
-                      <MenuItem
-                        onClick={() => handleMenuItemClick('edit', row.id)}
-                        disabled={row.status === 'completed'}
-                        sx={{ px: 2 }}
-                      >
+                      <MenuItem onClick={() => handleMenuItemClick('edit', row.id)} sx={{ px: 2 }}>
                         수정
                       </MenuItem>
                     )}
                     {onDelete && (
                       <MenuItem
                         onClick={() => handleMenuItemClick('delete', row.id)}
-                        disabled={row.status === 'completed'}
                         sx={{ color: 'error.main', px: 2 }}
                       >
                         삭제
@@ -596,6 +561,7 @@ export default function Risk_2200Table({
           writtenAt={selectedProgressRow.writtenAt}
           approvalDeadline={selectedProgressRow.approvalDeadline}
           documentId={selectedProgressRow.id}
+          signatureList={selectedProgressRow.signatureList}
         />
       )}
 
@@ -603,7 +569,7 @@ export default function Risk_2200Table({
         <PublishModal
           open={publishModalOpen}
           onClose={handleClosePublishModal}
-          onConfirm={handleConfirmPublish}
+          onConfirm={handlePublishSuccess}
           documentName={selectedPublishRow.documentName}
           documentId={selectedPublishRow.id}
         />

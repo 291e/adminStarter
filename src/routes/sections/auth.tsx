@@ -45,71 +45,57 @@ const authJwt = {
     {
       path: 'sign-up',
       element: (
-        <GuestGuard>
-          <AuthSplitLayout>
-            <Jwt.SignUpPage />
-          </AuthSplitLayout>
-        </GuestGuard>
+        <AuthSplitLayout>
+          <Jwt.SignUpPage />
+        </AuthSplitLayout>
       ),
     },
     {
       path: 'find-id',
       element: (
-        <GuestGuard>
-          <AuthSplitLayout>
-            <Jwt.FindIdPage />
-          </AuthSplitLayout>
-        </GuestGuard>
+        <AuthSplitLayout>
+          <Jwt.FindIdPage />
+        </AuthSplitLayout>
       ),
     },
     {
       path: 'find-id-success',
       element: (
-        <GuestGuard>
-          <AuthSplitLayout>
-            <Jwt.FindIdSuccessPage />
-          </AuthSplitLayout>
-        </GuestGuard>
+        <AuthSplitLayout>
+          <Jwt.FindIdSuccessPage />
+        </AuthSplitLayout>
       ),
     },
     {
       path: 'find-id-fail',
       element: (
-        <GuestGuard>
-          <AuthSplitLayout>
-            <Jwt.FindIdFailPage />
-          </AuthSplitLayout>
-        </GuestGuard>
+        <AuthSplitLayout>
+          <Jwt.FindIdFailPage />
+        </AuthSplitLayout>
       ),
     },
     {
       path: 'reset-password',
       element: (
-        <GuestGuard>
-          <AuthSplitLayout>
-            <Jwt.ResetPasswordPage />
-          </AuthSplitLayout>
-        </GuestGuard>
+        <AuthSplitLayout>
+          <Jwt.ResetPasswordPage />
+        </AuthSplitLayout>
       ),
     },
     {
       path: 'reset-password-new',
       element: (
-        <GuestGuard>
-          <AuthSplitLayout>
-            <Jwt.ResetPasswordNewPage />
-          </AuthSplitLayout>
-        </GuestGuard>
+        <AuthSplitLayout>
+          <Jwt.ResetPasswordNewPage />
+        </AuthSplitLayout>
       ),
     },
     {
       path: 'verify-code',
       element: (
-        <GuestGuard>
-          <AuthSplitLayout>
-            <Jwt.VerifyCodePage />
-          </AuthSplitLayout>
-        </GuestGuard>
+        <AuthSplitLayout>
+          <Jwt.VerifyCodePage />
+        </AuthSplitLayout>
       ),
     },
   ],

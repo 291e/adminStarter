@@ -19,7 +19,9 @@ import MemberTabs from './components/MemberTabs';
 import MemberFilters from './components/MemberFilters';
 import MemberTable from './components/MemberTable';
 import MemberPagination from './components/MemberPagination';
+import EditMemberModal from './components/EditMemberModal';
 import type { Organization } from 'src/services/organization/organization.types';
+import type { Member } from 'src/sections/Organization/types/member';
 
 // ----------------------------------------------------------------------
 
@@ -33,6 +35,8 @@ export function OrganizationDetailView({ title = '조직 관리', description, s
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(0);
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
 
   const organizationId = id ? parseInt(id, 10) : null;
 
@@ -60,21 +64,6 @@ export function OrganizationDetailView({ title = '조직 관리', description, s
   const handleBack = () => {
     navigate('/dashboard/organization');
   };
-
-  // 디버깅
-  if (import.meta.env.DEV) {
-    console.log('🔍 [OrganizationDetailView]', {
-      organizationId,
-      organizationDetailData,
-      organization,
-      membersCount: logic.filtered.length,
-      total: logic.total,
-      isLoadingOrganization,
-      isErrorOrganization,
-      isLoadingMembers: logic.isLoading,
-      isErrorMembers: logic.isError,
-    });
-  }
 
   // 로딩 상태
   if (isLoadingOrganization) {
@@ -180,10 +169,21 @@ export function OrganizationDetailView({ title = '조직 관리', description, s
                   organizationId={organizationId?.toString()}
                   rows={logic.filtered}
                   onEdit={(member) => {
-                    // TODO: 멤버 수정 모달 열기 또는 TanStack Query Hook(useMutation)으로 멤버 수정
-                    if (import.meta.env.DEV) {
-                      console.log('📝 [멤버 수정]', member);
-                    }
+                    setSelectedMember(member);
+                    setEditModalOpen(true);
+                  }}
+                />
+
+                <EditMemberModal
+                  open={editModalOpen}
+                  onClose={() => {
+                    setEditModalOpen(false);
+                    setSelectedMember(null);
+                  }}
+                  member={selectedMember}
+                  organization={organization}
+                  onUpdated={() => {
+                    // 쿼리 무효화는 모달 내부에서 처리됨
                   }}
                 />
 

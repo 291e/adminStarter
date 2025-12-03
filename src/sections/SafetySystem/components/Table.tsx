@@ -1,5 +1,3 @@
-import { useState } from 'react';
-
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -8,16 +6,35 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Paper from '@mui/material/Paper';
 import IconButton from '@mui/material/IconButton';
-import Collapse from '@mui/material/Collapse';
 import Box from '@mui/material/Box';
-import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
 
-import type { SafetySystem, SafetySystemItem } from 'src/_mock/_safety-system';
-import { cycleUnitLabels, statusLabels } from 'src/_mock/_safety-system';
+import type {
+  SafetySystem,
+  SafetySystemItem,
+} from 'src/services/safety-system/safety-system.types';
 import { fDateTime } from 'src/utils/format-time';
 import { Iconify } from 'src/components/iconify';
+
+// 주기 단위 라벨
+const cycleUnitLabels: Record<string, string> = {
+  YEAR: '년',
+  IMMEDIATE: '즉시',
+  HALF: '반기',
+  QUARTER: '분기',
+  DAY: '일',
+  WEEK: '주',
+  ALWAYS: '상시',
+};
+
+// 상태 라벨
+const statusLabels: Record<string, string> = {
+  NORMAL: '정상',
+  ALWAYS: '상시 작성',
+  APPROACHING: '마감 임박',
+  OVERDUE: '기한 초과',
+};
 
 type Props = {
   rows: SafetySystem[];
@@ -29,22 +46,22 @@ function getStatusColor(status: SafetySystemItem['status']): {
   color: string;
 } {
   switch (status) {
-    case 'normal':
+    case 'NORMAL':
       return {
         bgcolor: 'rgba(0, 184, 217, 0.16)',
         color: '#006c9c',
       };
-    case 'always':
+    case 'ALWAYS':
       return {
         bgcolor: 'rgba(145, 158, 171, 0.16)',
         color: '#637381',
       };
-    case 'approaching':
+    case 'APPROACHING':
       return {
         bgcolor: 'rgba(255, 171, 0, 0.16)',
         color: '#b76e00',
       };
-    case 'overdue':
+    case 'OVERDUE':
       return {
         bgcolor: 'rgba(255, 86, 48, 0.16)',
         color: '#b71d18',
@@ -67,18 +84,25 @@ function RowItem({
   onViewGuide?: () => void;
 }) {
   const statusColors = getStatusColor(item.status);
-  const plainName = item.documentName.replace(/^\d+-\d+\.\s*/, '');
+  const itemName = item.itemName || item.documentName || '';
+  const plainName = itemName.replace(/^\d+-\d+\.\s*/, '');
 
   return (
     <Box
       sx={{
-        bgcolor: 'background.paper',
         display: 'flex',
         alignItems: 'center',
-        pl: 1.5,
-        pr: 2,
-        py: 1.5,
+        py: 0.75,
         minWidth: 1320,
+        bgcolor: 'white',
+        cursor: 'pointer',
+        '&:hover': {
+          bgcolor: 'grey.50',
+        },
+        transition: 'background-color 0.2s ease',
+      }}
+      onClick={() => {
+        onViewGuide?.();
       }}
     >
       <Box
@@ -86,31 +110,57 @@ function RowItem({
           flex: 1,
           minWidth: 0,
           fontSize: 14,
+          pr: 1,
+          pl: 1,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
         }}
       >
         <Typography variant="body2" sx={{ fontSize: 14, height: 22, lineHeight: '22px' }}>
-          {`${item.safetyIdx}-${item.itemNumber}. ${plainName}`}
+          {`${item.safetyIdx}-${item.itemNumber} ${plainName}`}
         </Typography>
+        <IconButton
+          size="small"
+          onClick={(e) => {
+            e.stopPropagation();
+            onViewGuide?.();
+          }}
+          aria-label="가이드 보기"
+          sx={{
+            width: 20,
+            height: 20,
+            border: '1px solid',
+            borderColor: 'divider',
+            borderRadius: 0.5,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            bgcolor: 'background.paper',
+          }}
+        >
+          <Iconify icon="carbon:chevron-right" width={16} />
+        </IconButton>
       </Box>
       <Box
         sx={{
           width: 96,
           fontSize: 14,
-          px: 2,
+          pl: 2,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
         }}
       >
         <Typography variant="body2" sx={{ fontSize: 14 }}>
-          {item.documentCount}
+          {item.documentCount ?? item.documentList?.length ?? 0}
         </Typography>
       </Box>
       <Box
         sx={{
-          width: 104,
+          width: 94,
           fontSize: 14,
-          px: 2,
+          pl: 2,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -118,17 +168,14 @@ function RowItem({
         }}
       >
         <Typography variant="body2" sx={{ fontSize: 14 }}>
-          {item.cycle}
-        </Typography>
-        <Typography variant="body2" sx={{ fontSize: 14 }}>
-          {cycleUnitLabels[item.cycleUnit]}
+          {cycleUnitLabels[item.cycleUnit] || item.writingCycle || item.cycleUnit}
         </Typography>
       </Box>
       <Box
         sx={{
           width: 148,
           fontSize: 14,
-          px: 2,
+          pl: 2,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -140,15 +187,15 @@ function RowItem({
       </Box>
       <Box
         sx={{
-          width: 84,
+          width: 100,
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          px: 2,
+          pl: 2,
         }}
       >
         <Chip
-          label={statusLabels[item.status]}
+          label={statusLabels[item.status] || item.status}
           size="small"
           sx={{
             bgcolor: statusColors.bgcolor,
@@ -165,10 +212,17 @@ function RowItem({
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          px: 2,
+          pl: 2,
         }}
       >
-        <IconButton size="small" onClick={onViewGuide} aria-label="가이드 보기" sx={{ p: 1 }}>
+        <IconButton
+          size="small"
+          onClick={(e) => {
+            e.stopPropagation(); // Box의 onClick 이벤트 전파 방지
+          }}
+          aria-label="가이드 보기"
+          sx={{ p: 1 }}
+        >
           <Iconify icon="solar:eye-bold" width={20} />
         </IconButton>
       </Box>
@@ -177,17 +231,10 @@ function RowItem({
 }
 
 function Row({ row, onViewGuide }: { row: SafetySystem; onViewGuide?: Props['onViewGuide'] }) {
-  const [open, setOpen] = useState(false);
-
-  const totalDocuments = row.items.reduce((sum, item) => sum + item.documentCount, 0);
-
   return (
     <>
       <TableRow
-        hover
-        onClick={() => setOpen(!open)}
         sx={{
-          cursor: 'pointer',
           borderBottom: '1px dashed',
           borderColor: 'divider',
           '& > td': {
@@ -202,10 +249,11 @@ function Row({ row, onViewGuide }: { row: SafetySystem; onViewGuide?: Props['onV
             minWidth: 0,
             fontSize: 14,
             fontWeight: 600,
+            px: 2,
           }}
         >
           <Typography variant="subtitle2" component="span" sx={{ fontSize: 14, fontWeight: 600 }}>
-            {row.systemName}
+            {`${row.safetyIdx}. ${row.systemName}`}
           </Typography>
         </TableCell>
         <TableCell
@@ -213,17 +261,15 @@ function Row({ row, onViewGuide }: { row: SafetySystem; onViewGuide?: Props['onV
           sx={{
             width: 96,
             fontSize: 14,
-            pr: 3,
+            px: 2,
           }}
-        >
-          {totalDocuments}
-        </TableCell>
+        />
         <TableCell
           align="center"
           sx={{
-            width: 104,
+            width: 94,
             fontSize: 14,
-            pr: 3,
+            px: 2,
           }}
         />
         <TableCell
@@ -231,22 +277,21 @@ function Row({ row, onViewGuide }: { row: SafetySystem; onViewGuide?: Props['onV
           sx={{
             width: 148,
             fontSize: 14,
-            pr: 3,
+            px: 2,
           }}
         />
         <TableCell
           align="center"
           sx={{
-            width: 84,
-            pr: 3,
+            width: 100,
+            px: 2,
           }}
         />
-        <TableCell align="center" sx={{ width: 120, pr: 3 }}>
+        <TableCell align="center" sx={{ width: 120, px: 2 }}>
           <IconButton
             size="small"
-            onClick={(e) => {
-              e.stopPropagation();
-              onViewGuide?.(row);
+            onClick={() => {
+              console.log('가이드 열기');
             }}
             aria-label="가이드 보기"
             sx={{ p: 1 }}
@@ -254,47 +299,21 @@ function Row({ row, onViewGuide }: { row: SafetySystem; onViewGuide?: Props['onV
             <Iconify icon="solar:eye-bold" width={20} />
           </IconButton>
         </TableCell>
-        <TableCell
-          sx={{
-            width: 16,
-            p: 0,
-          }}
-        >
-          <IconButton
-            size="small"
-            onClick={(e) => {
-              e.stopPropagation();
-              setOpen(!open);
-            }}
-            aria-label={open ? '접기' : '펼치기'}
-            sx={{ p: 0.5 }}
-          >
-            <Iconify icon={open ? 'eva:arrow-upward-fill' : 'eva:arrow-downward-fill'} width={16} />
-          </IconButton>
-        </TableCell>
       </TableRow>
       <TableRow>
-        <TableCell colSpan={7} sx={{ p: 0, borderBottom: 'none' }}>
-          <Collapse in={open} timeout="auto" unmountOnExit>
-            <Box
-              sx={{
-                bgcolor: 'grey.100',
-                p: 1.5,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 0.25,
-              }}
-            >
-              {row.items.map((item, idx) => (
-                <RowItem
-                  key={`${item.safetyIdx}-${item.itemNumber}`}
-                  item={item}
-                  itemIndex={idx}
-                  onViewGuide={() => onViewGuide?.(row, item)}
-                />
-              ))}
-            </Box>
-          </Collapse>
+        <TableCell colSpan={6} sx={{ p: 0, borderBottom: 'none' }}>
+          <Box
+            sx={{ display: 'flex', flexDirection: 'column', gap: 0.25, bgcolor: 'grey.100', p: 1 }}
+          >
+            {(row.items || []).map((item, idx) => (
+              <RowItem
+                key={`${item.safetyIdx}-${item.itemNumber}`}
+                item={item}
+                itemIndex={idx}
+                onViewGuide={() => onViewGuide?.(row, item)}
+              />
+            ))}
+          </Box>
         </TableCell>
       </TableRow>
     </>
@@ -327,6 +346,7 @@ export default function SafetySystemTable({ rows, onViewGuide }: Props) {
                 fontWeight: 600,
                 fontSize: 14,
                 color: 'text.secondary',
+                px: 2,
               }}
             >
               문서 개수
@@ -335,10 +355,11 @@ export default function SafetySystemTable({ rows, onViewGuide }: Props) {
               align="center"
               sx={{
                 bgcolor: 'grey.100',
-                width: 104,
+                width: 94,
                 fontWeight: 600,
                 fontSize: 14,
                 color: 'text.secondary',
+                px: 2,
               }}
             >
               작성 주기
@@ -351,6 +372,7 @@ export default function SafetySystemTable({ rows, onViewGuide }: Props) {
                 fontWeight: 600,
                 fontSize: 14,
                 color: 'text.secondary',
+                px: 2,
               }}
             >
               최근 작성일
@@ -359,10 +381,11 @@ export default function SafetySystemTable({ rows, onViewGuide }: Props) {
               align="center"
               sx={{
                 bgcolor: 'grey.100',
-                width: 84,
+                width: 100,
                 fontWeight: 600,
                 fontSize: 14,
                 color: 'text.secondary',
+                px: 2,
               }}
             >
               상태
@@ -375,17 +398,11 @@ export default function SafetySystemTable({ rows, onViewGuide }: Props) {
                 fontWeight: 600,
                 fontSize: 14,
                 color: 'text.secondary',
+                px: 2,
               }}
             >
               가이드
             </TableCell>
-            <TableCell
-              sx={{
-                bgcolor: 'grey.100',
-                width: 16,
-                p: 0,
-              }}
-            />
           </TableRow>
         </TableHead>
 
