@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 import {
   getRiskReports,
@@ -50,8 +51,19 @@ export function useCreateRiskReport() {
 
   return useMutation({
     mutationFn: (params: CreateRiskReportParams) => createRiskReport(params),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      const resultMessage = response?.header?.resultMessage || '위험 보고가 등록되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('위험 보고가 등록되었습니다.');
+      }
       queryClient.invalidateQueries({ queryKey: ['riskReports'] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '위험 보고 등록에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -64,8 +76,14 @@ export function useDeleteRiskReport() {
 
   return useMutation({
     mutationFn: (params: DeleteRiskReportParams) => deleteRiskReport(params),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      toast.success('위험 보고가 삭제되었습니다.');
       queryClient.invalidateQueries({ queryKey: ['riskReports'] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '위험 보고 삭제에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -77,9 +95,20 @@ export function useUpdateRiskReport() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (params: UpdateRiskReportParams) => updateRiskReport(params),
-    onSuccess: (_, variables) => {
+    onSuccess: (response, variables) => {
+      const resultMessage = response?.header?.resultMessage || '위험 보고가 수정되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('위험 보고가 수정되었습니다.');
+      }
       queryClient.invalidateQueries({ queryKey: ['riskReports'] });
       queryClient.invalidateQueries({ queryKey: ['riskReportDetail', variables.riskReportIdx] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '위험 보고 수정에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -91,8 +120,19 @@ export function useCreateRiskReportFromChat() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (params: CreateRiskReportFromChatParams) => createRiskReportFromChat(params),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      const resultMessage = response?.header?.resultMessage || '채팅 위험 보고가 생성되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('채팅 위험 보고가 생성되었습니다.');
+      }
       queryClient.invalidateQueries({ queryKey: ['riskReports'] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '채팅 위험 보고 생성에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }

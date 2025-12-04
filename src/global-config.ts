@@ -28,6 +28,10 @@ export type ConfigValue = {
   amplify: { userPoolId: string; userPoolWebClientId: string; region: string };
   auth0: { clientId: string; domain: string; callbackUrl: string };
   supabase: { url: string; key: string };
+  payple: {
+    clientKey: string;
+    sdkUrl: string; // 테스트: https://democpay.payple.kr/js/v1/payment.js, 운영: https://cpay.payple.kr/js/v1/payment.js
+  };
 };
 
 // ----------------------------------------------------------------------
@@ -85,5 +89,16 @@ export const CONFIG: ConfigValue = {
   supabase: {
     url: import.meta.env.VITE_SUPABASE_URL ?? '',
     key: import.meta.env.VITE_SUPABASE_ANON_KEY ?? '',
+  },
+  /**
+   * Payple
+   */
+  payple: {
+    clientKey: import.meta.env.VITE_PAYPLE_CLIENT_KEY ?? '',
+    sdkUrl:
+      import.meta.env.VITE_PAYPLE_SDK_URL ??
+      (import.meta.env.DEV
+        ? 'https://democpay.payple.kr/js/v1/payment.js' // 테스트 환경
+        : 'https://cpay.payple.kr/js/v1/payment.js'), // 운영 환경
   },
 };

@@ -11,6 +11,8 @@ import { TimePicker } from '@mui/x-date-pickers/TimePicker';
 import dayjs, { type Dayjs } from 'dayjs';
 
 import { Iconify } from 'src/components/iconify';
+import { uploadFile } from 'src/services/system/system.service';
+
 import type {
   Table1200IndustrialAccidentRow,
   InvestigationTeamMember,
@@ -134,11 +136,24 @@ export default function Table1200IndustrialAccidentForm({
 
   const displayedHumanDamage = row.humanDamage;
 
-  const handleAddImages = (files?: FileList | File[]) => {
+  const handleAddImages = async (files?: FileList | File[]) => {
     if (!files) return;
-    const nextFiles = Array.from(files).filter((file) => file.type.startsWith('image/'));
-    if (!nextFiles.length) return;
-    onRowChange('investigationImages', [...row.investigationImages, ...nextFiles]);
+    const imageFiles = Array.from(files).filter((file) => file.type.startsWith('image/'));
+    if (!imageFiles.length) return;
+
+    try {
+      // 이미지 업로드
+      const uploadResponse = await uploadFile({ files: imageFiles });
+      const uploadedFiles = (uploadResponse as any).files || [];
+      const imageUrls = uploadedFiles.map((file: any) => file.fileUrl || file.url).filter(Boolean);
+
+      if (imageUrls.length > 0) {
+        onRowChange('investigationImages', [...row.investigationImages, ...imageUrls]);
+      }
+    } catch (error) {
+      console.error('이미지 업로드 실패:', error);
+      // TODO: 에러 토스트 표시
+    }
   };
 
   const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -181,17 +196,30 @@ export default function Table1200IndustrialAccidentForm({
     setIsUploadModalOpen(false);
   };
 
-  const handleUploadModalConfirm = (images: File[]) => {
-    onRowChange('investigationImages', images);
-    setIsUploadModalOpen(false);
+  const handleUploadModalConfirm = async (images: File[]) => {
+    try {
+      // 이미지 업로드
+      const uploadResponse = await uploadFile({ files: images });
+      const uploadedFiles = (uploadResponse as any).files || [];
+      const imageUrls = uploadedFiles.map((file: any) => file.fileUrl || file.url).filter(Boolean);
+
+      if (imageUrls.length > 0) {
+        onRowChange('investigationImages', imageUrls);
+      }
+      setIsUploadModalOpen(false);
+    } catch (error) {
+      console.error('이미지 업로드 실패:', error);
+      // TODO: 에러 토스트 표시
+    }
   };
 
   useEffect(() => {
-    const urls = row.investigationImages.map((file) => URL.createObjectURL(file));
-    setImagePreviewUrls(urls);
-    return () => {
-      urls.forEach((url) => URL.revokeObjectURL(url));
-    };
+    // investigationImages는 이제 URL 문자열 배열
+    if (row.investigationImages && row.investigationImages.length > 0) {
+      setImagePreviewUrls(row.investigationImages);
+    } else {
+      setImagePreviewUrls([]);
+    }
   }, [row.investigationImages]);
 
   return (
@@ -1144,7 +1172,7 @@ export default function Table1200IndustrialAccidentForm({
         open={isUploadModalOpen}
         onClose={handleUploadModalClose}
         onConfirm={handleUploadModalConfirm}
-        initialImages={row.investigationImages}
+        initialImages={[]}
       />
     </Box>
   );

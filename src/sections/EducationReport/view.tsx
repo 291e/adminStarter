@@ -78,7 +78,10 @@ export function EducationReportView({ title = '교육 이수 현황', descriptio
   // 클라이언트 필터링 (role 필터)
   const filteredReports = useMemo(() => {
     if (filters.role === 'all') return reports;
-    return reports.filter((r) => r.role === filters.role);
+    return reports.filter((r) => {
+      const role = r.memberInformation?.memberRole || r.role || '';
+      return role === filters.role;
+    });
   }, [reports, filters.role]);
 
   // 필터링된 전체 개수
@@ -141,7 +144,9 @@ export function EducationReportView({ title = '교육 이수 현황', descriptio
           onViewDetail={(row) => {
             // educationReportIdx를 사용하여 상세 정보 조회
             const reportIdx =
-              row.educationReportId || row.id ? Number(row.educationReportId || row.id) : null;
+              row.educationReportIdx ||
+              (row.educationReportId ? Number(row.educationReportId) : null) ||
+              (row.id ? Number(row.id) : null);
             if (reportIdx) {
               setSelectedMemberIdx(row.memberIdx || null);
               setSelectedEducationReportIdx(reportIdx);
@@ -177,14 +182,18 @@ export function EducationReportView({ title = '교육 이수 현황', descriptio
 
           logic.selectedIds.forEach((selectedId) => {
             const selectedReport = reports.find(
-              (r) => String(r.id || r.educationReportId || r.memberIdx || '') === selectedId
+              (r) =>
+                String(r.educationReportIdx || r.educationReportId || r.id || r.memberIdx || '') ===
+                selectedId
             );
 
             if (selectedReport) {
               const reportIdx =
-                selectedReport.educationReportId || selectedReport.id
-                  ? Number(selectedReport.educationReportId || selectedReport.id)
-                  : null;
+                selectedReport.educationReportIdx ||
+                (selectedReport.educationReportId
+                  ? Number(selectedReport.educationReportId)
+                  : null) ||
+                (selectedReport.id ? Number(selectedReport.id) : null);
               if (reportIdx) {
                 selectedReportIdxes.push(reportIdx);
                 if (!firstMemberIdx) {

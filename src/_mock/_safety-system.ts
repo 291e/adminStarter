@@ -609,7 +609,7 @@ function generateDocumentTableData(): DocumentTableDataRecord[] {
       preventionMeasure: '케이블 덕트 설치, 작업 전 위험요인 점검',
       preventionRiskLevel: 'A',
       siteSituation: '라인 중앙에 케이블이 다수 노출되어 있으며 통행 동선이 협소함.',
-      siteImages: [] as File[],
+      siteImages: [],
     },
     {
       workName: '원자재 창고 적재 작업',
@@ -623,7 +623,7 @@ function generateDocumentTableData(): DocumentTableDataRecord[] {
       preventionMeasure: '적재 높이 기준 재교육, 고정 장치 설치',
       preventionRiskLevel: 'B',
       siteSituation: '통로 폭이 좁아 지게차 진입 시 가시성 확보 어려움.',
-      siteImages: [] as File[],
+      siteImages: [],
     },
     {
       workName: '도장 부스 청소',
@@ -637,7 +637,7 @@ function generateDocumentTableData(): DocumentTableDataRecord[] {
       preventionMeasure: '건조 시간 준수, 작업 중 미끄럼 주의 표지 설치',
       preventionRiskLevel: 'B',
       siteSituation: '부스 내부 조도가 낮아 바닥 상태 식별이 어려움.',
-      siteImages: [] as File[],
+      siteImages: [],
     },
   ];
 
@@ -687,7 +687,7 @@ function generateDocumentTableData(): DocumentTableDataRecord[] {
       },
       otherContent:
         '사고 발생 즉시 응급조치 실시, 병원 이송 완료. 사고조사반 구성하여 원인 분석 및 재발방지 대책 수립.',
-      investigationImages: [] as File[],
+      investigationImages: [],
     },
     {
       accidentName: '크레인 작업 중 추락 사고',
@@ -725,7 +725,7 @@ function generateDocumentTableData(): DocumentTableDataRecord[] {
         risk: '낮음',
       },
       otherContent: '사고 발생 즉시 응급조치 및 병원 이송. 크레인 작업 일시 중단 후 안전점검 실시.',
-      investigationImages: [] as File[],
+      investigationImages: [],
     },
   ];
 

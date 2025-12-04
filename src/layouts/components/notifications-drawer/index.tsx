@@ -25,9 +25,9 @@ import { NotificationItem } from './notification-item';
 // ----------------------------------------------------------------------
 
 const TABS = [
-  { value: 'all', label: 'All', count: 22 },
-  { value: 'unread', label: 'Unread', count: 12 },
-  { value: 'archived', label: 'Archived', count: 10 },
+  { value: 'all', label: '전체', count: 22 },
+  { value: 'unread', label: '읽지 않음', count: 12 },
+  { value: 'archived', label: '읽음', count: 10 },
 ];
 
 // ----------------------------------------------------------------------
@@ -64,8 +64,8 @@ export function NotificationsDrawer({ data = [], sx, ...other }: NotificationsDr
         alignItems: 'center',
       }}
     >
-      <Typography variant="h6" sx={{ flexGrow: 1 }}>
-        Notifications
+      <Typography variant="h6" align="center" sx={{ flexGrow: 1 }}>
+        알림
       </Typography>
 
       {!!totalUnRead && (
@@ -106,6 +106,31 @@ export function NotificationsDrawer({ data = [], sx, ...other }: NotificationsDr
               {tab.count}
             </Label>
           }
+          sx={{
+            minHeight: 48,
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            '&.Mui-selected': {
+              '& .MuiTab-iconWrapper': {
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              },
+            },
+            '& .MuiTab-iconWrapper': {
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginLeft: 0.5,
+            },
+            '& .MuiTab-label': {
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            },
+          }}
         />
       ))}
     </Tabs>
@@ -155,7 +180,7 @@ export function NotificationsDrawer({ data = [], sx, ...other }: NotificationsDr
 
         <Box sx={{ p: 1 }}>
           <Button fullWidth size="large">
-            View all
+            더 보기
           </Button>
         </Box>
       </Drawer>

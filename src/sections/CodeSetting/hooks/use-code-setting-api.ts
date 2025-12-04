@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 import {
   getCodes,
@@ -52,8 +53,19 @@ export function useCreateMachine() {
 
   return useMutation({
     mutationFn: (params: CreateMachineParams) => createMachine(params),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      const resultMessage = response?.header?.resultMessage || '기계·설비가 등록되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('기계·설비가 등록되었습니다.');
+      }
       queryClient.invalidateQueries({ queryKey: ['codes'] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '기계·설비 등록에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -66,11 +78,22 @@ export function useUpdateMachine() {
 
   return useMutation({
     mutationFn: (params: UpdateMachineParams) => updateMachine(params),
-    onSuccess: (_, variables) => {
+    onSuccess: (response, variables) => {
+      const resultMessage = response?.header?.resultMessage || '기계·설비 정보가 수정되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('기계·설비 정보가 수정되었습니다.');
+      }
       queryClient.invalidateQueries({ queryKey: ['codes'] });
       queryClient.invalidateQueries({
         queryKey: ['codeDetail', variables.codeSettingIdx],
       });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '기계·설비 수정에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -83,8 +106,19 @@ export function useCreateHazard() {
 
   return useMutation({
     mutationFn: (params: CreateHazardParams) => createHazard(params),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      const resultMessage = response?.header?.resultMessage || '유해인자가 등록되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('유해인자가 등록되었습니다.');
+      }
       queryClient.invalidateQueries({ queryKey: ['codes'] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '유해인자 등록에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -97,11 +131,22 @@ export function useUpdateHazard() {
 
   return useMutation({
     mutationFn: (params: UpdateHazardParams) => updateHazard(params),
-    onSuccess: (_, variables) => {
+    onSuccess: (response, variables) => {
+      const resultMessage = response?.header?.resultMessage || '유해인자 정보가 수정되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('유해인자 정보가 수정되었습니다.');
+      }
       queryClient.invalidateQueries({ queryKey: ['codes'] });
       queryClient.invalidateQueries({
         queryKey: ['codeDetail', variables.codeSettingIdx],
       });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '유해인자 수정에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -124,10 +169,21 @@ export function useSaveHazardCategories() {
 
   return useMutation({
     mutationFn: (params: SaveHazardCategoriesParams) => saveHazardCategories(params),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      const resultMessage = response?.header?.resultMessage || '카테고리가 저장되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('카테고리가 저장되었습니다.');
+      }
       // 카테고리 목록과 코드 목록 모두 무효화하여 최신 데이터 반영
       queryClient.invalidateQueries({ queryKey: ['hazardCategories'] });
       queryClient.invalidateQueries({ queryKey: ['codes'] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '카테고리 저장에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }

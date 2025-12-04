@@ -9,6 +9,7 @@ import Button from '@mui/material/Button';
 import MenuItem from '@mui/material/MenuItem';
 
 import { Iconify } from 'src/components/iconify';
+import { uploadFile } from 'src/services/system/system.service';
 
 import type {
   Table1200NearMissRow,
@@ -102,11 +103,24 @@ export default function Table1200NearMissForm({ row, onRowChange }: Props) {
     setIsReporterModalOpen(false);
   };
 
-  const handleAddImages = (files?: FileList | File[]) => {
+  const handleAddImages = async (files?: FileList | File[]) => {
     if (!files) return;
-    const nextFiles = Array.from(files).filter((file) => file.type.startsWith('image/'));
-    if (!nextFiles.length) return;
-    onRowChange('siteImages', [...row.siteImages, ...nextFiles]);
+    const imageFiles = Array.from(files).filter((file) => file.type.startsWith('image/'));
+    if (!imageFiles.length) return;
+
+    try {
+      // 이미지 업로드
+      const uploadResponse = await uploadFile({ files: imageFiles });
+      const uploadedFiles = (uploadResponse as any).files || [];
+      const imageUrls = uploadedFiles.map((file: any) => file.fileUrl || file.url).filter(Boolean);
+
+      if (imageUrls.length > 0) {
+        onRowChange('siteImages', [...row.siteImages, ...imageUrls]);
+      }
+    } catch (error) {
+      console.error('이미지 업로드 실패:', error);
+      // TODO: 에러 토스트 표시
+    }
   };
 
   const handleDropImages = (event: React.DragEvent<HTMLDivElement>) => {
@@ -140,9 +154,21 @@ export default function Table1200NearMissForm({ row, onRowChange }: Props) {
     setIsUploadModalOpen(false);
   };
 
-  const handleUploadModalConfirm = (images: File[]) => {
-    onRowChange('siteImages', images);
-    setIsUploadModalOpen(false);
+  const handleUploadModalConfirm = async (images: File[]) => {
+    try {
+      // 이미지 업로드
+      const uploadResponse = await uploadFile({ files: images });
+      const uploadedFiles = (uploadResponse as any).files || [];
+      const imageUrls = uploadedFiles.map((file: any) => file.fileUrl || file.url).filter(Boolean);
+
+      if (imageUrls.length > 0) {
+        onRowChange('siteImages', imageUrls);
+      }
+      setIsUploadModalOpen(false);
+    } catch (error) {
+      console.error('이미지 업로드 실패:', error);
+      // TODO: 에러 토스트 표시
+    }
   };
 
   const handleRemoveImage = (index: number) => {
@@ -155,11 +181,12 @@ export default function Table1200NearMissForm({ row, onRowChange }: Props) {
   };
 
   useEffect(() => {
-    const urls = row.siteImages.map((file) => URL.createObjectURL(file));
-    setImagePreviewUrls(urls);
-    return () => {
-      urls.forEach((url) => URL.revokeObjectURL(url));
-    };
+    // siteImages는 이제 URL 문자열 배열
+    if (row.siteImages && row.siteImages.length > 0) {
+      setImagePreviewUrls(row.siteImages);
+    } else {
+      setImagePreviewUrls([]);
+    }
   }, [row.siteImages]);
 
   return (
@@ -210,7 +237,21 @@ export default function Table1200NearMissForm({ row, onRowChange }: Props) {
           </tr>
 
           <tr>
-            <th style={headerCellStyle}>신고자</th>
+            <th style={headerCellStyle}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+                onClick={handleReporterSearch}
+              >
+                <Typography sx={{ fontSize: 16, fontWeight: 600 }}>신고자</Typography>
+                <Iconify icon="eva:search-fill" width={24} />
+              </Box>
+            </th>
             <td style={bodyCellStyle} colSpan={3}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <TextField
@@ -220,13 +261,6 @@ export default function Table1200NearMissForm({ row, onRowChange }: Props) {
                   onChange={handleRowChange('reporter')}
                   placeholder="신고자를 입력하세요."
                 />
-                <IconButton
-                  color="inherit"
-                  sx={{ border: '1px solid', borderColor: 'divider' }}
-                  onClick={handleReporterSearch}
-                >
-                  <Iconify icon="eva:search-fill" />
-                </IconButton>
               </Box>
             </td>
             <th style={headerCellStyle}>소속</th>
@@ -359,41 +393,126 @@ export default function Table1200NearMissForm({ row, onRowChange }: Props) {
                   placeholder="작업현장 상황을 설명하세요."
                 />
 
-                <Box
-                  onClick={() => fileInputRef.current?.click()}
-                  onDrop={handleDropImages}
-                  onDragOver={(event) => {
-                    event.preventDefault();
-                    setIsDragActive(true);
-                  }}
-                  onDragEnter={handleDragEnter}
-                  onDragLeave={handleDragLeave}
-                  sx={{
-                    border: '1px dashed',
-                    borderColor: isDragActive ? 'primary.main' : 'divider',
-                    bgcolor: isDragActive ? 'primary.lighter' : 'grey.50',
-                    borderRadius: 2,
-                    px: { xs: 2, sm: 4 },
-                    py: { xs: 4, sm: 6 },
-                    textAlign: 'center',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                  }}
-                >
-                  <Iconify
-                    icon="eva:cloud-upload-fill"
-                    width={64}
-                    sx={{ color: 'primary.main', mb: 2 }}
-                  />
-                  <Typography variant="h6" sx={{ mb: 0.5 }}>
-                    이미지 업로드
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                    클릭하여 파일을 선택하거나 마우스로 드래그하여 옮겨주세요.
-                  </Typography>
-                </Box>
+                {/* 사진이 없을 때만 드래그 앤 드롭 영역 표시 */}
+                {imagePreviewUrls.length === 0 && (
+                  <Box
+                    onClick={() => fileInputRef.current?.click()}
+                    onDrop={handleDropImages}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      setIsDragActive(true);
+                    }}
+                    onDragEnter={handleDragEnter}
+                    onDragLeave={handleDragLeave}
+                    sx={{
+                      border: '1px dashed',
+                      borderColor: isDragActive ? 'primary.main' : 'divider',
+                      bgcolor: isDragActive ? 'primary.lighter' : 'grey.50',
+                      borderRadius: 2,
+                      px: { xs: 2, sm: 4 },
+                      py: { xs: 4, sm: 6 },
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    <Iconify
+                      icon="eva:cloud-upload-fill"
+                      width={64}
+                      sx={{ color: 'primary.main', mb: 2 }}
+                    />
+                    <Typography variant="h6" sx={{ mb: 0.5 }}>
+                      이미지 업로드
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                      클릭하여 파일을 선택하거나 마우스로 드래그하여 옮겨주세요.
+                    </Typography>
+                  </Box>
+                )}
 
-                {imagePreviewUrls.length > 0 && (
+                {/* 사진이 1개일 때: 드래그 앤 드롭 영역을 사진 미리보기로 대체 */}
+                {imagePreviewUrls.length === 1 && (
+                  <Box
+                    sx={{
+                      position: 'relative',
+                      width: '100%',
+                      borderRadius: 2,
+                      overflow: 'hidden',
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => fileInputRef.current?.click()}
+                    onDrop={handleDropImages}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      setIsDragActive(true);
+                    }}
+                    onDragEnter={handleDragEnter}
+                    onDragLeave={handleDragLeave}
+                  >
+                    <Box
+                      component="img"
+                      src={imagePreviewUrls[0]}
+                      alt="현장 이미지"
+                      sx={{
+                        width: '100%',
+                        height: '100%',
+                        maxHeight: 300,
+                        display: 'block',
+                        objectFit: 'contain',
+                      }}
+                    />
+                    <IconButton
+                      size="small"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleRemoveImage(0);
+                      }}
+                      sx={{
+                        position: 'absolute',
+                        top: 8,
+                        right: 8,
+                        bgcolor: 'rgba(0,0,0,0.5)',
+                        color: 'common.white',
+                        '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' },
+                      }}
+                    >
+                      <Iconify icon="solar:close-circle-bold" width={16} />
+                    </IconButton>
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      justifyContent="flex-end"
+                      sx={{ p: 1.5, bgcolor: 'background.paper' }}
+                    >
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleRemoveAllImages();
+                        }}
+                      >
+                        제거
+                      </Button>
+                      <Button
+                        variant="contained"
+                        color="inherit"
+                        size="small"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleOpenUploadModal();
+                        }}
+                      >
+                        업로드
+                      </Button>
+                    </Stack>
+                  </Box>
+                )}
+
+                {/* 사진이 2개 이상일 때: 그리드 형태로 표시 */}
+                {imagePreviewUrls.length > 1 && (
                   <Stack spacing={1.5}>
                     <Stack direction="row" spacing={1} flexWrap="wrap">
                       {imagePreviewUrls.map((url, index) => (
@@ -514,7 +633,7 @@ export default function Table1200NearMissForm({ row, onRowChange }: Props) {
         open={isUploadModalOpen}
         onClose={handleUploadModalClose}
         onConfirm={handleUploadModalConfirm}
-        initialImages={row.siteImages}
+        initialImages={[]}
       />
       <InvestigationTeamSelectModal
         open={isReporterModalOpen}

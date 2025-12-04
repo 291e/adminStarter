@@ -174,13 +174,32 @@ export default function EducationDetailModal({ open, onClose, educationReportIdx
 
     // 리포트 정보 (사용자 정보 포함)
     const report: EducationReport | null = detail.report || {
-      organizationName: detail.organizationName || '',
-      name: detail.name || '',
-      position: detail.position || '',
-      department: detail.department || '',
-      role: detail.role || '',
-      standardEducation: standardTime,
+      educationReportIdx: detail.educationReportIdx,
+      memberIdx: detail.memberIdx,
       companyIdx: detail.companyIdx,
+      mandatoryEducation: detail.mandatoryEducation || 0,
+      regularEducation: detail.regularEducation || 0,
+      totalEducation: detail.totalEducation || 0,
+      standardEducation: standardTime,
+      completionRate: detail.completionRate || 0,
+      createAt: detail.createAt,
+      memberInformation: detail.memberInformation || {
+        memberIdx: detail.memberIdx || 0,
+        memberName: detail.name || '',
+        position: detail.position || null,
+        department: detail.department || null,
+        memberRole: (detail.role as any) || 'WORKER',
+      },
+      companyInformation: detail.companyInformation || {
+        companyIdx: detail.companyIdx || 0,
+        companyName: detail.organizationName || '',
+      },
+      // 하위 호환성
+      organizationName: detail.companyInformation?.companyName || detail.organizationName,
+      name: detail.memberInformation?.memberName || detail.name,
+      position: detail.memberInformation?.position || detail.position,
+      department: detail.memberInformation?.department || detail.department,
+      role: detail.memberInformation?.memberRole || detail.role,
     };
 
     return {
@@ -334,7 +353,7 @@ export default function EducationDetailModal({ open, onClose, educationReportIdx
                     이름
                   </Typography>
                   <Typography variant="body2" sx={{ fontSize: 14 }}>
-                    {report.name}
+                    {report?.memberInformation?.memberName || report?.name || '-'}
                   </Typography>
                 </Stack>
                 <Stack direction="row" spacing={4} alignItems="center" sx={{ minWidth: 200 }}>
@@ -358,7 +377,7 @@ export default function EducationDetailModal({ open, onClose, educationReportIdx
                     소속
                   </Typography>
                   <Typography variant="body2" sx={{ fontSize: 14 }}>
-                    {report.department}
+                    {report?.memberInformation?.department || report?.department || '-'}
                   </Typography>
                 </Stack>
                 <Stack direction="row" spacing={4} alignItems="center" sx={{ minWidth: 200 }}>
@@ -369,7 +388,7 @@ export default function EducationDetailModal({ open, onClose, educationReportIdx
                     역할
                   </Typography>
                   <Typography variant="body2" sx={{ fontSize: 14 }}>
-                    {getRoleLabel(report.role)}
+                    {getRoleLabel(report?.memberInformation?.memberRole || report?.role || '')}
                   </Typography>
                 </Stack>
               </Stack>

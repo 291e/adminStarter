@@ -237,7 +237,7 @@ export type Table1200IndustrialAccidentRow = {
     risk: string; // 위험성
   };
   otherContent: string; // 기타내용 사고조사 내용
-  investigationImages: File[]; // 기타내용 사고조사 사진
+  investigationImages: string[]; // 기타내용 사고조사 사진 URL
 };
 
 export type Table1200RiskGrade = 'A' | 'B' | 'C';
@@ -254,7 +254,7 @@ export type Table1200NearMissRow = {
   preventionMeasure: string; // 예방대책
   preventionRiskLevel: Table1200RiskGrade; // 예방대책 위험정도
   siteSituation: string; // 작업현장 상황 설명
-  siteImages: File[]; // 현장 이미지
+  siteImages: string[]; // 현장 이미지 URL
 };
 
 // 통합 타입 (Union)

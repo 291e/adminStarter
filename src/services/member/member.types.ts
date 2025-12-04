@@ -81,6 +81,17 @@ export type CreateMemberDto = {
   companyBranchIdx?: number;
 };
 
+// 아이디 중복검사 요청
+export type CheckIdParams = {
+  memberId: string;
+};
+
+// 아이디 중복검사 응답
+export type CheckIdResponse = BaseResponseDto<{
+  isAvailable: boolean;
+  message: string;
+}>;
+
 // 회원 생성 응답
 export type CreateMemberResponse = BaseResponseDto<{
   memberIdx: number;

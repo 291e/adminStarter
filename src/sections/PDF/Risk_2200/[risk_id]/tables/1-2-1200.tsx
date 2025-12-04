@@ -22,7 +22,7 @@ const defaultRow: Table1200NearMissRow = {
   preventionMeasure: '케이블 덕트 설치, 작업 전 동선 점검 및 위험표지 설치',
   preventionRiskLevel: 'A',
   siteSituation: '포장 라인 중앙에 케이블이 복수 노출되어 있으며 통행 동선이 협소함.',
-  siteImages: [] as File[],
+  siteImages: [],
 };
 
 const gradeGuideRows = [

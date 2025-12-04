@@ -12,6 +12,10 @@ import FormControl from '@mui/material/FormControl';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import InputAdornment from '@mui/material/InputAdornment';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { type Dayjs } from 'dayjs';
 
 import { Iconify } from 'src/components/iconify';
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
@@ -23,6 +27,10 @@ export type InviteMemberFormData = {
   organizationName: string;
   role: string;
   email: string;
+  memberName?: string;
+  workType?: 'PRODUCTION' | 'OFFICE' | '';
+  department?: string;
+  joinedAt?: Dayjs | null;
 };
 
 type Props = {
@@ -53,6 +61,10 @@ export default function InviteMemberModal({
     organizationName,
     role: '',
     email: '',
+    memberName: '',
+    workType: '',
+    department: '',
+    joinedAt: null,
   });
   const [errors, setErrors] = useState<Partial<Record<keyof InviteMemberFormData, string>>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -73,6 +85,10 @@ export default function InviteMemberModal({
         setErrors((prev) => ({ ...prev, [field]: undefined }));
       }
     };
+
+  const handleDateChange = (date: Dayjs | null) => {
+    setFormData((prev) => ({ ...prev, joinedAt: date }));
+  };
 
   const validate = (): boolean => {
     const newErrors: Partial<Record<keyof InviteMemberFormData, string>> = {};
@@ -107,11 +123,27 @@ export default function InviteMemberModal({
     }
 
     try {
-      await inviteMemberMutation.mutateAsync({
+      const params: any = {
         companyIdx,
         email,
         memberRole: formData.role,
-      });
+      };
+
+      // 선택적 필드 추가
+      if (formData.memberName) {
+        params.memberName = formData.memberName;
+      }
+      if (formData.workType) {
+        params.workType = formData.workType;
+      }
+      if (formData.department) {
+        params.department = formData.department;
+      }
+      if (formData.joinedAt) {
+        params.joinedAt = formData.joinedAt.format('YYYY-MM-DD');
+      }
+
+      await inviteMemberMutation.mutateAsync(params);
 
       if (import.meta.env.DEV) {
         console.log('✅ [InviteMemberModal] 조직원 초대 성공');
@@ -130,6 +162,10 @@ export default function InviteMemberModal({
       organizationName,
       role: '',
       email: '',
+      memberName: '',
+      workType: '',
+      department: '',
+      joinedAt: null,
     });
     setErrors({});
     setSubmitError(null);
@@ -157,95 +193,200 @@ export default function InviteMemberModal({
       </DialogTitle>
 
       <DialogContent>
-        <Stack spacing={3} sx={{ px: 3, pt: 3, pb: 0 }}>
-          {/* 조직명 필드 (읽기 전용) */}
-          <TextField
-            fullWidth
-            variant="filled"
-            value={formData.organizationName}
-            disabled
-            sx={{
-              '& .MuiFilledInput-root': {
-                bgcolor: 'grey.100',
-                height: 56,
-                '&:hover': {
+        <LocalizationProvider dateAdapter={AdapterDayjs}>
+          <Stack spacing={3} sx={{ px: 3, pt: 3, pb: 0 }}>
+            {/* 조직명 필드 (읽기 전용, 전체 너비) */}
+            <TextField
+              fullWidth
+              variant="filled"
+              value={formData.organizationName}
+              disabled
+              sx={{
+                '& .MuiFilledInput-root': {
                   bgcolor: 'grey.100',
+                  height: 56,
+                  '&:hover': {
+                    bgcolor: 'grey.100',
+                  },
+                  '&.Mui-disabled': {
+                    bgcolor: 'grey.100',
+                  },
+                  '& .MuiFilledInput-input': {
+                    py: 2,
+                    fontSize: 15,
+                    lineHeight: '24px',
+                  },
                 },
-                '&.Mui-disabled': {
-                  bgcolor: 'grey.100',
-                },
-                '& .MuiFilledInput-input': {
-                  py: 2,
-                  fontSize: 15,
-                  lineHeight: '24px',
-                },
-              },
-            }}
-          />
-
-          {/* 역할 필드 */}
-          <FormControl fullWidth error={!!errors.role}>
-            <Select
-              value={formData.role}
-              onChange={(e) => handleChange('role')(e as React.ChangeEvent<HTMLInputElement>)}
-              displayEmpty
-              renderValue={(value) => {
-                if (!value) {
-                  return (
-                    <Typography
-                      component="span"
-                      sx={{ color: 'text.disabled', fontSize: 15, lineHeight: '24px' }}
-                    >
-                      역할<span style={{ color: '#00a76f' }}>*</span>
-                    </Typography>
-                  );
-                }
-                return roles.find((r) => r.value === value)?.label || value;
               }}
-              endAdornment={
-                <InputAdornment position="end">
-                  <Iconify icon={`solar:chevron-down-bold` as any} width={18} />
-                </InputAdornment>
-              }
-            >
-              {roles.map((role) => (
-                <MenuItem key={role.value} value={role.value}>
-                  {role.label}
-                </MenuItem>
-              ))}
-            </Select>
-            {errors.role && (
-              <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1.75 }}>
-                {errors.role}
-              </Typography>
-            )}
-          </FormControl>
+            />
 
-          {/* 이메일 필드 */}
-          <TextField
-            fullWidth
-            variant="outlined"
-            placeholder="이메일*"
-            value={formData.email}
-            onChange={handleChange('email')}
-            error={!!errors.email}
-            helperText={errors.email}
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                height: 56,
-                '& input': {
-                  py: 2,
-                  fontSize: 15,
-                  lineHeight: '24px',
-                },
-                '& input::placeholder': {
-                  color: 'text.disabled',
-                  opacity: 1,
-                },
-              },
-            }}
-          />
-        </Stack>
+            {/* 이름 + 이메일 (2개 한 줄) */}
+            <Stack direction="row" spacing={2}>
+              <TextField
+                fullWidth
+                variant="outlined"
+                placeholder="이름*"
+                value={formData.memberName || ''}
+                onChange={handleChange('memberName')}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    height: 56,
+                    '& input': {
+                      py: 2,
+                      fontSize: 15,
+                      lineHeight: '24px',
+                    },
+                    '& input::placeholder': {
+                      color: 'text.disabled',
+                      opacity: 1,
+                    },
+                  },
+                }}
+              />
+              <TextField
+                fullWidth
+                variant="outlined"
+                placeholder="이메일*"
+                value={formData.email}
+                onChange={handleChange('email')}
+                error={!!errors.email}
+                helperText={errors.email}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    height: 56,
+                    '& input': {
+                      py: 2,
+                      fontSize: 15,
+                      lineHeight: '24px',
+                    },
+                    '& input::placeholder': {
+                      color: 'text.disabled',
+                      opacity: 1,
+                    },
+                  },
+                }}
+              />
+            </Stack>
+
+            {/* 소속 + 역할 (2개 한 줄) */}
+            <Stack direction="row" spacing={2}>
+              <TextField
+                fullWidth
+                variant="outlined"
+                placeholder="소속*"
+                value={formData.department || ''}
+                onChange={handleChange('department')}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    height: 56,
+                    '& input': {
+                      py: 2,
+                      fontSize: 15,
+                      lineHeight: '24px',
+                    },
+                    '& input::placeholder': {
+                      color: 'text.disabled',
+                      opacity: 1,
+                    },
+                  },
+                }}
+              />
+              <FormControl fullWidth error={!!errors.role}>
+                <Select
+                  value={formData.role}
+                  onChange={(e) => handleChange('role')(e as React.ChangeEvent<HTMLInputElement>)}
+                  displayEmpty
+                  renderValue={(value) => {
+                    if (!value) {
+                      return (
+                        <Typography
+                          component="span"
+                          sx={{ color: 'text.disabled', fontSize: 15, lineHeight: '24px' }}
+                        >
+                          역할<span style={{ color: '#00a76f' }}>*</span>
+                        </Typography>
+                      );
+                    }
+                    return roles.find((r) => r.value === value)?.label || value;
+                  }}
+                  endAdornment={
+                    <InputAdornment position="end">
+                      <Iconify icon={`solar:chevron-down-bold` as any} width={18} />
+                    </InputAdornment>
+                  }
+                >
+                  {roles.map((role) => (
+                    <MenuItem key={role.value} value={role.value}>
+                      {role.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+                {errors.role && (
+                  <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1.75 }}>
+                    {errors.role}
+                  </Typography>
+                )}
+              </FormControl>
+            </Stack>
+
+            {/* 직종 + 입사일 (2개 한 줄) */}
+            <Stack direction="row" spacing={2}>
+              {/* 직종 필드 */}
+              <FormControl fullWidth>
+                <Select
+                  value={formData.workType || ''}
+                  onChange={(e) =>
+                    handleChange('workType')(e as React.ChangeEvent<HTMLInputElement>)
+                  }
+                  displayEmpty
+                  renderValue={(value) => {
+                    if (!value) {
+                      return (
+                        <Typography
+                          component="span"
+                          sx={{ color: 'text.disabled', fontSize: 15, lineHeight: '24px' }}
+                        >
+                          직종<span style={{ color: '#00a76f' }}>*</span>
+                        </Typography>
+                      );
+                    }
+                    return value === 'PRODUCTION' ? '생산직' : '사무직';
+                  }}
+                  endAdornment={
+                    <InputAdornment position="end">
+                      <Iconify icon={`solar:chevron-down-bold` as any} width={18} />
+                    </InputAdornment>
+                  }
+                >
+                  <MenuItem value="PRODUCTION">생산직</MenuItem>
+                  <MenuItem value="OFFICE">사무직</MenuItem>
+                </Select>
+              </FormControl>
+              <DatePicker
+                label="입사일*"
+                value={formData.joinedAt}
+                onChange={handleDateChange}
+                format="YYYY-MM-DD"
+                slotProps={{
+                  textField: {
+                    fullWidth: true,
+                    variant: 'outlined',
+                    sx: {
+                      '& .MuiOutlinedInput-root': {
+                        height: 56,
+                        '& input': {
+                          py: 2,
+                          fontSize: 15,
+                          lineHeight: '24px',
+                        },
+                      },
+                    },
+                  },
+                }}
+              />
+            </Stack>
+          </Stack>
+        </LocalizationProvider>
       </DialogContent>
 
       <DialogActions>

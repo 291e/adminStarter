@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 import {
   getApis,
@@ -51,8 +52,19 @@ export function useCreateApi() {
 
   return useMutation({
     mutationFn: (params: CreateApiParams) => createApi(params),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      const resultMessage = response?.header?.resultMessage || 'API가 등록되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('API가 등록되었습니다.');
+      }
       queryClient.invalidateQueries({ queryKey: ['apis'] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || 'API 등록에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -65,9 +77,20 @@ export function useUpdateApi() {
 
   return useMutation({
     mutationFn: (params: UpdateApiParams) => updateApi(params),
-    onSuccess: (_, variables) => {
+    onSuccess: (response, variables) => {
+      const resultMessage = response?.header?.resultMessage || 'API 정보가 수정되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('API 정보가 수정되었습니다.');
+      }
       queryClient.invalidateQueries({ queryKey: ['apis'] });
       queryClient.invalidateQueries({ queryKey: ['apiDetail', variables.id] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || 'API 수정에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -80,8 +103,19 @@ export function useGenerateApiKey() {
 
   return useMutation({
     mutationFn: (params: GenerateApiKeyParams) => generateApiKey(params),
-    onSuccess: (_, variables) => {
+    onSuccess: (response, variables) => {
+      const resultMessage = response?.header?.resultMessage || '새 API Key가 생성되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('새 API Key가 생성되었습니다.');
+      }
       queryClient.invalidateQueries({ queryKey: ['apiDetail', variables.id] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || 'API Key 생성에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }

@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useTheme } from '@mui/material/styles';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import Button from '@mui/material/Button';
-import Autocomplete from '@mui/material/Autocomplete';
 
 import { Iconify } from 'src/components/iconify';
+import { uploadFile } from 'src/services/system/system.service';
+
 import type { Table2400TBMData, InvestigationTeamMember } from '../../types/table-data';
 import InvestigationTeamSelectModal from './modal/InvestigationTeamSelectModal';
 import EducationVideoSelectModal from './modal/EducationVideoSelectModal';
@@ -35,14 +37,6 @@ type Props = {
   onEducationVideoAddRow: () => void;
 };
 
-// TODO: TanStack Query Hook(useQuery)으로 교육영상 목록 가져오기
-const MOCK_EDUCATION_VIDEOS = [
-  '아크릴로니트릴_10분안전',
-  '화학물질 안전관리',
-  '개인보호구 착용법',
-  '비상대응 절차',
-] as const;
-
 export default function Table2400TBMForm({
   data,
   onDataChange,
@@ -63,6 +57,7 @@ export default function Table2400TBMForm({
   const [dragOverVideoIndex, setDragOverVideoIndex] = useState<number | null>(null);
   const [participantModalIndex, setParticipantModalIndex] = useState<number | null>(null);
   const [educationVideoModalIndex, setEducationVideoModalIndex] = useState<number | null>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
   // 점검내용 테이블 드래그 핸들러
   const handleInspectionDragStart = (index: number) => {
@@ -143,11 +138,7 @@ export default function Table2400TBMForm({
     handleCloseParticipantModal();
   };
 
-  // 교육영상 선택 모달 핸들러
-  const handleOpenEducationVideoModal = (index: number) => {
-    setEducationVideoModalIndex(index);
-  };
-
+  // 교육영상 선택 모달 핸들러 (동영상 업로드로 대체되었지만, 모달이 여전히 사용될 수 있으므로 유지)
   const handleCloseEducationVideoModal = () => {
     setEducationVideoModalIndex(null);
   };
@@ -430,36 +421,39 @@ export default function Table2400TBMForm({
                 </td>
                 <td>
                   {row.educationVideo ? (
-                    <Autocomplete
-                      freeSolo
-                      size="small"
-                      options={MOCK_EDUCATION_VIDEOS}
-                      value={row.educationVideo}
-                      onInputChange={(_, newValue) => {
-                        onEducationVideoRowChange(index, 'educationVideo', newValue);
-                      }}
-                      renderInput={(params) => (
-                        <TextField
-                          {...params}
-                          fullWidth
-                          InputProps={{
-                            ...params.InputProps,
-                            endAdornment: <>{params.InputProps.endAdornment}</>,
-                          }}
-                          sx={{
-                            '& .MuiOutlinedInput-root': {
-                              fontSize: 14,
-                              height: 'auto',
-                            },
-                          }}
-                        />
-                      )}
-                    />
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          flex: 1,
+                          fontSize: 14,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {row.educationVideo}
+                      </Typography>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => videoInputRef.current?.click()}
+                        sx={{
+                          minHeight: 30,
+                          fontSize: 13,
+                          fontWeight: 700,
+                          px: 1,
+                          py: 0.5,
+                        }}
+                      >
+                        변경
+                      </Button>
+                    </Box>
                   ) : (
                     <Button
                       variant="outlined"
                       size="small"
-                      onClick={() => handleOpenEducationVideoModal(index)}
+                      onClick={() => videoInputRef.current?.click()}
                       sx={{
                         minHeight: 30,
                         fontSize: 13,
@@ -468,9 +462,38 @@ export default function Table2400TBMForm({
                         py: 0.5,
                       }}
                     >
-                      교육영상 선택
+                      동영상 업로드
                     </Button>
                   )}
+                  <input
+                    ref={videoInputRef}
+                    type="file"
+                    accept="video/*"
+                    style={{ display: 'none' }}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+
+                      try {
+                        // 동영상 업로드
+                        const uploadResponse = await uploadFile({ files: [file] });
+                        const uploadedFiles = (uploadResponse as any).files || [];
+                        const videoUrl = uploadedFiles[0]?.fileUrl || uploadedFiles[0]?.url;
+
+                        if (videoUrl) {
+                          onEducationVideoRowChange(index, 'educationVideo', videoUrl);
+                        }
+                      } catch (error) {
+                        console.error('동영상 업로드 실패:', error);
+                        // TODO: 에러 토스트 표시
+                      }
+
+                      // input 초기화
+                      if (videoInputRef.current) {
+                        videoInputRef.current.value = '';
+                      }
+                    }}
+                  />
                 </td>
                 <td>
                   <Button

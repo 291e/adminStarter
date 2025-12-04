@@ -4,25 +4,44 @@ import type { BaseResponseDto } from '../common';
 
 // ----------------------------------------------------------------------
 
+// 멤버 정보 (memberInformation)
+export type EducationReportMemberInformation = {
+  memberIdx: number;
+  memberName: string;
+  position: string | null;
+  department: string | null;
+  memberRole: 'OPERATOR_MANAGER' | 'MANAGEMENT_SUPERVISOR' | 'SAFETY_MANAGER' | 'WORKER';
+  memberEmail?: string;
+  memberPhone?: string;
+};
+
+// 회사 정보 (companyInformation)
+export type EducationReportCompanyInformation = {
+  companyIdx: number;
+  companyName: string;
+};
+
 // 교육 리포트 정보 (실제 API 응답 구조)
 export type EducationReport = {
+  educationReportIdx?: number;
   educationReportId?: string;
   id?: string; // 일부 API에서 사용
   memberIdx?: number;
   companyIdx?: number;
-  organizationName: string;
-  name: string;
-  position: string;
-  department: string;
-  role: string;
   mandatoryEducation?: number; // 의무교육(분)
   regularEducation?: number; // 정기교육(분)
   totalEducation?: number; // 총 이수(분)
   standardEducation?: number; // 이수 기준(분)
   completionRate?: number; // 이수율 (%)
-  description?: string;
-  memo?: string;
-  // ... 기타 필드
+  createAt?: string;
+  memberInformation?: EducationReportMemberInformation;
+  companyInformation?: EducationReportCompanyInformation;
+  // 하위 호환성을 위한 필드 (deprecated)
+  organizationName?: string;
+  name?: string;
+  position?: string;
+  department?: string;
+  role?: string;
 };
 
 // 교육 이수 현황 목록 조회 요청 파라미터 (실제 API 스펙)
@@ -49,15 +68,8 @@ export type GetEducationDetailParams = {
 };
 
 // 교육 상세 정보
-export type EducationDetail = {
-  education: EducationReport;
-  participants: Array<{
-    id: string;
-    name: string;
-    joinDate: string;
-    role: string;
-    completionStatus: 'completed' | 'pending';
-  }>;
+export type EducationDetail = EducationReport & {
+  educationRecordList?: EducationRecord[];
 };
 
 // 교육 리포트 상세 조회 응답 (deprecated - GetEducationReportResponse 사용)
@@ -66,13 +78,6 @@ export type GetEducationDetailResponse = BaseResponseDto<EducationDetail>;
 // 교육 리포트 생성 요청
 export type CreateEducationReportParams = {
   memberIdx: number; // 필수
-  organizationName: string; // 필수
-  name: string; // 필수
-  position: string; // 필수
-  department: string; // 필수
-  role: 'OPERATOR_MANAGER' | 'MANAGEMENT_SUPERVISOR' | 'SAFETY_MANAGER' | 'WORKER'; // 필수
-  description?: string;
-  memo?: string;
 };
 
 // 교육 리포트 생성 응답
@@ -86,16 +91,9 @@ export type GetEducationReportParams = {
 // 교육 리포트 조회 응답
 export type GetEducationReportResponse = BaseResponseDto<EducationDetail>;
 
-// 교육 리포트 수정 요청
+// 교육 리포트 수정 요청 (빈 DTO - 항상 이수율 재계산)
 export type UpdateEducationReportParams = {
   educationReportIdx: string | number;
-  organizationName?: string;
-  name?: string;
-  position?: string;
-  department?: string;
-  role?: 'OPERATOR_MANAGER' | 'MANAGEMENT_SUPERVISOR' | 'SAFETY_MANAGER' | 'WORKER';
-  description?: string;
-  memo?: string;
 };
 
 // 교육 리포트 수정 응답

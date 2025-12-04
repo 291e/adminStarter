@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 import {
   getChecklists,
@@ -43,8 +44,19 @@ export function useUpdateHighRiskWork() {
 
   return useMutation({
     mutationFn: (params: UpdateHighRiskWorkParams) => updateHighRiskWork(params),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      const resultMessage = response?.header?.resultMessage || '고위험작업/상황이 업데이트되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('고위험작업/상황이 업데이트되었습니다.');
+      }
       queryClient.invalidateQueries({ queryKey: ['checklists'] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '고위험작업/상황 업데이트에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -68,9 +80,20 @@ export function useSaveDisasterFactors() {
 
   return useMutation({
     mutationFn: (params: SaveDisasterFactorsParams) => saveDisasterFactors(params),
-    onSuccess: (_, variables) => {
+    onSuccess: (response, variables) => {
+      const resultMessage = response?.header?.resultMessage || '재해유발요인이 저장되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('재해유발요인이 저장되었습니다.');
+      }
       queryClient.invalidateQueries({ queryKey: ['checklists'] });
       queryClient.invalidateQueries({ queryKey: ['disasterFactors', variables.checklistIdx] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '재해유발요인 저장에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -93,9 +116,20 @@ export function useCreateIndustry() {
 
   return useMutation({
     mutationFn: (params: CreateIndustryParams) => createIndustry(params),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      const resultMessage = response?.header?.resultMessage || '업종이 등록되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('업종이 등록되었습니다.');
+      }
       queryClient.invalidateQueries({ queryKey: ['industries'] });
       queryClient.invalidateQueries({ queryKey: ['checklists'] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '업종 등록에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -108,9 +142,20 @@ export function useUpdateIndustry() {
 
   return useMutation({
     mutationFn: (params: UpdateIndustryParams) => updateIndustry(params),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      const resultMessage = response?.header?.resultMessage || '업종 정보가 수정되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('업종 정보가 수정되었습니다.');
+      }
       queryClient.invalidateQueries({ queryKey: ['industries'] });
       queryClient.invalidateQueries({ queryKey: ['checklists'] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '업종 수정에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -123,9 +168,15 @@ export function useDeleteIndustry() {
 
   return useMutation({
     mutationFn: (params: DeleteIndustryParams) => deleteIndustry(params),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      toast.success('업종이 삭제되었습니다.');
       queryClient.invalidateQueries({ queryKey: ['industries'] });
       queryClient.invalidateQueries({ queryKey: ['checklists'] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '업종 삭제에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -138,8 +189,19 @@ export function useCreateChecklist() {
 
   return useMutation({
     mutationFn: (params: CreateChecklistParams) => createChecklist(params),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      const resultMessage = response?.header?.resultMessage || '체크리스트가 등록되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('체크리스트가 등록되었습니다.');
+      }
       queryClient.invalidateQueries({ queryKey: ['checklists'] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '체크리스트 등록에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }

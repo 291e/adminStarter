@@ -25,9 +25,7 @@ export type UseEducationReportResult = {
   total: number;
 };
 
-export function useEducationReport(
-  reports: EducationReport[]
-): UseEducationReportResult {
+export function useEducationReport(reports: EducationReport[]): UseEducationReportResult {
   const [filters, setFilters] = useState<EducationReportFilters>({
     role: 'all',
     searchFilter: 'all',
@@ -64,8 +62,9 @@ export function useEducationReport(
   const filteredAll = useMemo(
     () =>
       reports.filter((r) => {
-        // 역할 필터
-        const roleMatch = filters.role === 'all' || r.role === filters.role;
+        // 역할 필터 (memberInformation.memberRole 우선 사용)
+        const role = r.memberInformation?.memberRole || r.role || '';
+        const roleMatch = filters.role === 'all' || role === filters.role;
 
         // 검색 필터
         if (!filters.searchValue) {
@@ -75,20 +74,28 @@ export function useEducationReport(
         const searchLower = filters.searchValue.toLowerCase();
         let searchMatch = false;
 
+        // memberInformation과 companyInformation 우선 사용, 없으면 하위 호환 필드 사용
+        const memberInfo = r.memberInformation;
+        const companyInfo = r.companyInformation;
+        const organizationName = companyInfo?.companyName || r.organizationName || '';
+        const memberName = memberInfo?.memberName || r.name || '';
+        const department = memberInfo?.department || r.department || '';
+        const memberRole = memberInfo?.memberRole || r.role || '';
+
         if (filters.searchFilter === 'all') {
           searchMatch =
-            r.organizationName.toLowerCase().includes(searchLower) ||
-            r.name.toLowerCase().includes(searchLower) ||
-            r.department.toLowerCase().includes(searchLower) ||
-            r.role.toLowerCase().includes(searchLower);
+            organizationName.toLowerCase().includes(searchLower) ||
+            memberName.toLowerCase().includes(searchLower) ||
+            department.toLowerCase().includes(searchLower) ||
+            memberRole.toLowerCase().includes(searchLower);
         } else if (filters.searchFilter === 'organizationName') {
-          searchMatch = r.organizationName.toLowerCase().includes(searchLower);
+          searchMatch = organizationName.toLowerCase().includes(searchLower);
         } else if (filters.searchFilter === 'name') {
-          searchMatch = r.name.toLowerCase().includes(searchLower);
+          searchMatch = memberName.toLowerCase().includes(searchLower);
         } else if (filters.searchFilter === 'department') {
-          searchMatch = r.department.toLowerCase().includes(searchLower);
+          searchMatch = department.toLowerCase().includes(searchLower);
         } else if (filters.searchFilter === 'role') {
-          searchMatch = r.role.toLowerCase().includes(searchLower);
+          searchMatch = memberRole.toLowerCase().includes(searchLower);
         }
 
         return roleMatch && searchMatch;
@@ -101,7 +108,9 @@ export function useEducationReport(
       if (checked) {
         setSelectedIds(
           filteredAll
-            .map((r) => r.id || r.educationReportId || String(r.memberIdx || ''))
+            .map((r) =>
+              String(r.educationReportIdx || r.educationReportId || r.id || r.memberIdx || '')
+            )
             .filter((id): id is string => !!id)
         );
       } else {
@@ -143,4 +152,3 @@ export function useEducationReport(
     total,
   };
 }
-

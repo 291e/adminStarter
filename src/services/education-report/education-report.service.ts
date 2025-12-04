@@ -70,22 +70,36 @@ export async function getEducationReports(
     body: {
       educationReports: Array.isArray(rawData.educationReportList)
         ? rawData.educationReportList.map((item: any) => ({
-            id: item.educationReportId || item.id || String(item.memberIdx || ''),
-            educationReportId: item.educationReportId || item.id,
+            educationReportIdx: item.educationReportIdx,
+            educationReportId: item.educationReportIdx || item.educationReportId || item.id,
+            id: String(item.educationReportIdx || item.educationReportId || item.id || item.memberIdx || ''),
             memberIdx: item.memberIdx,
             companyIdx: item.companyIdx,
-            organizationName: item.organizationName || '',
-            name: item.name || '',
-            position: item.position || '',
-            department: item.department || '',
-            role: item.role || '',
             mandatoryEducation: item.mandatoryEducation || 0,
             regularEducation: item.regularEducation || 0,
             totalEducation: item.totalEducation || 0,
             standardEducation: item.standardEducation || 0,
             completionRate: item.completionRate || 0,
-            description: item.description,
-            memo: item.memo,
+            createAt: item.createAt,
+            memberInformation: item.memberInformation || {
+              memberIdx: item.memberIdx || 0,
+              memberName: item.name || item.memberInformation?.memberName || '',
+              position: item.position || item.memberInformation?.position || null,
+              department: item.department || item.memberInformation?.department || null,
+              memberRole: item.role || item.memberInformation?.memberRole || 'WORKER',
+              memberEmail: item.memberInformation?.memberEmail,
+              memberPhone: item.memberInformation?.memberPhone,
+            },
+            companyInformation: item.companyInformation || {
+              companyIdx: item.companyIdx || 0,
+              companyName: item.organizationName || item.companyInformation?.companyName || '',
+            },
+            // 하위 호환성을 위한 필드 (deprecated)
+            organizationName: item.companyInformation?.companyName || item.organizationName,
+            name: item.memberInformation?.memberName || item.name,
+            position: item.memberInformation?.position || item.position,
+            department: item.memberInformation?.department || item.department,
+            role: item.memberInformation?.memberRole || item.role,
           }))
         : [],
       total: rawData.totalCount || 0,
@@ -180,10 +194,11 @@ export async function updateEducationReport(
     });
   }
 
-  const { educationReportIdx, ...body } = params;
+  const { educationReportIdx } = params;
+  // UpdateEducationReportParams는 빈 DTO이므로 빈 객체 전달
   const response = await axiosInstance.put<UpdateEducationReportResponse>(
     `${endpoints.education.reports}/${educationReportIdx}`,
-    body
+    {}
   );
 
   // 디버깅: 응답 로그

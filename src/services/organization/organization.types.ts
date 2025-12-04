@@ -224,8 +224,6 @@ export type GetSubscriptionsResponse = BaseResponseDto<{
 export type SubscribeParams = {
   companyIdx: number;
   serviceSettingIdx: number; // 서비스 설정 Index (숫자)
-  billingKey?: string; // 결제 빌링키 (선택)
-  immediateCancel?: boolean; // 즉시 해지 여부 (기본값: false)
 };
 
 // 서비스 구독 응답
@@ -286,29 +284,49 @@ export type GetCurrentSubscriptionResponse = BaseResponseDto<{
 
 // 등록된 카드 정보
 export type RegisteredCard = {
-  cardId: string;
-  cardType: 'visa' | 'mastercard' | 'amex' | 'other';
-  cardNumber: string; // 마스킹된 카드 번호 (예: '**** **** **** 5678')
-  isPrimary: boolean;
-  billingKey?: string; // 페이플 빌링키
+  companyCardIdx: number;
+  companyIdx: number;
+  billingKey: string | null;
+  cardName: string;
+  cardNo: string;
+  orderNo: string | null;
+  amount: string | null;
+  isDefaultCard: number; // 0 또는 1
+  isCardAuthCompleted: number; // 0 또는 1
+  isAlreadyAuthenticated: number; // 0 또는 1
+  resultMsg: string | null;
+  createAt: string; // ISO date string
+  updateAt: string; // ISO date string
 };
 
 // 등록된 카드 목록 조회 응답
 export type GetRegisteredCardsResponse = BaseResponseDto<{
-  cards: RegisteredCard[];
+  cardList: RegisteredCard[];
+  totalCount: number;
 }>;
 
 // 카드 등록 요청 파라미터 (페이플 콜백 후)
 export type RegisterCardParams = {
-  billingKey: string;
-  orderNo: string;
-  amount: string;
-  cardName: string;
-  cardNo: string;
+  billingKey?: string; // 빌링키 (선택, undefined 가능)
+  cardName: string; // 카드명 (예: "신한카드")
+  cardNo: string; // 카드번호 마스킹 (예: "5107-****-****-4684")
+  orderNo?: string; // 주문번호 (선택)
+  amount?: string; // 인증 금액 (선택)
+  isCardAuthCompleted: number; // 카드 인증 완료 여부 (0 또는 1)
+  isAlreadyAuthenticated: number; // 이미 인증된 카드 여부 (0 또는 1)
+  resultMsg?: string; // 결과 메시지 (선택)
 };
 
 // 카드 등록 응답
 export type RegisterCardResponse = BaseResponseDto<RegisteredCard>;
+
+// 카드 수정 요청 파라미터
+export type UpdateCardParams = {
+  isDefaultCard?: number; // 0 또는 1
+};
+
+// 카드 수정 응답
+export type UpdateCardResponse = BaseResponseDto<RegisteredCard>;
 
 // 무재해 인증 이력 항목
 export type AccidentFreeHistoryItem = {
@@ -343,6 +361,10 @@ export type UpdateAccidentFreeParams = {
 export type InviteMemberParams = {
   email: string;
   memberRole: string;
+  memberName?: string;
+  workType?: 'PRODUCTION' | 'OFFICE';
+  department?: string;
+  joinedAt?: string; // YYYY-MM-DD 형식
 };
 
 // 조직원 초대 응답
@@ -364,6 +386,11 @@ export type VerifyInvitationCodeResponse = BaseResponseDto<{
     invitedEmail: string;
     memberRole: string;
     expiresAt: string;
+    memberName?: string; // 초대 시 저장된 이름
+    workType?: 'PRODUCTION' | 'OFFICE'; // 초대 시 저장된 직종
+    department?: string; // 초대 시 저장된 소속
+    joinedAt?: string; // 초대 시 저장된 입사일 (YYYY-MM-DD 형식)
+    description?: string | null; // 초대 시 저장된 메타 정보 (JSON 문자열, 하위 호환성)
   } | null;
 }>;
 
@@ -374,6 +401,8 @@ export type AcceptInvitationParams = {
   memberName: string;
   password: string;
   memberPhone?: string;
+  department?: string;
+  joinedAt?: string; // YYYY-MM-DD 형식
   [key: string]: any; // 추가 필드 허용
 };
 
@@ -397,4 +426,49 @@ export type GetCompanyMembersParams = {
 export type GetCompanyMembersResponse = BaseResponseDto<{
   members: Member[];
   total: number;
+}>;
+
+// 빌링키 등록 요청 (회사 단위)
+export type CreateBillingKeyParams = {
+  PCD_PAYER_ID: string; // Payple 빌링키
+  memberBillingType: string; // "card" | "transfer"
+  memberBillingInfo: string; // JSON 문자열
+};
+
+// 빌링키 등록 응답
+export type CreateBillingKeyResponse = BaseResponseDto;
+
+// 결제 내역 조회 파라미터
+export type GetPaymentHistoryParams = {
+  companyIdx: number;
+  page?: number; // 기본값: 1
+  pageSize?: number; // 기본값: 20
+};
+
+// 결제 내역 항목
+export type PaymentHistory = {
+  paymentIdx: number;
+  companySubscriptionIdx: number;
+  companyIdx: number;
+  serviceSettingIdx: number;
+  serviceName: string;
+  paymentAmount: number;
+  paymentDate: Date | string; // ISO date string or Date
+  paymentStatus: 'SUCCESS' | 'FAILED' | 'CANCELLED';
+  paymentMethod: 'card' | 'transfer';
+  failureReason: string | null;
+  retryDate: Date | string | null; // ISO date string or Date
+  createAt: Date | string; // ISO date string or Date
+  // Payple 정보
+  paypleReceipt: string | null; // 영수증 URL 또는 번호
+  payplePaymentNumber: string | null; // 결제 번호
+  payplePaymentDate: string | null; // 결제일
+};
+
+// 결제 내역 조회 응답
+export type GetPaymentHistoryResponse = BaseResponseDto<{
+  paymentList: PaymentHistory[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
 }>;

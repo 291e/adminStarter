@@ -17,9 +17,20 @@ import type {
   SendHelpMessageDto,
   UpdateFcmTokenDto,
   UpdatePushSettingsDto,
+  CheckIdParams,
+  CheckIdResponse,
 } from './member.types';
 
 // ----------------------------------------------------------------------
+
+/**
+ * 아이디 중복검사
+ * POST /user/check-id
+ */
+export async function checkId(params: CheckIdParams): Promise<CheckIdResponse> {
+  const response = await axiosInstance.post<CheckIdResponse>(endpoints.auth.checkId, params);
+  return response.data;
+}
 
 /**
  * 회원 생성

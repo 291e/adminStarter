@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 import {
   getDocumentSignatureList,
@@ -88,8 +89,21 @@ export function useCreateSharedDocument() {
 
   return useMutation({
     mutationFn: (params: CreateSharedDocumentParams) => createSharedDocument(params),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      const resultMessage = response?.header?.resultMessage || '공유 문서가 생성되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('공유 문서가 생성되었습니다.');
+      }
       queryClient.invalidateQueries({ queryKey: ['sharedDocuments'] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '공유 문서 생성에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -102,8 +116,21 @@ export function useUpdateSharedDocument() {
 
   return useMutation({
     mutationFn: (params: UpdateSharedDocumentParams) => updateSharedDocument(params),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      const resultMessage = response?.header?.resultMessage || '공유 문서가 수정되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('공유 문서가 수정되었습니다.');
+      }
       queryClient.invalidateQueries({ queryKey: ['sharedDocuments'] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '공유 문서 수정에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -116,8 +143,16 @@ export function useDeleteSharedDocument() {
 
   return useMutation({
     mutationFn: (params: DeleteSharedDocumentParams) => deleteSharedDocument(params),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      toast.success('공유 문서가 삭제되었습니다.');
       queryClient.invalidateQueries({ queryKey: ['sharedDocuments'] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '공유 문서 삭제에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -131,7 +166,15 @@ export function useShareDocumentToChatRoom() {
   return useMutation({
     mutationFn: (params: ShareDocumentToChatRoomParams) => shareDocumentToChatRoom(params),
     onSuccess: () => {
+      toast.success('문서가 채팅방에 공유되었습니다.');
       queryClient.invalidateQueries({ queryKey: ['sharedDocuments'] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '문서 공유에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -154,8 +197,21 @@ export function useCreatePrioritySetting() {
 
   return useMutation({
     mutationFn: (params: CreatePrioritySettingParams) => createPrioritySetting(params),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      const resultMessage = response?.header?.resultMessage || '중요도 설정이 생성되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('중요도 설정이 생성되었습니다.');
+      }
       queryClient.invalidateQueries({ queryKey: ['prioritySettings'] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '중요도 설정 생성에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -168,8 +224,21 @@ export function useUpdatePrioritySetting() {
 
   return useMutation({
     mutationFn: (params: UpdatePrioritySettingParams) => updatePrioritySetting(params),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      const resultMessage = response?.header?.resultMessage || '중요도 설정이 수정되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('중요도 설정이 수정되었습니다.');
+      }
       queryClient.invalidateQueries({ queryKey: ['prioritySettings'] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '중요도 설정 수정에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -183,7 +252,15 @@ export function useDeletePrioritySetting() {
   return useMutation({
     mutationFn: (params: DeletePrioritySettingParams) => deletePrioritySetting(params),
     onSuccess: () => {
+      toast.success('중요도 설정이 삭제되었습니다.');
       queryClient.invalidateQueries({ queryKey: ['prioritySettings'] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '중요도 설정 삭제에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }

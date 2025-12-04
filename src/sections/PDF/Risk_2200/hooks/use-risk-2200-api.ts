@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 import {
   getRisk2200Documents,
@@ -79,8 +80,19 @@ export function useCreateRisk2200Document() {
 
   return useMutation({
     mutationFn: (params: CreateRisk2200DocumentParams) => createRisk2200Document(params),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      const resultMessage = response?.header?.resultMessage || '문서가 등록되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('문서가 등록되었습니다.');
+      }
       queryClient.invalidateQueries({ queryKey: ['risk2200Documents'] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '문서 등록에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -92,8 +104,18 @@ export function useTemporarySaveRisk2200Document() {
   return useMutation({
     mutationFn: (params: TemporarySaveRisk2200DocumentParams) =>
       temporarySaveRisk2200Document(params),
-    onSuccess: () => {
-      // 임시 저장 성공 처리
+    onSuccess: (response) => {
+      const resultMessage = response?.header?.resultMessage || '문서가 임시 저장되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('문서가 임시 저장되었습니다.');
+      }
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '임시 저장에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -117,8 +139,14 @@ export function useDeleteRisk2200Document() {
 
   return useMutation({
     mutationFn: (params: DeleteRisk2200DocumentParams) => deleteRisk2200Document(params),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      toast.success('문서가 삭제되었습니다.');
       queryClient.invalidateQueries({ queryKey: ['risk2200Documents'] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '문서 삭제에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -129,8 +157,18 @@ export function useDeleteRisk2200Document() {
 export function useSendRisk2200Notification() {
   return useMutation({
     mutationFn: (params: SendRisk2200NotificationParams) => sendRisk2200Notification(params),
-    onSuccess: () => {
-      // 알림 발송 성공 처리
+    onSuccess: (response) => {
+      const resultMessage = response?.header?.resultMessage || '알림이 발송되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('알림이 발송되었습니다.');
+      }
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '알림 발송에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -141,8 +179,18 @@ export function useSendRisk2200Notification() {
 export function useExportRisk2200Documents() {
   return useMutation({
     mutationFn: (params: ExportRisk2200DocumentsParams) => exportRisk2200Documents(params),
-    onSuccess: () => {
-      // 액션 처리 성공 처리
+    onSuccess: (response) => {
+      const resultMessage = response?.header?.resultMessage || '문서 내보내기가 완료되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('문서 내보내기가 완료되었습니다.');
+      }
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '문서 내보내기에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -210,10 +258,21 @@ export function useAddRisk2200Signature() {
 
   return useMutation({
     mutationFn: (params: AddRisk2200SignatureParams) => addRisk2200Signature(params),
-    onSuccess: (_, variables) => {
+    onSuccess: (response, variables) => {
+      const resultMessage = response?.header?.resultMessage || '서명이 추가되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('서명이 추가되었습니다.');
+      }
       queryClient.invalidateQueries({
         queryKey: ['risk2200ApprovalInfo', variables.documentId],
       });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '서명 추가에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }

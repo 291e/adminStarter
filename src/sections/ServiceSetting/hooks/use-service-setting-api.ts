@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 import {
   getServices,
@@ -49,8 +50,19 @@ export function useCreateService() {
 
   return useMutation({
     mutationFn: (params: CreateServiceParams) => createService(params),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      const resultMessage = response?.header?.resultMessage || '서비스가 등록되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('서비스가 등록되었습니다.');
+      }
       queryClient.invalidateQueries({ queryKey: ['services'] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '서비스 등록에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -63,9 +75,20 @@ export function useUpdateService() {
 
   return useMutation({
     mutationFn: (params: UpdateServiceParams) => updateService(params),
-    onSuccess: (_, variables) => {
+    onSuccess: (response, variables) => {
+      const resultMessage = response?.header?.resultMessage || '서비스 정보가 수정되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('서비스 정보가 수정되었습니다.');
+      }
       queryClient.invalidateQueries({ queryKey: ['services'] });
       queryClient.invalidateQueries({ queryKey: ['serviceDetail', variables.serviceSettingIdx] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '서비스 수정에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -78,8 +101,14 @@ export function useDeactivateService() {
 
   return useMutation({
     mutationFn: (params: DeactivateServiceParams) => deactivateService(params),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      toast.success('서비스가 비활성화되었습니다.');
       queryClient.invalidateQueries({ queryKey: ['services'] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '서비스 비활성화에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -92,8 +121,14 @@ export function useDeleteService() {
 
   return useMutation({
     mutationFn: (params: DeleteServiceParams) => deleteService(params),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      toast.success('서비스가 삭제되었습니다.');
       queryClient.invalidateQueries({ queryKey: ['services'] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '서비스 삭제에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }

@@ -40,7 +40,7 @@ const defaultRow: Table1200IndustrialAccidentRow = {
     risk: '낮음',
   },
   otherContent: '사고 발생 즉시 응급조치 실시, 병원 이송 완료',
-  investigationImages: [] as File[],
+  investigationImages: [],
 };
 
 export default function RiskTable_1_2_1200_Industrial({ row = defaultRow }: Props) {

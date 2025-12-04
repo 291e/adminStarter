@@ -2,6 +2,7 @@ import 'src/global.css';
 
 import { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from 'sonner';
 
 import { usePathname } from 'src/routes/hooks';
 
@@ -46,6 +47,7 @@ export default function App({ children }: AppProps) {
             <MotionLazy>
               <ProgressBar />
               <SettingsDrawer defaultSettings={defaultSettings} />
+              <Toaster position="top-right" />
               {children}
             </MotionLazy>
           </ThemeProvider>

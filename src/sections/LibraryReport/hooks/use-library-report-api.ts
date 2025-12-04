@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 import {
   getLibraryReports,
@@ -49,9 +50,20 @@ export function useSaveCategories() {
 
   return useMutation({
     mutationFn: (params: SaveLibraryCategoryListParams) => saveLibraryCategoryList(params),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      const resultMessage = response?.header?.resultMessage || '카테고리가 저장되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('카테고리가 저장되었습니다.');
+      }
       queryClient.invalidateQueries({ queryKey: ['libraryCategories'] });
       queryClient.invalidateQueries({ queryKey: ['libraryReports'] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '카테고리 저장에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -64,8 +76,19 @@ export function useUploadVOD() {
 
   return useMutation({
     mutationFn: (params: CreateLibraryReportParams) => createLibraryReport(params),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      const resultMessage = response?.header?.resultMessage || 'VOD가 업로드되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('VOD가 업로드되었습니다.');
+      }
       queryClient.invalidateQueries({ queryKey: ['libraryReports'] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || 'VOD 업로드에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -78,9 +101,20 @@ export function useUpdateContent() {
 
   return useMutation({
     mutationFn: (params: UpdateLibraryReportParams) => updateLibraryReport(params),
-    onSuccess: (_, variables) => {
+    onSuccess: (response, variables) => {
+      const resultMessage = response?.header?.resultMessage || '컨텐츠가 수정되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('컨텐츠가 수정되었습니다.');
+      }
       queryClient.invalidateQueries({ queryKey: ['libraryReports'] });
       queryClient.invalidateQueries({ queryKey: ['libraryReport', variables.libraryReportIdx] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '컨텐츠 수정에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -93,8 +127,14 @@ export function useDeleteContent() {
 
   return useMutation({
     mutationFn: (params: DeleteLibraryReportParams) => deleteLibraryReport(params),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      toast.success('컨텐츠가 삭제되었습니다.');
       queryClient.invalidateQueries({ queryKey: ['libraryReports'] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '컨텐츠 삭제에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }

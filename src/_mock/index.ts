@@ -14,8 +14,6 @@ export * from './_company';
 
 export * from './_company-branch';
 
-export * from './_education-report';
-
 // _others.ts는 _contacts, _notifications만 export하므로 유지
 export { _contacts, _notifications } from './_others';
 

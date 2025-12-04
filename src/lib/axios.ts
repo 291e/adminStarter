@@ -148,6 +148,8 @@ export const endpoints = {
     subscriptions: '/companies',
     upgrade: '/companies',
     cards: '/companies',
+    billingKey: '/companies/billing-key',
+    paymentHistory: '/companies',
     accidentFree: '/companies',
     invite: '/companies',
     inviteVerify: '/companies/invite/verify',
@@ -222,6 +224,7 @@ export const endpoints = {
     signUp: '/user/signup',
     signIn: '/user/signin',
     signout: '/user/signout',
+    checkId: '/user/check-id',
   },
   mail: {
     list: '/api/mail/list',

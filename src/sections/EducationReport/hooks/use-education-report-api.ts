@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 import {
   getEducationReports,
@@ -42,8 +43,19 @@ export function useCreateEducation() {
 
   return useMutation({
     mutationFn: (params: CreateEducationReportParams) => createEducationReport(params),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      const resultMessage = response?.header?.resultMessage || '교육 리포트가 생성되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('교육 리포트가 생성되었습니다.');
+      }
       queryClient.invalidateQueries({ queryKey: ['educationReports'] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '교육 리포트 생성에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -67,9 +79,20 @@ export function useUpdateEducationDetail() {
 
   return useMutation({
     mutationFn: (params: UpdateEducationReportParams) => updateEducationReport(params),
-    onSuccess: (_, variables) => {
+    onSuccess: (response, variables) => {
+      const resultMessage = response?.header?.resultMessage || '교육 리포트가 수정되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('교육 리포트가 수정되었습니다.');
+      }
       queryClient.invalidateQueries({ queryKey: ['educationReports'] });
       queryClient.invalidateQueries({ queryKey: ['educationReport', variables.educationReportIdx] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '교육 리포트 수정에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -108,7 +131,13 @@ export function useCreateEducationRecord() {
 
   return useMutation({
     mutationFn: (params: CreateEducationRecordParams) => createEducationRecord(params),
-    onSuccess: (_, variables) => {
+    onSuccess: (response, variables) => {
+      const resultMessage = response?.header?.resultMessage || '교육 기록이 등록되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('교육 기록이 등록되었습니다.');
+      }
       // 교육 상세 현황 새로고침
       queryClient.invalidateQueries({ queryKey: ['educationDetailStatistics'] });
       // 교육 리포트 목록도 새로고침 (필요시)
@@ -118,6 +147,11 @@ export function useCreateEducationRecord() {
           queryKey: ['educationReport', variables.educationReportIdx],
         });
       }
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '교육 기록 등록에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -130,11 +164,22 @@ export function useUpdateEducationRecord() {
 
   return useMutation({
     mutationFn: (params: UpdateEducationRecordParams) => updateEducationRecord(params),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      const resultMessage = response?.header?.resultMessage || '교육 기록이 수정되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('교육 기록이 수정되었습니다.');
+      }
       // 교육 상세 현황 새로고침
       queryClient.invalidateQueries({ queryKey: ['educationDetailStatistics'] });
       // 교육 리포트 목록도 새로고침 (필요시)
       queryClient.invalidateQueries({ queryKey: ['educationReports'] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '교육 기록 수정에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }
@@ -147,11 +192,17 @@ export function useDeleteEducationRecord() {
 
   return useMutation({
     mutationFn: (params: DeleteEducationRecordParams) => deleteEducationRecord(params),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      toast.success('교육 기록이 삭제되었습니다.');
       // 교육 상세 현황 새로고침
       queryClient.invalidateQueries({ queryKey: ['educationDetailStatistics'] });
       // 교육 리포트 목록도 새로고침 (필요시)
       queryClient.invalidateQueries({ queryKey: ['educationReports'] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '교육 기록 삭제에 실패했습니다.';
+      toast.error(resultMessage);
     },
   });
 }

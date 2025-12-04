@@ -55,6 +55,7 @@ export const navData: NavSectionProps['data'] = [
         title: '대시보드',
         path: paths.dashboard.root,
         icon: ICONS.dashboard,
+        deepMatch: true,
       },
     ],
   },
@@ -65,14 +66,16 @@ export const navData: NavSectionProps['data'] = [
     subheader: 'Management',
     items: [
       {
-        title: '조직관리',
+        title: '조직 관리',
         path: paths.dashboard.organization.root,
         icon: ICONS.job,
+        deepMatch: true,
       },
       {
         title: '현장 운영 관리',
         path: paths.dashboard.operation.root,
         icon: ICONS.tour,
+        deepMatch: true,
         children: [
           { title: '채팅', path: paths.dashboard.operation.chat },
           {
@@ -87,11 +90,13 @@ export const navData: NavSectionProps['data'] = [
         title: '안전보건체계 관리',
         path: paths.dashboard.safetySystem.root,
         icon: ICONS.file,
+        deepMatch: true,
       },
       {
         title: '설정 및 관리',
         path: paths.dashboard.systemSetting.root,
         icon: ICONS.lock,
+        deepMatch: true,
         children: [
           { title: '서비스 관리', path: paths.dashboard.systemSetting.serviceSetting },
           { title: '문서 설정 관리', path: paths.dashboard.systemSetting.documentSetting },

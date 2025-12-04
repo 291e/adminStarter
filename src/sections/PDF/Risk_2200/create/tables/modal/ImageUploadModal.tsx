@@ -37,16 +37,30 @@ export default function ImageUploadModal({ open, onClose, onConfirm, initialImag
 
     const previewPromises = images.map(
       (file) =>
-        new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(file);
+        new Promise<string>((resolve, reject) => {
+          // File 객체인지 확인
+          if (file instanceof File) {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = () => reject(new Error('Failed to read file'));
+            reader.readAsDataURL(file);
+          } else if (typeof file === 'string') {
+            // 이미 URL 문자열인 경우
+            resolve(file);
+          } else {
+            reject(new Error('Invalid file type'));
+          }
         })
     );
 
-    Promise.all(previewPromises).then((previewUrls) => {
-      setPreviews(previewUrls);
-    });
+    Promise.all(previewPromises)
+      .then((previewUrls) => {
+        setPreviews(previewUrls);
+      })
+      .catch((error) => {
+        console.error('Error creating previews:', error);
+        setPreviews([]);
+      });
   }, [images]);
 
   // 모달이 열릴 때 초기 이미지 설정

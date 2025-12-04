@@ -55,7 +55,9 @@ export default function EducationReportTable({
   onViewDetail,
 }: Props) {
   // rows의 모든 ID가 selectedIds에 포함되어 있는지 확인
-  const rowIds = rows.map((row) => row.id || row.educationReportId || String(row.memberIdx || ''));
+  const rowIds = rows.map((row) =>
+    String(row.educationReportIdx || row.educationReportId || row.id || row.memberIdx || '')
+  );
   const allSelected = rows.length > 0 && rowIds.every((id) => selectedIds.includes(id));
   const someSelected =
     rows.length > 0 && rowIds.some((id) => selectedIds.includes(id)) && !allSelected;
@@ -105,8 +107,18 @@ export default function EducationReportTable({
 
         <TableBody>
           {rows.map((row) => {
-            const rowId = row.id || row.educationReportId || String(row.memberIdx || '');
+            const rowId =
+              row.id ||
+              String(row.educationReportIdx || row.educationReportId || row.memberIdx || '');
             const isSelected = selectedIds.includes(rowId);
+            // memberInformation 우선, 없으면 하위 호환 필드 사용
+            const memberInfo = row.memberInformation;
+            const companyInfo = row.companyInformation;
+            const organizationName = companyInfo?.companyName || row.organizationName || '-';
+            const memberName = memberInfo?.memberName || row.name || '-';
+            const position = memberInfo?.position || row.position || '-';
+            const department = memberInfo?.department || row.department || '-';
+            const role = memberInfo?.memberRole || row.role || '';
             return (
               <TableRow key={rowId} hover>
                 <TableCell padding="checkbox">
@@ -116,21 +128,21 @@ export default function EducationReportTable({
                   />
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2">{row.organizationName || '-'}</Typography>
+                  <Typography variant="body2">{organizationName}</Typography>
                 </TableCell>
                 <TableCell>
                   <Stack spacing={0.5}>
-                    <Typography variant="body2">{row.name || '-'}</Typography>
+                    <Typography variant="body2">{memberName}</Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {row.position || '-'}
+                      {position}
                     </Typography>
                   </Stack>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2">{row.department || '-'}</Typography>
+                  <Typography variant="body2">{department}</Typography>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2">{getRoleLabel(row.role || '') || '-'}</Typography>
+                  <Typography variant="body2">{getRoleLabel(role) || '-'}</Typography>
                 </TableCell>
                 <TableCell align="center">
                   <Typography variant="body2">{row.mandatoryEducation || 0}</Typography>
