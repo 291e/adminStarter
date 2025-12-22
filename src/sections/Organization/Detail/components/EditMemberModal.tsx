@@ -86,8 +86,9 @@ const WORK_TYPES = [
 
 const NATIONALITIES = [
   { value: 'ko', label: '한국' },
-  { value: 'zh', label: '중국' },
-  { value: 'en', label: '영어권' },
+  { value: 'vn', label: '베트남' },
+  { value: 'en', label: '미국' },
+  { value: 'uz', label: '우즈베키스탄' },
 ];
 
 // 핸드폰 번호 포맷팅 함수
@@ -224,7 +225,11 @@ export default function EditMemberModal({ open, onClose, member, onUpdated, orga
 
   // 초기 데이터 로드
   useEffect(() => {
-    if (member && open) {
+    // 이미 현재 멤버를 편집 중이라면(formData.memberId === member.memberId) 초기화하지 않음
+    // 단, member 객체가 변경되었고(예: standardHours 업데이트 등) 새로 열린 경우(open)는 초기화
+    // 여기서는 간단히 open이 true가 될 때 member 정보를 로드하도록 함.
+    // 추가로 memberId가 변경되었을 때도 로드.
+    if (member && open && (!formData.memberId || formData.memberId !== member.memberId)) {
       const memberRole = (member.memberRole || 'WORKER') as
         | 'OPERATOR_MANAGER'
         | 'MANAGEMENT_SUPERVISOR'
@@ -233,6 +238,14 @@ export default function EditMemberModal({ open, onClose, member, onUpdated, orga
       const workType = (member.workType || '') as 'PRODUCTION' | 'OFFICE' | '';
       const isAccidentFree = isAccidentFreeWorksite(organization);
       const { mandatory, regular } = calculateMandatoryHours(memberRole, workType, isAccidentFree);
+
+      const calculatedHours = memberRole === 'WORKER' ? regular : mandatory;
+
+      // standardHours가 있으면 그것을 사용 (분 -> 시간), 없으면 계산된 값 사용
+      let initialMandatoryHours = calculatedHours.toString();
+      if (member.standardHours !== undefined && member.standardHours !== null) {
+        initialMandatoryHours = (member.standardHours / 60).toString();
+      }
 
       setFormData({
         memberId: member.memberId || '',
@@ -249,10 +262,10 @@ export default function EditMemberModal({ open, onClose, member, onUpdated, orga
         password: '',
         passwordConfirm: '',
         workType,
-        joinedAt: member.createAt ? dayjs(member.createAt) : null,
+        joinedAt: member.joinedAt ? dayjs(member.joinedAt) : null,
         memberLang: member.memberLang || 'ko',
         memberNameOrg: member.memberNameOrg || '',
-        mandatoryHours: mandatory.toString(),
+        mandatoryHours: initialMandatoryHours,
         regularHours: regular.toString(),
         companyIdx: member.companyIdx || '',
         companyBranchIdx: member.companyBranchIdx || '',
@@ -260,29 +273,10 @@ export default function EditMemberModal({ open, onClose, member, onUpdated, orga
       setErrors({});
       setSubmitError(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [member, open, organization]);
 
-  // 역할 또는 직종 변경 시 기준시간 자동 업데이트
-  useEffect(() => {
-    if (open && formData.memberRole) {
-      const isAccidentFree = isAccidentFreeWorksite(organization);
-      // 근로자가 아닌 경우 직종은 무관하므로 빈 문자열로 전달
-      const workTypeForCalc =
-        formData.memberRole === 'WORKER' ? formData.workType : ('' as 'PRODUCTION' | 'OFFICE' | '');
-      const { mandatory, regular } = calculateMandatoryHours(
-        formData.memberRole,
-        workTypeForCalc,
-        isAccidentFree
-      );
-      // 근로자의 경우 연 시간(regularHours)을 표시, 그 외는 mandatoryHours 표시
-      const displayHours = formData.memberRole === 'WORKER' ? regular : mandatory;
-      setFormData((prev) => ({
-        ...prev,
-        mandatoryHours: displayHours.toString(),
-        regularHours: regular.toString(),
-      }));
-    }
-  }, [formData.memberRole, formData.workType, organization, open]);
+  // 역할 또는 직종 변경 시 기준시간 자동 업데이트 useEffect 제거 (handleChange에서 처리)
 
   const updateMemberMutation = useMutation({
     mutationFn: ({ memberIdx, params }: { memberIdx: number; params: UpdateMemberDto }) =>
@@ -310,7 +304,32 @@ export default function EditMemberModal({ open, onClose, member, onUpdated, orga
         processedValue = formatPhoneNumber(value);
       }
 
-      setFormData((prev) => ({ ...prev, [field]: processedValue }));
+      setFormData((prev) => {
+        const newData = { ...prev, [field]: processedValue };
+
+        // 역할 또는 직종 변경 시 기준시간 재계산
+        if (field === 'memberRole' || field === 'workType') {
+          const newRole = field === 'memberRole' ? (processedValue as any) : prev.memberRole;
+          const newWorkType = field === 'workType' ? (processedValue as any) : prev.workType;
+
+          const isAccidentFree = isAccidentFreeWorksite(organization);
+          const workTypeForCalc = newRole === 'WORKER' ? newWorkType : '';
+
+          const { mandatory, regular } = calculateMandatoryHours(
+            newRole,
+            workTypeForCalc,
+            isAccidentFree
+          );
+
+          const displayHours = newRole === 'WORKER' ? regular : mandatory;
+
+          newData.mandatoryHours = displayHours.toString();
+          newData.regularHours = regular.toString();
+        }
+
+        return newData;
+      });
+
       if (errors[field]) {
         setErrors((prev) => ({ ...prev, [field]: undefined }));
       }
@@ -353,6 +372,17 @@ export default function EditMemberModal({ open, onClose, member, onUpdated, orga
       return;
     }
 
+    // 현재 입력된 시간 (분 단위 변환)
+    const currentHoursMinutes = formData.mandatoryHours
+      ? Number(formData.mandatoryHours) * 60
+      : undefined;
+
+    let standardHoursToSend: number | null | undefined = undefined;
+
+    if (currentHoursMinutes !== undefined && !Number.isNaN(currentHoursMinutes)) {
+      standardHoursToSend = currentHoursMinutes;
+    }
+
     const params: UpdateMemberDto = {
       memberId: formData.memberId.trim(),
       memberName: formData.memberName.trim() || undefined,
@@ -368,6 +398,8 @@ export default function EditMemberModal({ open, onClose, member, onUpdated, orga
       ...(formData.password && { password: formData.password }),
       ...(formData.companyIdx && { companyIdx: Number(formData.companyIdx) }),
       ...(formData.companyBranchIdx && { companyBranchIdx: Number(formData.companyBranchIdx) }),
+      ...(standardHoursToSend !== undefined && { standardHours: standardHoursToSend }),
+      ...(formData.joinedAt && { joinedAt: formData.joinedAt.format('YYYY-MM-DD') }),
     };
 
     updateMemberMutation.mutate({
@@ -462,12 +494,6 @@ export default function EditMemberModal({ open, onClose, member, onUpdated, orga
                     : '-'}
                 </Typography>
               </Stack>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Typography variant="subtitle2" sx={{ minWidth: 80 }}>
-                  최근 접속 IP
-                </Typography>
-                <Typography variant="body2">-</Typography>
-              </Stack>
             </Stack>
           </Box>
 
@@ -479,7 +505,14 @@ export default function EditMemberModal({ open, onClose, member, onUpdated, orga
 
             <TextField
               fullWidth
-              label="아이디*"
+              label={
+                <>
+                  아이디
+                  <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
+                    *
+                  </Typography>
+                </>
+              }
               value={formData.memberId}
               onChange={handleChange('memberId')}
               error={!!errors.memberId}
@@ -575,7 +608,14 @@ export default function EditMemberModal({ open, onClose, member, onUpdated, orga
             <Stack direction="row" spacing={2}>
               <TextField
                 fullWidth
-                label="이름*"
+                label={
+                  <>
+                    이름
+                    <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
+                      *
+                    </Typography>
+                  </>
+                }
                 value={formData.memberName}
                 onChange={handleChange('memberName')}
                 error={!!errors.memberName}
@@ -595,20 +635,28 @@ export default function EditMemberModal({ open, onClose, member, onUpdated, orga
             <Stack direction="row" spacing={2}>
               <TextField
                 fullWidth
-                label="소속*"
+                label="소속팀"
                 value={formData.department}
                 onChange={handleChange('department')}
-                error={!!errors.department}
-                helperText={errors.department}
                 slotProps={{ inputLabel: { shrink: true } }}
               />
               <FormControl fullWidth>
                 <InputLabel id="memberRole-label" shrink>
-                  역할*
+                  역할
+                  <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
+                    *
+                  </Typography>
                 </InputLabel>
                 <Select
                   labelId="memberRole-label"
-                  label="역할*"
+                  label={
+                    <>
+                      역할
+                      <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
+                        *
+                      </Typography>
+                    </>
+                  }
                   value={formData.memberRole}
                   onChange={handleChange('memberRole')}
                   error={!!errors.memberRole}
@@ -626,15 +674,28 @@ export default function EditMemberModal({ open, onClose, member, onUpdated, orga
             <Stack direction="row" spacing={2}>
               <FormControl fullWidth>
                 <InputLabel id="workType-label" shrink>
-                  직종{formData.memberRole === 'WORKER' ? '*' : ''}
+                  직종
+                  {formData.memberRole === 'WORKER' && (
+                    <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
+                      *
+                    </Typography>
+                  )}
                 </InputLabel>
                 <Select
                   labelId="workType-label"
-                  label={`직종${formData.memberRole === 'WORKER' ? '*' : ''}`}
+                  label={
+                    <>
+                      직종
+                      {formData.memberRole === 'WORKER' && (
+                        <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
+                          *
+                        </Typography>
+                      )}
+                    </>
+                  }
                   value={formData.workType}
                   onChange={handleChange('workType')}
                   error={!!errors.workType}
-                  disabled={formData.memberRole !== 'WORKER'}
                 >
                   {WORK_TYPES.map((type) => (
                     <MenuItem key={type.value} value={type.value}>
@@ -645,25 +706,25 @@ export default function EditMemberModal({ open, onClose, member, onUpdated, orga
                 {errors.workType && <FormHelperText error>{errors.workType}</FormHelperText>}
               </FormControl>
               <DatePicker
-                label="입사일*"
                 value={formData.joinedAt}
+                label="입사일"
                 onChange={(newValue) => {
                   setFormData((prev) => ({ ...prev, joinedAt: newValue }));
                 }}
                 format="YYYY-MM-DD"
-                slotProps={{
-                  textField: {
-                    fullWidth: true,
-                    size: 'medium',
-                    InputLabelProps: { shrink: true },
-                  },
-                }}
               />
             </Stack>
 
             <TextField
               fullWidth
-              label="핸드폰 번호*"
+              label={
+                <>
+                  핸드폰 번호
+                  <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
+                    *
+                  </Typography>
+                </>
+              }
               value={formData.memberPhone}
               onChange={handleChange('memberPhone')}
               error={!!errors.memberPhone}
@@ -679,7 +740,14 @@ export default function EditMemberModal({ open, onClose, member, onUpdated, orga
 
             <TextField
               fullWidth
-              label="이메일*"
+              label={
+                <>
+                  이메일
+                  <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
+                    *
+                  </Typography>
+                </>
+              }
               type="email"
               value={formData.memberEmail}
               onChange={handleChange('memberEmail')}
@@ -726,6 +794,7 @@ export default function EditMemberModal({ open, onClose, member, onUpdated, orga
               </Typography>
               <TextField
                 size="small"
+                type="number"
                 value={formData.mandatoryHours}
                 onChange={handleChange('mandatoryHours')}
                 slotProps={{

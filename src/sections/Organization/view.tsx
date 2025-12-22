@@ -129,6 +129,8 @@ export function OrganizationView({ title = 'Blank', description, sx }: Props) {
         <>
           <OrganizationTable
             rows={organizations}
+            page={page}
+            rowsPerPage={rowsPerPage}
             onViewDetail={handleViewDetail}
             onDeactivate={handleDeactivate}
             onDelete={handleDelete}
@@ -152,7 +154,7 @@ export function OrganizationView({ title = 'Blank', description, sx }: Props) {
       {description && <Typography sx={{ mt: 1 }}> {description} </Typography>}
 
       <OrganizationBreadcrumbs
-        items={[{ label: '대시보드', href: '/' }, { label: title }]}
+        items={[{ label: '대시보드', href: '/admin/dashboard' }, { label: title }]}
         onCreate={() => setCreateModalOpen(true)}
       />
 

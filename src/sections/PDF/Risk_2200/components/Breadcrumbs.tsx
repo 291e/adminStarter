@@ -37,25 +37,24 @@ export default function Risk_2200Breadcrumbs({
     <Stack
       sx={{ pt: { xs: 1, md: 2 } }}
       direction="row"
-      alignItems="center"
+      alignItems="flex-start"
       justifyContent="space-between"
     >
-      <Stack direction="row" spacing={1} alignItems="center">
-        <Breadcrumbs>
-          {items.map((item, idx) =>
-            item.href ? (
-              <Link key={idx} color="inherit" href={item.href} underline="hover">
-                {item.label}
-              </Link>
-            ) : (
-              <Typography key={idx} color="text.primary">
-                {item.label}
-              </Typography>
-            )
-          )}
-        </Breadcrumbs>
-      </Stack>
-      <Stack direction="row" spacing={1} alignItems="center">
+      <Breadcrumbs>
+        {items.map((item, idx) =>
+          item.href ? (
+            <Link key={idx} color="inherit" href={item.href} underline="hover">
+              {item.label}
+            </Link>
+          ) : (
+            <Typography key={idx} color="text.primary">
+              {item.label}
+            </Typography>
+          )
+        )}
+      </Breadcrumbs>
+
+      <Stack direction="row" spacing={1}>
         {onViewSample && (
           <Button variant="contained" color="info" onClick={onViewSample}>
             샘플 보기

@@ -190,6 +190,15 @@ export const endpoints = {
     hazard: '/code-settings/hazard',
     categories: '/code-settings/categories',
   },
+  // Payment
+  payment: {
+    base: '/payment',
+    billingKey: '/payment/billingKey',
+    billingKeyForAdmin: '/payment/billingKeyForAdmin',
+    before: '/payment/before',
+    after: '/payment/after',
+    cancel: '/payment',
+  },
   // API Setting
   apiSetting: {
     base: '/api-settings',
@@ -215,6 +224,12 @@ export const endpoints = {
     documents: '/safety-system/documents',
     items: '/safety-system/items',
     chemicals: '/safety-system/chemicals',
+    riskAssessmentCriteria: '/safety-system/risk-assessment-criteria',
+    riskAssessmentLevels: '/safety-system/risk-assessment-levels',
+  },
+  // VOD
+  vod: {
+    base: '/vods',
   },
   // Legacy (기존 호환성 유지)
   auth: {

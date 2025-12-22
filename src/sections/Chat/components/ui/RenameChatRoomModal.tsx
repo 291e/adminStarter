@@ -67,12 +67,24 @@ export default function RenameChatRoomModal({
   };
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      maxWidth="sm"
+      fullWidth
+      PaperProps={{
+        sx: {
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+        },
+      }}
+    >
       <DialogTitle sx={{ fontSize: 18, fontWeight: 600, lineHeight: '28px', pb: 3 }}>
         채팅방 이름 변경
       </DialogTitle>
 
-      <DialogContent sx={{ px: 3, py: 0 }}>
+      <DialogContent sx={{ px: 3, py: 0, overflow: 'hidden' }}>
         <Stack spacing={1.5} sx={{ width: '100%' }}>
           <Typography
             variant="subtitle2"

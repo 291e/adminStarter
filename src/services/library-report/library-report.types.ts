@@ -19,6 +19,7 @@ export type LibraryReportCategoryInformation = {
 export type LibraryReport = {
   id: string;
   libraryReportIdx?: number;
+  vodIdx?: number;
   libraryCategoryIdx?: number | null;
   libraryReportCategoryInformation?: LibraryReportCategoryInformation | null;
   registrationDate?: string;

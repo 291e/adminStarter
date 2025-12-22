@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { CONFIG } from 'src/global-config';
 
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -63,9 +64,39 @@ export default function EditContentModal({
 
   const [isDraggingVideo, setIsDraggingVideo] = useState(false);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
+  const [existingFileName, setExistingFileName] = useState<string | null>(null); // 기존 파일명
   const videoFileInputRef = useRef<HTMLInputElement>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  // 파일 URL을 전체 URL로 변환하는 헬퍼 함수
+  const getFullFileUrl = (url: string | null | undefined): string | null => {
+    if (!url) return null;
+    // 잘못된 형식: data:image/png;base64,data/admin/... 같은 경우 처리
+    if (
+      url.startsWith('data:image/png;base64,data/admin/') ||
+      url.startsWith('data:image/png;base64,/data/admin/')
+    ) {
+      const cleanUrl = url.replace(/^data:image\/png;base64,/, '');
+      const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
+      const path = cleanUrl.startsWith('/') ? cleanUrl : `/${cleanUrl}`;
+      return `${baseUrl}${path}`;
+    }
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    if (url.startsWith('data:image/') && !url.includes('data/admin/')) {
+      return url;
+    }
+    const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
+    const path = url.startsWith('/') ? url : `/${url}`;
+    return `${baseUrl}${path}`;
+  };
+
+  const normalizedThumbnailUrl = useMemo(
+    () => getFullFileUrl(initialData?.thumbnailUrl),
+    [initialData?.thumbnailUrl]
+  );
 
   useEffect(() => {
     if (open && initialData) {
@@ -79,7 +110,29 @@ export default function EditContentModal({
         isActive: (initialData.status ?? 'active') === 'active',
         thumbnailDataUrl: null,
       });
-      setVideoPreview(null);
+
+      // 기존 파일 URL 및 파일명 설정
+      const fileUrl = (initialData as any).videoUrl || (initialData as any).fileUrl || null;
+
+      // 파일명 추출 (URL에서 또는 fileName 필드에서)
+      let fileName = (initialData as any).fileName || null;
+      if (!fileName && fileUrl) {
+        // URL에서 파일명 추출
+        const urlParts = fileUrl.split('/');
+        fileName = urlParts[urlParts.length - 1];
+        // 쿼리 파라미터 제거
+        if (fileName.includes('?')) {
+          fileName = fileName.split('?')[0];
+        }
+      }
+      setExistingFileName(fileName);
+
+      // 썸네일이 있고 유효한 경우에만 썸네일 표시
+      if (normalizedThumbnailUrl && !normalizedThumbnailUrl.includes('data/admin/')) {
+        setVideoPreview(normalizedThumbnailUrl);
+      } else {
+        setVideoPreview(null);
+      }
     } else if (open) {
       setFormData({
         category: '',
@@ -90,12 +143,13 @@ export default function EditContentModal({
         thumbnailDataUrl: null,
       });
       setVideoPreview(null);
+      setExistingFileName(null);
     }
     if (open) {
       setIsSaving(false);
       setErrorMessage('');
     }
-  }, [open, initialData]);
+  }, [open, initialData, normalizedThumbnailUrl]);
 
   const handleChange = (field: keyof EditContentFormData, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -173,6 +227,7 @@ export default function EditContentModal({
     handleChange('videoFile', null);
     handleChange('thumbnailDataUrl', null);
     setVideoPreview(null);
+    setExistingFileName(null);
   };
 
   const handleSave = async () => {
@@ -220,6 +275,7 @@ export default function EditContentModal({
       thumbnailDataUrl: null,
     });
     setVideoPreview(null);
+    setExistingFileName(null);
     setErrorMessage('');
     setIsSaving(false);
     onClose();
@@ -265,7 +321,7 @@ export default function EditContentModal({
       {/* 등록일/수정일 정보 영역 */}
       <Box
         sx={{
-          bgcolor: 'grey.50',
+          bgcolor: '#F4F6F8',
           px: 3,
           py: 2,
           display: 'flex',
@@ -332,25 +388,27 @@ export default function EditContentModal({
               onDrop={handleVideoDrop}
               onDragOver={handleVideoDragOver}
               onDragLeave={handleVideoDragLeave}
-              onClick={() => !videoPreview && videoFileInputRef.current?.click()}
+              onClick={() =>
+                !videoPreview && !existingFileName && videoFileInputRef.current?.click()
+              }
               sx={{
                 bgcolor: 'grey.50',
                 border: '1px dashed',
                 borderColor: isDraggingVideo ? 'primary.main' : 'divider',
                 borderRadius: 1,
-                p: videoPreview ? 0 : 5,
+                p: videoPreview || existingFileName ? 0 : 5,
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                cursor: videoPreview ? 'default' : 'pointer',
+                cursor: videoPreview || existingFileName ? 'default' : 'pointer',
                 transition: 'all 0.2s',
                 position: 'relative',
-                minHeight: videoPreview ? 300 : 'auto',
+                minHeight: videoPreview ? 300 : existingFileName ? 120 : 'auto',
                 aspectRatio: videoPreview ? '16/9' : 'auto',
                 '&:hover': {
-                  bgcolor: videoPreview ? 'grey.50' : 'grey.100',
-                  borderColor: videoPreview ? 'divider' : 'primary.main',
+                  bgcolor: videoPreview || existingFileName ? 'grey.50' : 'grey.100',
+                  borderColor: videoPreview || existingFileName ? 'divider' : 'primary.main',
                 },
               }}
             >
@@ -385,6 +443,61 @@ export default function EditContentModal({
                       position: 'absolute',
                       top: 16,
                       right: 16,
+                      bgcolor: 'rgba(0, 0, 0, 0.48)',
+                      color: 'white',
+                      '&:hover': {
+                        bgcolor: 'rgba(0, 0, 0, 0.6)',
+                      },
+                    }}
+                  >
+                    <Iconify icon="solar:close-circle-bold" width={18} />
+                  </IconButton>
+                </>
+              ) : existingFileName ? (
+                // 기존 파일이 있지만 썸네일이 없는 경우 (MP4 등 비디오 파일)
+                <>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      py: 3,
+                      px: 2,
+                      width: '100%',
+                      height: '100%',
+                    }}
+                  >
+                    <Iconify
+                      icon={`solar:video-frame-bold` as any}
+                      width={48}
+                      sx={{ color: 'primary.main', mb: 1.5 }}
+                    />
+                    <Typography
+                      variant="body1"
+                      sx={{
+                        fontWeight: 600,
+                        color: 'text.primary',
+                        textAlign: 'center',
+                        wordBreak: 'break-all',
+                        maxWidth: '100%',
+                      }}
+                    >
+                      {existingFileName}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                      등록된 파일
+                    </Typography>
+                  </Box>
+                  <IconButton
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemoveVideo();
+                    }}
+                    sx={{
+                      position: 'absolute',
+                      top: 8,
+                      right: 8,
                       bgcolor: 'rgba(0, 0, 0, 0.48)',
                       color: 'white',
                       '&:hover': {

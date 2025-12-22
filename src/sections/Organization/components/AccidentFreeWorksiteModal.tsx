@@ -240,7 +240,19 @@ export default function AccidentFreeWorksiteModal({
   const companyName = organization?.companyName || '';
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="sm"
+      fullWidth
+      PaperProps={{
+        sx: {
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+        },
+      }}
+    >
       <DialogTitle
         sx={{
           px: 3,
@@ -253,7 +265,7 @@ export default function AccidentFreeWorksiteModal({
         무재해 사업장 인증
       </DialogTitle>
 
-      <DialogContent sx={{ px: 0 }}>
+      <DialogContent sx={{ px: 0, overflow: 'hidden' }}>
         <Stack spacing={1} sx={{ p: 3, bgcolor: 'grey.100' }}>
           {/* 조직명 */}
           <Stack direction="row" spacing={1} alignItems="center">
@@ -312,7 +324,7 @@ export default function AccidentFreeWorksiteModal({
         </Stack>
       </DialogContent>
 
-      <DialogContent sx={{ px: 0, py: 2.5 }}>
+      <DialogContent sx={{ px: 0, py: 2.5, overflow: 'hidden' }}>
         <Stack spacing={1.5} sx={{ px: 3, width: '100%' }}>
           <Typography
             variant="subtitle2"
@@ -334,7 +346,8 @@ export default function AccidentFreeWorksiteModal({
             sx={{
               position: 'relative',
               width: '100%',
-              minHeight: 320,
+              height: 320,
+              maxHeight: 320,
               bgcolor: 'grey.50',
               border: '1px dashed',
               borderColor: isDragging ? 'primary.main' : 'grey.300',
@@ -362,8 +375,8 @@ export default function AccidentFreeWorksiteModal({
                   sx={{
                     width: '100%',
                     height: '100%',
-                    minHeight: 320,
-                    objectFit: 'cover',
+                    maxHeight: 320,
+                    objectFit: 'contain',
                     display: 'block',
                   }}
                 />
@@ -393,14 +406,10 @@ export default function AccidentFreeWorksiteModal({
               <>
                 <Iconify icon="eva:cloud-upload-fill" width={80} sx={{ color: 'primary.main' }} />
                 <Typography variant="h6" sx={{ fontWeight: 600, mt: 3, mb: 1 }}>
-                  Drop or select file
+                  인증 파일 업로드
                 </Typography>
                 <Typography variant="body2" color="text.secondary" textAlign="center">
-                  Drop files here or click to{' '}
-                  <Box component="span" sx={{ color: 'primary.main' }}>
-                    browse
-                  </Box>{' '}
-                  through your machine.
+                  클릭하여 파일을 선택하거나 마우스로 드래그하여 옮겨주세요.
                 </Typography>
               </>
             )}
@@ -416,7 +425,7 @@ export default function AccidentFreeWorksiteModal({
       </DialogContent>
 
       {/* 인증 여부 선택 */}
-      <DialogContent sx={{ px: 0, py: 2.5 }}>
+      <DialogContent sx={{ px: 0, py: 2.5, overflow: 'hidden' }}>
         <Stack spacing={1.5} sx={{ px: 3, width: '100%' }}>
           <Typography
             variant="subtitle2"

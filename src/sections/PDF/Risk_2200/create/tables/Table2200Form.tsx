@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useTheme } from '@mui/material/styles';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
 import IconButton from '@mui/material/IconButton';
@@ -25,7 +24,6 @@ export default function Table2200Form({
   onRowMove,
   onAddRow,
 }: Props) {
-  const theme = useTheme();
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
@@ -96,16 +94,14 @@ export default function Table2200Form({
               <th style={{ flex: 1 }}>공학적 통제</th>
               <th style={{ flex: 1 }}>행정적 통제</th>
               <th style={{ flex: 1 }}>PPE방안</th>
-              <th style={{ width: 46 }}>이동</th>
-              <th style={{ width: 55 }}>삭제</th>
+              <th style={{ width: 30 }}>이동</th>
+              <th style={{ width: 39 }}>삭제</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row, index) => (
               <tr
                 key={index}
-                draggable
-                onDragStart={() => handleDragStart(index)}
                 onDragOver={(e) => handleDragOver(e, index)}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, index)}
@@ -122,10 +118,12 @@ export default function Table2200Form({
                     value={row.risk}
                     onChange={(e) => onRowChange(index, 'risk', e.target.value)}
                     fullWidth
+                    multiline
                     sx={{
                       '& .MuiOutlinedInput-root': {
                         fontSize: 15,
                         height: 'auto',
+                        p: 1,
                       },
                     }}
                   />
@@ -136,10 +134,12 @@ export default function Table2200Form({
                     value={row.removal}
                     onChange={(e) => onRowChange(index, 'removal', e.target.value)}
                     fullWidth
+                    multiline
                     sx={{
                       '& .MuiOutlinedInput-root': {
                         fontSize: 15,
                         height: 'auto',
+                        p: 1,
                       },
                     }}
                   />
@@ -150,10 +150,12 @@ export default function Table2200Form({
                     value={row.engineering}
                     onChange={(e) => onRowChange(index, 'engineering', e.target.value)}
                     fullWidth
+                    multiline
                     sx={{
                       '& .MuiOutlinedInput-root': {
                         fontSize: 15,
                         height: 'auto',
+                        p: 1,
                       },
                     }}
                   />
@@ -164,10 +166,12 @@ export default function Table2200Form({
                     value={row.administrative}
                     onChange={(e) => onRowChange(index, 'administrative', e.target.value)}
                     fullWidth
+                    multiline
                     sx={{
                       '& .MuiOutlinedInput-root': {
                         fontSize: 15,
                         height: 'auto',
+                        p: 1,
                       },
                     }}
                   />
@@ -178,10 +182,12 @@ export default function Table2200Form({
                     value={row.ppe}
                     onChange={(e) => onRowChange(index, 'ppe', e.target.value)}
                     fullWidth
+                    multiline
                     sx={{
                       '& .MuiOutlinedInput-root': {
                         fontSize: 15,
                         height: 'auto',
+                        p: 1,
                       },
                     }}
                   />
@@ -190,14 +196,19 @@ export default function Table2200Form({
                   <Box sx={{ display: 'flex', justifyContent: 'center', px: 1 }}>
                     <IconButton
                       size="small"
+                      draggable
+                      onDragStart={() => handleDragStart(index)}
+                      onDragEnd={handleDragEnd}
                       sx={{
+                        p: 0.625,
                         cursor: 'grab',
                         '&:active': {
                           cursor: 'grabbing',
                         },
                       }}
+                      onMouseDown={(e) => e.stopPropagation()}
                     >
-                      <Iconify icon="eva:more-vertical-fill" width={20} />
+                      <Iconify icon="custom:drag-dots-fill" width={20} />
                     </IconButton>
                   </Box>
                 </td>
@@ -215,6 +226,7 @@ export default function Table2200Form({
                         fontWeight: 700,
                         px: 1,
                         py: 0.5,
+                        width: 23,
                         '&:hover': {
                           bgcolor: 'error.dark',
                         },

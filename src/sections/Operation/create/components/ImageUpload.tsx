@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -6,8 +6,39 @@ import IconButton from '@mui/material/IconButton';
 import Button from '@mui/material/Button';
 import Stack from '@mui/material/Stack';
 import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
+import { toast } from 'sonner';
 
 import { Iconify } from 'src/components/iconify';
+import { uploadFile } from 'src/services/system/system.service';
+import { CONFIG } from 'src/global-config';
+
+// 파일 URL을 전체 URL로 변환하는 헬퍼 함수
+const getFullFileUrl = (url: string | null | undefined): string | null => {
+  if (!url) return null;
+  // 잘못된 형식: data:image/png;base64,data/admin/... 같은 경우 처리
+  if (
+    url.startsWith('data:image/png;base64,data/admin/') ||
+    url.startsWith('data:image/png;base64,/data/admin/')
+  ) {
+    const cleanUrl = url.replace(/^data:image\/png;base64,/, '');
+    const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
+    const path = cleanUrl.startsWith('/') ? cleanUrl : `/${cleanUrl}`;
+    return `${baseUrl}${path}`;
+  }
+  // 이미 전체 URL인 경우
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  // base64 데이터 URL인 경우 그대로 반환
+  if (url.startsWith('data:image/') && !url.includes('data/admin/')) {
+    return url;
+  }
+  // 상대 경로인 경우 CONFIG.serverUrl과 결합
+  const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
+  const path = url.startsWith('/') ? url : `/${url}`;
+  return `${baseUrl}${path}`;
+};
 
 // ----------------------------------------------------------------------
 
@@ -16,6 +47,7 @@ type Props = {
   onChange: (images: File[]) => void;
   existingImageUrls?: string[];
   onRemoveExistingUrl?: (url: string) => void;
+  onUploadedUrls?: (urls: string[]) => void; // 업로드된 URL 콜백 추가
 };
 
 export default function ImageUpload({
@@ -23,9 +55,12 @@ export default function ImageUpload({
   onChange,
   existingImageUrls = [],
   onRemoveExistingUrl,
+  onUploadedUrls,
 }: Props) {
   const [isDragging, setIsDragging] = useState(false);
   const [previews, setPreviews] = useState<string[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadedUrls, setUploadedUrls] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -44,14 +79,63 @@ export default function ImageUpload({
     Promise.all(previewPromises).then((result) => setPreviews(result));
   }, [images]);
 
-  const handleFileSelect = (files: FileList | null) => {
+  const handleFileSelect = async (files: FileList | null) => {
     if (!files) return;
 
     const imageFiles = Array.from(files).filter((file) => file.type.startsWith('image/'));
     if (imageFiles.length === 0) return;
 
-    const newImages = [...images, ...imageFiles];
-    onChange(newImages);
+    setIsUploading(true);
+
+    try {
+      // 파일 업로드 (ProfileCard와 동일한 방식)
+      const uploadResponse = await uploadFile({ files: imageFiles });
+
+      // axios 인터셉터가 응답을 평탄화하므로 여러 형태 확인
+      let fileUrls: string[] = [];
+
+      // 형태 1: fileUrls 배열
+      if ((uploadResponse as any)?.fileUrls && Array.isArray((uploadResponse as any).fileUrls)) {
+        fileUrls = (uploadResponse as any).fileUrls;
+      }
+      // 형태 2: files 배열에서 fileUrl 추출
+      else if ((uploadResponse as any)?.files && Array.isArray((uploadResponse as any).files)) {
+        fileUrls = (uploadResponse as any).files.map((f: any) => f.fileUrl).filter(Boolean);
+      }
+      // 형태 3: data.fileUrls
+      else if (
+        (uploadResponse as any)?.data?.fileUrls &&
+        Array.isArray((uploadResponse as any).data.fileUrls)
+      ) {
+        fileUrls = (uploadResponse as any).data.fileUrls;
+      }
+
+      if (fileUrls.length === 0) {
+        throw new Error('파일 업로드에 실패했습니다.');
+      }
+
+      // 업로드 성공 시 이미지와 URL 모두 저장
+      const newImages = [...images, ...imageFiles];
+      onChange(newImages);
+
+      const newUploadedUrls = [...uploadedUrls, ...fileUrls];
+      setUploadedUrls(newUploadedUrls);
+      onUploadedUrls?.(newUploadedUrls);
+
+      toast.success('이미지가 업로드되었습니다.');
+    } catch (error: any) {
+      const errorMessage =
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '파일 업로드에 실패했습니다.';
+      toast.error(errorMessage);
+    } finally {
+      setIsUploading(false);
+      // 파일 입력 초기화
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -98,8 +182,14 @@ export default function ImageUpload({
     onChange([selected, ...rest]);
   };
 
+  // 기존 이미지 URL을 전체 URL로 변환
+  const normalizedExistingUrls = useMemo(
+    () => existingImageUrls.map((url) => getFullFileUrl(url) || url),
+    [existingImageUrls]
+  );
+
   // 기존 이미지 URL과 새로 업로드한 이미지 프리뷰 결합
-  const allImageUrls = [...existingImageUrls, ...previews];
+  const allImageUrls = [...normalizedExistingUrls, ...previews];
   const thumbnails = allImageUrls.slice(1);
   const mainPreview = allImageUrls[0] ?? null;
   const hasImages = images.length > 0 || existingImageUrls.length > 0;
@@ -193,6 +283,16 @@ export default function ImageUpload({
             >
               <Iconify icon="mingcute:close-line" width={18} />
             </IconButton>
+          </>
+        ) : isUploading ? (
+          <>
+            <CircularProgress size={60} sx={{ mb: 2 }} />
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
+              업로드 중...
+            </Typography>
+            <Typography variant="body2" color="text.secondary" textAlign="center">
+              이미지를 업로드하고 있습니다. 잠시만 기다려주세요.
+            </Typography>
           </>
         ) : (
           <>

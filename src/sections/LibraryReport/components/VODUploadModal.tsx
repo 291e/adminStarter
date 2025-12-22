@@ -17,9 +17,11 @@ import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
 import Alert from '@mui/material/Alert';
 import LoadingButton from '@mui/lab/LoadingButton';
+import LinearProgress from '@mui/material/LinearProgress';
 
 import { Iconify } from 'src/components/iconify';
 import type { CategoryItem } from './CategorySettingsModal';
+import { useUploadVod, useVodStatus } from 'src/sections/VOD/hooks/use-vod-api';
 
 // ----------------------------------------------------------------------
 
@@ -35,9 +37,11 @@ export type VODUploadFormData = {
 type Props = {
   open: boolean;
   onClose: () => void;
-  onSave: (data: VODUploadFormData) => Promise<void> | void;
+  onSave?: (data: VODUploadFormData, vodIdx?: number) => Promise<void> | void; // 선택적 (새 API 사용 시, vodIdx 전달)
   categories: CategoryItem[];
 };
+
+type UploadStep = 'idle' | 'uploading' | 'processing' | 'completed' | 'error';
 
 export default function VODUploadModal({ open, onClose, onSave, categories }: Props) {
   const [formData, setFormData] = useState<VODUploadFormData>({
@@ -54,25 +58,169 @@ export default function VODUploadModal({ open, onClose, onSave, categories }: Pr
   const videoFileInputRef = useRef<HTMLInputElement>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [uploadStep, setUploadStep] = useState<UploadStep>('idle');
+  const [vodIdx, setVodIdx] = useState<number | null>(null);
+  const formDataRef = useRef<VODUploadFormData>(formData);
+  // onSave 호출 여부 추적 (무한 호출 방지)
+  const onSaveCalledRef = useRef(false);
+  // 프로그래스바 자동 포커싱을 위한 ref
+  const progressBarRef = useRef<HTMLDivElement>(null);
+
+  // VOD API 훅
+  const uploadVodMutation = useUploadVod();
+  // vodIdx가 있고 processing 상태이면 폴링 계속
+  const isProcessing = uploadStep === 'processing' || uploadStep === 'uploading';
+  const shouldEnablePolling = vodIdx !== null && isProcessing;
+  const { data: vodStatus } = useVodStatus(vodIdx, {
+    enabled: shouldEnablePolling,
+    refetchInterval: (query) => {
+      // enabled가 false면 폴링 중지
+      if (!shouldEnablePolling) return false;
+      // 데이터가 없으면 계속 폴링
+      const data = query.state.data as any;
+      if (!data) return 3000;
+      // COMPLETED나 FAILED 상태면 폴링 중지
+      const status = data.status;
+      if (status === 'COMPLETED' || status === 'FAILED') {
+        return false;
+      }
+      // progress가 100이면 폴링 중지
+      const progress = data.progress as number;
+      if (progress >= 100) {
+        return false;
+      }
+      // PROCESSING이나 PENDING 상태면 계속 폴링
+      return 3000;
+    },
+  });
+  // 디버깅용: 폴링 상태 확인
+  const shouldPoll =
+    shouldEnablePolling &&
+    vodStatus &&
+    (vodStatus as any).status !== 'COMPLETED' &&
+    (vodStatus as any).status !== 'FAILED';
+
+  // 디버깅: 폴링 상태 확인
+  useEffect(() => {
+    if (import.meta.env.DEV && vodIdx !== null) {
+      console.log('🔍 [VODUploadModal] 폴링 상태:', {
+        vodIdx,
+        uploadStep,
+        shouldPoll,
+        hasVodStatus: !!vodStatus,
+        progress: vodStatus ? (vodStatus as any).progress : null,
+      });
+    }
+  }, [vodIdx, uploadStep, shouldPoll, vodStatus]);
 
   useEffect(() => {
     if (open) {
-      setFormData({
+      const initialData = {
         category: '',
         title: '',
         videoFile: null,
         description: '',
         isActive: true,
         thumbnailDataUrl: null,
-      });
+      };
+      setFormData(initialData);
+      formDataRef.current = initialData;
       setVideoPreview(null);
       setIsSaving(false);
       setErrorMessage('');
+      setUploadStep('idle');
+      setVodIdx(null);
+      // 모달이 열릴 때 onSave 호출 플래그 리셋
+      onSaveCalledRef.current = false;
     }
   }, [open]);
 
+  // 업로드/처리 시작 시 프로그래스바로 자동 스크롤
+  useEffect(() => {
+    if ((uploadStep === 'uploading' || uploadStep === 'processing') && progressBarRef.current) {
+      // 약간의 딜레이 후 스크롤 (DOM 업데이트 대기)
+      setTimeout(() => {
+        progressBarRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        });
+      }, 100);
+    }
+  }, [uploadStep]);
+
+  // VOD 처리 상태 모니터링 (axios interceptor가 응답을 평탄화하므로 직접 접근)
+  useEffect(() => {
+    if (!vodStatus || !vodIdx) return;
+
+      // axios interceptor가 평탄화한 응답 구조: { vodIdx, status, processStep, progress, errorMessage, header }
+      const statusData = vodStatus as any;
+      const status = statusData.status as string;
+    const progress = statusData.progress as number;
+
+    if (import.meta.env.DEV) {
+      console.log('📊 [VODUploadModal] 상태 업데이트:', {
+        status,
+        progress,
+        processStep: statusData.processStep,
+      });
+    }
+
+      if (status === 'COMPLETED') {
+      // 이미 completed 상태이고 onSave가 호출되었다면 중복 호출 방지
+      if (uploadStep === 'completed' && onSaveCalledRef.current) {
+        return;
+      }
+        setUploadStep('completed');
+        setIsSaving(false);
+      // 처리 완료 시 onSave 호출 (vodIdx 전달) - 한 번만 호출
+      if (onSave && !onSaveCalledRef.current) {
+        onSaveCalledRef.current = true;
+        // 최신 formData를 사용하기 위해 ref 사용
+        try {
+          const saveResult = onSave(formDataRef.current, vodIdx);
+          // Promise인 경우에만 catch 처리
+          if (saveResult instanceof Promise) {
+            saveResult.catch((error: unknown) => {
+              if (import.meta.env.DEV) {
+                console.error('❌ [VODUploadModal] onSave 실패', error);
+              }
+              setUploadStep('error');
+              setErrorMessage(
+                error instanceof Error
+                  ? error.message || '라이브러리 리포트 생성 중 오류가 발생했습니다.'
+                  : '라이브러리 리포트 생성 중 오류가 발생했습니다.'
+              );
+            });
+          }
+        } catch (error: unknown) {
+          // 동기 에러 처리
+          if (import.meta.env.DEV) {
+            console.error('❌ [VODUploadModal] onSave 실패', error);
+          }
+          setUploadStep('error');
+          setErrorMessage(
+            error instanceof Error
+              ? error.message || '라이브러리 리포트 생성 중 오류가 발생했습니다.'
+              : '라이브러리 리포트 생성 중 오류가 발생했습니다.'
+          );
+        }
+      }
+      } else if (status === 'FAILED') {
+        setUploadStep('error');
+        setErrorMessage(statusData.errorMessage || 'VOD 처리 중 오류가 발생했습니다.');
+        setIsSaving(false);
+      } else if (status === 'PROCESSING' || status === 'PENDING') {
+      // processing 상태로 설정 (이미 processing이어도 상태는 유지하여 폴링 계속)
+        setUploadStep('processing');
+    }
+  }, [vodStatus, vodIdx, onSave, uploadStep]);
+
   const handleChange = (field: keyof VODUploadFormData, value: any) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData((prev) => {
+      const updated = { ...prev, [field]: value };
+      formDataRef.current = updated;
+      return updated;
+    });
   };
 
   const handleVideoFileSelect = (file: File) => {
@@ -150,34 +298,56 @@ export default function VODUploadModal({ open, onClose, onSave, categories }: Pr
   };
 
   const handleSave = async () => {
-    if (!formData.category.trim() || !formData.title.trim()) {
-      setErrorMessage('카테고리와 제목을 모두 입력해주세요.');
-      return;
-    }
     if (!formData.videoFile) {
       setErrorMessage('비디오 파일을 업로드해주세요.');
       return;
     }
     setErrorMessage('');
     setIsSaving(true);
+    setUploadStep('uploading');
+
     try {
-      await onSave(formData);
-      onClose();
+      // 새 VOD API 사용
+      const response = await uploadVodMutation.mutateAsync({
+        video: formData.videoFile,
+      });
+
+      // axios interceptor가 응답을 평탄화하므로 직접 접근
+      const vodIdxValue = (response as any)?.vodIdx;
+      if (vodIdxValue) {
+        setVodIdx(vodIdxValue);
+        setUploadStep('processing');
+        // 처리 완료까지 대기 (useEffect에서 상태 모니터링)
+        // 첫 번째 상태 조회를 위해 약간의 딜레이 후 폴링 시작
+      } else {
+        throw new Error('VOD 업로드 응답에 vodIdx가 없습니다.');
+      }
     } catch (error) {
       if (import.meta.env.DEV) {
         console.error('❌ [VODUploadModal] 업로드 실패', error);
       }
+      setUploadStep('error');
       const message =
         error instanceof Error
           ? error.message || 'VOD 업로드 중 오류가 발생했습니다.'
           : 'VOD 업로드 중 오류가 발생했습니다.';
       setErrorMessage(message);
-    } finally {
       setIsSaving(false);
     }
   };
 
+  const handleCompletedClose = () => {
+    setUploadStep('idle');
+    setVodIdx(null);
+    setIsSaving(false);
+    onClose();
+  };
+
   const handleClose = () => {
+    if (uploadStep === 'processing') {
+      // 처리 중일 때는 닫기 방지
+      return;
+    }
     setFormData({
       category: '',
       title: '',
@@ -189,6 +359,8 @@ export default function VODUploadModal({ open, onClose, onSave, categories }: Pr
     setVideoPreview(null);
     setErrorMessage('');
     setIsSaving(false);
+    setUploadStep('idle');
+    setVodIdx(null);
     onClose();
   };
 
@@ -214,177 +386,405 @@ export default function VODUploadModal({ open, onClose, onSave, categories }: Pr
 
       <DialogContent sx={{ pb: 3 }}>
         <Stack spacing={3} sx={{ mt: 1 }}>
-          {errorMessage && (
+          {/* 완료 화면 */}
+          {uploadStep === 'completed' && (
+            <Alert severity="success" sx={{ mb: 1 }}>
+              <Stack spacing={1}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                  ✅ VOD 업로드 및 처리 완료!
+                </Typography>
+                <Typography variant="body2">
+                  비디오가 성공적으로 업로드되었고 STT/번역 처리가 완료되었습니다.
+                </Typography>
+              </Stack>
+            </Alert>
+          )}
+
+          {/* 에러 메시지 */}
+          {errorMessage && uploadStep !== 'completed' && (
             <Alert severity="error" sx={{ mb: 1 }}>
               {errorMessage}
             </Alert>
           )}
-          {/* 카테고리 선택 */}
-          <FormControl fullWidth>
-            <InputLabel id="category-label">카테고리</InputLabel>
-            <Select
-              labelId="category-label"
-              label="카테고리"
-              value={formData.category}
-              onChange={(e) => handleChange('category', e.target.value)}
-            >
-              {categories.map((cat) => (
-                <MenuItem key={cat.id} value={cat.name}>
-                  {cat.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
 
-          {/* 제목 입력 */}
-          <TextField
-            fullWidth
-            label="제목"
-            placeholder="제목"
-            value={formData.title}
-            onChange={(e) => handleChange('title', e.target.value)}
-          />
-
-          {/* 파일 업로드 */}
-          <Box>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>
-              파일 업로드
-            </Typography>
-            <Box
-              onDrop={handleVideoDrop}
-              onDragOver={handleVideoDragOver}
-              onDragLeave={handleVideoDragLeave}
-              onClick={() => !videoPreview && videoFileInputRef.current?.click()}
-              sx={{
-                bgcolor: 'grey.50',
-                border: '1px dashed',
-                borderColor: isDraggingVideo ? 'primary.main' : 'divider',
-                borderRadius: 1,
-                p: videoPreview ? 0 : 5,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: videoPreview ? 'default' : 'pointer',
-                transition: 'all 0.2s',
-                position: 'relative',
-                minHeight: videoPreview ? 300 : 'auto',
-                aspectRatio: videoPreview ? '16/9' : 'auto',
-                '&:hover': {
-                  bgcolor: videoPreview ? 'grey.50' : 'grey.100',
-                  borderColor: videoPreview ? 'divider' : 'primary.main',
-                },
-              }}
-            >
-              {videoPreview ? (
-                <>
+          {/* 처리 중일 때는 폼 비활성화 */}
+          {uploadStep !== 'idle' && uploadStep !== 'error' && uploadStep !== 'completed' ? (
+            <Box sx={{ opacity: 0.6, pointerEvents: 'none' }}>
+              <Stack spacing={3}>
+                <FormControl fullWidth>
+                  <InputLabel id="category-label">카테고리</InputLabel>
+                  <Select
+                    labelId="category-label"
+                    label="카테고리"
+                    value={formData.category}
+                    disabled
+                  >
+                    {categories.map((cat) => (
+                      <MenuItem key={cat.id} value={cat.name}>
+                        {cat.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <TextField fullWidth label="제목" value={formData.title} disabled />
+                <Box>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>
+                    파일 업로드
+                  </Typography>
                   <Box
                     sx={{
-                      position: 'absolute',
-                      inset: 0,
+                      bgcolor: 'grey.50',
+                      border: '1px dashed',
+                      borderColor: 'divider',
                       borderRadius: 1,
+                      p: videoPreview ? 0 : 5,
+                      minHeight: videoPreview ? 300 : 'auto',
+                      aspectRatio: videoPreview ? '16/9' : 'auto',
+                      position: 'relative',
                       overflow: 'hidden',
-                      width: '100%',
-                      height: '100%',
                     }}
                   >
-                    <img
-                      src={videoPreview}
-                      alt="Video preview"
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                      }}
-                    />
+                    {videoPreview && (
+                      <img
+                        src={videoPreview}
+                        alt="Video preview"
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                        }}
+                      />
+                    )}
                   </Box>
-                  <IconButton
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRemoveVideo();
+                </Box>
+                <TextField
+                  fullWidth
+                  label="내용"
+                  multiline
+                  minRows={4}
+                  value={formData.description}
+                  disabled
+                />
+                {/* 진행 상황 표시 - 내용 아래에 배치 */}
+                <Box
+                  ref={progressBarRef}
+                  sx={{
+                    mt: 3,
+                    pt: 3,
+                    borderTop: '1px solid',
+                    borderColor: 'divider',
+                  }}
+                >
+                  <Stack spacing={2}>
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      alignItems="center"
+                      justifyContent="space-between"
+                    >
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                        {uploadStep === 'uploading' ? '비디오 업로드 중...' : '비디오 처리 중...'}
+                      </Typography>
+                      {uploadStep === 'processing' && vodStatus && (
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main' }}>
+                          {((vodStatus as any).progress as number) || 0}%
+                        </Typography>
+                      )}
+                    </Stack>
+                    {uploadStep === 'processing' && vodStatus ? (
+                      <Box>
+                        <LinearProgress
+                          variant="determinate"
+                          value={((vodStatus as any).progress as number) || 0}
+                          sx={{
+                            height: 6,
+                            borderRadius: 3,
+                            bgcolor: 'grey.200',
+                            '& .MuiLinearProgress-bar': {
+                              borderRadius: 3,
+                            },
+                          }}
+                        />
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ mt: 1, display: 'block' }}
+                        >
+                          단계: {((vodStatus as any).processStep as string) || '처리 중'}
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <LinearProgress
+                        variant="indeterminate"
+                        sx={{
+                          height: 6,
+                          borderRadius: 3,
+                          bgcolor: 'grey.200',
+                          '& .MuiLinearProgress-bar': {
+                            borderRadius: 3,
+                          },
+                        }}
+                      />
+                    )}
+                  </Stack>
+                </Box>
+              </Stack>
+            </Box>
+          ) : (
+            <>
+              {/* 카테고리 선택 */}
+              <FormControl fullWidth>
+                <InputLabel id="category-label">카테고리</InputLabel>
+                <Select
+                  labelId="category-label"
+                  label="카테고리"
+                  value={formData.category}
+                  onChange={(e) => handleChange('category', e.target.value)}
+                >
+                  {categories.map((cat) => (
+                    <MenuItem key={cat.id} value={cat.name}>
+                      {cat.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              {/* 제목 입력 */}
+              <TextField
+                fullWidth
+                label="제목"
+                placeholder="제목"
+                value={formData.title}
+                onChange={(e) => handleChange('title', e.target.value)}
+              />
+
+              {/* 파일 업로드 */}
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>
+                  파일 업로드
+                </Typography>
+                <Box
+                  onDrop={handleVideoDrop}
+                  onDragOver={handleVideoDragOver}
+                  onDragLeave={handleVideoDragLeave}
+                  onClick={() => !videoPreview && videoFileInputRef.current?.click()}
+                  sx={{
+                    bgcolor: 'grey.50',
+                    border: '1px dashed',
+                    borderColor: isDraggingVideo ? 'primary.main' : 'divider',
+                    borderRadius: 1,
+                    p: videoPreview ? 0 : 5,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: videoPreview ? 'default' : 'pointer',
+                    transition: 'all 0.2s',
+                    position: 'relative',
+                    minHeight: videoPreview ? 300 : 'auto',
+                    aspectRatio: videoPreview ? '16/9' : 'auto',
+                    '&:hover': {
+                      bgcolor: videoPreview ? 'grey.50' : 'grey.100',
+                      borderColor: videoPreview ? 'divider' : 'primary.main',
+                    },
+                  }}
+                >
+                  {videoPreview ? (
+                    <>
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          inset: 0,
+                          borderRadius: 1,
+                          overflow: 'hidden',
+                          width: '100%',
+                          height: '100%',
+                        }}
+                      >
+                        <img
+                          src={videoPreview}
+                          alt="Video preview"
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                          }}
+                        />
+                      </Box>
+                      <IconButton
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveVideo();
+                        }}
+                        sx={{
+                          position: 'absolute',
+                          top: 16,
+                          right: 16,
+                          bgcolor: 'rgba(0, 0, 0, 0.48)',
+                          color: 'white',
+                          '&:hover': {
+                            bgcolor: 'rgba(0, 0, 0, 0.6)',
+                          },
+                        }}
+                      >
+                        <Iconify icon="solar:close-circle-bold" width={18} />
+                      </IconButton>
+                    </>
+                  ) : (
+                    <>
+                      <Box
+                        sx={{
+                          width: 200,
+                          height: 150,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          mb: 2,
+                        }}
+                      >
+                        <Iconify
+                          icon="eva:cloud-upload-fill"
+                          width={80}
+                          sx={{ color: 'primary.main' }}
+                        />
+                      </Box>
+                      <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
+                        교육 자료 업로드
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" textAlign="center">
+                        클릭하여 파일을 선택하거나 마우스로 드래그하여 옮겨주세요.
+                      </Typography>
+                    </>
+                  )}
+                  <input
+                    ref={videoFileInputRef}
+                    type="file"
+                    accept="video/*"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        handleVideoFileSelect(file);
+                      }
                     }}
-                    sx={{
-                      position: 'absolute',
-                      top: 16,
-                      right: 16,
-                      bgcolor: 'rgba(0, 0, 0, 0.48)',
-                      color: 'white',
-                      '&:hover': {
-                        bgcolor: 'rgba(0, 0, 0, 0.6)',
-                      },
-                    }}
-                  >
-                    <Iconify icon="solar:close-circle-bold" width={18} />
-                  </IconButton>
-                </>
-              ) : (
-                <>
-                  <Box
-                    sx={{
-                      width: 200,
-                      height: 150,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      mb: 2,
-                    }}
-                  >
-                    <Iconify
-                      icon="eva:cloud-upload-fill"
-                      width={80}
-                      sx={{ color: 'primary.main' }}
-                    />
-                  </Box>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
-                    교육 자료 업로드
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" textAlign="center">
-                    클릭하여 파일을 선택하거나 마우스로 드래그하여 옮겨주세요.
-                  </Typography>
-                </>
-              )}
-              <input
-                ref={videoFileInputRef}
-                type="file"
-                accept="video/*"
-                style={{ display: 'none' }}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    handleVideoFileSelect(file);
-                  }
+                  />
+                </Box>
+              </Box>
+
+              {/* 내용 입력 */}
+              <TextField
+                fullWidth
+                label="내용"
+                placeholder="내용을 입력해주세요"
+                multiline
+                minRows={4}
+                value={formData.description}
+                onChange={(e) => handleChange('description', e.target.value)}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    bgcolor: 'grey.50',
+                  },
                 }}
               />
-            </Box>
-          </Box>
 
-          {/* 내용 입력 */}
-          <TextField
-            fullWidth
-            label="내용"
-            placeholder="내용을 입력해주세요"
-            multiline
-            minRows={4}
-            value={formData.description}
-            onChange={(e) => handleChange('description', e.target.value)}
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                bgcolor: 'grey.50',
-              },
-            }}
-          />
+              {/* 진행 상황 표시 - 내용 아래에 배치 */}
+              {((uploadStep as any) === 'uploading' || (uploadStep as any) === 'processing') && (
+                <Box
+                  ref={progressBarRef}
+                  sx={{
+                    mt: 3,
+                    pt: 3,
+                    borderTop: '1px solid',
+                    borderColor: 'divider',
+                  }}
+                >
+                  <Stack spacing={2}>
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      alignItems="center"
+                      justifyContent="space-between"
+                    >
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                        {(uploadStep as any) === 'uploading'
+                          ? '비디오 업로드 중...'
+                          : '비디오 처리 중...'}
+                      </Typography>
+                      {(uploadStep as any) === 'processing' && vodStatus && (
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main' }}>
+                          {((vodStatus as any).progress as number) || 0}%
+                        </Typography>
+                      )}
+                    </Stack>
+                    {(uploadStep as any) === 'processing' && vodStatus ? (
+                      <Box>
+                        <LinearProgress
+                          variant="determinate"
+                          value={((vodStatus as any).progress as number) || 0}
+                          sx={{
+                            height: 6,
+                            borderRadius: 3,
+                            bgcolor: 'grey.200',
+                            '& .MuiLinearProgress-bar': {
+                              borderRadius: 3,
+                            },
+                          }}
+                        />
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ mt: 1, display: 'block' }}
+                        >
+                          단계: {((vodStatus as any).processStep as string) || '처리 중'}
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <LinearProgress
+                        variant="indeterminate"
+                        sx={{
+                          height: 6,
+                          borderRadius: 3,
+                          bgcolor: 'grey.200',
+                          '& .MuiLinearProgress-bar': {
+                            borderRadius: 3,
+                          },
+                        }}
+                      />
+                    )}
+                  </Stack>
+                </Box>
+              )}
+            </>
+          )}
         </Stack>
       </DialogContent>
 
       <Divider />
 
       <DialogActions sx={{ p: 3 }}>
-        <Button variant="outlined" onClick={handleClose} disabled={isSaving}>
-          취소
-        </Button>
-        <LoadingButton variant="contained" onClick={handleSave} loading={isSaving}>
-          등록
-        </LoadingButton>
+        {uploadStep === 'completed' ? (
+          <Button variant="contained" onClick={handleCompletedClose} fullWidth>
+            확인
+          </Button>
+        ) : (
+          <>
+            <Button
+              variant="outlined"
+              onClick={handleClose}
+              disabled={isSaving || uploadStep === 'processing'}
+            >
+              취소
+            </Button>
+            <LoadingButton
+              variant="contained"
+              onClick={handleSave}
+              loading={isSaving || uploadStep === 'processing'}
+              disabled={uploadStep === 'processing'}
+            >
+              {uploadStep === 'uploading' ? '업로드 중...' : '등록'}
+            </LoadingButton>
+          </>
+        )}
       </DialogActions>
     </Dialog>
   );

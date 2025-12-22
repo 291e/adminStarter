@@ -56,7 +56,7 @@ export default function AddHumanDamageModal({ open, onClose, onConfirm }: Props)
           pb: 3,
         }}
       >
-        인적피해 항목 추가
+        인적피해 항목추가
       </DialogTitle>
 
       <DialogContent>
@@ -71,13 +71,13 @@ export default function AddHumanDamageModal({ open, onClose, onConfirm }: Props)
                 color: 'text.primary',
               }}
             >
-              소속
+              소속팀
             </Typography>
             <TextField
               fullWidth
               value={department}
               onChange={(e) => setDepartment(e.target.value)}
-              placeholder="소속을 입력하세요"
+              placeholder="소속팀을 입력하세요"
               sx={{
                 '& .MuiOutlinedInput-root': {
                   fontSize: 15,

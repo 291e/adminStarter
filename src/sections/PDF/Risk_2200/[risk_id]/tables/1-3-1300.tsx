@@ -74,6 +74,21 @@ const defaultRows: Table1300Row[] = [
 ];
 
 export default function RiskTable_1_3_1300({ rows = defaultRows }: Props) {
+  // 빈 행 필터링: 모든 필드가 비어있으면 제외
+  const filteredRows = rows.filter(
+    (row) =>
+      row.name?.trim() ||
+      row.id?.trim() ||
+      row.capacity?.trim() ||
+      row.location?.trim() ||
+      row.quantity?.toString().trim() ||
+      row.inspectionTarget?.trim() ||
+      row.safetyDevice?.trim() ||
+      row.inspectionCycle?.trim() ||
+      row.accidentForm?.trim() ||
+      row.remark?.trim()
+  );
+
   return (
     <Box sx={{ width: '100%', maxWidth: 1240, mt: 4 }}>
       <Box
@@ -103,13 +118,17 @@ export default function RiskTable_1_3_1300({ rows = defaultRows }: Props) {
             lineHeight: '22px',
             whiteSpace: 'pre-wrap',
           },
+          '& tbody tr': {
+            pageBreakInside: 'avoid',
+            breakInside: 'avoid',
+          },
         }}
       >
         <thead>
           <tr>
             <th style={{ width: 48 }}>순번</th>
             <th style={{ width: 88 }}>
-              기계.기구.
+              기계·기구·
               <br />
               설비명
             </th>
@@ -133,7 +152,7 @@ export default function RiskTable_1_3_1300({ rows = defaultRows }: Props) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
+          {filteredRows.map((r) => (
             <tr key={r.number}>
               <td>{r.number}</td>
               <td>{r.name}</td>

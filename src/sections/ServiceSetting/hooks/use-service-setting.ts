@@ -61,9 +61,17 @@ export function useServiceSetting(services: ServiceSetting[]): UseServiceSetting
       services.filter((s) => {
         // 상태 필터 ('활성' -> 'ACTIVE', '비활성' -> 'INACTIVE', 'all' -> 모두)
         if (filters.status !== 'all' && filters.status !== '전체') {
-          if (filters.status === 'ACTIVE' || filters.status === '활성') {
+          if (
+            filters.status === 'ACTIVE' ||
+            filters.status === '활성' ||
+            filters.status === 'active'
+          ) {
             if (s.status !== 'ACTIVE') return false;
-          } else if (filters.status === 'INACTIVE' || filters.status === '비활성') {
+          } else if (
+            filters.status === 'INACTIVE' ||
+            filters.status === '비활성' ||
+            filters.status === 'inactive'
+          ) {
             if (s.status !== 'INACTIVE') return false;
           }
         }
@@ -107,4 +115,3 @@ export function useServiceSetting(services: ServiceSetting[]): UseServiceSetting
     total,
   };
 }
-

@@ -247,7 +247,17 @@ export default function ShareToChatModal({
                               <ListItem
                                 key={room.chatRoomIdx}
                                 disablePadding
-                                onClick={() => handleToggleRoom(room.chatRoomIdx)}
+                                onClick={(e) => {
+                                  // 체크박스 영역 클릭이 아닐 때만 토글
+                                  const target = e.target as HTMLElement;
+                                  if (
+                                    target.closest('input[type="checkbox"]') ||
+                                    target.closest('.MuiCheckbox-root')
+                                  ) {
+                                    return;
+                                  }
+                                  handleToggleRoom(room.chatRoomIdx);
+                                }}
                                 sx={{
                                   cursor: 'pointer',
                                   bgcolor: isSelected ? 'action.selected' : 'transparent',
@@ -268,11 +278,20 @@ export default function ShareToChatModal({
                                   }}
                                 >
                                   <Box
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                    }}
                                     sx={{ display: 'flex', alignItems: 'center', minHeight: 56 }}
                                   >
                                     <Checkbox
                                       checked={isSelected}
-                                      onChange={() => handleToggleRoom(room.chatRoomIdx)}
+                                      onChange={(e) => {
+                                        e.stopPropagation();
+                                        handleToggleRoom(room.chatRoomIdx);
+                                      }}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                      }}
                                       size="small"
                                       sx={{ p: 1 }}
                                     />
@@ -424,7 +443,17 @@ export default function ShareToChatModal({
                               <ListItem
                                 key={room.chatRoomIdx}
                                 disablePadding
-                                onClick={() => handleToggleRoom(room.chatRoomIdx)}
+                                onClick={(e) => {
+                                  // 체크박스 영역 클릭이 아닐 때만 토글
+                                  const target = e.target as HTMLElement;
+                                  if (
+                                    target.closest('input[type="checkbox"]') ||
+                                    target.closest('.MuiCheckbox-root')
+                                  ) {
+                                    return;
+                                  }
+                                  handleToggleRoom(room.chatRoomIdx);
+                                }}
                                 sx={{
                                   cursor: 'pointer',
                                   bgcolor: isSelected ? 'action.selected' : 'transparent',
@@ -445,11 +474,20 @@ export default function ShareToChatModal({
                                   }}
                                 >
                                   <Box
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                    }}
                                     sx={{ display: 'flex', alignItems: 'center', minHeight: 56 }}
                                   >
                                     <Checkbox
                                       checked={isSelected}
-                                      onChange={() => handleToggleRoom(room.chatRoomIdx)}
+                                      onChange={(e) => {
+                                        e.stopPropagation();
+                                        handleToggleRoom(room.chatRoomIdx);
+                                      }}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                      }}
                                       size="small"
                                       sx={{ p: 1 }}
                                     />

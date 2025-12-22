@@ -19,6 +19,7 @@ import MenuItem from '@mui/material/MenuItem';
 import Box from '@mui/material/Box';
 
 import { Iconify } from 'src/components/iconify';
+import { CONFIG } from 'src/global-config';
 
 import type { DocumentSettingItem, DocumentPeriod } from '../hooks/use-document-setting';
 import SaveConfirmModal from 'src/sections/PDF/Risk_2200/components/SaveConfirmModal';
@@ -45,7 +46,8 @@ export type DocumentEditFormData = {
   approvalStep: '0' | '1' | '2' | '3';
   status: 'active' | 'inactive';
   guideFile: File | null;
-  sampleFile: File | null;
+  sampleFiles: File[]; // 새로 추가된 샘플 파일들
+  existingSampleUrls: string[]; // 유지되는 기존 샘플 URL들
 };
 
 type Props = {
@@ -54,6 +56,60 @@ type Props = {
   onSave: (data: DocumentEditFormData) => void;
   initialData?: DocumentSettingItem | null;
 };
+
+const getFullFileUrl = (url: string | null | undefined): string | null => {
+  if (!url) return null;
+  if (
+    url.startsWith('http://') ||
+    url.startsWith('https://') ||
+    url.startsWith('blob:') ||
+    url.startsWith('data:')
+  ) {
+    return url;
+  }
+  const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
+  const path = url.startsWith('/') ? url : `/${url}`;
+  return `${baseUrl}${path}`;
+};
+
+/**
+ * 샘플 URL 문자열을 파싱하여 SampleItem 배열로 변환
+ * 지원 형식:
+ * 1. 단일 URL: "http://example.com/file.pdf"
+ * 2. 콤마 구분 URL: "url1,url2,url3"
+ * 3. JSON 배열: '["url1", "url2"]'
+ */
+function parseSampleUrls(
+  sampleUrl: string | null | undefined
+): Array<{ url: string; name: string }> {
+  if (!sampleUrl) return [];
+
+  // JSON 배열 형식 시도
+  if (sampleUrl.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(sampleUrl);
+      if (Array.isArray(parsed)) {
+        return parsed.map((url: string, index: number) => ({
+          url,
+          name: url.split('/').pop() || `샘플 ${index + 1}`,
+        }));
+      }
+    } catch {
+      // JSON 파싱 실패시 다른 형식 시도
+    }
+  }
+
+  // 콤마 구분 형식 시도
+  const urls = sampleUrl
+    .split(',')
+    .map((u) => u.trim())
+    .filter(Boolean);
+
+  return urls.map((url, index) => ({
+    url,
+    name: url.split('/').pop() || `샘플 ${index + 1}`,
+  }));
+}
 
 export default function EditDocumentSettingModal({ open, onClose, onSave, initialData }: Props) {
   // 시스템인지 아이템인지 구분 (safetySystemItemIdx === 0이면 시스템)
@@ -65,7 +121,8 @@ export default function EditDocumentSettingModal({ open, onClose, onSave, initia
     approvalStep: '0',
     status: 'active',
     guideFile: null,
-    sampleFile: null,
+    sampleFiles: [],
+    existingSampleUrls: [],
   });
 
   const [errors, setErrors] = useState<Partial<Record<'period' | 'approvalStep', string>>>({});
@@ -73,7 +130,7 @@ export default function EditDocumentSettingModal({ open, onClose, onSave, initia
   const [isDraggingGuide, setIsDraggingGuide] = useState(false);
   const [isDraggingSample, setIsDraggingSample] = useState(false);
   const [guidePreview, setGuidePreview] = useState<string | null>(null);
-  const [samplePreview, setSamplePreview] = useState<string | null>(null);
+  const [samplePreviews, setSamplePreviews] = useState<Array<{ url: string; name: string }>>([]); // 여러 샘플 미리보기
   const guideFileInputRef = useRef<HTMLInputElement>(null);
   const sampleFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -85,11 +142,14 @@ export default function EditDocumentSettingModal({ open, onClose, onSave, initia
         approvalStep: String(initialData.approvalStep ?? 0) as '0' | '1' | '2' | '3',
         status: initialData.isActive ? 'active' : 'inactive',
         guideFile: null,
-        sampleFile: null,
+        sampleFiles: [],
+        existingSampleUrls: parseSampleUrls(initialData.sampleUrl).map((s) => s.url),
       });
       setErrors({});
-      setGuidePreview(null);
-      setSamplePreview(null);
+      setGuidePreview(getFullFileUrl(initialData.guideUrl));
+      // 기존 샘플 URL 파싱 (콤마 구분 또는 JSON 배열 지원)
+      const existingSamples = parseSampleUrls(initialData.sampleUrl);
+      setSamplePreviews(existingSamples);
     }
   }, [initialData, open]);
 
@@ -101,22 +161,27 @@ export default function EditDocumentSettingModal({ open, onClose, onSave, initia
         setGuidePreview(reader.result as string);
       };
       reader.readAsDataURL(formData.guideFile);
-    } else {
-      setGuidePreview(null);
     }
   }, [formData.guideFile]);
 
   useEffect(() => {
-    if (formData.sampleFile) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setSamplePreview(reader.result as string);
-      };
-      reader.readAsDataURL(formData.sampleFile);
-    } else {
-      setSamplePreview(null);
+    if (formData.sampleFiles.length > 0) {
+      // 새로 추가된 파일들의 미리보기 생성
+      const newPreviews: Array<{ url: string; name: string }> = [];
+      formData.sampleFiles.forEach((file) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          newPreviews.push({ url: reader.result as string, name: file.name });
+          if (newPreviews.length === formData.sampleFiles.length) {
+            // 기존 서버 샘플 + 새 파일 샘플
+            const existingSamples = parseSampleUrls(initialData?.sampleUrl);
+            setSamplePreviews([...existingSamples, ...newPreviews]);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
     }
-  }, [formData.sampleFile]);
+  }, [formData.sampleFiles, initialData?.sampleUrl]);
 
   const handleChange = (field: keyof DocumentEditFormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value as DocumentEditFormData[typeof field] }));
@@ -151,7 +216,15 @@ export default function EditDocumentSettingModal({ open, onClose, onSave, initia
   };
 
   const handleConfirmSave = () => {
-    onSave(formData);
+    // 현재 samplePreviews에 남아있는 것들 중 서버 URL인 것들만 추출
+    const currentExistingUrls = samplePreviews
+      .filter((s) => !s.url.startsWith('blob:') && !s.url.startsWith('data:'))
+      .map((s) => s.url);
+
+    onSave({
+      ...formData,
+      existingSampleUrls: currentExistingUrls,
+    });
     setConfirmOpen(false);
     handleClose();
   };
@@ -164,8 +237,9 @@ export default function EditDocumentSettingModal({ open, onClose, onSave, initia
 
   const handleSampleFileSelect = (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    const file = files[0];
-    setFormData((prev) => ({ ...prev, sampleFile: file }));
+    // 여러 파일 추가 지원
+    const newFiles = Array.from(files);
+    setFormData((prev) => ({ ...prev, sampleFiles: [...prev.sampleFiles, ...newFiles] }));
   };
 
   const handleGuideDrop = (e: React.DragEvent) => {
@@ -214,9 +288,24 @@ export default function EditDocumentSettingModal({ open, onClose, onSave, initia
     }
   };
 
-  const handleRemoveSample = () => {
-    setFormData((prev) => ({ ...prev, sampleFile: null }));
-    setSamplePreview(null);
+  const handleRemoveSample = (index: number) => {
+    // 인덱스로 특정 샘플 제거
+    const existingSamples = parseSampleUrls(initialData?.sampleUrl);
+    const existingCount = existingSamples.length;
+
+    if (index < existingCount) {
+      // 서버에 저장된 샘플 제거 - UI에서만 제거 (저장 시 반영됨)
+      setSamplePreviews((prev) => prev.filter((_, i) => i !== index));
+    } else {
+      // 새로 추가된 파일 제거
+      const fileIndex = index - existingCount;
+      setFormData((prev) => ({
+        ...prev,
+        sampleFiles: prev.sampleFiles.filter((_, i) => i !== fileIndex),
+      }));
+      setSamplePreviews((prev) => prev.filter((_, i) => i !== index));
+    }
+
     if (sampleFileInputRef.current) {
       sampleFileInputRef.current.value = '';
     }
@@ -229,11 +318,12 @@ export default function EditDocumentSettingModal({ open, onClose, onSave, initia
       approvalStep: '0',
       status: 'active',
       guideFile: null,
-      sampleFile: null,
+      sampleFiles: [],
+      existingSampleUrls: [],
     });
     setErrors({});
     setGuidePreview(null);
-    setSamplePreview(null);
+    setSamplePreviews([]);
     setIsDraggingGuide(false);
     setIsDraggingSample(false);
     onClose();
@@ -315,7 +405,7 @@ export default function EditDocumentSettingModal({ open, onClose, onSave, initia
               fullWidth
               label="문서명"
               value={formData.documentName}
-              InputProps={{ readOnly: true }}
+              onChange={(e) => handleChange('documentName', e.target.value)}
             />
 
             {/* 아이템인 경우에만 작성주기와 결재 단계 표시 */}
@@ -422,7 +512,9 @@ export default function EditDocumentSettingModal({ open, onClose, onSave, initia
                       }}
                     />
                     <Typography variant="body2" sx={{ fontSize: 14, color: 'text.secondary' }}>
-                      {formData.guideFile?.name}
+                      {formData.guideFile
+                        ? formData.guideFile.name
+                        : initialData?.guideUrl?.split('/').pop() || '기존 가이드 파일'}
                     </Typography>
                     <Button
                       variant="outlined"
@@ -460,100 +552,137 @@ export default function EditDocumentSettingModal({ open, onClose, onSave, initia
               </Box>
             </Stack>
 
-            {/* 샘플 업로드 영역 (시스템인 경우에만 표시) */}
-            {isSystem && (
+            {/* 샘플 업로드 영역 (아이템인 경우에만 표시) */}
+            {!isSystem && (
               <Stack spacing={1.5}>
-                <Typography
-                  variant="subtitle2"
-                  sx={{ fontSize: 14, fontWeight: 600, color: 'text.primary' }}
+                <Box
+                  sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
                 >
-                  샘플
-                </Typography>
-              <input
-                ref={sampleFileInputRef}
-                type="file"
-                hidden
-                onChange={(e) => handleSampleFileSelect(e.target.files)}
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png"
-              />
-              <Box
-                onDrop={handleSampleDrop}
-                onDragOver={handleSampleDragOver}
-                onDragLeave={handleSampleDragLeave}
-                onClick={!samplePreview ? handleSampleUploadClick : undefined}
-                sx={{
-                  width: '100%',
-                  minHeight: 200,
-                  borderRadius: 1,
-                  border: '1px dashed',
-                  borderColor: isDraggingSample ? 'primary.main' : 'divider',
-                  bgcolor: samplePreview ? 'grey.50' : 'grey.100',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  px: 4,
-                  py: 5,
-                  textAlign: 'center',
-                  cursor: samplePreview ? 'default' : 'pointer',
-                  transition: 'all 0.2s',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  '&:hover': {
-                    bgcolor: samplePreview ? 'grey.50' : 'grey.200',
-                    borderColor: samplePreview ? 'divider' : 'primary.main',
-                  },
-                }}
-              >
-                {samplePreview ? (
-                  <Stack spacing={1} alignItems="center" sx={{ width: '100%' }}>
-                    <Box
-                      component="img"
-                      src={samplePreview}
-                      alt="샘플 미리보기"
-                      sx={{
-                        maxWidth: '100%',
-                        maxHeight: 300,
-                        objectFit: 'contain',
-                        borderRadius: 1,
-                      }}
-                    />
-                    <Typography variant="body2" sx={{ fontSize: 14, color: 'text.secondary' }}>
-                      {formData.sampleFile?.name}
-                    </Typography>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRemoveSample();
-                      }}
-                      sx={{ mt: 1 }}
-                    >
-                      파일 제거
-                    </Button>
+                  <Typography
+                    variant="subtitle2"
+                    sx={{ fontSize: 14, fontWeight: 600, color: 'text.primary' }}
+                  >
+                    샘플 ({samplePreviews.length}개)
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={handleSampleUploadClick}
+                    startIcon={<Iconify icon="solar:add-circle-bold" width={16} />}
+                  >
+                    샘플 추가
+                  </Button>
+                </Box>
+                <input
+                  ref={sampleFileInputRef}
+                  type="file"
+                  hidden
+                  multiple
+                  onChange={(e) => handleSampleFileSelect(e.target.files)}
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png"
+                />
+
+                {/* 샘플 파일 목록 */}
+                {samplePreviews.length > 0 ? (
+                  <Stack spacing={1}>
+                    {samplePreviews.map((sample, index) => (
+                      <Box
+                        key={index}
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          p: 1.5,
+                          borderRadius: 1,
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          bgcolor: 'grey.50',
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1.5,
+                            overflow: 'hidden',
+                            flex: 1,
+                          }}
+                        >
+                          <Iconify
+                            icon="solar:file-bold-duotone"
+                            width={24}
+                            sx={{ color: 'primary.main', flexShrink: 0 }}
+                          />
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              fontWeight: 500,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {sample.name}
+                          </Typography>
+                        </Box>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleRemoveSample(index)}
+                          sx={{ color: 'error.main' }}
+                        >
+                          <Iconify icon="solar:close-circle-bold" width={18} />
+                        </IconButton>
+                      </Box>
+                    ))}
                   </Stack>
                 ) : (
-                  <Stack spacing={1} alignItems="center" sx={{ width: '100%' }}>
-                    <Iconify
-                      icon="eva:cloud-upload-fill"
-                      width={48}
-                      sx={{ color: 'text.secondary' }}
-                    />
-                    <Typography
-                      variant="h6"
-                      sx={{ fontSize: 18, fontWeight: 600, color: 'text.primary' }}
-                    >
-                      파일 업로드
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      sx={{ fontSize: 14, color: 'text.secondary', lineHeight: '22px' }}
-                    >
-                      클릭하여 파일을 선택하거나 마우스로 드래그하여 옮겨주세요.
-                    </Typography>
-                  </Stack>
+                  <Box
+                    onDrop={handleSampleDrop}
+                    onDragOver={handleSampleDragOver}
+                    onDragLeave={handleSampleDragLeave}
+                    onClick={handleSampleUploadClick}
+                    sx={{
+                      width: '100%',
+                      minHeight: 120,
+                      borderRadius: 1,
+                      border: '1px dashed',
+                      borderColor: isDraggingSample ? 'primary.main' : 'divider',
+                      bgcolor: 'grey.100',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      px: 4,
+                      py: 3,
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      '&:hover': {
+                        bgcolor: 'grey.200',
+                        borderColor: 'primary.main',
+                      },
+                    }}
+                  >
+                    <Stack spacing={1} alignItems="center" sx={{ width: '100%' }}>
+                      <Iconify
+                        icon="eva:cloud-upload-fill"
+                        width={36}
+                        sx={{ color: 'text.secondary' }}
+                      />
+                      <Typography
+                        variant="body1"
+                        sx={{ fontSize: 14, fontWeight: 600, color: 'text.primary' }}
+                      >
+                        파일 업로드 (여러 개 선택 가능)
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        sx={{ fontSize: 12, color: 'text.secondary', lineHeight: '18px' }}
+                      >
+                        클릭하거나 드래그하여 파일을 추가하세요.
+                      </Typography>
+                    </Stack>
+                  </Box>
                 )}
-              </Box>
               </Stack>
             )}
           </Stack>

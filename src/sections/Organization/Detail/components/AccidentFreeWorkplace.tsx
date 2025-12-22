@@ -27,6 +27,7 @@ import Badge from 'src/components/safeyoui/badge';
 import { useAccidentFree } from '../../hooks/use-organization-api';
 import AccidentFreeWorkplacePagination from './AccidentFreeWorkplacePagination';
 import UpdateCertificationModal from './UpdateCertificationModal';
+import EditCertificationRecordModal from './EditCertificationRecordModal';
 
 // ----------------------------------------------------------------------
 
@@ -38,6 +39,7 @@ type CertificationRecord = {
   certificateFileName?: string;
   accidentFreeYear?: number | null;
   status?: string; // API 응답의 status 필드 (PENDING, APPROVED, REJECTED 등)
+  fileUrl?: string; // 원본 파일 URL
 };
 
 type StatusType = 'valid' | 'pending' | 'expired';
@@ -53,6 +55,8 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [uploadedFiles, setUploadedFiles] = useState<{ [key: string]: File | null }>({});
   const [updateModalOpen, setUpdateModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState<CertificationRecord | null>(null);
 
   const companyIdx = organizationId ? parseInt(organizationId, 10) : 0;
 
@@ -192,7 +196,8 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
         certificateFileName,
         accidentFreeYear:
           history.appliedYear && history.appliedYear > 0 ? history.appliedYear : null,
-        status: history.status || 'PENDING', // API 응답의 status 필드 추가
+        status: history.status || 'PENDING',
+        fileUrl: history.fileUrl,
       };
     });
 
@@ -224,6 +229,11 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
 
   const handleUpdate = () => {
     setUpdateModalOpen(true);
+  };
+
+  const handleEditRecord = (record: CertificationRecord) => {
+    setSelectedRecord(record);
+    setEditModalOpen(true);
   };
 
   const handleUpdateSave = (data: { certificationDate: Dayjs | null; file: File | null }) => {
@@ -293,24 +303,37 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
     // API 응답의 status 필드가 있으면 우선 사용
     if (record.status) {
       const statusUpper = record.status.toUpperCase();
-      if (statusUpper === 'APPROVED') {
-        // APPROVED인 경우 적용 연도로 유효/만료 판단
-        if (!record.applicationYear) {
-          return 'pending';
-        }
-        const applicationYearNum = extractYear(record.applicationYear);
-        if (applicationYearNum === null) {
-          return 'pending';
-        }
-        if (applicationYearNum === currentYear) {
-          return 'valid';
-        }
-        return 'expired';
-      }
+
+      // PENDING 상태는 항상 검토 대기
       if (statusUpper === 'PENDING') {
         return 'pending';
       }
+
+      // REJECTED 상태는 항상 만료
       if (statusUpper === 'REJECTED') {
+        return 'expired';
+      }
+
+      // APPROVED인 경우 적용 연도로 유효/만료 판단
+      if (statusUpper === 'APPROVED') {
+        // 적용 연도가 없으면 검토 대기
+        if (!record.applicationYear) {
+          return 'pending';
+        }
+
+        const applicationYearNum = extractYear(record.applicationYear);
+
+        // 적용 연도를 추출할 수 없으면 검토 대기
+        if (applicationYearNum === null) {
+          return 'pending';
+        }
+
+        // 적용 연도가 현재 연도와 같거나 미래이면 유효
+        if (applicationYearNum >= currentYear) {
+          return 'valid';
+        }
+
+        // 적용 연도가 현재 연도보다 과거이면 만료
         return 'expired';
       }
     }
@@ -328,12 +351,12 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
       return 'pending';
     }
 
-    // 적용 연도와 현재 연도가 같으면 유효
-    if (applicationYearNum === currentYear) {
+    // 적용 연도가 현재 연도와 같거나 미래이면 유효
+    if (applicationYearNum >= currentYear) {
       return 'valid';
     }
 
-    // 그 외는 만료
+    // 적용 연도가 현재 연도보다 과거이면 만료
     return 'expired';
   };
 
@@ -422,15 +445,20 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, minWidth: 100 }}>
                   인증 상태
                 </Typography>
-                {currentStatus ? (
-                  <Chip label={currentStatus} variant="outlined" color="info" size="medium" />
-                ) : accidentFreeStatus === 'PENDING' ? (
-                  renderStatusBadge('pending')
-                ) : (
-                  <Typography variant="body2" color="text.secondary">
-                    인증 정보 없음
-                  </Typography>
-                )}
+                <Stack direction="row" spacing={1} alignItems="center">
+                  {currentStatus ? (
+                    <Chip label={currentStatus} variant="outlined" color="info" size="medium" />
+                  ) : accidentFreeStatus === 'PENDING' ? (
+                    renderStatusBadge('pending')
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      인증 정보 없음
+                    </Typography>
+                  )}
+                  <IconButton onClick={handleUpdate} size="small" sx={{ color: 'text.secondary' }}>
+                    <Iconify icon="solar:pen-bold" width={18} />
+                  </IconButton>
+                </Stack>
               </Stack>
               <Stack direction="row" spacing={2} alignItems="center">
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, minWidth: 100 }}>
@@ -630,6 +658,20 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
                     >
                       상태
                     </TableCell>
+                    <TableCell
+                      align="center"
+                      sx={{
+                        bgcolor: 'grey.100',
+                        fontWeight: 600,
+                        fontSize: 14,
+                        p: 2,
+                        width: 48,
+                        minWidth: 48,
+                        maxWidth: 48,
+                      }}
+                    >
+                      &nbsp;
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -705,6 +747,15 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
                           </Stack>
                         </TableCell>
                         <TableCell align="center">{renderStatusBadge(getStatus(record))}</TableCell>
+                        <TableCell align="center">
+                          <IconButton
+                            onClick={() => handleEditRecord(record)}
+                            size="small"
+                            sx={{ color: 'text.secondary' }}
+                          >
+                            <Iconify icon="solar:pen-bold" width={18} />
+                          </IconButton>
+                        </TableCell>
                       </TableRow>
                     );
                   })}
@@ -734,6 +785,21 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
         defaultFileUrl={accidentFreeInfo?.accidentFreeFileUrl ?? null}
         onSave={handleUpdateSave}
         onUpdated={() => setUpdateModalOpen(false)}
+      />
+
+      {/* 인증 이력 수정 모달 */}
+      <EditCertificationRecordModal
+        open={editModalOpen}
+        onClose={() => {
+          setEditModalOpen(false);
+          setSelectedRecord(null);
+        }}
+        companyIdx={companyIdx}
+        record={selectedRecord}
+        onUpdated={() => {
+          setEditModalOpen(false);
+          setSelectedRecord(null);
+        }}
       />
     </LocalizationProvider>
   );

@@ -79,7 +79,7 @@ export default function EducationReportPagination({
         </FormControl>
 
         <Typography variant="body2">
-          {start}-{end} of {count}
+          {start}-{end} / {count}
         </Typography>
 
         <Stack direction="row" spacing={0}>

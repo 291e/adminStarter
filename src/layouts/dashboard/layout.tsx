@@ -10,8 +10,6 @@ import Alert from '@mui/material/Alert';
 import { useTheme } from '@mui/material/styles';
 import { iconButtonClasses } from '@mui/material/IconButton';
 
-import { _notifications } from 'src/_mock';
-
 import { Logo } from 'src/components/logo';
 import { useSettingsContext } from 'src/components/settings';
 
@@ -190,7 +188,7 @@ export function DashboardLayout({
           /> */}
 
           {/** @slot Notifications popover */}
-          <NotificationsDrawer data={_notifications} />
+          <NotificationsDrawer />
 
           {/** @slot Contacts popover */}
           {/* <ContactsPopover data={_contacts} /> */}

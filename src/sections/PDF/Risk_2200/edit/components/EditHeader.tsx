@@ -21,7 +21,6 @@ export default function EditHeader({ onBack, onSampleView, title }: Props) {
         gap: 1,
         alignItems: 'flex-end',
         width: '100%',
-        maxWidth: 1320,
       }}
     >
       <IconButton onClick={onBack} sx={{ p: 1 }}>
@@ -54,6 +53,3 @@ export default function EditHeader({ onBack, onSampleView, title }: Props) {
     </Box>
   );
 }
-
-
-

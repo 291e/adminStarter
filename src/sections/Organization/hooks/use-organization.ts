@@ -64,20 +64,14 @@ export function useOrganization(): UseOrganizationResult {
   const [page, setPage] = useState<number>(1);
   const [rowsPerPage, setRowsPerPage] = useState<number>(10);
 
-  // API 파라미터 구성
+  // API 파라미터 구성 (모든 데이터를 가져오기 위해 pageSize를 1000으로 설정)
   const apiParams = useMemo(() => {
     const params: any = {
-      page,
-      pageSize: rowsPerPage,
+      page: 1,
+      pageSize: 1000, // 충분히 큰 값으로 모든 데이터 가져오기
     };
 
-    // 상태 필터
-    if (tab === 'active') {
-      params.status = 'active';
-    } else if (tab === 'inactive') {
-      params.status = 'inactive';
-    }
-
+    // 상태 필터는 클라이언트에서 처리하므로 API에 전달하지 않음
     // 조직 구분 필터 (division을 companyType으로 변환)
     if (division !== 'all') {
       const divisionToCompanyType: Record<DivisionType, string> = {
@@ -116,7 +110,7 @@ export function useOrganization(): UseOrganizationResult {
     }
 
     return params;
-  }, [tab, division, filters, searchField, page, rowsPerPage]);
+  }, [division, filters, searchField]);
 
   // API 호출
   const {
@@ -126,7 +120,7 @@ export function useOrganization(): UseOrganizationResult {
   } = useOrganizations(apiParams);
 
   // 데이터 변환 (axios interceptor가 body를 flatten하므로 직접 접근)
-  const organizations = useMemo(() => {
+  const allOrganizations = useMemo(() => {
     if (!organizationsData?.header?.isSuccess) {
       if (import.meta.env.DEV && organizationsData) {
         console.warn('⚠️ Organizations: Invalid response structure', organizationsData);
@@ -158,20 +152,63 @@ export function useOrganization(): UseOrganizationResult {
     });
   }, [organizationsData]);
 
-  // 카운트 계산
+  // 클라이언트 필터링
+  const filteredOrganizations = useMemo(() => {
+    let result = [...allOrganizations];
+
+    // 상태 필터 (tab)
+    if (tab === 'active') {
+      result = result.filter((org) => org.status === 'active');
+    } else if (tab === 'inactive') {
+      result = result.filter((org) => org.status === 'inactive');
+    }
+
+    // 검색 필터 (클라이언트에서 추가 필터링)
+    if (filters.searchValue) {
+      const searchLower = filters.searchValue.toLowerCase();
+      if (searchField === 'orgName') {
+        result = result.filter((org) => org.companyName?.toLowerCase().includes(searchLower));
+      } else if (searchField === 'manager') {
+        result = result.filter((org) =>
+          org.manager?.memberName?.toLowerCase().includes(searchLower)
+        );
+      } else {
+        // 전체 검색
+        result = result.filter(
+          (org) =>
+            org.companyName?.toLowerCase().includes(searchLower) ||
+            org.manager?.memberName?.toLowerCase().includes(searchLower) ||
+            org.phone?.toLowerCase().includes(searchLower) ||
+            org.email?.toLowerCase().includes(searchLower)
+        );
+      }
+    }
+
+    return result;
+  }, [allOrganizations, tab, filters.searchValue, searchField]);
+
+  // 클라이언트 페이지네이션
+  const organizations = useMemo(() => {
+    const start = (page - 1) * rowsPerPage;
+    return filteredOrganizations.slice(start, start + rowsPerPage);
+  }, [filteredOrganizations, page, rowsPerPage]);
+
+  // 카운트 계산 (필터링된 전체 데이터 기준)
   const counts = useMemo(() => {
-    // axios interceptor가 body를 flatten하므로 totalCount는 최상위에 있음
-    const total = (organizationsData as any)?.totalCount || organizations.length;
-    const active = organizations.filter((org: Organization) => org.status === 'active').length;
-    const inactive = organizations.filter((org: Organization) => org.status === 'inactive').length;
+    const active = filteredOrganizations.filter(
+      (org: Organization) => org.status === 'active'
+    ).length;
+    const inactive = filteredOrganizations.filter(
+      (org: Organization) => org.status === 'inactive'
+    ).length;
     return {
-      all: total || active + inactive,
+      all: filteredOrganizations.length,
       active,
       inactive,
     };
-  }, [organizations, organizationsData]);
+  }, [filteredOrganizations]);
 
-  const total = (organizationsData as any)?.totalCount || organizations.length;
+  const total = filteredOrganizations.length;
 
   // 디버깅
   useEffect(() => {

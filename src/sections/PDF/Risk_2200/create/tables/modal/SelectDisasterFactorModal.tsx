@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -8,14 +8,18 @@ import Checkbox from '@mui/material/Checkbox';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
+import CircularProgress from '@mui/material/CircularProgress';
+import Alert from '@mui/material/Alert';
 
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
+import { useChecklists, useDisasterFactors } from 'src/sections/ChackList/hooks/use-checklist-api';
 
 // ----------------------------------------------------------------------
 
 export type DisasterFactorItem = {
   id: string;
   name: string;
+  disasterFactorIdx?: number;
 };
 
 type Props = {
@@ -26,27 +30,6 @@ type Props = {
   industry?: string; // 업종: 제조업, 운수‧창고‧통신업, 임업, 건물 등의 종합관리사업, 위생 및 유사서비스업
 };
 
-// TODO: TanStack Query Hook(useQuery)으로 재해유발요인 목록 조회
-// 임시 목업 데이터
-const mockDisasterFactors: DisasterFactorItem[] = [
-  { id: '1', name: '작업 중 기계⋅기구에 안전장치(방호장치 등) 미설치·미흡·무효화 8대 위험요인' },
-  {
-    id: '2',
-    name: '정비, 수리, 교체 및 청소 등의 작업 시 설비 가동 정지 후 불시가동을 방지하기 위한 조치(기동장치에 잠금장치, 표지판) 미실시 8대 위험요인',
-  },
-  { id: '3', name: '정비, 수리, 교체 및 청소 등의 작업 시 설비⋅기계의 운전 정지 미실시' },
-  { id: '4', name: '추락의 위험이 있는 장소에서 정비·수리 등의 작업 시 추락위험 방지조치 미실시' },
-  { id: '5', name: '중량물, 설비 하부에서 작업 시 중량물 등의 미고정 등 깔림 위험 예방조치 미흡' },
-  {
-    id: '6',
-    name: '밀폐공간 내 작업 시 산소결핍 또는 유해 가스에 의한 질식·중독 위험 예방조치 미실시 (적정공기: 산소농도 18~23.5%, 탄산가스농도 1.5%미만, 황화수소 10ppm미만 등)',
-  },
-  {
-    id: '7',
-    name: '가동 중인 설비 인근에서 작업 시 끼임, 부딪힘 등 위험 예방조치를 위한 충분한 작업 공간 확보 미실시',
-  },
-];
-
 export default function SelectDisasterFactorModal({
   open,
   onClose,
@@ -55,19 +38,86 @@ export default function SelectDisasterFactorModal({
   industry,
 }: Props) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [checklistIdx, setChecklistIdx] = useState<number | null>(null);
 
-  // TODO: TanStack Query Hook(useQuery)으로 고위험작업별 재해유발요인 목록 조회
-  // const { data: disasterFactors } = useQuery({
-  //   queryKey: ['disasterFactors', highRiskWork, industry],
-  //   queryFn: () => getDisasterFactors({ highRiskWork, industry }),
-  //   enabled: open && !!highRiskWork,
-  // });
+  // 업종별 체크리스트 목록 조회 (고위험작업으로 체크리스트 찾기)
+  const { data: checklistsData } = useChecklists({
+    page: 1,
+    pageSize: 1000,
+    industry: industry || undefined,
+    status: 'active',
+  });
 
-  // TODO: 고위험작업별 필터링 로직 추가
-  // if (highRiskWork) {
-  //   return mockDisasterFactors.filter((factor) => factor.highRiskWork === highRiskWork);
-  // }
-  const disasterFactors = useMemo(() => mockDisasterFactors, [highRiskWork, industry]);
+  // 고위험작업으로 체크리스트 ID 찾기
+  useEffect(() => {
+    if (
+      !checklistsData?.checklistList ||
+      !Array.isArray(checklistsData.checklistList) ||
+      !highRiskWork
+    ) {
+      setChecklistIdx(null);
+      return;
+    }
+
+    if (typeof checklistsData.checklistList[0] === 'string') {
+      setChecklistIdx(null);
+      return;
+    }
+
+    const checklists = checklistsData.checklistList as Array<{
+      checklistIdx?: number;
+      highRiskWork: string;
+    }>;
+
+    const foundChecklist = checklists.find(
+      (checklist) => checklist.highRiskWork === highRiskWork && checklist.checklistIdx
+    );
+
+    setChecklistIdx(foundChecklist?.checklistIdx || null);
+  }, [checklistsData, highRiskWork]);
+
+  // 재해유발요인 목록 조회
+  const {
+    data: disasterFactorsData,
+    isLoading,
+    isError,
+  } = useDisasterFactors({
+    checklistIdx: checklistIdx || 0,
+  });
+
+  // 재해유발요인 데이터 변환
+  const disasterFactors = useMemo<DisasterFactorItem[]>(() => {
+    if (
+      !disasterFactorsData?.disasterFactorList ||
+      !Array.isArray(disasterFactorsData.disasterFactorList)
+    ) {
+      return [];
+    }
+
+    // string[]인 경우 필터링
+    if (typeof disasterFactorsData.disasterFactorList[0] === 'string') {
+      return [];
+    }
+
+    const factors = disasterFactorsData.disasterFactorList as Array<{
+      disasterFactorIdx?: number;
+      factorName: string;
+      isActive?: number | boolean;
+    }>;
+
+    // 활성화된 항목만 필터링
+    return factors
+      .filter((factor) => {
+        if (factor.isActive === undefined) return true;
+        if (typeof factor.isActive === 'boolean') return factor.isActive;
+        return factor.isActive === 1;
+      })
+      .map((factor) => ({
+        id: factor.disasterFactorIdx?.toString() || `factor-${factor.factorName}`,
+        name: factor.factorName,
+        disasterFactorIdx: factor.disasterFactorIdx,
+      }));
+  }, [disasterFactorsData]);
 
   const handleToggle = (factorId: string) => {
     setSelectedIds((prev) =>
@@ -127,38 +177,60 @@ export default function SelectDisasterFactorModal({
       )}
 
       <DialogContent>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          {disasterFactors.map((factor) => (
-            <FormControlLabel
-              key={factor.id}
-              control={
-                <Checkbox
-                  checked={selectedIds.includes(factor.id)}
-                  onChange={() => handleToggle(factor.id)}
-                />
-              }
-              label={
-                <Typography
-                  sx={{
-                    fontSize: 14,
-                    fontWeight: 400,
-                    lineHeight: '22px',
-                    color: 'text.primary',
-                  }}
-                >
-                  {factor.name}
-                </Typography>
-              }
-              sx={{
-                alignItems: 'center',
-                py: 1,
-                '& .MuiFormControlLabel-label': {
-                  flex: 1,
-                },
-              }}
-            />
-          ))}
-        </Box>
+        {isLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : isError ? (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            데이터를 불러오는 중 오류가 발생했습니다.
+          </Alert>
+        ) : !highRiskWork ? (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            먼저 고위험작업을 선택해주세요.
+          </Alert>
+        ) : !checklistIdx ? (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            선택한 고위험작업에 해당하는 체크리스트를 찾을 수 없습니다.
+          </Alert>
+        ) : disasterFactors.length === 0 ? (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            선택한 고위험작업에 해당하는 재해유발요인이 없습니다.
+          </Alert>
+        ) : (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {disasterFactors.map((factor) => (
+              <FormControlLabel
+                key={factor.id}
+                control={
+                  <Checkbox
+                    checked={selectedIds.includes(factor.id)}
+                    onChange={() => handleToggle(factor.id)}
+                  />
+                }
+                label={
+                  <Typography
+                    sx={{
+                      fontSize: 14,
+                      fontWeight: 400,
+                      lineHeight: '22px',
+                      color: 'text.primary',
+                    }}
+                  >
+                    {factor.name}
+                  </Typography>
+                }
+                sx={{
+                  alignItems: 'center',
+                  py: 1,
+                  '& .MuiFormControlLabel-label': {
+                    flex: 1,
+                  },
+                }}
+              />
+            ))}
+          </Box>
+        )}
       </DialogContent>
 
       <DialogActions sx={{ justifyContent: 'flex-end', px: 3, pb: 3 }}>

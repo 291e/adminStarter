@@ -60,8 +60,9 @@ export type Member = {
   updateAt: string;
   deletedAt: string | null;
   position: string | null; // 직급 (과장, 대리 등)
-  department: string | null; // 소속 (생산 1팀, 영업 2팀 등)
+  department: string | null; // 소속팀 (생산 1팀, 영업 2팀 등)
   isSuperAdmin?: boolean; // 슈퍼어드민 여부
+  standardHours?: number | null; // 개별 이수 시간 (분)
 };
 
 // 회원 생성 요청
@@ -79,6 +80,7 @@ export type CreateMemberDto = {
   memberMemo?: string; // 메모
   companyIdx?: number;
   companyBranchIdx?: number;
+  joinedAt?: string; // 입사일 (YYYY-MM-DD 형식)
 };
 
 // 아이디 중복검사 요청
@@ -124,6 +126,7 @@ export type UpdateMyInfoDto = {
   lastLocationUpdateAt?: string; // 위치 정보 마지막 업데이트 시간
   newPassword?: string; // 새 패스워드, minLength: 4, maxLength: 25
   currentPassword?: string; // 현재 패스워드 (패스워드 변경 시 필수)
+  joinedAt?: string; // 입사일 (YYYY-MM-DD 형식)
 };
 
 // 내 정보 수정 응답
@@ -138,13 +141,15 @@ export type UpdateMemberDto = {
   memberAddress?: string;
   memberAddressDetail?: string;
   position?: string; // 직급 (과장, 대리 등)
-  department?: string; // 소속 (생산 1팀, 영업 2팀 등)
+  department?: string; // 소속팀 (생산 1팀, 영업 2팀 등)
   memberStatus?: 'ACTIVE' | 'INACTIVE';
   memberRole?: 'OPERATOR_MANAGER' | 'MANAGEMENT_SUPERVISOR' | 'SAFETY_MANAGER' | 'WORKER';
   memberThumbnail?: string; // 썸네일 이미지 경로
   password?: string; // maxLength: 100
   companyIdx?: number;
   companyBranchIdx?: number;
+  standardHours?: number; // 개별 이수 시간 (분, null이면 EducationStandard 기준 사용)
+  joinedAt?: string; // 입사일 (YYYY-MM-DD 형식)
 };
 
 // 회원 수정 응답

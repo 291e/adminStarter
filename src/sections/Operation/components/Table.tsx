@@ -14,6 +14,34 @@ import MenuItem from '@mui/material/MenuItem';
 import type { RiskReport } from 'src/services/operation/operation.types';
 import { fDateTime } from 'src/utils/format-time';
 import { Iconify } from 'src/components/iconify';
+import { CONFIG } from 'src/global-config';
+
+// 파일 URL을 전체 URL로 변환하는 헬퍼 함수
+const getFullFileUrl = (url: string | null | undefined): string | null => {
+  if (!url) return null;
+  // 잘못된 형식: data:image/png;base64,data/admin/... 같은 경우 처리
+  if (
+    url.startsWith('data:image/png;base64,data/admin/') ||
+    url.startsWith('data:image/png;base64,/data/admin/')
+  ) {
+    const cleanUrl = url.replace(/^data:image\/png;base64,/, '');
+    const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
+    const path = cleanUrl.startsWith('/') ? cleanUrl : `/${cleanUrl}`;
+    return `${baseUrl}${path}`;
+  }
+  // 이미 전체 URL인 경우
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  // base64 데이터 URL인 경우 그대로 반환
+  if (url.startsWith('data:image/') && !url.includes('data/admin/')) {
+    return url;
+  }
+  // 상대 경로인 경우 CONFIG.serverUrl과 결합
+  const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
+  const path = url.startsWith('/') ? url : `/${url}`;
+  return `${baseUrl}${path}`;
+};
 
 type Props = {
   rows: RiskReport[];
@@ -30,6 +58,7 @@ export default function OperationTable({
 }: Props) {
   const [menuAnchorEl, setMenuAnchorEl] = useState<{ [key: string]: HTMLElement | null }>({});
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
 
   const handleOpenMenu = (event: React.MouseEvent<HTMLElement>, rowId: string) => {
     event.stopPropagation();
@@ -43,13 +72,7 @@ export default function OperationTable({
   };
 
   return (
-    <Grid
-      container
-      spacing={3}
-      sx={{
-        mt: 2,
-      }}
-    >
+    <Grid container spacing={3}>
       {rows.map((row, index) => {
         // 고유한 key 생성
         const key = row.riskReportIdx
@@ -59,7 +82,16 @@ export default function OperationTable({
         const statusLabel = row.status === 'CONFIRMED' ? '확인' : '미확인';
         const statusColor =
           row.status === 'CONFIRMED' ? 'rgba(34, 197, 94, 0.16)' : 'rgba(145, 158, 171, 0.16)';
-        const thumbnail = row.imageUrl || (row.imageUrls && row.imageUrls[0]) || '';
+        const rawThumbnail = row.imageUrl || (row.imageUrls && row.imageUrls[0]) || '';
+        const thumbnail = getFullFileUrl(rawThumbnail) || '';
+        const imageKey = `${key}-${rawThumbnail}`;
+        const hasImageError = imageErrors.has(imageKey);
+        const shouldShowPlaceholder = !thumbnail || hasImageError;
+
+        const handleImageError = () => {
+          setImageErrors((prev) => new Set(prev).add(imageKey));
+        };
+
         return (
           <Grid key={key} size={{ xs: 12, md: 6 }}>
             <Card
@@ -228,11 +260,30 @@ export default function OperationTable({
                   alignSelf: 'center',
                 }}
               >
-                {thumbnail ? (
+                {shouldShowPlaceholder ? (
+                  <Box
+                    component="img"
+                    src={
+                      CONFIG.assetsDir
+                        ? `${CONFIG.assetsDir}/assets/icons/empty/ic-content.svg`
+                        : '/assets/icons/empty/ic-content.svg'
+                    }
+                    alt="이미지 없음"
+                    sx={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'contain',
+                      bgcolor: 'grey.50',
+                      p: 2,
+                      opacity: 0.5,
+                    }}
+                  />
+                ) : (
                   <Box
                     component="img"
                     src={thumbnail}
                     alt={row.title || 'report-image'}
+                    onError={handleImageError}
                     sx={{
                       width: '100%',
                       height: '100%',
@@ -240,20 +291,6 @@ export default function OperationTable({
                       pointerEvents: 'none',
                     }}
                   />
-                ) : (
-                  <Stack
-                    alignItems="center"
-                    justifyContent="center"
-                    sx={{
-                      width: '100%',
-                      height: '100%',
-                      bgcolor: 'grey.100',
-                      color: 'text.disabled',
-                      fontSize: 13,
-                    }}
-                  >
-                    이미지 없음
-                  </Stack>
                 )}
               </Box>
             </Card>

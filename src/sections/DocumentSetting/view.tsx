@@ -8,7 +8,6 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { DashboardContent } from 'src/layouts/dashboard';
-import { paths } from 'src/routes/paths';
 import { CONFIG } from 'src/global-config';
 import { updateSafetySystem } from 'src/services/safety-system/safety-system.service';
 import { uploadFile } from 'src/services/system/system.service';
@@ -74,22 +73,55 @@ export function DocumentSettingView({ title = '문서 설정 관리', sx }: Prop
     try {
       // 파일 업로드 처리
       let guideUrl: string | undefined;
-      let sampleUrl: string | undefined;
 
       if (data.guideFile) {
         const uploadResponse = await uploadFile({ files: [data.guideFile] });
-        const fileUrls = (uploadResponse as unknown as { fileUrls: string[] }).fileUrls;
-        if (fileUrls && fileUrls.length > 0) {
-          guideUrl = fileUrls[0];
+        let fileUrl: string | undefined;
+
+        if ((uploadResponse as any)?.fileUrls && Array.isArray((uploadResponse as any).fileUrls)) {
+          fileUrl = (uploadResponse as any).fileUrls[0];
+        } else if ((uploadResponse as any)?.files && Array.isArray((uploadResponse as any).files)) {
+          fileUrl = (uploadResponse as any).files[0]?.fileUrl;
+        } else if (
+          (uploadResponse as any)?.data?.fileUrls &&
+          Array.isArray((uploadResponse as any).data.fileUrls)
+        ) {
+          fileUrl = (uploadResponse as any).data.fileUrls[0];
+        }
+
+        if (fileUrl) {
+          guideUrl = fileUrl;
         }
       }
 
-      if (data.sampleFile && isSystem) {
-        // 시스템인 경우에만 샘플 업로드
-        const uploadResponse = await uploadFile({ files: [data.sampleFile] });
-        const fileUrls = (uploadResponse as unknown as { fileUrls: string[] }).fileUrls;
-        if (fileUrls && fileUrls.length > 0) {
-          sampleUrl = fileUrls[0];
+      let finalSampleUrl: string | undefined;
+
+      if (data.sampleFiles.length > 0 && !isSystem) {
+        // 아이템인 경우에만 샘플 업로드
+        const uploadResponse = await uploadFile({ files: data.sampleFiles });
+        let newlyUploadedUrls: string[] = [];
+
+        if ((uploadResponse as any)?.fileUrls && Array.isArray((uploadResponse as any).fileUrls)) {
+          newlyUploadedUrls = (uploadResponse as any).fileUrls;
+        } else if ((uploadResponse as any)?.files && Array.isArray((uploadResponse as any).files)) {
+          newlyUploadedUrls = (uploadResponse as any).files.map((f: any) => f.fileUrl);
+        } else if (
+          (uploadResponse as any)?.data?.fileUrls &&
+          Array.isArray((uploadResponse as any).data.fileUrls)
+        ) {
+          newlyUploadedUrls = (uploadResponse as any).data.fileUrls;
+        }
+
+        // 기존 유지된 URL + 새로 업로드된 URL 합치기
+        const allSamples = [...data.existingSampleUrls, ...newlyUploadedUrls];
+        if (allSamples.length > 0) {
+          // JSON 배열 형태로 저장 (parseSampleUrls에서 지원함)
+          finalSampleUrl = JSON.stringify(allSamples);
+        }
+      } else if (!isSystem) {
+        // 새로 추가된 파일은 없지만 기존 것들 중 유지된 것이 있는 경우
+        if (data.existingSampleUrls.length > 0) {
+          finalSampleUrl = JSON.stringify(data.existingSampleUrls);
         }
       }
 
@@ -97,8 +129,8 @@ export function DocumentSettingView({ title = '문서 설정 관리', sx }: Prop
         // 시스템 정보만 수정
         const params: UpdateSafetySystemDto = {
           guide: guideUrl || selectedRow.guideUrl || undefined,
-          sample: sampleUrl || selectedRow.sampleUrl || undefined,
           isActive: data.status === 'active' ? 1 : 0,
+          systemName: data.documentName,
         };
 
         await updateSystemMutation.mutateAsync({
@@ -127,8 +159,11 @@ export function DocumentSettingView({ title = '문서 설정 관리', sx }: Prop
         const itemParams: UpdateSystemItemDto = {
           safetySystemItemIdx: selectedRow.safetySystemItemIdx,
           guide: guideUrl || selectedRow.guideUrl || undefined,
+          sample:
+            finalSampleUrl !== undefined ? finalSampleUrl : selectedRow.sampleUrl || undefined,
           isActive: data.status === 'active' ? 1 : 0,
           approvalStep: Number(data.approvalStep), // 0/1/2/3
+          documentName: data.documentName,
         };
 
         if (cycleUnit) {
@@ -150,14 +185,38 @@ export function DocumentSettingView({ title = '문서 설정 관리', sx }: Prop
     }
   };
 
+  // 파일 URL을 전체 URL로 변환
+  const getFullFileUrl = (url: string | null | undefined): string | null => {
+    if (!url) return null;
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
+    const path = url.startsWith('/') ? url : `/${url}`;
+    return `${baseUrl}${path}`;
+  };
+
+  // 팝업 창 열기 헬퍼 함수
+  const openPopup = (url: string, name: string) => {
+    const width = 1200;
+    const height = 900;
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+    window.open(
+      url,
+      name,
+      `width=${width},height=${height},left=${left},top=${top},menubar=no,status=no,toolbar=no,scrollbars=yes`
+    );
+  };
+
   return (
     <DashboardContent maxWidth="xl">
       <Typography variant="h4">{title}</Typography>
 
       <DocumentSettingBreadcrumbs
         items={[
-          { label: '대시보드', href: paths.dashboard.root },
-          { label: '설정 및 관리', href: paths.dashboard.systemSetting.root },
+          { label: '대시보드', href: '/admin/dashboard' },
+          { label: '설정 및 관리', href: '/admin/dashboard' },
           { label: title },
         ]}
       />
@@ -197,37 +256,17 @@ export function DocumentSettingView({ title = '문서 설정 관리', sx }: Prop
             rows={logic.paginated}
             onViewGuide={(row) => {
               if (row.guideUrl) {
-                // 파일 URL을 전체 URL로 변환
-                const getFullFileUrl = (url: string | null | undefined): string | null => {
-                  if (!url) return null;
-                  if (url.startsWith('http://') || url.startsWith('https://')) {
-                    return url;
-                  }
-                  const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
-                  const path = url.startsWith('/') ? url : `/${url}`;
-                  return `${baseUrl}${path}`;
-                };
                 const fullUrl = getFullFileUrl(row.guideUrl);
                 if (fullUrl) {
-                  window.open(fullUrl, '_blank');
+                  openPopup(fullUrl, 'guide-popup');
                 }
               }
             }}
             onViewSample={(row) => {
               if (row.sampleUrl) {
-                // 파일 URL을 전체 URL로 변환
-                const getFullFileUrl = (url: string | null | undefined): string | null => {
-                  if (!url) return null;
-                  if (url.startsWith('http://') || url.startsWith('https://')) {
-                    return url;
-                  }
-                  const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
-                  const path = url.startsWith('/') ? url : `/${url}`;
-                  return `${baseUrl}${path}`;
-                };
                 const fullUrl = getFullFileUrl(row.sampleUrl);
                 if (fullUrl) {
-                  window.open(fullUrl, '_blank');
+                  openPopup(fullUrl, 'sample-popup');
                 }
               }
             }}

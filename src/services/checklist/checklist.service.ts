@@ -18,6 +18,12 @@ import type {
   GetDisasterFactorsResponse,
   SaveDisasterFactorsParams,
   SaveDisasterFactorsResponse,
+  CreateDisasterFactorParams,
+  CreateDisasterFactorResponse,
+  UpdateDisasterFactorParams,
+  UpdateDisasterFactorResponse,
+  DeleteDisasterFactorParams,
+  DeleteDisasterFactorResponse,
 } from './checklist.types';
 
 // ----------------------------------------------------------------------
@@ -26,9 +32,7 @@ import type {
  * 체크리스트 목록 조회
  * GET /checklists
  */
-export async function getChecklists(
-  params: GetChecklistsParams
-): Promise<GetChecklistsResponse> {
+export async function getChecklists(params: GetChecklistsParams): Promise<GetChecklistsResponse> {
   const { data } = await axiosInstance.get<GetChecklistsResponse>('/checklists', { params });
   return data;
 }
@@ -126,16 +130,59 @@ export async function getDisasterFactors(
 }
 
 /**
- * 재해유발요인 목록 저장
- * POST /checklists/{checklistIdx}/disaster-factors
+ * 재해유발요인 목록 전체 저장 (전체 교체)
+ * PUT /checklists/{checklistIdx}/disaster-factors
  */
 export async function saveDisasterFactors(
   params: SaveDisasterFactorsParams
 ): Promise<SaveDisasterFactorsResponse> {
   const { checklistIdx, ...body } = params;
-  const { data } = await axiosInstance.post<SaveDisasterFactorsResponse>(
+  const { data } = await axiosInstance.put<SaveDisasterFactorsResponse>(
     `/checklists/${checklistIdx}/disaster-factors`,
     body
+  );
+  return data;
+}
+
+/**
+ * 재해유발요인 개별 생성
+ * POST /checklists/disaster-factors
+ */
+export async function createDisasterFactor(
+  params: CreateDisasterFactorParams
+): Promise<CreateDisasterFactorResponse> {
+  const { data } = await axiosInstance.post<CreateDisasterFactorResponse>(
+    '/checklists/disaster-factors',
+    params
+  );
+  return data;
+}
+
+/**
+ * 재해유발요인 개별 수정
+ * PATCH /checklists/disaster-factors/{disasterFactorIdx}
+ */
+export async function updateDisasterFactor(
+  params: UpdateDisasterFactorParams
+): Promise<UpdateDisasterFactorResponse> {
+  const { disasterFactorIdx, ...body } = params;
+  const { data } = await axiosInstance.patch<UpdateDisasterFactorResponse>(
+    `/checklists/disaster-factors/${disasterFactorIdx}`,
+    body
+  );
+  return data;
+}
+
+/**
+ * 재해유발요인 개별 삭제 (Soft Delete)
+ * DELETE /checklists/disaster-factors/{disasterFactorIdx}
+ */
+export async function deleteDisasterFactor(
+  params: DeleteDisasterFactorParams
+): Promise<DeleteDisasterFactorResponse> {
+  const { disasterFactorIdx } = params;
+  const { data } = await axiosInstance.delete<DeleteDisasterFactorResponse>(
+    `/checklists/disaster-factors/${disasterFactorIdx}`
   );
   return data;
 }

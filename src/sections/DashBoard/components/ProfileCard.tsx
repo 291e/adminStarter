@@ -1,3 +1,7 @@
+import { useRef, useState, useMemo } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Avatar from '@mui/material/Avatar';
@@ -7,6 +11,9 @@ import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 
 import { Iconify } from 'src/components/iconify';
+import { CONFIG } from 'src/global-config';
+import { uploadFile } from 'src/services/system/system.service';
+import { updateMyInfo } from 'src/services/member/member.service';
 
 // ----------------------------------------------------------------------
 
@@ -39,19 +46,155 @@ type Props = {
   label: string;
   roles: string[];
   educationRate: number;
+  memberThumbnail?: string;
   onViewDetail?: () => void;
+  isSuperAdmin?: boolean;
 };
 
-export default function ProfileCard({ name, label, roles, educationRate, onViewDetail }: Props) {
-  // label을 한글로 변환
-  const labelKorean = getRoleLabel(label);
+export default function ProfileCard({
+  name,
+  label,
+  roles,
+  educationRate,
+  memberThumbnail,
+  onViewDetail,
+  isSuperAdmin,
+}: Props) {
+  const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  // label을 한글로 변환 (슈퍼어드민이면 '최고관리자')
+  const labelKorean = isSuperAdmin ? '최고관리자' : getRoleLabel(label);
+
+  // 파일 URL을 전체 URL로 변환하는 헬퍼 함수
+  const getFullFileUrl = (url: string | null | undefined): string | null => {
+    if (!url) return null;
+    // 잘못된 형식: data:image/png;base64,data/admin/... 같은 경우 처리
+    if (
+      url.startsWith('data:image/png;base64,data/admin/') ||
+      url.startsWith('data:image/png;base64,/data/admin/')
+    ) {
+      // base64 접두사를 제거하고 URL로 처리
+      const cleanUrl = url.replace(/^data:image\/png;base64,/, '');
+      const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
+      const path = cleanUrl.startsWith('/') ? cleanUrl : `/${cleanUrl}`;
+      return `${baseUrl}${path}`;
+    }
+    // 이미 전체 URL인 경우 (http:// 또는 https://로 시작)
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    // base64 데이터 URL인 경우 그대로 반환 (실제 base64 데이터인 경우)
+    if (url.startsWith('data:image/') && !url.includes('data/admin/')) {
+      return url;
+    }
+    // 상대 경로인 경우 CONFIG.serverUrl과 결합
+    // data/admin/로 시작하는 경우도 처리
+    const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
+    const path = url.startsWith('/') ? url : `/${url}`;
+    return `${baseUrl}${path}`;
+  };
+
+  // 프로필 이미지 전체 URL
+  const profileImageUrl = useMemo(() => getFullFileUrl(memberThumbnail), [memberThumbnail]);
+
+  // 내 정보 수정 Mutation
+  const updateMyInfoMutation = useMutation({
+    mutationFn: (params: { memberThumbnail: string }) => updateMyInfo(params),
+    onSuccess: () => {
+      toast.success('프로필 사진이 업데이트되었습니다.');
+      queryClient.invalidateQueries({ queryKey: ['myInfo'] });
+      setIsUploading(false);
+    },
+    onError: (error: any) => {
+      const errorMessage =
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '프로필 사진 업데이트에 실패했습니다.';
+      toast.error(errorMessage);
+      setIsUploading(false);
+    },
+  });
+
+  // 파일 선택 핸들러
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+    if (!file.type.startsWith('image/')) {
+      toast.error('이미지 파일만 업로드 가능합니다.');
+      return;
+    }
+
+    setIsUploading(true);
+
+    try {
+      // 파일 업로드
+      const uploadResponse = await uploadFile({ files: [file] });
+
+      // axios 인터셉터가 응답을 평탄화하므로 여러 형태 확인
+      let fileUrl: string | undefined;
+
+      // 형태 1: fileUrls 배열
+      if ((uploadResponse as any)?.fileUrls && Array.isArray((uploadResponse as any).fileUrls)) {
+        fileUrl = (uploadResponse as any).fileUrls[0];
+      }
+      // 형태 2: files 배열에서 fileUrl 추출
+      else if ((uploadResponse as any)?.files && Array.isArray((uploadResponse as any).files)) {
+        fileUrl = (uploadResponse as any).files[0]?.fileUrl;
+      }
+      // 형태 3: data.fileUrls
+      else if (
+        (uploadResponse as any)?.data?.fileUrls &&
+        Array.isArray((uploadResponse as any).data.fileUrls)
+      ) {
+        fileUrl = (uploadResponse as any).data.fileUrls[0];
+      }
+
+      if (!fileUrl) {
+        throw new Error('파일 업로드에 실패했습니다.');
+      }
+
+      // 내 정보 수정 API 호출 - memberThumbnail만 포함
+      await updateMyInfoMutation.mutateAsync({
+        memberThumbnail: fileUrl,
+      } as { memberThumbnail: string });
+    } catch (error: any) {
+      const errorMessage =
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '파일 업로드에 실패했습니다.';
+      toast.error(errorMessage);
+      setIsUploading(false);
+    } finally {
+      // 파일 입력 초기화
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  // 아바타 클릭 핸들러
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  // IconButton 클릭 핸들러
+  const handleIconButtonClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    fileInputRef.current?.click();
+  };
 
   return (
     <Box
       sx={{
         bgcolor: 'background.paper',
         borderRadius: { xs: 2, sm: 2.5 },
-        p: { xs: 2, sm: 2.5 },
+        pb: { xs: 2, sm: 2.5 },
+        px: { xs: 2, sm: 2.5 },
+        pt: { xs: 4, sm: 5 },
         display: 'flex',
         flexDirection: { xs: 'column', sm: 'row' },
         gap: { xs: 2, sm: 3.5 },
@@ -62,15 +205,30 @@ export default function ProfileCard({ name, label, roles, educationRate, onViewD
     >
       {/* 프로필 아바타 */}
       <Box sx={{ position: 'relative', flexShrink: 0 }}>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={handleFileSelect}
+        />
         <Avatar
+          src={profileImageUrl || undefined}
+          onClick={handleAvatarClick}
           sx={{
             width: { xs: 80, sm: 96 },
             height: { xs: 80, sm: 96 },
+            cursor: 'pointer',
+            '&:hover': {
+              opacity: 0.8,
+            },
           }}
         >
           {name[0]}
         </Avatar>
         <IconButton
+          onClick={handleIconButtonClick}
+          disabled={isUploading}
           sx={{
             position: 'absolute',
             left: { xs: 52, sm: 64 },
@@ -83,6 +241,9 @@ export default function ProfileCard({ name, label, roles, educationRate, onViewD
             boxShadow: 2,
             '&:hover': {
               bgcolor: 'text.primary',
+            },
+            '&:disabled': {
+              opacity: 0.6,
             },
           }}
         >

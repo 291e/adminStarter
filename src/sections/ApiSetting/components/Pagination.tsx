@@ -70,7 +70,7 @@ export default function ApiSettingPagination({
       </FormControl>
 
       <Typography variant="body2">
-        {start}-{end} of {count}
+        {start}-{end} / {count}
       </Typography>
 
       <Stack direction="row" spacing={0}>
@@ -98,4 +98,3 @@ export default function ApiSettingPagination({
     </Box>
   );
 }
-

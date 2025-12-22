@@ -6,7 +6,7 @@ import ListItemText from '@mui/material/ListItemText';
 import ListItemAvatar from '@mui/material/ListItemAvatar';
 import ListItemButton from '@mui/material/ListItemButton';
 
-import { fToNow } from 'src/utils/format-time';
+import { fDate } from 'src/utils/format-time';
 
 import { Label } from 'src/components/label';
 import { FileThumbnail } from 'src/components/file-thumbnail';
@@ -24,7 +24,15 @@ export type NotificationItemProps = {
     isUnRead: boolean;
     avatarUrl: string | null;
     createdAt: string | number | null;
+    documentInfo?: {
+      safetySystemDocumentIdx: number;
+      documentName: string;
+      organizationName: string;
+      approvalDeadline: string;
+      isPublished: number;
+    };
   };
+  onMarkAsRead?: (notificationId: string) => void;
 };
 
 const readerContent = (data: string) => (
@@ -46,7 +54,19 @@ const renderIcon = (type: string) =>
     delivery: notificationIcons.delivery,
   })[type];
 
-export function NotificationItem({ notification }: NotificationItemProps) {
+export function NotificationItem({ notification, onMarkAsRead }: NotificationItemProps) {
+  const handleClick = () => {
+    // 읽지 않은 알림인 경우 읽음 처리
+    if (notification.isUnRead && onMarkAsRead) {
+      onMarkAsRead(notification.id);
+    }
+
+    // 문서 정보가 있으면 해당 문서 페이지로 이동
+    if (notification.documentInfo) {
+      // TODO: 문서 상세 페이지로 이동하는 로직 추가
+      // 예: navigate(`/dashboard/pdf/risk-2200/${notification.documentInfo.safetySystemDocumentIdx}`);
+    }
+  };
   const renderAvatar = () => (
     <ListItemAvatar>
       {notification.avatarUrl ? (
@@ -74,7 +94,7 @@ export function NotificationItem({ notification }: NotificationItemProps) {
       primary={readerContent(notification.title)}
       secondary={
         <>
-          {fToNow(notification.createdAt)}
+          {notification.createdAt ? fDate(notification.createdAt, 'YYYY-MM-DD') : '-'}
           <Box
             component="span"
             sx={{ width: 2, height: 2, borderRadius: '50%', bgcolor: 'currentColor' }}
@@ -220,6 +240,7 @@ export function NotificationItem({ notification }: NotificationItemProps) {
   return (
     <ListItemButton
       disableRipple
+      onClick={handleClick}
       sx={[
         (theme) => ({
           p: 2.5,

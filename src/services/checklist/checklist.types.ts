@@ -116,11 +116,65 @@ export type DisasterFactorItem = {
   name?: string; // UI에서 사용하는 이름 (factorName과 동일)
 };
 
-// 재해유발요인 목록 저장 파라미터
+// 재해유발요인 목록 전체 저장 파라미터 (PUT)
 export type SaveDisasterFactorsParams = {
   checklistIdx: number;
   disasterFactorList: DisasterFactorItem[];
 };
 
-// 재해유발요인 목록 저장 응답
-export type SaveDisasterFactorsResponse = BaseResponseDto;
+// 재해유발요인 목록 전체 저장 응답
+export type SaveDisasterFactorsResponse = BaseResponseDto & {
+  addedCount?: number;
+  updatedCount?: number;
+};
+
+// 재해유발요인 개별 생성 파라미터 (POST)
+export type CreateDisasterFactorParams = {
+  checklistIdx: number;
+  factorName: string;
+  description?: string;
+  isActive?: number; // 0: 비활성, 1: 활성 (기본값: 1)
+};
+
+// 재해유발요인 개별 생성 응답
+export type CreateDisasterFactorResponse = {
+  disasterFactorIdx: number;
+  checklistIdx: number;
+  factorName: string;
+  description?: string;
+  isActive: number;
+  createAt: string;
+  updateAt: string;
+  deletedAt?: string | null;
+};
+
+// 재해유발요인 개별 수정 파라미터 (PATCH)
+export type UpdateDisasterFactorParams = {
+  disasterFactorIdx: number;
+  factorName?: string;
+  description?: string;
+  isActive?: number; // 0: 비활성, 1: 활성
+};
+
+// 재해유발요인 개별 수정 응답
+export type UpdateDisasterFactorResponse = {
+  disasterFactorIdx: number;
+  checklistIdx: number;
+  factorName: string;
+  description?: string;
+  isActive: number;
+  createAt: string;
+  updateAt: string;
+  deletedAt?: string | null;
+};
+
+// 재해유발요인 개별 삭제 파라미터 (DELETE)
+export type DeleteDisasterFactorParams = {
+  disasterFactorIdx: number;
+};
+
+// 재해유발요인 개별 삭제 응답
+export type DeleteDisasterFactorResponse = {
+  success: boolean;
+  message?: string;
+};

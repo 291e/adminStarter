@@ -52,7 +52,7 @@ export default function EducationReportFilters({
         >
           <MenuItem value="all">전체</MenuItem>
           <MenuItem value="name">이름</MenuItem>
-          <MenuItem value="department">소속</MenuItem>
+          <MenuItem value="department">소속팀</MenuItem>
         </Select>
       </FormControl>
 
@@ -65,7 +65,7 @@ export default function EducationReportFilters({
         InputProps={{
           startAdornment: (
             <InputAdornment position="start">
-              <Iconify icon="eva:search-fill" width={24} />
+              <Iconify icon="eva:search-fill" width={24} sx={{ color: 'primary.main' }} />
             </InputAdornment>
           ),
         }}

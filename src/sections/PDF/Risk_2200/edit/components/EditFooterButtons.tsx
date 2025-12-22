@@ -38,23 +38,6 @@ export default function EditFooterButtons({ onSave, onTemporarySave, onCancel }:
         수정
       </Button>
       <Button
-        variant="contained"
-        size="large"
-        onClick={onTemporarySave}
-        sx={{
-          bgcolor: 'warning.main',
-          color: 'warning.contrastText',
-          minHeight: 48,
-          fontSize: 15,
-          fontWeight: 700,
-          lineHeight: '26px',
-          px: 2,
-          py: 1,
-        }}
-      >
-        임시 저장
-      </Button>
-      <Button
         variant="outlined"
         size="large"
         onClick={onCancel}
@@ -72,6 +55,3 @@ export default function EditFooterButtons({ onSave, onTemporarySave, onCancel }:
     </Box>
   );
 }
-
-
-

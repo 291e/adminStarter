@@ -13,6 +13,7 @@ import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import FormControl from '@mui/material/FormControl';
 import Switch from '@mui/material/Switch';
+import Button from '@mui/material/Button';
 
 import { Iconify } from 'src/components/iconify';
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
@@ -20,7 +21,6 @@ import { usePrioritySettings, useDeletePrioritySetting } from '../../hooks/use-d
 import type { PrioritySetting } from 'src/services/dashboard/dashboard.types';
 import { COLOR_OPTIONS, COLOR_VALUES } from '../constants/colors';
 
-import warningIcon from 'src/assets/icons/safeyoui/warning.svg';
 // ----------------------------------------------------------------------
 
 export type PriorityItem = {
@@ -411,83 +411,48 @@ export default function PrioritySettingsModal({
         maxWidth="xs"
         fullWidth
       >
-        <DialogContent
-          sx={{
-            p: 3,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 2.5,
-          }}
-        >
-          {/* 아이콘 */}
-          <Box
-            sx={{
-              width: 64,
-              height: 64,
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              p: 0,
-            }}
-          >
-            <img src={warningIcon} alt="warning" width={64} height={64} />
-          </Box>
+        <DialogContent>
+          <Stack spacing={2} alignItems="center" sx={{ pt: 2 }}>
+            {/* 경고 아이콘 */}
+            <Box
+              sx={{
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Iconify
+                icon={'solar:danger-circle-bold' as any}
+                width={64}
+                sx={{ color: 'error.main' }}
+              />
+            </Box>
 
-          {/* 텍스트 영역 */}
-          <Stack spacing={1} alignItems="center" sx={{ textAlign: 'center', width: '100%' }}>
-            <Typography
-              variant="h5"
-              sx={{
-                fontSize: 20,
-                fontWeight: 700,
-                lineHeight: '30px',
-                color: 'text.primary',
-              }}
-            >
-              중요도 설정 변경 시
-            </Typography>
-            <Typography
-              variant="subtitle2"
-              sx={{
-                fontSize: 14,
-                fontWeight: 600,
-                lineHeight: '22px',
-                color: 'text.secondary',
-              }}
-            >
-              기존 문서의 중요도 표시가 달라질 수 있습니다.
-            </Typography>
-          </Stack>
-
-          {/* 버튼 영역 */}
-          <Stack direction="row" spacing={1.5} sx={{ width: '100%', mt: 1 }}>
-            <DialogBtn
-              variant="outlined"
-              onClick={() => setConfirmModalOpen(false)}
-              sx={{ flex: 1, minHeight: 36, fontSize: 14 }}
-            >
-              취소
-            </DialogBtn>
-            <DialogBtn
-              variant="contained"
-              onClick={handleConfirmSave}
-              sx={{
-                flex: 1,
-                minHeight: 36,
-                fontSize: 14,
-                bgcolor: 'grey.900',
-                color: 'common.white',
-                '&:hover': {
-                  bgcolor: 'grey.800',
-                },
-              }}
-            >
-              확인
-            </DialogBtn>
+            {/* 메시지 */}
+            <Stack alignItems="center">
+              <Typography sx={{ fontWeight: 700, textAlign: 'center' }}>
+                중요도 설정 변경 시
+              </Typography>
+              <Typography sx={{ fontWeight: 700, textAlign: 'center', mt: 1 }}>
+                기존 문서의 중요도 표시가 달라질 수 있습니다.
+              </Typography>
+            </Stack>
           </Stack>
         </DialogContent>
+
+        <DialogActions sx={{ px: 3, pb: 3, justifyContent: 'center', gap: 1 }}>
+          <Button
+            variant="outlined"
+            onClick={() => setConfirmModalOpen(false)}
+            sx={{ minWidth: 64 }}
+          >
+            취소
+          </Button>
+          <Button variant="contained" onClick={handleConfirmSave} sx={{ minWidth: 64 }}>
+            확인
+          </Button>
+        </DialogActions>
       </Dialog>
     </Dialog>
   );

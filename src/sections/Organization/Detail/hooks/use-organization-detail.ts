@@ -95,6 +95,7 @@ export function useOrganizationDetail(
         updateAt: member.updateAt || '',
 
         lastSigninDate: member.lastSigninAt || null,
+        joinedAt: member.joinedAt || null, // 입사일 추가
         companyIdx: member.companyIdx || companyIdx || 0,
         companyBranchIdx: member.companyBranchIdx || null,
         memberNameOrg: member.memberNameOrg || null,
@@ -106,6 +107,7 @@ export function useOrganizationDetail(
         memberlat: member.memberlat || null,
         memberlng: member.memberlng || null,
         accidentFreeYear: null,
+        standardHours: member.standardHours || null, // 교육 이수 기준시간 추가
         order: page * rowsPerPage + index + 1, // 순번 추가
       })) as (Member & { order: number })[];
     }
@@ -131,6 +133,7 @@ export function useOrganizationDetail(
       createAt: member.createAt || '',
       updateAt: member.updateAt || '',
       lastSigninDate: member.lastSigninDate || null,
+      joinedAt: member.joinedAt || null, // 입사일 추가
       companyIdx: member.companyIdx || companyIdx || 0,
       companyBranchIdx: member.companyBranchIdx || null,
       memberNameOrg: member.memberNameOrg || null,
@@ -142,6 +145,7 @@ export function useOrganizationDetail(
       memberlat: null,
       memberlng: null,
       accidentFreeYear: null,
+      standardHours: member.standardHours || null, // 교육 이수 기준시간 추가
       order: page * rowsPerPage + index + 1, // 순번 추가
     })) as (Member & { order: number })[];
   }, [membersData, companyMemberList, page, rowsPerPage, companyIdx]);

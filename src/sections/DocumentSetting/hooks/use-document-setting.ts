@@ -99,12 +99,12 @@ function mapItemToDocumentItem(system: SafetySystem, item: SafetySystemItem): Do
     name: item.itemName || item.documentName || '',
     period: mapCycleToPeriod(item.writingCycle),
     hasGuide: !!item.guide,
-    hasSample: false, // SafetySystemItem에는 샘플이 없음
+    hasSample: !!item.sample,
     isActive: item.isActive === 1,
     safetyIdx: system.safetyIdx,
     safetySystemItemIdx: item.safetySystemItemIdx,
     guideUrl: item.guide ?? null,
-    sampleUrl: null, // SafetySystemItem에는 샘플이 없음
+    sampleUrl: item.sample ?? null,
     approvalStep: item.approvalStep ?? 0, // 기본값 0
   };
 }

@@ -50,7 +50,7 @@ export type GetRiskReportsResponse = BaseResponseDto<{
 
 // 위험 보고 등록 요청 파라미터
 export type CreateRiskReportParams = {
-  title: string;
+  title?: string;
   location: string;
   content: string;
   imageUrl?: string;

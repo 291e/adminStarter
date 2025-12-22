@@ -18,6 +18,7 @@ import Box from '@mui/material/Box';
 import Pagination from '@mui/material/Pagination';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
+import TextField from '@mui/material/TextField';
 
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
 import { Iconify } from 'src/components/iconify';
@@ -70,6 +71,7 @@ type Props = {
 
 export default function CreateChatRoomModal({ open, onClose, onConfirm }: Props) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [roomName, setRoomName] = useState('');
   const [page, setPage] = useState(1);
   const rowsPerPage = 5;
 
@@ -221,15 +223,19 @@ export default function CreateChatRoomModal({ open, onClose, onConfirm }: Props)
   };
 
   const handleConfirm = () => {
-    onConfirm('', selectedIds);
+    onConfirm(roomName.trim(), selectedIds);
     handleClose();
   };
 
   const handleClose = () => {
     setSelectedIds([]);
+    setRoomName('');
     setPage(1);
     onClose();
   };
+
+  // 2명 이상 선택했는지 확인
+  const shouldShowRoomNameInput = selectedIds.length >= 2;
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
@@ -237,7 +243,28 @@ export default function CreateChatRoomModal({ open, onClose, onConfirm }: Props)
         새로운 채팅
       </DialogTitle>
 
-      <DialogContent sx={{ px: 3, py: 0 }}>
+      {/* 채팅방 이름 입력 필드 (2명 이상 선택 시 표시) */}
+      {shouldShowRoomNameInput && (
+        <Box sx={{ px: 3, pb: 2 }}>
+          <TextField
+            fullWidth
+            label="채팅방 이름"
+            placeholder="채팅방 이름을 입력하세요"
+            value={roomName}
+            onChange={(e) => setRoomName(e.target.value)}
+            slotProps={{
+              inputLabel: { shrink: true },
+            }}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                height: 56,
+              },
+            }}
+          />
+        </Box>
+      )}
+
+      <DialogContent sx={{ px: 0, py: 0 }}>
         {/* 테이블 */}
         {isMembersLoading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
@@ -247,10 +274,9 @@ export default function CreateChatRoomModal({ open, onClose, onConfirm }: Props)
           <TableContainer>
             <Table size="small">
               <TableHead>
-                <TableRow>
+                <TableRow sx={{ bgcolor: '#F4F6F8' }}>
                   <TableCell
                     sx={{
-                      bgcolor: 'grey.50',
                       minWidth: 72,
                       width: 72,
                       px: 1,
@@ -267,7 +293,6 @@ export default function CreateChatRoomModal({ open, onClose, onConfirm }: Props)
                   </TableCell>
                   <TableCell
                     sx={{
-                      bgcolor: 'grey.50',
                       fontSize: 14,
                       fontWeight: 600,
                       lineHeight: '24px',
@@ -280,7 +305,6 @@ export default function CreateChatRoomModal({ open, onClose, onConfirm }: Props)
                   </TableCell>
                   <TableCell
                     sx={{
-                      bgcolor: 'grey.50',
                       fontSize: 14,
                       fontWeight: 600,
                       lineHeight: '24px',
@@ -288,12 +312,12 @@ export default function CreateChatRoomModal({ open, onClose, onConfirm }: Props)
                       px: 2,
                       py: 1.75,
                     }}
+                    align="center"
                   >
-                    소속
+                    소속팀
                   </TableCell>
                   <TableCell
                     sx={{
-                      bgcolor: 'grey.50',
                       fontSize: 14,
                       fontWeight: 600,
                       lineHeight: '24px',
@@ -391,6 +415,7 @@ export default function CreateChatRoomModal({ open, onClose, onConfirm }: Props)
                               lineHeight: '22px',
                               color: 'text.primary',
                             }}
+                            align="center"
                           >
                             {invitableUser.department || '-'}
                           </Typography>
@@ -440,12 +465,15 @@ export default function CreateChatRoomModal({ open, onClose, onConfirm }: Props)
               gap: 1,
               width: '100%',
               py: 2,
+              px: 3,
             }}
           >
             {selectedUsers.map((selectedUser: InvitableUser) => (
               <Chip
                 key={selectedUser.id}
                 label={selectedUser.name}
+                onDelete={() => handleSelectUser(selectedUser.id)}
+                deleteIcon={<Iconify icon="solar:close-circle-bold" width={16} />}
                 size="small"
                 sx={{
                   height: 24,

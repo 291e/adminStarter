@@ -70,8 +70,28 @@ const defaultRows: Table1500Row[] = [
 ];
 
 export default function RiskTable_1_5_1500({ rows = defaultRows }: Props) {
+  // 빈 행 필터링: 모든 필드가 비어있으면 제외
+  const filteredRows = rows.filter(
+    (row) =>
+      row.unit?.trim() ||
+      row.work?.trim() ||
+      row.hazardCode?.trim() ||
+      row.machine?.trim() ||
+      row.machineId?.trim() ||
+      row.chemical?.trim() ||
+      row.casNo?.trim() ||
+      row.accidentForm?.trim() ||
+      row.partner?.trim() ||
+      row.freq?.toString().trim() ||
+      row.sev?.toString().trim() ||
+      row.evalLabel?.trim() ||
+      row.remark?.trim()
+  );
+
   return (
-    <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+    <Box
+      sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', mt: 4 }}
+    >
       <Box sx={{ pb: 5, pt: 0, px: 0, width: '100%' }}>
         <Box
           component="table"
@@ -88,7 +108,6 @@ export default function RiskTable_1_5_1500({ rows = defaultRows }: Props) {
               verticalAlign: 'middle',
             },
             '& th': {
-              backgroundColor: 'grey.100',
               fontSize: 14,
               fontWeight: 600,
               lineHeight: '22px',
@@ -100,12 +119,18 @@ export default function RiskTable_1_5_1500({ rows = defaultRows }: Props) {
               lineHeight: '22px',
               whiteSpace: 'pre-wrap',
             },
+            '& tbody tr': {
+              pageBreakInside: 'avoid',
+              breakInside: 'avoid',
+            },
           }}
         >
           <thead>
             <tr style={{ height: 60 }}>
               <th rowSpan={2} style={{ width: 94 }}>
-                단위작업장소
+                단위
+                <br />
+                작업장소
               </th>
               <th rowSpan={2} style={{ width: 99 }}>
                 작업내용
@@ -114,7 +139,7 @@ export default function RiskTable_1_5_1500({ rows = defaultRows }: Props) {
                 위험코드
               </th>
               <th colSpan={2} style={{ width: 203 }}>
-                기계·기구·설비
+                관련기계·기구·설비
               </th>
               <th colSpan={2} style={{ width: 200 }}>
                 화학물질
@@ -125,7 +150,9 @@ export default function RiskTable_1_5_1500({ rows = defaultRows }: Props) {
                 재해형태
               </th>
               <th rowSpan={2} style={{ width: 92 }}>
-                관련 협력업체
+                관련
+                <br />
+                협력업체
               </th>
               <th colSpan={3} style={{ width: 240 }}>
                 위험성 평가
@@ -149,7 +176,7 @@ export default function RiskTable_1_5_1500({ rows = defaultRows }: Props) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((r, i) => (
+            {filteredRows.map((r, i) => (
               <tr key={i} style={{ height: i === 0 ? 96 : i === 1 ? 72 : 48 }}>
                 <td>
                   <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{r.unit}</Typography>
@@ -185,7 +212,23 @@ export default function RiskTable_1_5_1500({ rows = defaultRows }: Props) {
                   <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{r.sev}</Typography>
                 </td>
                 <td>
-                  <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{r.evalLabel}</Typography>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    <Typography sx={{ fontSize: 14, fontWeight: 400 }}>
+                      {r.evalLabel?.split(' ')[0] || ''}
+                    </Typography>
+                    {r.evalLabel?.includes('(') && (
+                      <Typography
+                        sx={{
+                          fontSize: 12,
+                          fontWeight: 400,
+                          color: 'text.secondary',
+                          textAlign: 'center',
+                        }}
+                      >
+                        {r.evalLabel.substring(r.evalLabel.indexOf('('))}
+                      </Typography>
+                    )}
+                  </Box>
                 </td>
                 <td>
                   <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{r.remark}</Typography>

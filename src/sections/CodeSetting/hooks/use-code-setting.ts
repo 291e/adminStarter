@@ -33,10 +33,10 @@ export type UseCodeSettingResult = {
 
 export function useCodeSetting(codes: CodeSetting[], category: string): UseCodeSettingResult {
   const [filters, setFilters] = useState<CodeSettingFilters>({
-    status: '',
+    status: 'all',
     startDate: null,
     endDate: null,
-    searchFilter: '',
+    searchFilter: 'all',
     searchValue: '',
     categoryFilter: 'all',
   });
@@ -85,10 +85,10 @@ export function useCodeSetting(codes: CodeSetting[], category: string): UseCodeS
   // 카테고리 변경 시 필터 초기화
   useEffect(() => {
     setFilters({
-      status: '',
+      status: 'all',
       startDate: null,
       endDate: null,
-      searchFilter: '',
+      searchFilter: 'all',
       searchValue: '',
       categoryFilter: 'all',
     });
@@ -109,7 +109,7 @@ export function useCodeSetting(codes: CodeSetting[], category: string): UseCodeS
         }
 
         // 상태 필터 (대소문자 모두 지원)
-        if (filters.status) {
+        if (filters.status && filters.status !== 'all') {
           const statusUpper = c.status?.toUpperCase();
           if (filters.status === '활성' && statusUpper !== 'ACTIVE') {
             return false;
@@ -148,8 +148,8 @@ export function useCodeSetting(codes: CodeSetting[], category: string): UseCodeS
         const searchLower = filters.searchValue.toLowerCase();
         let searchMatch = false;
 
-        if (!filters.searchFilter) {
-          // 검색어 필터가 없으면 코드와 이름 모두 검색
+        if (!filters.searchFilter || filters.searchFilter === 'all') {
+          // 검색어 필터가 없거나 'all'이면 코드와 이름 모두 검색
           searchMatch =
             c.code.toLowerCase().includes(searchLower) ||
             c.name.toLowerCase().includes(searchLower);

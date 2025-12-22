@@ -10,9 +10,9 @@ type Props = {
   writerIp?: string;
   registeredAt?: string;
   modifiedAt?: string;
-  documentDate: Dayjs | null;
+  documentWrittenAt: Dayjs | null;
   approvalDeadline: Dayjs | null;
-  onDocumentDateChange: (date: Dayjs | null) => void;
+  onDocumentWrittenAtChange: (date: Dayjs | null) => void;
   onApprovalDeadlineChange: (date: Dayjs | null) => void;
   onSendNotification?: () => void;
 };
@@ -22,9 +22,9 @@ export default function EditDocumentInfo({
   writerIp,
   registeredAt,
   modifiedAt,
-  documentDate,
+  documentWrittenAt,
   approvalDeadline,
-  onDocumentDateChange,
+  onDocumentWrittenAtChange,
   onApprovalDeadlineChange,
   onSendNotification,
 }: Props) {
@@ -86,8 +86,8 @@ export default function EditDocumentInfo({
             문서 작성일
           </Typography>
           <DatePicker
-            value={documentDate}
-            onChange={onDocumentDateChange}
+            value={documentWrittenAt}
+            onChange={onDocumentWrittenAtChange}
             format="YYYY-MM-DD"
             slotProps={{
               textField: {
@@ -123,31 +123,7 @@ export default function EditDocumentInfo({
             }}
           />
         </Box>
-        {onSendNotification && (
-          <Box>
-            <button
-              onClick={onSendNotification}
-              style={{
-                backgroundColor: '#2563e9',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                padding: '4px 8px',
-                fontSize: '13px',
-                fontWeight: 700,
-                lineHeight: '22px',
-                cursor: 'pointer',
-                minHeight: '30px',
-              }}
-            >
-              알림 보내기
-            </button>
-          </Box>
-        )}
       </Box>
     </Box>
   );
 }
-
-
-

@@ -12,6 +12,7 @@ export type SafetySystem = {
   sample?: string | null;
   guide?: string | null;
   documentCount: number; // 모든 아이템의 문서 수 합계
+  isActive?: number; // 활성화 여부 (0: 비활성, 1: 활성)
   itemList?: SafetySystemItem[]; // API 응답 필드
   items?: SafetySystemItem[]; // UI 호환성을 위한 필드 (itemList의 별칭)
 };
@@ -51,6 +52,7 @@ export type SafetySystemItem = {
   writingCycle: string; // "년", "반기", "분기" 등
   status: 'NORMAL' | 'ALWAYS' | 'APPROACHING' | 'OVERDUE' | string;
   guide?: string | null;
+  sample?: string | null;
   isActive: number;
   approvalStep?: number; // 결재 단계 (0: 없음, 1: 승인만, 2: 작성+승인, 3: 작성+검토+승인)
   documentList?: SafetySystemDocument[]; // 문서 목록
@@ -72,6 +74,7 @@ export type UpdateSystemItemDto = {
   cycleUnit?: 'YEAR' | 'IMMEDIATE' | 'HALF' | 'QUARTER' | 'DAY' | 'WEEK' | 'ALWAYS'; // 주기 단위
   status?: 'NORMAL' | 'ALWAYS' | 'APPROACHING' | 'OVERDUE'; // 아이템 상태
   guide?: string; // 가이드 파일 URL
+  sample?: string; // 샘플 파일 URL
   isActive?: number; // 활성 여부 (1: 활성, 0: 비활성)
   approvalStep?: number; // 결재 단계 (0: 없음, 1: 승인만, 2: 작성+승인, 3: 작성+검토+승인)
 };
@@ -106,6 +109,7 @@ export type CreateSafetySystemDocumentDto = {
   organizationName: string;
   documentName: string;
   tableData?: string; // JSON string
+  workerList?: WorkerTargetDto[]; // 근로자 목록 (선택적) - 문서 생성 시 함께 등록
 };
 
 // 문서 등록 응답
@@ -179,6 +183,10 @@ export type DocumentSignatureInfo = {
   targetMemberIdx: number;
   memberName: string;
   memberEmail?: string;
+  memberRole?: string; // 멤버 역할 (WORKER, SAFETY_MANAGER 등)
+  isSuperAdmin?: boolean; // 슴퍼어드민 여부
+  position?: string; // 직급
+  department?: string; // 소속팀
   approvalStep: number; // 1: 승인, 2: 작성, 3: 검토
   approvalOrder?: number; // 결재 순서
   approvalType: 'SEQUENTIAL' | 'PARALLEL'; // 순차 결재 | 병렬 결재
@@ -187,6 +195,22 @@ export type DocumentSignatureInfo = {
   approvedAt?: string; // 승인일 (ISO 문자열)
   createAt: string; // 생성일 (ISO 문자열)
   description?: string; // 설명
+};
+
+// 근로자 서명 현황 정보 (추가된 타입)
+export type WorkerSignatureStatusInfo = {
+  workerSignatureIdx: number;
+  targetMemberIdx: number;
+  memberName: string;
+  memberEmail?: string;
+  memberRole?: string; // 멤버 역할 (WORKER, SAFETY_MANAGER 등)
+  isSuperAdmin?: boolean; // 슴퍼어드민 여부
+  position?: string; // 직급
+  department?: string; // 소속팀
+  status: 'SIGNED' | 'PENDING' | 'WATCHED' | 'WATCHING'; // 서명 상태
+  signatureData?: string; // Base64 서명 데이터
+  signedAt?: string; // 서명일 (ISO 문자열)
+  createAt: string; // 생성일 (ISO 문자열)
 };
 
 // ----------------------------------------------------------------------
@@ -203,6 +227,35 @@ export type PublishDocumentDto = {
   priorityIdx: number; // 중요도 설정 Index (PrioritySetting.priorityIdx)
   isPublished: number; // 게시 여부 (0: 미게시, 1: 게시)
   documentName?: string; // 문서명 (게시 시 문서명 수정 가능)
+};
+
+// ----------------------------------------------------------------------
+// 근로자 서명 (Worker Signature)
+// ----------------------------------------------------------------------
+
+// 근로자 대상자 DTO
+export type WorkerTargetDto = {
+  targetMemberIdx: number; // 근로자 Index (필수)
+  vodIdx?: number; // 교육 영상 Index (VOD) (선택)
+};
+
+// 근로자 대상자 등록 요청
+export type CreateWorkerSignatureDto = {
+  workerList: WorkerTargetDto[]; // 근로자 목록 (targetMemberIdx와 vodIdx를 함께 지정)
+};
+
+// 근로자 서명 등록 요청
+export type AddWorkerSignatureDto = {
+  signatureData: string; // 서명 데이터 (Base64) (필수)
+  description?: string; // 설명 (선택)
+};
+
+// 교육 영상 시청 진행률 업데이트 요청
+export type UpdateWorkerSignatureWatchDto = {
+  watchProgress?: number; // 시청 진행률 (0-100) - 선택적, currentTime과 duration이 있으면 자동 계산
+  currentTime?: number; // 현재 재생 시간 (초) - watchProgress 대신 사용 가능
+  duration?: number; // 비디오 전체 길이 (초) - currentTime과 함께 사용
+  isCompleted?: number; // 시청 완료 여부 (true인 경우 자동으로 100% 처리)
 };
 
 // ----------------------------------------------------------------------
@@ -223,3 +276,94 @@ export type ChemicalListResponseDto = BaseResponseDto<{
   numOfRows: number;
   totalCount: number;
 }>;
+
+// 화학물질 검색 요약 파라미터
+export type GetChemicalSummaryParams = {
+  search: string;
+};
+
+// 화학물질 검색 요약 응답
+export type ChemicalSummaryData = {
+  chemId: string;
+  chemicalName: string;
+  chemicalFormula: string | null;
+  casNo: string;
+  explosionLowerLimit: string;
+  explosionUpperLimit: string;
+  exposureStandard: string;
+  flashPoint: string;
+  autoIgnitionTemperature: string;
+  hazardClassification: string;
+  regulationOsha: string;
+  dailyUsage: string | null;
+  storageAmount: string;
+};
+
+export type ChemicalSummaryResponseDto = BaseResponseDto<ChemicalSummaryData>;
+
+// ----------------------------------------------------------------------
+// 위험성 평가 기준 (Risk Assessment Criteria)
+// ----------------------------------------------------------------------
+
+// 빈도 항목
+export type FrequencyItemDto = {
+  value: number; // 빈도 값
+  label: string; // 빈도 라벨
+};
+
+// 심각도 항목
+export type SeverityItemDto = {
+  value: number; // 심각도 값
+  label: string; // 심각도 라벨
+};
+
+// 위험도 레벨 항목
+export type RiskLevelItemDto = {
+  minValue?: number | null; // 최솟값 (null이면 무한대)
+  maxValue?: number | null; // 최댓값 (null이면 무한대)
+  label: string; // 위험도 라벨
+  isActive?: number; // 활성화 여부 (0: 비활성, 1: 활성)
+  riskAssessmentLevelIdx?: number; // 위험도 레벨 Index (응답에 포함)
+};
+
+// 위험성 평가 기준 조회 응답
+export type RiskAssessmentCriteriaResponseDto = {
+  header: {
+    isSuccess: boolean;
+    resultCode: Record<string, unknown>;
+    resultMessage: string;
+    timestamp: string;
+  };
+  riskAssessmentCriteriaIdx?: number;
+  frequencyMin: number;
+  frequencyMax: number;
+  severityMin: number;
+  severityMax: number;
+  frequencyList: string[] | FrequencyItemDto[]; // JSON 문자열 배열 또는 객체 배열
+  severityList: string[] | SeverityItemDto[]; // JSON 문자열 배열 또는 객체 배열
+  riskLevelList: string[] | RiskLevelItemDto[]; // JSON 문자열 배열 또는 객체 배열
+  createAt?: string;
+  updateAt?: string;
+};
+
+// 위험성 평가 기준 생성 요청
+export type CreateRiskAssessmentCriteriaDto = {
+  frequencyMin: number;
+  frequencyMax: number;
+  severityMin: number;
+  severityMax: number;
+  frequencyList: FrequencyItemDto[];
+  severityList: SeverityItemDto[];
+  riskLevelList: RiskLevelItemDto[];
+};
+
+// 위험성 평가 기준 수정 요청
+export type UpdateRiskAssessmentCriteriaDto = {
+  frequencyMin?: number;
+  frequencyMax?: number;
+  severityMin?: number;
+  severityMax?: number;
+  frequencyList?: FrequencyItemDto[];
+  severityList?: SeverityItemDto[];
+  riskLevelList?: RiskLevelItemDto[];
+};

@@ -4,6 +4,7 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import Stack from '@mui/material/Stack';
+import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
 import RadioGroup from '@mui/material/RadioGroup';
 import FormControlLabel from '@mui/material/FormControlLabel';
@@ -37,6 +38,7 @@ export type RiskReportFormData = {
   location: string;
   content: string;
   images: File[];
+  uploadedImageUrls?: string[]; // 이미 업로드된 이미지 URL
   signalType: string;
   sourceType: string;
   description: string;
@@ -70,6 +72,7 @@ export default function RiskReportForm({
     location: initialData?.location || '',
     content: initialData?.content || '',
     images: initialData?.images || [],
+    uploadedImageUrls: [], // 업로드된 이미지 URL 저장
     signalType: initialData?.signalType || '',
     sourceType: initialData?.sourceType || '',
     description: initialData?.description || '',
@@ -159,8 +162,6 @@ export default function RiskReportForm({
         boxShadow: (theme) => theme.customShadows.card,
         overflow: 'hidden',
         width: '100%',
-        maxWidth: 'sm',
-        mx: 'auto',
       }}
     >
       {/* 헤더 */}
@@ -178,141 +179,86 @@ export default function RiskReportForm({
 
       {/* 폼 내용 */}
       <Box sx={{ p: 3 }}>
-        <Stack spacing={3}>
-          {/* 제목 */}
-          <Box>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>
-              제목
-            </Typography>
-            <TextField
-              fullWidth
-              placeholder="사고 상황을 입력하세요"
-              value={formData.title}
-              onChange={(e) => handleChange('title', e.target.value)}
+        <Grid container spacing={3}>
+          {/* 왼쪽: 이미지 업로드 */}
+          <Grid size={{ xs: 12, md: 5 }}>
+            <ImageUpload
+              images={formData.images}
+              onChange={(images) => handleChange('images', images)}
+              existingImageUrls={existingImageUrls}
+              onRemoveExistingUrl={(url) => {
+                setExistingImageUrls((prev) => prev.filter((u) => u !== url));
+              }}
+              onUploadedUrls={(urls) => handleChange('uploadedImageUrls', urls)}
             />
-          </Box>
+          </Grid>
 
-          {/* 이미지 업로드 */}
-          <ImageUpload
-            images={formData.images}
-            onChange={(images) => handleChange('images', images)}
-            existingImageUrls={existingImageUrls}
-            onRemoveExistingUrl={(url) => {
-              setExistingImageUrls((prev) => prev.filter((u) => u !== url));
-            }}
-          />
-
-          {/* 위치 */}
-          <Box>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
-              위치
-            </Typography>
-
-            <Stack spacing={2}>
-              <TextField
-                inputRef={addressInputRef}
-                fullWidth
-                placeholder="주소"
-                value={address}
-                onClick={handleAddressFieldClick}
-                InputProps={{
-                  readOnly: true,
-                }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    cursor: 'pointer',
-                  },
-                }}
-              />
+          {/* 오른쪽: 입력 필드들 */}
+          <Grid size={{ xs: 12, md: 7 }}>
+            <Stack spacing={3}>
+              {/* 첫 번째 행: 위치 */}
               <Box>
-                <TextField
-                  fullWidth
-                  placeholder="상세 주소"
-                  value={detailAddress}
-                  onChange={(e) => {
-                    setDetailAddress(e.target.value);
-                    updateLocation(address, e.target.value);
-                  }}
-                />
-                <Stack
-                  direction="row"
-                  spacing={1}
-                  alignItems="flex-start"
-                  sx={{ mt: 1.5, px: 1.5 }}
-                >
-                  <Iconify
-                    icon="solar:info-circle-bold"
-                    width={16}
-                    sx={{ color: 'text.secondary', mt: 0.25 }}
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
+                  위치
+                </Typography>
+
+                <Stack spacing={2}>
+                  <TextField
+                    inputRef={addressInputRef}
+                    fullWidth
+                    placeholder="주소"
+                    value={address}
+                    onClick={handleAddressFieldClick}
+                    InputProps={{
+                      readOnly: true,
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        cursor: 'pointer',
+                      },
+                    }}
                   />
-                  <Typography variant="caption" color="text.secondary">
-                    단위 작업장소를 함께 입력해 주세요. (예: 1공장, 2층 조립라인, 도장작업장 등)
-                  </Typography>
+                  <Box>
+                    <TextField
+                      fullWidth
+                      placeholder="상세 주소"
+                      value={detailAddress}
+                      onChange={(e) => {
+                        setDetailAddress(e.target.value);
+                        updateLocation(address, e.target.value);
+                      }}
+                    />
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      alignItems="flex-start"
+                      sx={{ mt: 1.5, px: 1.5 }}
+                    >
+                      <Iconify
+                        icon="solar:info-circle-bold"
+                        width={16}
+                        sx={{ color: 'text.secondary', mt: 0.25 }}
+                      />
+                      <Typography variant="caption" color="text.secondary">
+                        단위 작업장소를 함께 입력해 주세요. (예: 1공장, 2층 조립라인, 도장작업장 등)
+                      </Typography>
+                    </Stack>
+                  </Box>
                 </Stack>
               </Box>
-            </Stack>
-          </Box>
 
-          {/* 내용 */}
-          <Box>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>
-              내용
-            </Typography>
-            <TextField
-              fullWidth
-              multiline
-              rows={6}
-              placeholder="포크레인 사고 현장"
-              value={formData.content}
-              onChange={(e) => handleChange('content', e.target.value)}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  bgcolor: 'grey.50',
-                },
-              }}
-            />
-          </Box>
-          {/* 보고자/작성자 */}
-          <Stack direction="row" spacing={2}>
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>
-                보고자
-              </Typography>
-              <TextField
-                fullWidth
-                placeholder="김안전"
-                value={formData.reporterName}
-                onChange={(e) => handleChange('reporterName', e.target.value)}
-              />
-            </Box>
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>
-                작성자
-              </Typography>
-              <TextField
-                fullWidth
-                placeholder="트루트루스"
-                value={formData.authorName}
-                onChange={(e) => handleChange('authorName', e.target.value)}
-              />
-            </Box>
-          </Stack>
-
-          {/* 수정 모드일 때만 표시되는 필드 */}
-          {mode === 'edit' && (
-            <>
-              {/* 메모 */}
+              {/* 두 번째 행: 내용 */}
               <Box>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>
-                  메모
+                  내용
                 </Typography>
                 <TextField
                   fullWidth
                   multiline
                   rows={6}
-                  placeholder="메모를 입력하세요"
-                  value={formData.memo}
-                  onChange={(e) => handleChange('memo', e.target.value)}
+                  placeholder="포크레인 사고 현장"
+                  value={formData.content}
+                  onChange={(e) => handleChange('content', e.target.value)}
                   sx={{
                     '& .MuiOutlinedInput-root': {
                       bgcolor: 'grey.50',
@@ -321,23 +267,82 @@ export default function RiskReportForm({
                 />
               </Box>
 
-              {/* 확인 */}
-              <Box>
-                <FormLabel sx={{ mb: 1.5, display: 'block', fontWeight: 600 }}>확인</FormLabel>
-                <RadioGroup
-                  row
-                  value={formData.status || 'UNCONFIRMED'}
-                  onChange={(e) =>
-                    handleChange('status', e.target.value as 'CONFIRMED' | 'UNCONFIRMED')
-                  }
-                >
-                  <FormControlLabel value="CONFIRMED" control={<Radio />} label="확인" />
-                  <FormControlLabel value="UNCONFIRMED" control={<Radio />} label="미확인" />
-                </RadioGroup>
-              </Box>
-            </>
-          )}
-        </Stack>
+              {/* 세 번째 행: 보고자/작성자 */}
+              <Stack direction="row" spacing={2}>
+                <Box sx={{ flex: 1 }}>
+                  <Box sx={{ mb: 1.5 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                      보고자
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      해당 위험을 처음 보고한 사람
+                    </Typography>
+                  </Box>
+                  <TextField
+                    fullWidth
+                    value={formData.reporterName}
+                    onChange={(e) => handleChange('reporterName', e.target.value)}
+                  />
+                </Box>
+                <Box sx={{ flex: 1 }}>
+                  <Box sx={{ mb: 1.5 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                      작성자
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ mb: 1.5 }}>
+                      게시물을 작성하는 사람
+                    </Typography>
+                  </Box>
+                  <TextField
+                    fullWidth
+                    value={formData.authorName}
+                    onChange={(e) => handleChange('authorName', e.target.value)}
+                  />
+                </Box>
+              </Stack>
+            </Stack>
+          </Grid>
+        </Grid>
+
+        {/* 수정 모드일 때만 표시되는 필드 */}
+        {mode === 'edit' && (
+          <Stack spacing={3} sx={{ mt: 3 }}>
+            {/* 메모 */}
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>
+                메모
+              </Typography>
+              <TextField
+                fullWidth
+                multiline
+                rows={6}
+                placeholder="메모를 입력하세요"
+                value={formData.memo}
+                onChange={(e) => handleChange('memo', e.target.value)}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    bgcolor: 'grey.50',
+                  },
+                }}
+              />
+            </Box>
+
+            {/* 확인 */}
+            <Box>
+              <FormLabel sx={{ mb: 1.5, display: 'block', fontWeight: 600 }}>확인</FormLabel>
+              <RadioGroup
+                row
+                value={formData.status || 'UNCONFIRMED'}
+                onChange={(e) =>
+                  handleChange('status', e.target.value as 'CONFIRMED' | 'UNCONFIRMED')
+                }
+              >
+                <FormControlLabel value="CONFIRMED" control={<Radio />} label="확인" />
+                <FormControlLabel value="UNCONFIRMED" control={<Radio />} label="미확인" />
+              </RadioGroup>
+            </Box>
+          </Stack>
+        )}
       </Box>
 
       {/* 하단 버튼 */}

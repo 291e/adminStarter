@@ -28,6 +28,17 @@ const defaultRows: Table1100Row[] = [
 ];
 
 export default function RiskTable_1_1_1100({ rows = defaultRows }: Props) {
+  // 빈 행 필터링: 모든 필드가 비어있으면 제외
+  const filteredRows = rows.filter(
+    (row) =>
+      row.highRiskWork?.trim() ||
+      row.disasterFactor?.trim() ||
+      row.workplace?.trim() ||
+      row.machineHazard?.trim() ||
+      row.improvementNeeded?.trim() ||
+      row.remark?.trim()
+  );
+
   return (
     <Box sx={{ width: '100%', maxWidth: 1240, mt: 4 }}>
       <Box
@@ -45,7 +56,6 @@ export default function RiskTable_1_1_1100({ rows = defaultRows }: Props) {
             verticalAlign: 'middle',
           },
           '& th': {
-            backgroundColor: 'grey.100',
             fontSize: 14,
             fontWeight: 600,
             lineHeight: '22px',
@@ -57,14 +67,18 @@ export default function RiskTable_1_1_1100({ rows = defaultRows }: Props) {
             lineHeight: '22px',
             whiteSpace: 'pre-wrap',
           },
+          '& tbody tr': {
+            pageBreakInside: 'avoid',
+            breakInside: 'avoid',
+          },
         }}
       >
         <thead>
           <tr>
             <th style={{ maxWidth: 200 }}>고위험작업 및 상황</th>
             <th style={{ maxWidth: 361 }}>재해유발요인</th>
-            <th style={{ maxWidth: 100 }}>작업장소</th>
-            <th style={{ maxWidth: 160 }}>
+            <th style={{ maxWidth: 120 }}>작업장소</th>
+            <th style={{ maxWidth: 180 }}>
               기계·기구·설비
               <br />
               유해인자
@@ -74,7 +88,7 @@ export default function RiskTable_1_1_1100({ rows = defaultRows }: Props) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, index) => (
+          {filteredRows.map((row, index) => (
             <tr key={index}>
               <td>
                 <Typography

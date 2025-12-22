@@ -2,9 +2,9 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
+import InputLabel from '@mui/material/InputLabel';
 import FormControl from '@mui/material/FormControl';
 import InputAdornment from '@mui/material/InputAdornment';
-import Typography from '@mui/material/Typography';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -54,73 +54,17 @@ export default function SharedDocumentFilters({
           alignItems: 'center',
         }}
       >
-        <FormControl size="small" sx={{ width: 160 }}>
+        <FormControl size="small" sx={{ minWidth: 160 }}>
+          <InputLabel id="priority-label">중요도</InputLabel>
           <Select
-            displayEmpty
-            value={priority}
+            labelId="priority-label"
+            label="중요도"
+            value={priority || ''}
             onChange={(e) => {
               onChangePriority(e.target.value || '');
             }}
-            renderValue={(selected) => {
-              if (!selected) {
-                return (
-                  <Typography
-                    component="span"
-                    sx={{
-                      fontSize: 15,
-                      lineHeight: '24px',
-                      color: 'text.primary',
-                    }}
-                  >
-                    전체
-                  </Typography>
-                );
-              }
-              // 선택된 중요도 설정 찾기
-              const selectedSetting = activePrioritySettings.find(
-                (setting) => setting.labelType === selected
-              );
-              return (
-                <Typography
-                  component="span"
-                  sx={{
-                    fontSize: 15,
-                    lineHeight: '24px',
-                    color: 'text.primary',
-                  }}
-                >
-                  {getPriorityLabel(selectedSetting?.labelType || selected)}
-                </Typography>
-              );
-            }}
-            sx={{
-              bgcolor: 'background.paper',
-              fontSize: 15,
-              lineHeight: '24px',
-              '& .MuiSelect-select': {
-                fontSize: 15,
-                lineHeight: '24px',
-                py: 1,
-              },
-              '& .MuiSelect-icon': {
-                width: 18,
-                height: 18,
-                right: 10,
-              },
-            }}
           >
-            <MenuItem value="">
-              <Typography
-                component="span"
-                sx={{
-                  fontSize: 15,
-                  lineHeight: '24px',
-                  color: 'text.primary',
-                }}
-              >
-                전체
-              </Typography>
-            </MenuItem>
+            <MenuItem value="">전체</MenuItem>
             {activePrioritySettings.map((setting) => (
               <MenuItem key={setting.priorityIdx} value={setting.labelType || ''}>
                 {getPriorityLabel(setting.labelType)}
@@ -130,71 +74,27 @@ export default function SharedDocumentFilters({
         </FormControl>
 
         <DatePicker
+          label="시작일"
           value={startDate}
-          onChange={(value) => {
-            onChangeStartDate(value);
-            // TODO: 시작일 변경 시 TanStack Query로 공유 문서 목록 새로고침
-            // queryClient.invalidateQueries({ queryKey: ['sharedDocuments'] });
-          }}
+          onChange={onChangeStartDate}
           format="YYYY-MM-DD"
           slotProps={{
             textField: {
               size: 'small',
-              placeholder: '시작일',
-              sx: {
-                width: 160,
-                '& .MuiInputBase-input': {
-                  fontSize: 15,
-                  lineHeight: '24px',
-                  color: startDate ? 'text.primary' : 'text.disabled',
-                  '&::placeholder': {
-                    opacity: 1,
-                    color: 'text.disabled',
-                  },
-                },
-              },
-            },
-            openPickerIcon: {
-              sx: {
-                width: 24,
-                height: 24,
-                color: 'text.secondary',
-              },
+              sx: { maxWidth: 160 },
             },
           }}
         />
 
         <DatePicker
+          label="종료일"
           value={endDate}
-          onChange={(value) => {
-            onChangeEndDate(value);
-            // TODO: 종료일 변경 시 TanStack Query로 공유 문서 목록 새로고침
-            // queryClient.invalidateQueries({ queryKey: ['sharedDocuments'] });
-          }}
+          onChange={onChangeEndDate}
           format="YYYY-MM-DD"
           slotProps={{
             textField: {
               size: 'small',
-              placeholder: '종료일',
-              sx: {
-                width: 160,
-                '& .MuiInputBase-input': {
-                  fontSize: 15,
-                  lineHeight: '24px',
-                  color: endDate ? 'text.primary' : 'text.disabled',
-                  '&::placeholder': {
-                    opacity: 1,
-                    color: 'text.disabled',
-                  },
-                },
-              },
-            },
-            openPickerIcon: {
-              sx: {
-                width: 24,
-                height: 24,
-                color: 'text.secondary',
-              },
+              sx: { maxWidth: 160 },
             },
           }}
         />

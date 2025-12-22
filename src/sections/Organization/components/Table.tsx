@@ -20,18 +20,27 @@ import type { Organization } from 'src/services/organization/organization.types'
 import Chip from '@mui/material/Chip';
 import { fDateTime } from 'src/utils/format-time';
 import { Iconify } from 'src/components/iconify';
+import Badge from 'src/components/safeyoui/badge';
 import AccidentFreeWorksiteModal from './AccidentFreeWorksiteModal';
 import DeleteMemberModal from './DeleteMemberModal';
 import EditOrganizationModal from './EditOrganizationModal';
 
 type Props = {
   rows: Organization[];
+  page?: number;
+  rowsPerPage?: number;
   onViewDetail?: (row: Organization) => void;
   onDeactivate?: (row: Organization) => void;
   onDelete?: (row: Organization) => void;
 };
 
-export default function OrganizationTable({ rows, onViewDetail, onDelete }: Props) {
+export default function OrganizationTable({
+  rows,
+  page = 1,
+  rowsPerPage = 10,
+  onViewDetail,
+  onDelete,
+}: Props) {
   const [menuAnchorEl, setMenuAnchorEl] = useState<{ [key: string]: HTMLElement | null }>({});
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -120,14 +129,20 @@ export default function OrganizationTable({ rows, onViewDetail, onDelete }: Prop
       <Table size="small" stickyHeader>
         <TableHead>
           <TableRow>
-            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 72 }}>순번</TableCell>
-            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 220 }}>등록일</TableCell>
-            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 100 }}>구분</TableCell>
-            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 200 }}>조직명</TableCell>
-            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 160 }}>담당자</TableCell>
-            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 260 }}>전화번호 / 이메일</TableCell>
-            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 200 }}>주소</TableCell>
-            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 160 }}>무재해 사업장</TableCell>
+            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 72 }} align="center">
+              순번
+            </TableCell>
+            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 120 }}>등록일</TableCell>
+            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 80 }}>구분</TableCell>
+            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 120 }}>조직명</TableCell>
+            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 100 }} align="center">
+              담당자
+            </TableCell>
+            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 140 }}>전화번호 / 이메일</TableCell>
+            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 160 }}>주소</TableCell>
+            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 120 }} align="center">
+              무재해 사업장
+            </TableCell>
             <TableCell align="center" sx={{ bgcolor: 'grey.100', minWidth: 120 }}>
               상태
             </TableCell>
@@ -150,9 +165,12 @@ export default function OrganizationTable({ rows, onViewDetail, onDelete }: Prop
               ? `${accidentYear}년 무재해 사업장`
               : '무재해 사업장';
 
+            // 전체 데이터 기준 순번 계산
+            const rowNumber = (page - 1) * rowsPerPage + idx + 1;
+
             return (
               <TableRow key={row.companyIdx} hover>
-                <TableCell>{idx + 1}</TableCell>
+                <TableCell align="center">{rowNumber}</TableCell>
                 <TableCell>
                   <Stack>
                     <Typography variant="body2">
@@ -169,14 +187,9 @@ export default function OrganizationTable({ rows, onViewDetail, onDelete }: Prop
                 <TableCell>
                   <Typography variant="subtitle2">{row.companyName}</Typography>
                 </TableCell>
-                <TableCell>
+                <TableCell align="center">
                   {row.manager ? (
-                    <Stack>
-                      <Typography variant="body2">{row.manager.memberName || '-'}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {row.manager.memberEmail || '-'}
-                      </Typography>
-                    </Stack>
+                    <Typography variant="body2">{row.manager.memberName || '-'}</Typography>
                   ) : (
                     '-'
                   )}
@@ -194,50 +207,73 @@ export default function OrganizationTable({ rows, onViewDetail, onDelete }: Prop
                     {row.address ? `${row.address} ${row.addressDetail || ''}`.trim() : '-'}
                   </Typography>
                 </TableCell>
-                <TableCell>
-                  {accidentStatus === 'APPROVED' ? (
-                    <Chip
-                      color="info"
-                      variant="outlined"
-                      size="small"
-                      label={accidentLabel}
-                      sx={{ fontWeight: 600, pointerEvents: 'none' }}
-                    />
-                  ) : (
-                    <Button
-                      variant="outlined"
-                      color="inherit"
-                      size="small"
-                      endIcon={<Iconify icon="eva:arrow-forward-fill" width={16} />}
-                      onClick={() => handleOpenModal(row)}
-                      sx={{
-                        height: 24,
-                        minHeight: 24,
-                        px: 0.75,
-                        py: 0,
-                        fontSize: 12,
-                        fontWeight: 700,
-                        lineHeight: '20px',
-                        borderRadius: 0.75,
-                        borderWidth: 1,
-                        borderColor: 'grey.900',
-                        color: 'grey.900',
-                        textTransform: 'none',
-                        '&:hover': {
-                          borderColor: 'grey.800',
-                          bgcolor: 'action.hover',
-                        },
-                      }}
-                    >
-                      검토 대기
-                    </Button>
-                  )}
+                <TableCell align="center">
+                  {(() => {
+                    // 무재해 사업장 인증 정보가 없는 경우 또는 'none' 상태인 경우
+                    if (
+                      !accidentInfo ||
+                      !accidentStatus ||
+                      accidentStatus === 'none' ||
+                      accidentStatus === 'NONE'
+                    ) {
+                      return <Typography variant="body2">-</Typography>;
+                    }
+
+                    // 승인된 경우
+                    if (accidentStatus === 'APPROVED') {
+                      return (
+                        <Chip
+                          color="info"
+                          variant="outlined"
+                          size="small"
+                          label={accidentLabel}
+                          sx={{ fontWeight: 600, pointerEvents: 'none' }}
+                        />
+                      );
+                    }
+
+                    // 검토 대기 상태인 경우
+                    if (accidentStatus === 'PENDING') {
+                      return (
+                        <Button
+                          variant="outlined"
+                          color="inherit"
+                          size="small"
+                          endIcon={<Iconify icon="eva:arrow-forward-fill" width={16} />}
+                          onClick={() => handleOpenModal(row)}
+                          sx={{
+                            height: 24,
+                            minHeight: 24,
+                            px: 0.75,
+                            py: 0,
+                            fontSize: 12,
+                            fontWeight: 700,
+                            lineHeight: '20px',
+                            borderRadius: 0.75,
+                            borderWidth: 1,
+                            borderColor: 'grey.900',
+                            color: 'grey.900',
+                            textTransform: 'none',
+                            '&:hover': {
+                              borderColor: 'grey.800',
+                              bgcolor: 'action.hover',
+                            },
+                          }}
+                        >
+                          검토 대기
+                        </Button>
+                      );
+                    }
+
+                    // 그 외 상태 (REJECTED 등)
+                    return <Typography variant="body2">-</Typography>;
+                  })()}
                 </TableCell>
                 <TableCell align="center">
-                  {row.status === 'active' ? (
-                    <Chip label="활성" size="small" color="success" variant="soft" />
+                  {row.isActive === 1 || row.status === 'active' ? (
+                    <Badge label="활성" variant="active" />
                   ) : (
-                    <Chip label="비활성" size="small" sx={{ bgcolor: 'grey.300' }} />
+                    <Badge label="비활성" variant="inactive" />
                   )}
                 </TableCell>
                 <TableCell align="right">

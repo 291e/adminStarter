@@ -238,7 +238,13 @@ export default function EducationDetailModal({ open, onClose, educationReportIdx
     joinDate,
   } = educationDetail;
 
-  const joinDateDayjs = joinDate ? dayjs(joinDate) : null;
+  // 시간대 변환 문제 방지를 위해 날짜 부분만 추출
+  const joinDateFormatted = joinDate
+    ? joinDate.includes('T')
+      ? joinDate.split('T')[0]
+      : joinDate
+    : null;
+  const joinDateDayjs = joinDateFormatted ? dayjs(joinDateFormatted) : null;
 
   const yearOptions = useMemo(() => {
     if (!joinDateDayjs) {
@@ -364,7 +370,7 @@ export default function EducationDetailModal({ open, onClose, educationReportIdx
                     입사일
                   </Typography>
                   <Typography variant="body2" sx={{ fontSize: 14 }}>
-                    {joinDate || '2025-10-31'}
+                    {joinDateFormatted || '-'}
                   </Typography>
                 </Stack>
               </Stack>
@@ -374,7 +380,7 @@ export default function EducationDetailModal({ open, onClose, educationReportIdx
                     variant="subtitle2"
                     sx={{ fontSize: 14, fontWeight: 600, minWidth: 64 }}
                   >
-                    소속
+                    소속팀
                   </Typography>
                   <Typography variant="body2" sx={{ fontSize: 14 }}>
                     {report?.memberInformation?.department || report?.department || '-'}

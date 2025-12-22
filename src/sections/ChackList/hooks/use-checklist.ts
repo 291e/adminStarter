@@ -78,13 +78,12 @@ export function useChecklist(allData: Checklist[], industry: string): UseCheckli
     if (filters.searchValue.trim()) {
       const searchLower = filters.searchValue.toLowerCase();
       result = result.filter((item) => {
-        if (filters.searchFilter === 'all') {
+        if (filters.searchFilter === 'all' || filters.searchFilter === '전체') {
           return item.highRiskWork.toLowerCase().includes(searchLower);
         }
-        if (filters.searchFilter === 'highRiskWork') {
+        if (filters.searchFilter === 'highRiskWork' || filters.searchFilter === '고위험작업/상황') {
           return item.highRiskWork.toLowerCase().includes(searchLower);
         }
-        // disasterFactors는 별도 API로 가져오므로 여기서는 검색하지 않음
         return true;
       });
     }

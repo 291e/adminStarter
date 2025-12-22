@@ -1,7 +1,7 @@
 import type { Theme, SxProps } from '@mui/material/styles';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import dayjs, { type Dayjs } from 'dayjs';
 
 import Box from '@mui/material/Box';
@@ -11,9 +11,14 @@ import { DashboardContent } from 'src/layouts/dashboard';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import type { SafetySystem } from 'src/_mock/_safety-system';
+import { CONFIG } from 'src/global-config';
 import type { SafetySystemItem } from 'src/services/safety-system/safety-system.types';
+import type { OriginalDocument } from 'src/services/dashboard/dashboard.types';
 import { getTableDataByDocument, FIXED_MINIMUM_EDUCATION_ROWS } from 'src/_mock/_safety-system';
-import { createSafetySystemDocument } from 'src/services/safety-system/safety-system.service';
+import {
+  createSafetySystemDocument,
+  getRiskAssessmentCriteria,
+} from 'src/services/safety-system/safety-system.service';
 import { useMyInfo } from 'src/sections/Chat/hooks/use-my-info';
 import type {
   Table1100Row,
@@ -48,7 +53,9 @@ import Table2400EducationForm from './tables/Table2400EducationForm';
 import FooterButtons from './components/FooterButtons';
 import RiskAssessmentSettingModal, {
   type RiskAssessmentData,
+  convertApiResponseToRiskAssessmentData,
 } from '../components/RiskAssessmentSettingModal';
+import SampleViewModal, { parseSampleUrls } from '../components/SampleViewModal';
 
 // ----------------------------------------------------------------------
 
@@ -164,7 +171,7 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
         isGuide?: boolean;
         documentId?: string;
         copyFrom?: string; // 복사할 문서 ID
-        documentData?: any; // 복사할 문서 데이터 (API 연동 시)
+        documentData?: OriginalDocument | any; // 복사할 문서 데이터 (API 연동 시) 또는 위험보고에서 전달된 메타정보
         documentType?: 'industrial-accident' | 'near-miss' | 'tbm' | 'education'; // 1200번대, 2400번대 문서 타입
       }
     | undefined;
@@ -193,8 +200,20 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
   const is2400TBM = is2400Series && state?.documentType === 'tbm'; // TBM 일지 작성
   const is2400Education = is2400Series && state?.documentType === 'education'; // 연간 교육 계획 작성
 
-  const [documentDate, setDocumentDate] = useState<Dayjs | null>(dayjs());
-  const [approvalDeadline, setApprovalDeadline] = useState<Dayjs | null>(dayjs().add(33, 'day'));
+  const [documentWrittenAt, setDocumentWrittenAt] = useState<Dayjs | null>(dayjs());
+  const [approvalDeadline, setApprovalDeadline] = useState<Dayjs | null>(dayjs().add(1, 'month'));
+
+  // 문서 작성일 변경 핸들러 (결재 마감일 자동 업데이트)
+  const handleDocumentWrittenAtChange = useCallback((date: Dayjs | null) => {
+    setDocumentWrittenAt(date);
+    // 문서 작성일 변경 시 결재 마감일을 한 달 뒤로 자동 설정
+    if (date) {
+      setApprovalDeadline(date.add(1, 'month'));
+    }
+  }, []);
+  const [safetySystemDocumentIdx, setSafetySystemDocumentIdx] = useState<number | undefined>(
+    undefined
+  );
   const [table1100Rows, setTable1100Rows] = useState<Table1100Row[]>(initialTable1100Rows);
   const [table1200IndustrialAccidentRow, setTable1200IndustrialAccidentRow] =
     useState<Table1200IndustrialAccidentRow>({
@@ -278,8 +297,71 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
   const [table2400EducationRows, setTable2400EducationRows] = useState<Table2400EducationRow[]>([
     {
       number: 1,
-      educationType: '법정',
-      educationCourse: '',
+      educationType: undefined,
+      educationCourse: '근로자 정기 안전보건교육',
+      scheduleMonths: Array(12).fill(false),
+      targetCount: '',
+      educationMethod: '',
+      remark: '',
+    },
+    {
+      number: 2,
+      educationType: undefined,
+      educationCourse: '신규 채용 시 안전보건교육',
+      scheduleMonths: Array(12).fill(false),
+      targetCount: '',
+      educationMethod: '',
+      remark: '',
+    },
+    {
+      number: 3,
+      educationType: undefined,
+      educationCourse: '관리감독자 안전보건교육',
+      scheduleMonths: Array(12).fill(false),
+      targetCount: '',
+      educationMethod: '',
+      remark: '',
+    },
+    {
+      number: 4,
+      educationType: undefined,
+      educationCourse: '특별안전보건 교육',
+      scheduleMonths: Array(12).fill(false),
+      targetCount: '',
+      educationMethod: '',
+      remark: '',
+    },
+    {
+      number: 5,
+      educationType: undefined,
+      educationCourse: '비상사태대비 교육 및 훈련',
+      scheduleMonths: Array(12).fill(false),
+      targetCount: '',
+      educationMethod: '',
+      remark: '',
+    },
+    {
+      number: 6,
+      educationType: undefined,
+      educationCourse: '물질안전보건 교육',
+      scheduleMonths: Array(12).fill(false),
+      targetCount: '',
+      educationMethod: '',
+      remark: '',
+    },
+    {
+      number: 7,
+      educationType: undefined,
+      educationCourse: '공정위험성 평가 교육',
+      scheduleMonths: Array(12).fill(false),
+      targetCount: '',
+      educationMethod: '',
+      remark: '',
+    },
+    {
+      number: 8,
+      educationType: undefined,
+      educationCourse: '작업내용 변경자 교육',
       scheduleMonths: Array(12).fill(false),
       targetCount: '',
       educationMethod: '',
@@ -363,8 +445,29 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
 
   const [riskAssessmentModalOpen, setRiskAssessmentModalOpen] = useState(false);
 
+  // 위험성 평가 기준 조회
+  const { data: riskAssessmentCriteriaData } = useQuery({
+    queryKey: ['riskAssessmentCriteria'],
+    queryFn: () => getRiskAssessmentCriteria(),
+    staleTime: 5 * 60 * 1000, // 5분
+  });
+
+  // API 데이터를 RiskAssessmentData로 변환
+  const apiRiskAssessmentData = useMemo(() => {
+    if (riskAssessmentCriteriaData) {
+      return convertApiResponseToRiskAssessmentData(riskAssessmentCriteriaData);
+    }
+    return null;
+  }, [riskAssessmentCriteriaData]);
+
+  // API 데이터가 있으면 우선 사용, 없으면 기본값 또는 문서 데이터 사용
+  useEffect(() => {
+    if (apiRiskAssessmentData) {
+      setRiskAssessmentData(apiRiskAssessmentData);
+    }
+  }, [apiRiskAssessmentData]);
+
   const handleRiskAssessmentSave = (data: RiskAssessmentData) => {
-    // TODO: API 호출하여 위험성 평가 기준 저장
     setRiskAssessmentData(data);
     // 위험도 설정이 변경되면 기존 위험도 값들의 label도 업데이트
     const updatedAssessment = table2100Data.assessment.map((row) => {
@@ -385,68 +488,186 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
     setTable2100Data({ ...table2100Data, assessment: updatedAssessment });
   };
 
+  // 위험보고에서 전달된 메타정보로 초기값 설정
+  useEffect(() => {
+    if (state?.documentData && !state?.copyFrom) {
+      const metaData = state.documentData;
+
+      // 아차사고 (near-miss)인 경우
+      if (is1200NearMiss && metaData) {
+        setTable1200NearMissRow({
+          workName: metaData.workName || '',
+          grade: metaData.grade || 'A',
+          reporter: metaData.reporter || '',
+          reporterDepartment: metaData.reporterDepartment || '',
+          workContent: metaData.workContent || '',
+          accidentContent: metaData.accidentContent || '',
+          accidentRiskLevel: metaData.accidentRiskLevel || 'A',
+          accidentCause: metaData.accidentCause || '',
+          preventionMeasure: metaData.preventionMeasure || '',
+          preventionRiskLevel: metaData.preventionRiskLevel || 'A',
+          siteSituation: metaData.siteSituation || '',
+          siteImages: metaData.siteImages || [],
+        });
+      }
+
+      // 산업재해 (industrial-accident)인 경우
+      if (is1200IndustrialAccident && metaData) {
+        setTable1200IndustrialAccidentRow({
+          accidentName: metaData.accidentName || '',
+          accidentDate: metaData.accidentDate || '',
+          accidentTime: metaData.accidentTime || '',
+          accidentLocation: metaData.accidentLocation || '',
+          accidentType: metaData.accidentType || '',
+          investigationTeam: metaData.investigationTeam || [{ department: '', name: '' }],
+          humanDamage: metaData.humanDamage || [
+            { department: '', name: '', position: '', injury: '' },
+          ],
+          materialDamage: metaData.materialDamage || '',
+          accidentContent: metaData.accidentContent || '',
+          riskAssessmentBefore: metaData.riskAssessmentBefore || {
+            possibility: '',
+            severity: '',
+            risk: '',
+          },
+          accidentCause: metaData.accidentCause || '',
+          doctorOpinion: metaData.doctorOpinion || '',
+          preventionMeasure: metaData.preventionMeasure || '',
+          riskAssessmentAfter: metaData.riskAssessmentAfter || {
+            possibility: '',
+            severity: '',
+            risk: '',
+          },
+          otherContent: metaData.otherContent || '',
+          investigationImages: metaData.investigationImages || [],
+        });
+      }
+    }
+  }, [state?.documentData, state?.copyFrom, is1200NearMiss, is1200IndustrialAccident]);
+
   // 복사된 문서 데이터 로드
   useEffect(() => {
-    if (state?.copyFrom) {
-      // TODO: API 연동 시 state.documentData 사용
-      // if (state.documentData) {
-      //   // API에서 가져온 문서 데이터로 폼 초기화
-      //   const docData = state.documentData;
-      //   if (docData.documentDate) setDocumentDate(dayjs(docData.documentDate));
-      //   if (docData.approvalDeadline) setApprovalDeadline(dayjs(docData.approvalDeadline));
-      //   // 테이블 데이터 설정
-      //   if (is1100Series && docData.tableData?.type === '1100') {
-      //     setTable1100Rows(docData.tableData.rows);
-      //   } else if (is1300Series && docData.tableData?.type === '1300') {
-      //     setTable1300Rows(docData.tableData.rows);
-      //   }
-      //   // ... 다른 시리즈도 동일하게 처리
-      //   return;
-      // }
+    if (state?.copyFrom && state?.documentData) {
+      const docData = state.documentData as OriginalDocument;
 
-      // 목업 데이터 사용
-      const parts = state.copyFrom.split('-');
-      if (parts.length >= 3) {
-        const copySafetyIdx = Number(parts[0]);
-        const copyItemNumber = Number(parts[1]);
-        const documentNumber = Number(parts[2]);
-        const tableData = getTableDataByDocument(copySafetyIdx, copyItemNumber, documentNumber);
+      // 문서 작성일 설정 (documentWrittenAt 우선, 없으면 createAt 사용)
+      const documentWrittenAtDate =
+        (docData as any).documentWrittenAt ||
+        (docData as any).writtenAt ||
+        (docData as any).documentDate ||
+        docData.createAt;
+      if (documentWrittenAtDate) {
+        const dateStr =
+          typeof documentWrittenAtDate === 'string'
+            ? documentWrittenAtDate
+            : new Date(documentWrittenAtDate).toISOString();
+        setDocumentWrittenAt(dayjs(dateStr.split('T')[0]));
+        // 복사된 문서의 작성일 기준으로 결재 마감일도 한 달 뒤로 설정
+        const writtenAtDate = dayjs(dateStr.split('T')[0]);
+        if (docData.approvalDeadline) {
+          // 복사된 문서에 결재 마감일이 있으면 그대로 사용
+          setApprovalDeadline(dayjs(docData.approvalDeadline));
+        } else {
+          // 없으면 작성일 기준으로 한 달 뒤로 설정
+          setApprovalDeadline(writtenAtDate.add(1, 'month'));
+        }
+      }
 
-        if (tableData) {
-          if (tableData.type === '1100' && is1100Series) {
-            setTable1100Rows(tableData.rows as Table1100Row[]);
-          } else if (tableData.type === '1300' && is1300Series) {
-            setTable1300Rows(tableData.rows as Table1300Row[]);
-          } else if (tableData.type === '1400' && is1400Series) {
-            setTable1400Data(tableData.data as Table1400Data);
-          } else if (tableData.type === '1500' && is1500Series) {
-            setTable1500Rows(tableData.rows as Table1500Row[]);
-          } else if (tableData.type === '2100' && is2100Series) {
-            setTable2100Data(tableData.data as Table2100Data);
-          } else if (tableData.type === '2200' && is2200Series) {
-            setTable2200Rows(tableData.rows as Table2200Row[]);
-          } else if (tableData.type === '2300' && is2300Series) {
-            setTable2300Rows(tableData.rows as Table2300Row[]);
-          } else if (tableData.type === '2400-tbm' && is2400TBM) {
-            setTable2400TBMData(tableData.data as Table2400TBMData);
-          } else if (tableData.type === '2400-education' && is2400Education) {
-            setTable2400EducationRows(tableData.rows as Table2400EducationRow[]);
+      // 결재 마감일 설정
+      if (docData.approvalDeadline) {
+        setApprovalDeadline(dayjs(docData.approvalDeadline));
+      }
+
+      // tableData 파싱 및 설정
+      let parsedTableData: any = null;
+      if (docData.tableData) {
+        try {
+          parsedTableData =
+            typeof docData.tableData === 'string'
+              ? JSON.parse(docData.tableData)
+              : docData.tableData;
+        } catch (error) {
+          console.error('tableData 파싱 실패:', error);
+        }
+      }
+
+      if (parsedTableData) {
+        const tableType = parsedTableData.tableType;
+
+        // tableType에 따라 데이터 설정 (복사 시에는 tableType만 확인)
+        if (tableType === '1100' && parsedTableData.rows) {
+          setTable1100Rows(parsedTableData.rows as Table1100Row[]);
+        } else if (tableType === '1300' && parsedTableData.rows) {
+          setTable1300Rows(parsedTableData.rows as Table1300Row[]);
+        } else if (tableType === '1400' && parsedTableData.data) {
+          setTable1400Data(parsedTableData.data as Table1400Data);
+        } else if (tableType === '1500' && parsedTableData.rows) {
+          setTable1500Rows(parsedTableData.rows as Table1500Row[]);
+        } else if (tableType === '2100' && parsedTableData.data) {
+          setTable2100Data(parsedTableData.data as Table2100Data);
+          // riskAssessmentData가 있으면 설정
+          if (parsedTableData.riskAssessmentData) {
+            setRiskAssessmentData(parsedTableData.riskAssessmentData as RiskAssessmentData);
+          }
+        } else if (tableType === '2200' && parsedTableData.rows) {
+          setTable2200Rows(parsedTableData.rows as Table2200Row[]);
+        } else if (tableType === '2300' && parsedTableData.rows) {
+          setTable2300Rows(parsedTableData.rows as Table2300Row[]);
+        } else if (tableType === '1200-industrial' && parsedTableData.row) {
+          setTable1200IndustrialAccidentRow(parsedTableData.row as Table1200IndustrialAccidentRow);
+        } else if (tableType === '1200-near-miss' && parsedTableData.row) {
+          setTable1200NearMissRow(parsedTableData.row as Table1200NearMissRow);
+        } else if (tableType === '2400-tbm' && parsedTableData.data) {
+          setTable2400TBMData(parsedTableData.data as Table2400TBMData);
+        } else if (tableType === '2400-education') {
+          if (parsedTableData.rows) {
+            setTable2400EducationRows(parsedTableData.rows as Table2400EducationRow[]);
+          }
+          if (parsedTableData.minimumEducationRows) {
+            setTable2400MinimumEducationRows(parsedTableData.minimumEducationRows);
+          }
+        }
+      } else {
+        // API 데이터가 없으면 목업 데이터 사용 (fallback)
+        const parts = state.copyFrom.split('-');
+        if (parts.length >= 3) {
+          const copySafetyIdx = Number(parts[0]);
+          const copyItemNumber = Number(parts[1]);
+          const documentNumber = Number(parts[2]);
+          const tableData = getTableDataByDocument(copySafetyIdx, copyItemNumber, documentNumber);
+
+          if (tableData) {
+            // 목업 데이터도 tableType만으로 판단
+            if (tableData.type === '1100') {
+              setTable1100Rows(tableData.rows as Table1100Row[]);
+            } else if (tableData.type === '1300') {
+              setTable1300Rows(tableData.rows as Table1300Row[]);
+            } else if (tableData.type === '1400') {
+              setTable1400Data(tableData.data as Table1400Data);
+            } else if (tableData.type === '1500') {
+              setTable1500Rows(tableData.rows as Table1500Row[]);
+            } else if (tableData.type === '2100') {
+              setTable2100Data(tableData.data as Table2100Data);
+            } else if (tableData.type === '2200') {
+              setTable2200Rows(tableData.rows as Table2200Row[]);
+            } else if (tableData.type === '2300') {
+              setTable2300Rows(tableData.rows as Table2300Row[]);
+            } else if (tableData.type === '1200-industrial' && (tableData as any).rows?.[0]) {
+              setTable1200IndustrialAccidentRow(
+                (tableData as any).rows[0] as Table1200IndustrialAccidentRow
+              );
+            } else if (tableData.type === '1200-near-miss' && (tableData as any).rows?.[0]) {
+              setTable1200NearMissRow((tableData as any).rows[0] as Table1200NearMissRow);
+            } else if (tableData.type === '2400-tbm') {
+              setTable2400TBMData(tableData.data as Table2400TBMData);
+            } else if (tableData.type === '2400-education') {
+              setTable2400EducationRows(tableData.rows as Table2400EducationRow[]);
+            }
           }
         }
       }
     }
-  }, [
-    state?.copyFrom,
-    is1100Series,
-    is1300Series,
-    is1400Series,
-    is1500Series,
-    is2100Series,
-    is2200Series,
-    is2300Series,
-    is2400TBM,
-    is2400Education,
-  ]);
+  }, [state?.copyFrom, state?.documentData]);
 
   // 2200번대 (위험요인 제거·대체 및 통제 등록) 핸들러
   const handleTable2200RowChange = useCallback(
@@ -582,8 +803,8 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
   const handleTable2400TBMEducationVideoRowChange = useCallback(
     (
       index: number,
-      field: 'participant' | 'educationVideo' | 'signature',
-      value: InvestigationTeamMember | null | string
+      field: 'participant' | 'educationVideo' | 'signature' | 'vodIdx' | 'workerSignatureIdx',
+      value: InvestigationTeamMember | null | string | number | undefined
     ) => {
       setTable2400TBMData((prev) => {
         const newRows = [...prev.educationVideoRows];
@@ -724,6 +945,14 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
         remark: '',
       },
     ]);
+  }, []);
+
+  const handleTable1100InsertRows = useCallback((index: number, newRows: Table1100Row[]) => {
+    setTable1100Rows((prev) => {
+      const updatedRows = [...prev];
+      updatedRows.splice(index + 1, 0, ...newRows);
+      return updatedRows;
+    });
   }, []);
 
   // 1200번대 산업재해 작성 핸들러
@@ -925,7 +1154,23 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
   // 문서 등록 Mutation
   const createDocumentMutation = useMutation({
     mutationFn: createSafetySystemDocument,
-    onSuccess: () => {
+    onSuccess: (response) => {
+      // 응답에서 safetySystemDocumentIdx 추출
+      // axios 인터셉터가 평탄화하므로 직접 접근
+      // CreateSafetySystemDocumentResponseDto는 BaseResponseDto<SafetySystemDocument>이므로
+      // 평탄화 후에는 SafetySystemDocument의 속성에 직접 접근 가능
+      const documentIdx =
+        (response as any)?.safetySystemDocumentIdx ||
+        (response as any)?.data?.safetySystemDocumentIdx ||
+        (response as any)?.body?.data?.safetySystemDocumentIdx;
+
+      if (documentIdx) {
+        setSafetySystemDocumentIdx(documentIdx);
+      }
+
+      // 알림 쿼리 무효화 (문서 생성 시 근로자 등록 후 알림 자동 발송됨)
+      queryClient.invalidateQueries({ queryKey: ['notificationHistory'] });
+
       // 아이템 상세 정보 쿼리 무효화하여 문서 목록 갱신
       if (state?.item?.safetySystemItemIdx) {
         queryClient.invalidateQueries({
@@ -967,41 +1212,41 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
 
     if (is1100Series) {
       tableData = { tableType: '1100', rows: table1100Rows };
-      documentName = `${documentPrefix} 위험요인파악`;
+      documentName = `${documentPrefix}. 위험요인 파악`;
     } else if (is1200IndustrialAccident) {
       tableData = { tableType: '1200-industrial', row: table1200IndustrialAccidentRow };
-      documentName = `${documentPrefix} 산업재해 및 아차사고`;
+      documentName = `${documentPrefix}. 사고조사 보고서`;
     } else if (is1200NearMiss) {
       tableData = { tableType: '1200-near-miss', row: table1200NearMissRow };
-      documentName = `${documentPrefix} 산업재해 및 아차사고`;
+      documentName = `${documentPrefix}. 아차사고 조사표`;
     } else if (is1300Series) {
       tableData = { tableType: '1300', rows: table1300Rows };
-      documentName = `${documentPrefix} 위험 기계·기구·설비`;
+      documentName = `${documentPrefix}. 위험 기계·기구·설비`;
     } else if (is1400Series) {
       tableData = { tableType: '1400', data: table1400Data };
-      documentName = `${documentPrefix} 유해인자`;
+      documentName = `${documentPrefix}. 유해인자`;
     } else if (is1500Series) {
       tableData = { tableType: '1500', rows: table1500Rows };
-      documentName = `${documentPrefix} 위험장소 및 작업형태별 위험요인`;
+      documentName = `${documentPrefix}. 위험장소 및 작업형태별 위험요인`;
     } else if (is2100Series) {
-      tableData = { tableType: '2100', data: table2100Data };
-      documentName = `${documentPrefix} 위험요인별 위험성 평가`;
+      tableData = { tableType: '2100', data: table2100Data, riskAssessmentData };
+      documentName = `${documentPrefix}. 위험요인별 위험성 평가`;
     } else if (is2200Series) {
       tableData = { tableType: '2200', rows: table2200Rows };
-      documentName = `${documentPrefix} 위험요인 제거·대체 및 통제 등록`;
+      documentName = `${documentPrefix}. 위험요인 제거·대체 및 통제`;
     } else if (is2300Series) {
       tableData = { tableType: '2300', rows: table2300Rows };
-      documentName = `${documentPrefix} 감소 대책 수립·이행`;
+      documentName = `${documentPrefix}. 감소 대책 수립·이행`;
     } else if (is2400TBM) {
       tableData = { tableType: '2400-tbm', data: table2400TBMData };
-      documentName = `${documentPrefix} 교육훈련`;
+      documentName = `${documentPrefix}. Tool Box Meeting 일지`;
     } else if (is2400Education) {
       tableData = {
         tableType: '2400-education',
         rows: table2400EducationRows,
         minimumEducationRows: table2400MinimumEducationRows,
       };
-      documentName = `${documentPrefix} 교육훈련`;
+      documentName = `${documentPrefix}. 연간 교육 계획`;
     } else {
       tableData = { tableType: '1100', rows: table1100Rows };
       documentName = `${documentPrefix} ${state.item?.itemName || '문서'}`;
@@ -1013,20 +1258,71 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
       (myInfoData as any)?.companyName ||
       '이편한자동화기술'; // 기본값
 
+    // 2400TBM 문서인 경우 근로자 목록 수집
+    let workerList: Array<{ targetMemberIdx: number; vodIdx?: number }> | undefined;
+    if (is2400TBM) {
+      workerList = table2400TBMData.educationVideoRows
+        .filter(
+          (row) => row.participant?.memberIdx && row.vodIdx // 대상자가 선택되어 있고 // 교육영상이 선택되어 있는 경우
+        )
+        .map((row) => ({
+          targetMemberIdx: row.participant!.memberIdx!,
+          vodIdx: row.vodIdx,
+        }));
+
+      if (import.meta.env.DEV) {
+        console.log('📋 [Risk2200CreateView] 문서 생성 시 근로자 목록 수집:', {
+          workerList,
+          educationVideoRows: table2400TBMData.educationVideoRows,
+        });
+      }
+
+      // 근로자 목록이 비어있으면 undefined로 설정 (API에 전송하지 않음)
+      if (workerList.length === 0) {
+        workerList = undefined;
+      }
+    }
+
+    // approvalStep 설정: 1200번대 산업재해/아차사고는 기본값 3 (작성+검토+승인)
+    let approvalStep: number | undefined;
+    if (is1200IndustrialAccident || is1200NearMiss) {
+      approvalStep = 3; // 작성+검토+승인
+    }
+
     // API 요청 데이터 구성
-    const requestData = {
+    const requestData: any = {
       safetySystemItemIdx: state.item.safetySystemItemIdx,
       organizationName,
       documentName,
+      documentWrittenAt: documentWrittenAt ? documentWrittenAt.format('YYYY-MM-DD') : undefined,
       tableData: JSON.stringify(tableData),
       // approvalDeadline은 API 스펙에 없으므로 제외 (나중에 수정 API로 업데이트 가능)
     };
+
+    // approvalStep이 있으면 추가
+    if (approvalStep !== undefined) {
+      requestData.approvalStep = approvalStep;
+    }
+
+    // 근로자 목록이 있으면 추가
+    if (workerList && workerList.length > 0) {
+      requestData.workerList = workerList;
+    }
+
+    if (import.meta.env.DEV) {
+      console.log('📤 [Risk2200CreateView] 문서 생성 요청 데이터:', {
+        ...requestData,
+        tableData: '[JSON string]', // tableData는 너무 길 수 있으므로 표시만
+        workerListCount: workerList?.length || 0,
+      });
+    }
 
     createDocumentMutation.mutate(requestData);
   }, [
     state,
     safetyIdx,
     itemNumber,
+    documentWrittenAt,
     table1100Rows,
     table1200IndustrialAccidentRow,
     table1200NearMissRow,
@@ -1037,7 +1333,9 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
     table2200Rows,
     table2300Rows,
     table2400TBMData,
+    myInfoData,
     table2400EducationRows,
+    riskAssessmentData,
     table2400MinimumEducationRows,
     is1100Series,
     is1200IndustrialAccident,
@@ -1050,10 +1348,7 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
     is2300Series,
     is2400TBM,
     is2400Education,
-    safetyId,
-    navigate,
     createDocumentMutation,
-    myInfoData,
   ]);
 
   const handleTemporarySave = useCallback(() => {
@@ -1067,34 +1362,38 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
     // 임시 저장 로직
     let data;
     if (is1100Series) {
-      data = { documentDate, approvalDeadline, rows: table1100Rows };
+      data = { documentDate: documentWrittenAt, approvalDeadline, rows: table1100Rows };
     } else if (is1200IndustrialAccident) {
-      data = { documentDate, approvalDeadline, row: table1200IndustrialAccidentRow };
+      data = {
+        documentDate: documentWrittenAt,
+        approvalDeadline,
+        row: table1200IndustrialAccidentRow,
+      };
     } else if (is1200NearMiss) {
-      data = { documentDate, approvalDeadline, row: table1200NearMissRow };
+      data = { documentDate: documentWrittenAt, approvalDeadline, row: table1200NearMissRow };
     } else if (is1300Series) {
-      data = { documentDate, approvalDeadline, rows: table1300Rows };
+      data = { documentDate: documentWrittenAt, approvalDeadline, rows: table1300Rows };
     } else if (is1400Series) {
-      data = { documentDate, approvalDeadline, data: table1400Data };
+      data = { documentDate: documentWrittenAt, approvalDeadline, data: table1400Data };
     } else if (is1500Series) {
-      data = { documentDate, approvalDeadline, rows: table1500Rows };
+      data = { documentDate: documentWrittenAt, approvalDeadline, rows: table1500Rows };
     } else if (is2100Series) {
-      data = { documentDate, approvalDeadline, data: table2100Data };
+      data = { documentDate: documentWrittenAt, approvalDeadline, data: table2100Data };
     } else if (is2200Series) {
-      data = { documentDate, approvalDeadline, rows: table2200Rows };
+      data = { documentDate: documentWrittenAt, approvalDeadline, rows: table2200Rows };
     } else if (is2300Series) {
-      data = { documentDate, approvalDeadline, rows: table2300Rows };
+      data = { documentDate: documentWrittenAt, approvalDeadline, rows: table2300Rows };
     } else if (is2400TBM) {
-      data = { documentDate, approvalDeadline, data: table2400TBMData };
+      data = { documentDate: documentWrittenAt, approvalDeadline, data: table2400TBMData };
     } else if (is2400Education) {
-      data = { documentDate, approvalDeadline, rows: table2400EducationRows };
+      data = { documentDate: documentWrittenAt, approvalDeadline, rows: table2400EducationRows };
     } else {
-      data = { documentDate, approvalDeadline, rows: table1100Rows };
+      data = { documentDate: documentWrittenAt, approvalDeadline, rows: table1100Rows };
     }
     // mutation.mutate({ ...data, safetyIdx, itemNumber });
     console.log('임시 저장:', data);
   }, [
-    documentDate,
+    documentWrittenAt,
     approvalDeadline,
     table1100Rows,
     table1200IndustrialAccidentRow,
@@ -1142,15 +1441,58 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
     }
   }, [navigate, safetyId, state?.system, state?.item]);
 
-  const handleSampleView = useCallback(() => {
-    // TODO: TanStack Query Hook(useQuery)으로 샘플 문서 조회
-    // const { data: sampleDocument } = useQuery({
-    //   queryKey: ['risk2200SampleDocument', safetyIdx, itemNumber],
-    //   queryFn: () => getRisk2200SampleDocument({ safetyIdx, itemNumber }),
-    //   enabled: !!safetyIdx && !!itemNumber,
-    // });
-    console.log('샘플 보기');
+  // 파일 URL을 전체 URL로 변환
+  const getFullFileUrl = useCallback((url: string | null | undefined): string | null => {
+    if (!url) return null;
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
+    const path = url.startsWith('/') ? url : `/${url}`;
+    return `${baseUrl}${path}`;
   }, []);
+
+  // 팝업 창 열기 헬퍼 함수
+  const openPopup = useCallback((url: string, name: string) => {
+    const width = 1200;
+    const height = 900;
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+    window.open(
+      url,
+      name,
+      `width=${width},height=${height},left=${left},top=${top},menubar=no,status=no,toolbar=no,scrollbars=yes`
+    );
+  }, []);
+
+  // 샘플 보기 모달 상태
+  const [sampleViewModalOpen, setSampleViewModalOpen] = useState(false);
+
+  const handleSampleView = useCallback(() => {
+    // 활성화된 아이템 정보(itemDetail) 또는 전달받은 상태(state.item)에서 샘플 URL 확인
+    const sampleUrl = (state?.item as any)?.sample || (state?.system as any)?.sample;
+    if (sampleUrl) {
+      const samples = parseSampleUrls(sampleUrl);
+      if (samples.length > 1) {
+        // 여러 개인 경우 모달 표시
+        setSampleViewModalOpen(true);
+      } else if (samples.length === 1) {
+        // 단일 샘플인 경우 바로 열기
+        const fullUrl = getFullFileUrl(samples[0].url);
+        if (fullUrl) {
+          openPopup(fullUrl, 'sample-popup');
+        }
+      }
+    } else {
+      alert('등록된 샘플 파일이 없습니다.');
+    }
+  }, [state?.item, state?.system, getFullFileUrl, openPopup]);
+
+  // 샘플 목록 가져오기 (모달용)
+  const sampleList = useMemo(() => {
+    const sampleUrl = (state?.item as any)?.sample || (state?.system as any)?.sample;
+    return parseSampleUrls(sampleUrl);
+  }, [state?.item, state?.system]);
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
@@ -1189,9 +1531,9 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
             <DocumentInfo
               documentNumber={undefined} // TODO: 임시 저장된 문서의 문서번호 또는 등록 시 서버에서 받은 문서번호
               writerIp={undefined} // TODO: 클라이언트 IP 가져오기 또는 서버에서 받은 작성 IP
-              documentDate={documentDate}
+              documentWrittenAt={documentWrittenAt}
               approvalDeadline={approvalDeadline}
-              onDocumentDateChange={setDocumentDate}
+              onDocumentWrittenAtChange={handleDocumentWrittenAtChange}
               onApprovalDeadlineChange={setApprovalDeadline}
             />
 
@@ -1230,7 +1572,7 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
                             : is2100Series
                               ? '위험요인별 위험성 평가'
                               : is2200Series
-                                ? '위험요인 제거·대체 및 통제 등록'
+                                ? '위험요인 제거·대체 및 통제'
                                 : is2300Series
                                   ? '종합대책 수립·이행'
                                   : is2400TBM
@@ -1252,6 +1594,7 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
                   onAddRow={handleTable1100AddRow}
                   onSelectHighRiskWork={handleSelectHighRiskWork}
                   onSelectDisasterFactor={handleSelectDisasterFactor}
+                  onInsertRows={handleTable1100InsertRows}
                 />
               ) : is1200IndustrialAccident ? (
                 <Table1200IndustrialAccidentForm
@@ -1286,6 +1629,7 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
                   onRowDelete={handleTable1500RowDelete}
                   onRowMove={handleTable1500RowMove}
                   onAddRow={handleTable1500AddRow}
+                  riskAssessmentData={riskAssessmentData}
                 />
               ) : is2100Series ? (
                 <Table2100Form
@@ -1323,6 +1667,7 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
                   onEducationVideoRowDelete={handleTable2400TBMEducationVideoRowDelete}
                   onEducationVideoRowMove={handleTable2400TBMEducationVideoRowMove}
                   onEducationVideoAddRow={handleTable2400TBMEducationVideoAddRow}
+                  safetySystemDocumentIdx={safetySystemDocumentIdx}
                 />
               ) : is2400Education ? (
                 <Table2400EducationForm
@@ -1354,6 +1699,11 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
             initialData={riskAssessmentData}
           />
         )}
+        <SampleViewModal
+          open={sampleViewModalOpen}
+          onClose={() => setSampleViewModalOpen(false)}
+          samples={sampleList}
+        />
       </DashboardContent>
     </LocalizationProvider>
   );

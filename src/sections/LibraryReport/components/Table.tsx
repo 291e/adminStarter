@@ -50,7 +50,7 @@ export default function LibraryReportTable({
               />
             </TableCell>
             <TableCell sx={{ bgcolor: 'grey.100', minWidth: 80 }}>순번</TableCell>
-            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 180 }}>등록일</TableCell>
+            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 120 }}>등록일</TableCell>
             <TableCell sx={{ bgcolor: 'grey.100', minWidth: 140 }}>조직명</TableCell>
             <TableCell sx={{ bgcolor: 'grey.100', minWidth: 160 }}>카테고리</TableCell>
             <TableCell sx={{ bgcolor: 'grey.100', minWidth: 444 }}>제목</TableCell>
@@ -64,7 +64,7 @@ export default function LibraryReportTable({
               상태
             </TableCell>
             <TableCell align="center" sx={{ bgcolor: 'grey.100', minWidth: 68 }}>
-              액션
+              &nbsp;
             </TableCell>
           </TableRow>
         </TableHead>
@@ -128,9 +128,9 @@ export default function LibraryReportTable({
                       }}
                     >
                       <Iconify
-                        icon="solar:check-circle-bold"
-                        width={24}
-                        sx={{ color: 'info.main' }}
+                        icon="eva:checkmark-fill"
+                        width={20}
+                        sx={{ color: 'primary.main' }}
                       />
                     </Box>
                   ) : (
@@ -144,16 +144,7 @@ export default function LibraryReportTable({
                   />
                 </TableCell>
                 <TableCell align="center">
-                  <IconButton
-                    size="small"
-                    onClick={() => onEdit?.(row)}
-                    sx={{
-                      bgcolor: 'grey.200',
-                      '&:hover': {
-                        bgcolor: 'grey.300',
-                      },
-                    }}
-                  >
+                  <IconButton size="small" onClick={() => onEdit?.(row)}>
                     <Iconify icon="solar:pen-bold" width={20} />
                   </IconButton>
                 </TableCell>

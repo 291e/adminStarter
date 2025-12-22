@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
@@ -106,20 +107,48 @@ export default function Table1200NearMissForm({ row, onRowChange }: Props) {
   const handleAddImages = async (files?: FileList | File[]) => {
     if (!files) return;
     const imageFiles = Array.from(files).filter((file) => file.type.startsWith('image/'));
-    if (!imageFiles.length) return;
+    if (!imageFiles.length) {
+      toast.error('이미지 파일만 업로드 가능합니다.');
+      return;
+    }
 
     try {
       // 이미지 업로드
       const uploadResponse = await uploadFile({ files: imageFiles });
-      const uploadedFiles = (uploadResponse as any).files || [];
-      const imageUrls = uploadedFiles.map((file: any) => file.fileUrl || file.url).filter(Boolean);
 
-      if (imageUrls.length > 0) {
-        onRowChange('siteImages', [...row.siteImages, ...imageUrls]);
+      // axios 인터셉터가 응답을 평탄화하므로 여러 형태 확인
+      let imageUrls: string[] = [];
+
+      // 형태 1: fileUrls 배열
+      if ((uploadResponse as any)?.fileUrls && Array.isArray((uploadResponse as any).fileUrls)) {
+        imageUrls = (uploadResponse as any).fileUrls;
       }
-    } catch (error) {
-      console.error('이미지 업로드 실패:', error);
-      // TODO: 에러 토스트 표시
+      // 형태 2: files 배열에서 fileUrl 추출
+      else if ((uploadResponse as any)?.files && Array.isArray((uploadResponse as any).files)) {
+        imageUrls = (uploadResponse as any).files
+          .map((file: any) => file.fileUrl || file.url)
+          .filter(Boolean);
+      }
+      // 형태 3: data.fileUrls
+      else if (
+        (uploadResponse as any)?.data?.fileUrls &&
+        Array.isArray((uploadResponse as any).data.fileUrls)
+      ) {
+        imageUrls = (uploadResponse as any).data.fileUrls;
+      }
+
+      if (imageUrls.length === 0) {
+        throw new Error('파일 업로드에 실패했습니다.');
+      }
+
+      onRowChange('siteImages', [...row.siteImages, ...imageUrls]);
+      toast.success(`${imageUrls.length}개의 이미지가 추가되었습니다.`);
+    } catch (error: any) {
+      const errorMessage =
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '파일 업로드에 실패했습니다.';
+      toast.error(errorMessage);
     }
   };
 
@@ -158,16 +187,41 @@ export default function Table1200NearMissForm({ row, onRowChange }: Props) {
     try {
       // 이미지 업로드
       const uploadResponse = await uploadFile({ files: images });
-      const uploadedFiles = (uploadResponse as any).files || [];
-      const imageUrls = uploadedFiles.map((file: any) => file.fileUrl || file.url).filter(Boolean);
 
-      if (imageUrls.length > 0) {
-        onRowChange('siteImages', imageUrls);
+      // axios 인터셉터가 응답을 평탄화하므로 여러 형태 확인
+      let imageUrls: string[] = [];
+
+      // 형태 1: fileUrls 배열
+      if ((uploadResponse as any)?.fileUrls && Array.isArray((uploadResponse as any).fileUrls)) {
+        imageUrls = (uploadResponse as any).fileUrls;
       }
+      // 형태 2: files 배열에서 fileUrl 추출
+      else if ((uploadResponse as any)?.files && Array.isArray((uploadResponse as any).files)) {
+        imageUrls = (uploadResponse as any).files
+          .map((file: any) => file.fileUrl || file.url)
+          .filter(Boolean);
+      }
+      // 형태 3: data.fileUrls
+      else if (
+        (uploadResponse as any)?.data?.fileUrls &&
+        Array.isArray((uploadResponse as any).data.fileUrls)
+      ) {
+        imageUrls = (uploadResponse as any).data.fileUrls;
+      }
+
+      if (imageUrls.length === 0) {
+        throw new Error('파일 업로드에 실패했습니다.');
+      }
+
+      onRowChange('siteImages', imageUrls);
       setIsUploadModalOpen(false);
-    } catch (error) {
-      console.error('이미지 업로드 실패:', error);
-      // TODO: 에러 토스트 표시
+      toast.success(`${imageUrls.length}개의 이미지가 업로드되었습니다.`);
+    } catch (error: any) {
+      const errorMessage =
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '파일 업로드에 실패했습니다.';
+      toast.error(errorMessage);
     }
   };
 
@@ -213,9 +267,17 @@ export default function Table1200NearMissForm({ row, onRowChange }: Props) {
               <TextField
                 size="small"
                 fullWidth
+                multiline
                 value={row.workName}
                 onChange={handleRowChange('workName')}
                 placeholder="작업명을 입력하세요."
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    fontSize: 15,
+                    height: 'auto',
+                    p: 1,
+                  },
+                }}
               />
             </td>
             <th style={headerCellStyle}>등급</th>
@@ -257,20 +319,36 @@ export default function Table1200NearMissForm({ row, onRowChange }: Props) {
                 <TextField
                   size="small"
                   fullWidth
+                  multiline
                   value={row.reporter}
                   onChange={handleRowChange('reporter')}
                   placeholder="신고자를 입력하세요."
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      fontSize: 15,
+                      height: 'auto',
+                      p: 1,
+                    },
+                  }}
                 />
               </Box>
             </td>
-            <th style={headerCellStyle}>소속</th>
+            <th style={headerCellStyle}>소속팀</th>
             <td style={bodyCellStyle}>
               <TextField
                 size="small"
                 fullWidth
+                multiline
                 value={row.reporterDepartment}
                 onChange={handleRowChange('reporterDepartment')}
-                placeholder="소속을 입력하세요."
+                placeholder="소속팀을 입력하세요."
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    fontSize: 15,
+                    height: 'auto',
+                    p: 1,
+                  },
+                }}
               />
             </td>
           </tr>
@@ -286,6 +364,13 @@ export default function Table1200NearMissForm({ row, onRowChange }: Props) {
                 value={row.workContent}
                 onChange={handleRowChange('workContent')}
                 placeholder="작업내용을 입력하세요."
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    fontSize: 15,
+                    height: 'auto',
+                    p: 1,
+                  },
+                }}
               />
             </td>
           </tr>
@@ -301,6 +386,13 @@ export default function Table1200NearMissForm({ row, onRowChange }: Props) {
                 value={row.accidentContent}
                 onChange={handleRowChange('accidentContent')}
                 placeholder="사고 내용을 입력하세요."
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    fontSize: 15,
+                    height: 'auto',
+                    p: 1,
+                  },
+                }}
               />
             </td>
             <td style={bodyCellStyle}>
@@ -336,6 +428,13 @@ export default function Table1200NearMissForm({ row, onRowChange }: Props) {
                 value={row.accidentCause}
                 onChange={handleRowChange('accidentCause')}
                 placeholder="발생 원인을 입력하세요."
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    fontSize: 15,
+                    height: 'auto',
+                    p: 1,
+                  },
+                }}
               />
             </td>
           </tr>
@@ -351,6 +450,13 @@ export default function Table1200NearMissForm({ row, onRowChange }: Props) {
                 value={row.preventionMeasure}
                 onChange={handleRowChange('preventionMeasure')}
                 placeholder="예방 대책을 입력하세요."
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    fontSize: 15,
+                    height: 'auto',
+                    p: 1,
+                  },
+                }}
               />
             </td>
             <td style={bodyCellStyle}>
@@ -391,6 +497,13 @@ export default function Table1200NearMissForm({ row, onRowChange }: Props) {
                   value={row.siteSituation}
                   onChange={handleRowChange('siteSituation')}
                   placeholder="작업현장 상황을 설명하세요."
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      fontSize: 15,
+                      height: 'auto',
+                      p: 1,
+                    },
+                  }}
                 />
 
                 {/* 사진이 없을 때만 드래그 앤 드롭 영역 표시 */}
@@ -604,7 +717,7 @@ export default function Table1200NearMissForm({ row, onRowChange }: Props) {
         <tbody>
           {gradeGuideRows.map((rowItem) => (
             <tr key={rowItem.grade}>
-              <td style={bodyCellStyle}>{rowItem.grade}</td>
+              <td style={{ ...bodyCellStyle, textAlign: 'center' }}>{rowItem.grade}</td>
               <td style={bodyCellStyle}>{rowItem.risk}</td>
               <td style={bodyCellStyle}>
                 <ul style={{ margin: 0, paddingLeft: '18px' }}>
@@ -639,6 +752,7 @@ export default function Table1200NearMissForm({ row, onRowChange }: Props) {
         open={isReporterModalOpen}
         onClose={handleReporterModalClose}
         onConfirm={handleReporterModalConfirm}
+        isNearMiss
       />
     </Box>
   );

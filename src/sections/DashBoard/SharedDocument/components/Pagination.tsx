@@ -1,6 +1,5 @@
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
-import Switch from '@mui/material/Switch';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import Select from '@mui/material/Select';
@@ -21,8 +20,6 @@ type Props = {
 };
 
 export default function SharedDocumentPagination({
-  dense,
-  onChangeDense,
   rowsPerPage,
   onChangeRowsPerPage,
   page,
@@ -45,21 +42,12 @@ export default function SharedDocumentPagination({
         borderColor: 'divider',
       }}
     >
-      <Stack direction="row" spacing={1} alignItems="center">
-        <Switch
-          checked={dense}
-          onChange={(e) => {
-            onChangeDense(e.target.checked);
-            // TODO: 좁게 보기 변경 시 UI만 업데이트 (API 호출 불필요)
-          }}
-          size="small"
-        />
-        <Typography variant="body2" sx={{ fontSize: 14 }}>
-          좁게 보기
-        </Typography>
-      </Stack>
-
-      <Stack direction="row" spacing={2} alignItems="center" sx={{ flex: 1, justifyContent: 'flex-end' }}>
+      <Stack
+        direction="row"
+        spacing={2}
+        alignItems="center"
+        sx={{ flex: 1, justifyContent: 'flex-end' }}
+      >
         <Typography variant="body2" sx={{ fontSize: 14, textAlign: 'right' }}>
           표시행 수
         </Typography>
@@ -85,7 +73,7 @@ export default function SharedDocumentPagination({
           </Select>
         </FormControl>
         <Typography variant="body2" sx={{ fontSize: 14 }}>
-          {start}-{end} of {total}
+          {start}-{end} / {total}
         </Typography>
         <Stack direction="row" spacing={0.5}>
           <IconButton
@@ -117,4 +105,3 @@ export default function SharedDocumentPagination({
     </Box>
   );
 }
-

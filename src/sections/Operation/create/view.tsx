@@ -12,6 +12,7 @@ import { Iconify } from 'src/components/iconify';
 import RiskReportForm, { type RiskReportFormData } from './components/Form';
 import { useCreateRiskReport } from '../hooks/use-operation-api';
 import { uploadFile } from 'src/services/system/system.service';
+import { useMyInfo } from 'src/sections/Chat/hooks/use-my-info';
 
 // ----------------------------------------------------------------------
 
@@ -24,12 +25,22 @@ type Props = {
 export function RiskReportCreateView({ title = '위험 보고 등록', description, sx }: Props) {
   const navigate = useNavigate();
   const createRiskReportMutation = useCreateRiskReport();
+  const { data: myInfoData } = useMyInfo();
+
+  // 현재 사용자 이름 추출
+  const currentUserName = myInfoData?.memberName || '';
 
   const handleSubmit = async (data: RiskReportFormData) => {
     try {
       let imageUrls: string[] = [];
 
-      if (data.images.length > 0) {
+      // 이미 업로드된 URL이 있으면 사용, 없으면 새로 업로드
+      if (data.uploadedImageUrls && data.uploadedImageUrls.length > 0) {
+        imageUrls = data.uploadedImageUrls;
+        if (import.meta.env.DEV) {
+          console.log('📤 [RiskReportCreateView] 이미 업로드된 이미지 사용', imageUrls.length);
+        }
+      } else if (data.images.length > 0) {
         if (import.meta.env.DEV) {
           console.log('📤 [RiskReportCreateView] 이미지 업로드 시작', data.images.length);
         }
@@ -45,7 +56,6 @@ export function RiskReportCreateView({ title = '위험 보고 등록', descripti
       }
 
       const payload = {
-        title: data.title.trim(),
         location: data.location.trim(),
         content: data.content,
         imageUrl: imageUrls[0],
@@ -102,6 +112,9 @@ export function RiskReportCreateView({ title = '위험 보고 등록', descripti
           onSubmit={handleSubmit}
           onCancel={handleCancel}
           isSubmitting={createRiskReportMutation.isPending}
+          initialData={{
+            authorName: currentUserName,
+          }}
         />
       </Box>
     </DashboardContent>

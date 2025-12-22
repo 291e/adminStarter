@@ -46,14 +46,14 @@ export function SharedDocumentView({ title = '공유 문서함', description, sx
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  // 공유된 문서 목록 조회
+  // 공유된 문서 목록 조회 (전체 데이터 가져오기 - 충분히 큰 pageSize로 모든 데이터 가져오기)
   const {
     data: sharedDocumentsData,
     isLoading: sharedDocumentsLoading,
     error: sharedDocumentsError,
   } = useSharedDocuments({
-    page,
-    pageSize: rowsPerPage,
+    page: 1,
+    pageSize: 1000, // 충분히 큰 값으로 모든 데이터 가져오기
   });
 
   // 중요도 설정 목록 조회
@@ -363,11 +363,7 @@ export function SharedDocumentView({ title = '공유 문서함', description, sx
 
       await updateDocumentMutation.mutateAsync(updateParams);
 
-      // 쿼리 무효화하여 최신 데이터 가져오기 (페이지네이션 파라미터 포함)
-      await queryClient.invalidateQueries({
-        queryKey: ['sharedDocuments', { page, pageSize: rowsPerPage }],
-      });
-      // 전체 쿼리도 무효화 (다른 페이지의 데이터도 갱신)
+      // 쿼리 무효화하여 최신 데이터 가져오기
       await queryClient.invalidateQueries({ queryKey: ['sharedDocuments'] });
 
       if (import.meta.env.DEV) {
@@ -403,8 +399,7 @@ export function SharedDocumentView({ title = '공유 문서함', description, sx
 
   return (
     <DashboardContent maxWidth="xl">
-      <Typography variant="h4"> {title} </Typography>
-      {description && <Typography sx={{ mt: 1 }}> {description} </Typography>}
+      <Typography variant="h4"> 공유 문서함</Typography>
 
       <SharedDocumentBreadcrumbs
         items={[
@@ -414,18 +409,6 @@ export function SharedDocumentView({ title = '공유 문서함', description, sx
         onPrioritySettings={handlePrioritySettings}
         onUpload={handleUpload}
       />
-
-      {description && (
-        <Typography
-          sx={{
-            mt: 1,
-            mb: { xs: 2, sm: 3, md: 3.5 },
-            fontSize: { xs: '0.875rem', sm: '1rem' },
-          }}
-        >
-          {description}
-        </Typography>
-      )}
 
       {sharedDocumentsLoading && (
         <Box sx={{ p: 3, textAlign: 'center' }}>
@@ -477,6 +460,8 @@ export function SharedDocumentView({ title = '공유 문서함', description, sx
           <SharedDocumentTable
             rows={logic.filtered}
             prioritySettings={prioritySettings}
+            page={logic.page}
+            rowsPerPage={logic.rowsPerPage}
             onShareToChat={handleShareToChat}
             onEdit={handleEdit}
             onDelete={handleDelete}
@@ -485,18 +470,15 @@ export function SharedDocumentView({ title = '공유 문서함', description, sx
           <SharedDocumentPagination
             dense={logic.dense}
             onChangeDense={logic.onChangeDense}
-            rowsPerPage={rowsPerPage}
+            rowsPerPage={logic.rowsPerPage}
             onChangeRowsPerPage={(newRowsPerPage) => {
-              setRowsPerPage(newRowsPerPage);
-              setPage(1);
-              queryClient.invalidateQueries({ queryKey: ['sharedDocuments'] });
+              logic.onChangeRowsPerPage(newRowsPerPage);
             }}
-            page={page}
-            total={sharedDocumentsData?.totalCount || 0}
+            page={logic.page}
+            total={logic.total}
             count={logic.filtered.length}
             onPageChange={(newPage) => {
-              setPage(newPage);
-              queryClient.invalidateQueries({ queryKey: ['sharedDocuments'] });
+              logic.onChangePage(newPage);
             }}
           />
         </Box>

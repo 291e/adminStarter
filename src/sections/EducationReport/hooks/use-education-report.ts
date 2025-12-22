@@ -79,23 +79,35 @@ export function useEducationReport(reports: EducationReport[]): UseEducationRepo
         const companyInfo = r.companyInformation;
         const organizationName = companyInfo?.companyName || r.organizationName || '';
         const memberName = memberInfo?.memberName || r.name || '';
-        const department = memberInfo?.department || r.department || '';
+        // department가 null이거나 undefined일 수 있으므로 명시적으로 처리
+        const department = memberInfo?.department ?? r.department ?? '';
         const memberRole = memberInfo?.memberRole || r.role || '';
 
+        // 디버깅: 소속팀 필터 검색 시 로그
+        if (import.meta.env.DEV && filters.searchFilter === 'department' && filters.searchValue) {
+          console.log('🔍 [useEducationReport] 소속팀 검색:', {
+            searchValue: filters.searchValue,
+            department,
+            memberInfo: memberInfo?.department,
+            rowDepartment: r.department,
+            match: department.toLowerCase().includes(searchLower),
+          });
+        }
+
         if (filters.searchFilter === 'all') {
+          // 전체 검색: 조직명, 이름, 소속팀, 역할 모두 검색
           searchMatch =
             organizationName.toLowerCase().includes(searchLower) ||
             memberName.toLowerCase().includes(searchLower) ||
-            department.toLowerCase().includes(searchLower) ||
+            (Boolean(department) && department.toLowerCase().includes(searchLower)) ||
             memberRole.toLowerCase().includes(searchLower);
-        } else if (filters.searchFilter === 'organizationName') {
-          searchMatch = organizationName.toLowerCase().includes(searchLower);
         } else if (filters.searchFilter === 'name') {
+          // 이름으로 검색
           searchMatch = memberName.toLowerCase().includes(searchLower);
         } else if (filters.searchFilter === 'department') {
-          searchMatch = department.toLowerCase().includes(searchLower);
-        } else if (filters.searchFilter === 'role') {
-          searchMatch = memberRole.toLowerCase().includes(searchLower);
+          // 소속팀으로 검색 (조직명이 아님)
+          // department가 빈 문자열이 아닐 때만 검색
+          searchMatch = Boolean(department) && department.toLowerCase().includes(searchLower);
         }
 
         return roleMatch && searchMatch;

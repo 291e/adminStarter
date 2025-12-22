@@ -24,7 +24,7 @@ export default function DocumentHeader({
   riskId,
   currentDocument,
 }: Props) {
-  const displayTitle = title || '위험요인 제거·대체 및 통제 등록';
+  const displayTitle = title || '위험요인 제거·대체 및 통제';
 
   return (
     <Box

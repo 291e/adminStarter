@@ -47,7 +47,7 @@ export type Table1400PhysicalRow = {
   factorName: string; // 유해인자명
   form: string; // 형태
   location: string; // 위치
-  department: string; // 대상부서
+  department: string; // 대상소속팀
   exposureRisk: string; // 노출위험
   managementStandard: string; // 관리기준
   managementMeasure: string; // 관리대책
@@ -58,7 +58,7 @@ export type Table1400BiologicalRow = {
   factorName: string; // 유해인자명
   type: string; // 유형
   location: string; // 발생위치
-  department: string; // 대상부서
+  department: string; // 대상소속팀
   exposureRisk: string; // 노출위험
   managementStandard: string; // 관리기준
   managementMeasure: string; // 관리대책
@@ -69,7 +69,7 @@ export type Table1400ErgonomicRow = {
   factorName: string; // 유해인자명
   form: string; // 형태
   location: string; // 위치
-  department: string; // 대상부서
+  department: string; // 대상소속팀
   exposureRisk: string; // 노출위험
   managementStandard: string; // 관리기준
   managementMeasure: string; // 관리대책
@@ -159,7 +159,9 @@ export type Table2400TBMInspectionRow = {
 export type Table2400TBMEducationVideoRow = {
   participant: InvestigationTeamMember | null; // 대상자
   educationVideo: string; // 교육영상
+  vodIdx?: number; // 교육 영상 Index (VOD)
   signature: string; // 서명 (이미지 URL 또는 파일)
+  workerSignatureIdx?: number; // 근로자 서명 Index (서명 등록 후 저장)
 };
 
 export type Table2400TBMData = {
@@ -171,7 +173,7 @@ export type Table2400TBMData = {
 // 2400번대: 교육훈련 - 연간 교육 계획
 export type Table2400EducationRow = {
   number: number; // 순번
-  educationType: '법정' | '자율'; // 교육구분
+  educationType?: '법정' | '자율'; // 교육구분 (옵셔널)
   educationCourse: string; // 교육과정
   scheduleMonths: boolean[]; // 일정 (1월~12월 체크박스, 12개)
   targetCount: string; // 대상 인원(명)
@@ -201,13 +203,13 @@ export type Table2400MinimumEducationRow = {
 
 // 1200번대: 산업재해 및 아차사고 - 산업재해 작성
 export type InvestigationTeamMember = {
-  department: string; // 소속
+  department: string; // 소속팀
   name: string; // 성명
   memberIdx?: number; // 멤버 인덱스 (결재 대상자 등록용, 선택적)
 };
 
 export type HumanDamage = {
-  department: string; // 소속
+  department: string; // 소속팀
   name: string; // 성명
   position: string; // 직급
   injury: string; // 상해부위/부상
@@ -246,7 +248,7 @@ export type Table1200NearMissRow = {
   workName: string; // 작업명
   grade: Table1200RiskGrade; // 등급
   reporter: string; // 신고자
-  reporterDepartment: string; // 소속
+  reporterDepartment: string; // 소속팀
   workContent: string; // 작업내용
   accidentContent: string; // 사고내용
   accidentRiskLevel: Table1200RiskGrade; // 사고내용 위험정도

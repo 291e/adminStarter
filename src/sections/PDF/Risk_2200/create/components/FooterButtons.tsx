@@ -17,7 +17,6 @@ export default function FooterButtons({ onSave, onTemporarySave, onCancel }: Pro
         gap: 2,
         justifyContent: 'flex-end',
         width: '100%',
-        maxWidth: 1320,
       }}
     >
       <Button
@@ -72,4 +71,3 @@ export default function FooterButtons({ onSave, onTemporarySave, onCancel }: Pro
     </Box>
   );
 }
-

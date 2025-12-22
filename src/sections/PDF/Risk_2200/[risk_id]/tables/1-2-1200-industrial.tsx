@@ -45,7 +45,6 @@ const defaultRow: Table1200IndustrialAccidentRow = {
 
 export default function RiskTable_1_2_1200_Industrial({ row = defaultRow }: Props) {
   const headerCellStyle: React.CSSProperties = {
-    backgroundColor: '#f4f6f8',
     padding: '8px',
     border: '1px solid #1c252e',
     textAlign: 'center',
@@ -63,7 +62,6 @@ export default function RiskTable_1_2_1200_Industrial({ row = defaultRow }: Prop
   };
 
   const subHeaderCellStyle: React.CSSProperties = {
-    backgroundColor: '#fafafa',
     padding: '8px',
     border: '1px solid #1c252e',
     borderTop: 'none',
@@ -78,15 +76,19 @@ export default function RiskTable_1_2_1200_Industrial({ row = defaultRow }: Prop
     border: '1px solid #dfe3e8',
   };
 
-  const hasInvestigationMembers = row.investigationTeam && row.investigationTeam.length > 0;
-  const displayedInvestigationTeam = hasInvestigationMembers
-    ? row.investigationTeam
-    : [{ department: '', name: '' }];
+  // 사고조사반 빈 행 필터링
+  const displayedInvestigationTeam = (row.investigationTeam || []).filter(
+    (member) => member.department?.trim() || member.name?.trim()
+  );
 
-  const hasHumanDamage = row.humanDamage && row.humanDamage.length > 0;
-  const displayedHumanDamage = hasHumanDamage
-    ? row.humanDamage
-    : [{ department: '', name: '', position: '', injury: '' }];
+  // 인적피해 빈 행 필터링
+  const displayedHumanDamage = (row.humanDamage || []).filter(
+    (damage) =>
+      damage.department?.trim() ||
+      damage.name?.trim() ||
+      damage.position?.trim() ||
+      damage.injury?.trim()
+  );
 
   const renderInvestigationImages = () => {
     if (!row.investigationImages || row.investigationImages.length === 0) {
@@ -131,6 +133,10 @@ export default function RiskTable_1_2_1200_Industrial({ row = defaultRow }: Prop
           border: '2px solid #1c252e',
           borderCollapse: 'collapse',
           tableLayout: 'fixed',
+          '& tbody tr': {
+            pageBreakInside: 'avoid',
+            breakInside: 'avoid',
+          },
         }}
       >
         <colgroup>
@@ -176,7 +182,9 @@ export default function RiskTable_1_2_1200_Industrial({ row = defaultRow }: Prop
           {/* 사고조사반 */}
           <tr>
             <th style={headerCellStyle}>
-              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+              <Box
+                sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}
+              >
                 <Iconify icon="eva:search-fill" width={24} />
                 <Typography sx={{ fontSize: 16, fontWeight: 600 }}>사고조사반</Typography>
               </Box>
@@ -196,7 +204,7 @@ export default function RiskTable_1_2_1200_Industrial({ row = defaultRow }: Prop
                   </colgroup>
                   <thead>
                     <tr>
-                      <th style={{ ...subHeaderCellStyle, ...innerCellStyle }}>소속</th>
+                      <th style={{ ...subHeaderCellStyle, ...innerCellStyle }}>소속팀</th>
                       <th style={{ ...subHeaderCellStyle, ...innerCellStyle }}>성명</th>
                     </tr>
                   </thead>
@@ -220,7 +228,9 @@ export default function RiskTable_1_2_1200_Industrial({ row = defaultRow }: Prop
           {/* 인적피해 */}
           <tr>
             <th style={headerCellStyle}>
-              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+              <Box
+                sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}
+              >
                 <Iconify icon="eva:search-fill" width={24} />
                 <Typography sx={{ fontSize: 16, fontWeight: 600 }}>인적피해</Typography>
               </Box>
@@ -242,7 +252,7 @@ export default function RiskTable_1_2_1200_Industrial({ row = defaultRow }: Prop
                   </colgroup>
                   <thead>
                     <tr>
-                      <th style={{ ...subHeaderCellStyle, ...innerCellStyle }}>소속</th>
+                      <th style={{ ...subHeaderCellStyle, ...innerCellStyle }}>소속팀</th>
                       <th style={{ ...subHeaderCellStyle, ...innerCellStyle }}>성명</th>
                       <th style={{ ...subHeaderCellStyle, ...innerCellStyle }}>직급</th>
                       <th style={{ ...subHeaderCellStyle, ...innerCellStyle }}>상해부위/부상</th>

@@ -5,16 +5,14 @@ import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
-import Avatar from '@mui/material/Avatar';
 
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
 import { useRemoveParticipants } from 'src/sections/Chat/hooks/use-chat-api';
 import { useQueryClient } from '@tanstack/react-query';
 import type { ChatRoomDto, ChatParticipantDto } from 'src/services/chat/chat.types';
-import warningIcon from 'src/assets/icons/safeyoui/warning.svg';
+import { Iconify } from 'src/components/iconify';
 
 // ----------------------------------------------------------------------
-
 
 type Props = {
   open: boolean;
@@ -41,14 +39,8 @@ export default function RemoveParticipantModal({
     selectedParticipantIds.includes(getParticipantId(participant, idx))
   );
 
-  // 대화 상대가 1명일 경우 상대방 프로필 정보 표시
-  // 일반 채팅(1대1)이거나 필터링된 참가자가 1명일 경우
-  const isSingleParticipant = participants.length === 1 || room?.type === 'NORMAL';
-  // 대화 상대가 1명일 경우 첫 번째 선택된 참가자만 표시
-  // 일반 채팅의 경우 선택된 참가자가 없어도 첫 번째 참가자를 표시
-  const displayParticipant = isSingleParticipant
-    ? selectedParticipants[0] || participants[0]
-    : null;
+  // 선택된 참가자가 1명인지 여부
+  const isSingleParticipant = selectedParticipants.length === 1;
 
   const queryClient = useQueryClient();
   const removeParticipantsMutation = useRemoveParticipants();
@@ -102,145 +94,90 @@ export default function RemoveParticipantModal({
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-      <DialogContent
-        sx={{
-          px: 3.5,
-          py: 3,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: 2.5,
-        }}
-      >
-        {/* 경고 아이콘 */}
-        <Box
-          sx={{
-            width: 64,
-            height: 64,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <img src={warningIcon} alt="warning" width={64} height={64} />
-        </Box>
-
-        {/* 텍스트 영역 */}
-        <Stack spacing={1} alignItems="center" sx={{ textAlign: 'center' }}>
-          <Typography variant="h5" sx={{ fontWeight: 700, fontSize: 20, lineHeight: '30px' }}>
-            {isSingleParticipant
-              ? '이 사용자를 내보내시겠습니까?'
-              : '선택한 사용자를 내보내시겠습니까?'}
-          </Typography>
-          <Typography
-            variant="subtitle2"
+      <DialogContent>
+        <Stack spacing={2} alignItems="center" sx={{ pt: 2 }}>
+          {/* 경고 아이콘 */}
+          <Box
             sx={{
-              fontSize: 14,
-              fontWeight: 600,
-              lineHeight: '22px',
-              color: 'text.secondary',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
+            <Iconify
+              icon={'solar:danger-circle-bold' as any}
+              width={64}
+              sx={{ color: 'error.main' }}
+            />
+          </Box>
+
+          {/* 메시지 */}
+          <Typography variant="subtitle1" sx={{ textAlign: 'center' }}>
             {isSingleParticipant
-              ? '내보내기를 진행하면 이 사용자는 대화에 참여할 수 없으며, 복구할 수 없습니다.'
-              : '내보내기를 진행하면 이 사용자들은 대화에 참여할 수 없으며, 복구할 수 없습니다.'}
+              ? '선택한 사용자를 내보내시겠습니까?'
+              : '선택한 사용자들을 내보내시겠습니까?'}
+          </Typography>
+          <Typography variant="body2" sx={{ textAlign: 'center', mt: 1 }}>
+            {isSingleParticipant ? (
+              <>
+                내보내기를 진행하면 이 사용자는 대화에 <br /> 참여할 수 없으며, 복구할 수 없습니다.
+              </>
+            ) : (
+              <>
+                내보내기를 진행하면 이 사용자들은 대화에 <br /> 참여할 수 없으며, 복구할 수
+                없습니다.
+              </>
+            )}
           </Typography>
         </Stack>
 
-        {/* 대화 상대가 1명일 경우: 아바타와 사용자 정보 표시 */}
-        {isSingleParticipant && displayParticipant ? (
-          <Stack spacing={1} alignItems="center" sx={{ width: '100%', pt: 1 }}>
-            <Avatar
-              sx={{
-                width: 64,
-                height: 64,
-                bgcolor: 'grey.300',
-                fontSize: 24,
-                fontWeight: 600,
-              }}
-            >
-              {displayParticipant.name[0]}
-            </Avatar>
-            <Stack spacing={0.5} alignItems="center">
-              <Typography
-                variant="subtitle1"
-                sx={{
-                  fontSize: 16,
-                  fontWeight: 600,
-                  lineHeight: '24px',
-                  color: 'text.primary',
-                }}
-              >
-                {displayParticipant.name}
-              </Typography>
-              {(displayParticipant as any).role && (
-                <Typography
-                  variant="body2"
+        {/* 선택된 참가자 Chip 목록 */}
+        {selectedParticipants.length > 0 && (
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{
+              flexWrap: 'wrap',
+              justifyContent: 'center',
+              gap: 1,
+              width: '100%',
+              pt: 1,
+            }}
+          >
+            {selectedParticipants.map((participant, idx) => {
+              const participantId = getParticipantId(participant, idx);
+              return (
+                <Chip
+                  key={participantId}
+                  label={participant.name}
+                  size="small"
                   sx={{
-                    fontSize: 14,
-                    fontWeight: 400,
-                    lineHeight: '22px',
-                    color: 'text.disabled',
+                    height: 24,
+                    bgcolor: 'info.lighter',
+                    color: 'info.darker',
+                    fontSize: 13,
+                    fontWeight: 500,
+                    lineHeight: '18px',
+                    '& .MuiChip-label': {
+                      px: 1.25,
+                      py: 0,
+                    },
                   }}
-                >
-                  {(displayParticipant as any).role}
-                </Typography>
-              )}
-            </Stack>
+                />
+              );
+            })}
           </Stack>
-        ) : (
-          /* 그룹 채팅: 선택된 참가자 Chip 목록 */
-          selectedParticipants.length > 0 && (
-            <Stack
-              direction="row"
-              spacing={1}
-              sx={{
-                flexWrap: 'wrap',
-                justifyContent: 'center',
-                gap: 1,
-                width: '100%',
-              }}
-            >
-              {selectedParticipants.map((participant, idx) => {
-                const participantId = getParticipantId(participant, idx);
-                return (
-                  <Chip
-                    key={participantId}
-                    label={participant.name}
-                    size="small"
-                    sx={{
-                      height: 24,
-                      bgcolor: 'info.lighter',
-                      color: 'info.darker',
-                      fontSize: 13,
-                      fontWeight: 500,
-                      lineHeight: '18px',
-                      '& .MuiChip-label': {
-                        px: 1.25,
-                        py: 0,
-                      },
-                    }}
-                  />
-                );
-              })}
-            </Stack>
-          )
         )}
       </DialogContent>
 
-      <DialogActions sx={{ px: 2, pb: 3, pt: 0 }}>
-        <Stack direction="row" spacing={1.5} justifyContent="center" sx={{ width: '100%' }}>
-          <DialogBtn variant="outlined" onClick={onClose} sx={{ minHeight: 36, fontSize: 14 }}>
-            취소
-          </DialogBtn>
-          <DialogBtn
-            variant="contained"
-            onClick={handleConfirm}
-            sx={{ minHeight: 36, fontSize: 14 }}
-          >
-            내보내기
-          </DialogBtn>
-        </Stack>
+      <DialogActions sx={{ px: 3, pb: 3, justifyContent: 'center', gap: 1 }}>
+        <DialogBtn variant="outlined" onClick={onClose} sx={{ minWidth: 64 }}>
+          취소
+        </DialogBtn>
+        <DialogBtn variant="contained" onClick={handleConfirm} sx={{ minWidth: 64 }}>
+          내보내기
+        </DialogBtn>
       </DialogActions>
     </Dialog>
   );

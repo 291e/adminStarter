@@ -8,18 +8,18 @@ import { type Dayjs } from 'dayjs';
 type Props = {
   documentNumber?: string;
   writerIp?: string;
-  documentDate: Dayjs | null;
+  documentWrittenAt: Dayjs | null;
   approvalDeadline: Dayjs | null;
-  onDocumentDateChange?: (date: Dayjs | null) => void;
+  onDocumentWrittenAtChange?: (date: Dayjs | null) => void;
   onApprovalDeadlineChange?: (date: Dayjs | null) => void;
 };
 
 export default function DocumentInfo({
   documentNumber,
   writerIp,
-  documentDate,
+  documentWrittenAt,
   approvalDeadline,
-  onDocumentDateChange,
+  onDocumentWrittenAtChange,
   onApprovalDeadlineChange,
 }: Props) {
   // TODO: TanStack Query Hook(useQuery)으로 임시 저장된 문서 정보 가져오기 (문서번호 표시용)
@@ -104,8 +104,8 @@ export default function DocumentInfo({
             문서 작성일
           </Typography>
           <DatePicker
-            value={documentDate}
-            onChange={(newValue) => onDocumentDateChange?.(newValue)}
+            value={documentWrittenAt}
+            onChange={(newValue) => onDocumentWrittenAtChange?.(newValue)}
             format="YYYY-MM-DD"
             slotProps={{
               textField: {

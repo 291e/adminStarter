@@ -21,11 +21,7 @@ import Checkbox from '@mui/material/Checkbox';
 import FormControlLabel from '@mui/material/FormControlLabel';
 
 import { Iconify } from 'src/components/iconify';
-import {
-  useCreateOrganization,
-  useSubscribe,
-  useInviteMember,
-} from '../hooks/use-organization-api';
+import { useCreateOrganization, useInviteMember } from '../hooks/use-organization-api';
 import { useServices } from 'src/sections/ServiceSetting/hooks/use-service-setting-api';
 
 // 다음 주소 API 타입 정의
@@ -66,7 +62,6 @@ export type OrganizationFormData = {
   detailAddress: string;
   subscriptionService: string;
   sendInvitationEmail: boolean;
-  invitationMemberId: string;
 };
 
 type Props = {
@@ -108,7 +103,6 @@ const DEFAULT_FORM_DATA: OrganizationFormData = {
   detailAddress: '',
   subscriptionService: '',
   sendInvitationEmail: false,
-  invitationMemberId: '',
 };
 
 const REQUIRED_FIELDS: Array<keyof OrganizationFormData> = [
@@ -117,8 +111,6 @@ const REQUIRED_FIELDS: Array<keyof OrganizationFormData> = [
   'representativeName',
   'representativePhone',
   'representativeEmail',
-  'businessCategory',
-  'businessItem',
 ];
 
 export default function CreateOrganizationModal({ open, onClose }: Props) {
@@ -128,7 +120,6 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
   const createOrganizationMutation = useCreateOrganization();
-  const subscribeMutation = useSubscribe();
   const inviteMemberMutation = useInviteMember();
 
   const addressInputRef = useRef<HTMLInputElement>(null);
@@ -144,10 +135,7 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
     return Array.isArray(list) ? list : [];
   }, [servicesData]);
 
-  const isSubmitting =
-    createOrganizationMutation.isPending ||
-    subscribeMutation.isPending ||
-    inviteMemberMutation.isPending;
+  const isSubmitting = createOrganizationMutation.isPending || inviteMemberMutation.isPending;
 
   const formatBusinessNumber = (value: string) => {
     const digits = value.replace(/\D/g, '').slice(0, 10);
@@ -269,15 +257,46 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
   };
 
   const handleSubmit = async () => {
-    const missingField = REQUIRED_FIELDS.find((field) => {
+    // 필수 필드 검증
+    const missingFields: string[] = [];
+
+    REQUIRED_FIELDS.forEach((field) => {
       const value = formData[field];
       if (typeof value === 'string') {
-        return !value.trim();
+        if (!value.trim()) {
+          missingFields.push(field);
+        }
+      } else if (!value) {
+        missingFields.push(field);
       }
-      return !value;
     });
 
-    if (missingField) {
+    // businessType 검증
+    const businessTypeNumber =
+      formData.businessType !== ''
+        ? Number(formData.businessType)
+        : (BUSINESS_TYPE_OPTIONS[0]?.value ?? 0);
+
+    if (typeof businessTypeNumber !== 'number' || Number.isNaN(businessTypeNumber)) {
+      missingFields.push('businessType');
+    }
+
+    // 이메일 형식 검증
+    if (formData.representativeEmail && !validateEmail(formData.representativeEmail)) {
+      setErrorMessage('올바른 이메일 주소를 입력해주세요.');
+      return;
+    }
+
+    // 전화번호 형식 검증
+    if (
+      formData.representativePhone &&
+      formData.representativePhone.replace(/\D/g, '').length < 9
+    ) {
+      setErrorMessage('올바른 전화번호 형식을 입력해주세요.');
+      return;
+    }
+
+    if (missingFields.length > 0) {
       setErrorMessage('필수 항목을 모두 입력해주세요.');
       return;
     }
@@ -285,15 +304,6 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
     const sanitizeField = (value: string, maxLen = 100) => value.trim().slice(0, maxLen);
     const digitsOnly = (value: string | undefined) =>
       value ? value.replace(/\D/g, '') : undefined;
-
-    const businessTypeNumber =
-      formData.businessType !== '' ? Number(formData.businessType) : BUSINESS_TYPE_OPTIONS[0]?.value ?? 0;
-
-    // 필수 필드 검증
-    if (typeof businessTypeNumber !== 'number' || Number.isNaN(businessTypeNumber)) {
-      setErrorMessage('사업자 유형을 선택해주세요.');
-      return;
-    }
 
     try {
       setErrorMessage(null);
@@ -329,25 +339,8 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
         (result as any)?.body?.companyIdx ??
         null;
 
-      if (newCompanyIdx && formData.subscriptionService) {
-        try {
-          if (import.meta.env.DEV) {
-            console.log('📤 [CreateOrganizationModal] 서비스 구독 요청', {
-              companyIdx: newCompanyIdx,
-              serviceSettingIdx: Number(formData.subscriptionService),
-            });
-          }
-          await subscribeMutation.mutateAsync({
-            companyIdx: newCompanyIdx,
-            serviceSettingIdx: Number(formData.subscriptionService),
-          });
-          if (import.meta.env.DEV) {
-            console.log('✅ [CreateOrganizationModal] 서비스 구독 성공');
-          }
-        } catch (subscribeError) {
-          console.error('❌ 서비스 구독 실패:', subscribeError);
-        }
-      }
+      // 참고: 구독은 빌링키 등록 시 자동으로 처리됩니다.
+      // 조직 생성 시 serviceSettingIdxes를 전달하면, 나중에 빌링키를 등록할 때 해당 서비스로 구독이 생성됩니다.
 
       if (newCompanyIdx && formData.sendInvitationEmail) {
         try {
@@ -409,11 +402,6 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
       </DialogTitle>
 
       <DialogContent>
-        {errorMessage && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {errorMessage}
-          </Alert>
-        )}
         <Box sx={{ py: 1 }}>
           <Stack spacing={3}>
             {/* 첫 번째 행: 구분, 조직명 */}
@@ -639,15 +627,11 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
               }
               label="초대 이메일을 발송합니다."
             />
-            {formData.sendInvitationEmail && (
-              <TextField
-                fullWidth
-                label="사용할 ID (선택)"
-                placeholder="초대받을 사용자의 ID"
-                value={formData.invitationMemberId}
-                onChange={(e) => handleChange('invitationMemberId', e.target.value)}
-                helperText="참고용으로만 사용되며 API에는 전송되지 않습니다."
-              />
+
+            {errorMessage && (
+              <Alert severity="error" sx={{ mt: 1 }}>
+                {errorMessage}
+              </Alert>
             )}
 
             <Divider sx={{ borderStyle: 'dashed' }} />

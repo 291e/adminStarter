@@ -15,6 +15,7 @@ import type { Organization, CompanyType } from 'src/services/organization/organi
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
 import { useUpdateOrganization } from '../../hooks/use-organization-api';
 import { useQueryClient } from '@tanstack/react-query';
+import { useMyInfo } from 'src/sections/Chat/hooks/use-my-info';
 
 import SubscriptionService from './SubscriptionService';
 import AccidentFreeWorkplace from './AccidentFreeWorkplace';
@@ -90,9 +91,13 @@ export default function OrganizationInfo({
 }: Props) {
   const queryClient = useQueryClient();
   const updateOrganizationMutation = useUpdateOrganization();
+  const { data: myInfo } = useMyInfo();
   const [tabValue, setTabValue] = useState(0);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+
+  // 슈퍼 어드민 여부 확인
+  const isSuperAdmin = useMemo(() => myInfo?.isSuperAdmin === true, [myInfo]);
 
   // 다음 주소 API 스크립트 로드
   useEffect(() => {
@@ -164,19 +169,23 @@ export default function OrganizationInfo({
   const handleSave = async () => {
     try {
       // 수정 요청 파라미터 구성
-      const updateParams = {
+      const updateParams: any = {
         companyIdx: organizationId,
         companyName: formData.companyName,
         businessNumber: formData.businessNumber || undefined,
         address: formData.address || undefined,
         phone: formData.representativePhone || undefined,
         email: formData.representativeEmail || undefined,
-        companyType: formData.division as CompanyType,
         representativeName: formData.representativeName || undefined,
         businessType: businessTypeToNumber(formData.businessType),
         businessCategory: formData.businessCategory || undefined,
         businessItem: formData.businessItem || undefined,
       };
+
+      // 슈퍼 어드민인 경우에만 companyType 전송
+      if (isSuperAdmin && formData.division) {
+        updateParams.companyType = formData.division as CompanyType;
+      }
 
       if (import.meta.env.DEV) {
         console.log('💾 [조직정보 수정 시작]', {
@@ -306,22 +315,6 @@ export default function OrganizationInfo({
                 </Typography>
                 <Typography variant="body2" sx={{ fontSize: 14, lineHeight: '22px' }}>
                   {lastAccessDate}
-                </Typography>
-              </Stack>
-              <Stack direction="row" spacing={1} alignItems="center" sx={{ flex: 1 }}>
-                <Typography
-                  variant="subtitle2"
-                  sx={{
-                    minWidth: 100,
-                    fontSize: 14,
-                    fontWeight: 600,
-                    lineHeight: '22px',
-                  }}
-                >
-                  최근 접속 IP
-                </Typography>
-                <Typography variant="body2" sx={{ fontSize: 14, lineHeight: '22px' }}>
-                  {lastAccessIP}
                 </Typography>
               </Stack>
             </Stack>
@@ -509,40 +502,42 @@ export default function OrganizationInfo({
 
               {/* 오른쪽 컬럼 */}
               <Stack spacing={1} sx={{ flex: 1 }}>
-                <Stack direction="row" spacing={1} alignItems="center" sx={{ height: 48 }}>
-                  <Typography
-                    variant="subtitle2"
-                    sx={{
-                      minWidth: 100,
-                      fontSize: 14,
-                      fontWeight: 600,
-                      lineHeight: '22px',
-                    }}
-                  >
-                    구분
-                  </Typography>
-                  <Select
-                    fullWidth
-                    size="small"
-                    value={formData.division || ''}
-                    onChange={(e) => handleChange('division', e.target.value)}
-                    disabled={!isEditMode}
-                    sx={{
-                      fontSize: 15,
-                      lineHeight: '24px',
-                    }}
-                  >
-                    {DIVISION_OPTIONS.map((option) => (
-                      <MenuItem
-                        key={option.value}
-                        value={option.value}
-                        disabled={option.value === 'OPERATOR'}
-                      >
-                        {option.label}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </Stack>
+                {isSuperAdmin && (
+                  <Stack direction="row" spacing={1} alignItems="center" sx={{ height: 48 }}>
+                    <Typography
+                      variant="subtitle2"
+                      sx={{
+                        minWidth: 100,
+                        fontSize: 14,
+                        fontWeight: 600,
+                        lineHeight: '22px',
+                      }}
+                    >
+                      구분
+                    </Typography>
+                    <Select
+                      fullWidth
+                      size="small"
+                      value={formData.division || ''}
+                      onChange={(e) => handleChange('division', e.target.value)}
+                      disabled={!isEditMode}
+                      sx={{
+                        fontSize: 15,
+                        lineHeight: '24px',
+                      }}
+                    >
+                      {DIVISION_OPTIONS.map((option) => (
+                        <MenuItem
+                          key={option.value}
+                          value={option.value}
+                          disabled={option.value === 'OPERATOR'}
+                        >
+                          {option.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </Stack>
+                )}
 
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ height: 48 }}>
                   <Typography

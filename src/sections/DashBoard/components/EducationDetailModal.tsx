@@ -64,7 +64,7 @@ export type UserProfile = {
   id: string;
   name: string;
   department: string;
-  joinDate: string; // YYYY-MM-DD
+  joinedAt: string | null; // YYYY-MM-DD 또는 null
   role: string;
 };
 
@@ -194,12 +194,12 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
     return false;
   }, [profileData]);
 
-  // joinDate를 dayjs로 변환
-  const joinDateDayjs = user?.joinDate ? dayjs(user.joinDate) : null;
+  // joinedAt을 dayjs로 변환
+  const joinedAtDayjs = user?.joinedAt ? dayjs(user.joinedAt) : null;
 
   // 연도 옵션 계산
   const yearOptions = useMemo(() => {
-    if (!joinDateDayjs) {
+    if (!joinedAtDayjs) {
       return [{ value: 'current', label: '현재' }];
     }
     return [
@@ -208,20 +208,20 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
       { value: 'year-2', label: '2년차' },
       { value: 'year-3', label: '3년차' },
     ];
-  }, [joinDateDayjs]);
+  }, [joinedAtDayjs]);
 
   // 선택된 연도 범위 계산
   type YearRange = { start: Dayjs | null; end: Dayjs | null };
 
   const selectedDateRange = useMemo<YearRange>(() => {
-    if (!joinDateDayjs || selectedYearRange === 'current') {
+    if (!joinedAtDayjs || selectedYearRange === 'current') {
       return { start: null, end: null };
     }
     const yearNumber = Number(selectedYearRange.split('-')[1]) || 1;
-    const start = joinDateDayjs.startOf('day').add(yearNumber - 1, 'year');
-    const end = joinDateDayjs.startOf('day').add(yearNumber, 'year').subtract(1, 'day');
+    const start = joinedAtDayjs.startOf('day').add(yearNumber - 1, 'year');
+    const end = joinedAtDayjs.startOf('day').add(yearNumber, 'year').subtract(1, 'day');
     return { start, end };
-  }, [joinDateDayjs, selectedYearRange]);
+  }, [joinedAtDayjs, selectedYearRange]);
 
   // 레코드 필터링 함수
   const filterRecordsByRange = (records: any[]) => {
@@ -322,7 +322,7 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
                       입사일
                     </Typography>
                     <Typography variant="body2" sx={{ fontSize: 14 }}>
-                      {user?.joinDate || '-'}
+                      {user?.joinedAt || '-'}
                     </Typography>
                   </Stack>
                 </Stack>
@@ -332,10 +332,16 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
                       variant="subtitle2"
                       sx={{ fontSize: 14, fontWeight: 600, minWidth: 64 }}
                     >
-                      소속
+                      소속팀
                     </Typography>
                     <Typography variant="body2" sx={{ fontSize: 14 }}>
-                      {user?.department || '-'}
+                      {profileData?.header?.isSuccess && profileData?.member
+                        ? (profileData.member as any).department ||
+                          (profileData.member as any).companyMember?.department ||
+                          (profileData.member as any).branchName ||
+                          user?.department ||
+                          '-'
+                        : user?.department || '-'}
                     </Typography>
                   </Stack>
                   <Stack direction="row" spacing={4} alignItems="center" sx={{ minWidth: 200 }}>
@@ -346,7 +352,9 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
                       역할
                     </Typography>
                     <Typography variant="body2" sx={{ fontSize: 14 }}>
-                      {getRoleLabel(user?.role || '') || '-'}
+                      {profileData?.header?.isSuccess && profileData?.member?.memberRole
+                        ? getRoleLabel(profileData.member.memberRole) || '-'
+                        : getRoleLabel(user?.role || '') || '-'}
                     </Typography>
                   </Stack>
                 </Stack>
@@ -415,7 +423,7 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
                       <TableRow>
                         <TableCell
                           sx={{
-                            bgcolor: 'grey.50',
+                            bgcolor: '#F4F6F8',
                             fontWeight: 600,
                             fontSize: 14,
                             color: 'text.secondary',
@@ -426,7 +434,7 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
                         </TableCell>
                         <TableCell
                           sx={{
-                            bgcolor: 'grey.50',
+                            bgcolor: '#F4F6F8',
                             fontWeight: 600,
                             fontSize: 14,
                             color: 'text.secondary',
@@ -438,7 +446,7 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
                         <TableCell
                           align="center"
                           sx={{
-                            bgcolor: 'grey.50',
+                            bgcolor: '#F4F6F8',
                             fontWeight: 600,
                             fontSize: 14,
                             color: 'text.secondary',
@@ -449,7 +457,7 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
                         </TableCell>
                         <TableCell
                           sx={{
-                            bgcolor: 'grey.50',
+                            bgcolor: '#F4F6F8',
                             fontWeight: 600,
                             fontSize: 14,
                             color: 'text.secondary',
@@ -460,7 +468,7 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
                         </TableCell>
                         <TableCell
                           sx={{
-                            bgcolor: 'grey.50',
+                            bgcolor: '#F4F6F8',
                             fontWeight: 600,
                             fontSize: 14,
                             color: 'text.secondary',
@@ -567,7 +575,7 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
                       <TableRow>
                         <TableCell
                           sx={{
-                            bgcolor: 'grey.50',
+                            bgcolor: '#F4F6F8',
                             fontWeight: 600,
                             fontSize: 14,
                             color: 'text.secondary',
@@ -578,7 +586,7 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
                         </TableCell>
                         <TableCell
                           sx={{
-                            bgcolor: 'grey.50',
+                            bgcolor: '#F4F6F8',
                             fontWeight: 600,
                             fontSize: 14,
                             color: 'text.secondary',
@@ -590,7 +598,7 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
                         <TableCell
                           align="center"
                           sx={{
-                            bgcolor: 'grey.50',
+                            bgcolor: '#F4F6F8',
                             fontWeight: 600,
                             fontSize: 14,
                             color: 'text.secondary',
@@ -601,7 +609,7 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
                         </TableCell>
                         <TableCell
                           sx={{
-                            bgcolor: 'grey.50',
+                            bgcolor: '#F4F6F8',
                             fontWeight: 600,
                             fontSize: 14,
                             color: 'text.secondary',
@@ -612,7 +620,7 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
                         </TableCell>
                         <TableCell
                           sx={{
-                            bgcolor: 'grey.50',
+                            bgcolor: '#F4F6F8',
                             fontWeight: 600,
                             fontSize: 14,
                             color: 'text.secondary',
@@ -715,6 +723,9 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
                           fontSize: 15,
                           fontWeight: 400,
                         },
+                        '& .MuiInputBase-root': {
+                          bgcolor: '#F4F6F8',
+                        },
                       }}
                     />
                     <Typography variant="subtitle2" sx={{ fontSize: 14, fontWeight: 600, mb: 0.5 }}>
@@ -732,6 +743,9 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
                         '& .MuiInputBase-input': {
                           fontSize: 15,
                           fontWeight: 400,
+                        },
+                        '& .MuiInputBase-root': {
+                          bgcolor: '#F4F6F8',
                         },
                       }}
                     />

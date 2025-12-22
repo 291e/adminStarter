@@ -53,7 +53,6 @@ const noteMessages = [
 
 export default function RiskTable_1_2_1200({ row = defaultRow }: Props) {
   const headerCellStyle: React.CSSProperties = {
-    backgroundColor: '#f4f6f8',
     padding: '8px',
     border: '1px solid #1c252e',
     textAlign: 'center',
@@ -71,13 +70,30 @@ export default function RiskTable_1_2_1200({ row = defaultRow }: Props) {
   };
 
   const renderRiskColumn = (label: string, value: string) => (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-      <Typography variant="subtitle2" sx={{ fontSize: 14, fontWeight: 600 }}>
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 1,
+        width: '100%',
+        margin: 0,
+        padding: 0,
+      }}
+    >
+      <Typography variant="subtitle2" sx={{ fontSize: 14, fontWeight: 600, textAlign: 'center' }}>
         {label}
       </Typography>
-      <Typography sx={{ fontSize: 14, fontWeight: 400, textAlign: 'center' }}>
-        {value}
-      </Typography>
+      <Box
+        sx={{
+          width: 'calc(100% + 24px)',
+          height: '2px',
+          bgcolor: '#1c252e',
+          my: 0.5,
+          marginLeft: '-12px',
+          marginRight: '-12px',
+        }}
+      />
+      <Typography sx={{ fontSize: 14, fontWeight: 400, textAlign: 'center' }}>{value}</Typography>
     </Box>
   );
 
@@ -124,6 +140,10 @@ export default function RiskTable_1_2_1200({ row = defaultRow }: Props) {
           border: '2px solid #1c252e',
           borderCollapse: 'collapse',
           tableLayout: 'fixed',
+          '& tbody tr': {
+            pageBreakInside: 'avoid',
+            breakInside: 'avoid',
+          },
         }}
       >
         <colgroup>
@@ -141,7 +161,7 @@ export default function RiskTable_1_2_1200({ row = defaultRow }: Props) {
               {row.workName}
             </td>
             <th style={headerCellStyle}>등급</th>
-            <td style={bodyCellStyle} colSpan={1}>
+            <td style={{ ...bodyCellStyle, textAlign: 'center' }} colSpan={1}>
               {row.grade}
             </td>
           </tr>
@@ -150,8 +170,8 @@ export default function RiskTable_1_2_1200({ row = defaultRow }: Props) {
             <td style={bodyCellStyle} colSpan={3}>
               <Typography sx={{ fontWeight: 600 }}>{row.reporter}</Typography>
             </td>
-            <th style={headerCellStyle}>소속</th>
-            <td style={bodyCellStyle}>{row.reporterDepartment}</td>
+            <th style={headerCellStyle}>소속팀</th>
+            <td style={{ ...bodyCellStyle, textAlign: 'center' }}>{row.reporterDepartment}</td>
           </tr>
           <tr>
             <th style={headerCellStyle}>작업내용</th>
@@ -164,7 +184,9 @@ export default function RiskTable_1_2_1200({ row = defaultRow }: Props) {
             <td style={bodyCellStyle} colSpan={4}>
               <Typography sx={{ whiteSpace: 'pre-line' }}>{row.accidentContent}</Typography>
             </td>
-            <td style={bodyCellStyle}>{renderRiskColumn('위험정도', row.accidentRiskLevel)}</td>
+            <td style={{ ...bodyCellStyle, textAlign: 'center' }}>
+              {renderRiskColumn('위험정도', row.accidentRiskLevel)}
+            </td>
           </tr>
           <tr>
             <th style={headerCellStyle}>발생원인</th>
@@ -177,7 +199,11 @@ export default function RiskTable_1_2_1200({ row = defaultRow }: Props) {
             <td style={bodyCellStyle} colSpan={4}>
               <Typography sx={{ whiteSpace: 'pre-line' }}>{row.preventionMeasure}</Typography>
             </td>
-            <td style={bodyCellStyle}>{renderRiskColumn('위험정도', row.preventionRiskLevel)}</td>
+            <td
+              style={{ ...bodyCellStyle, textAlign: 'center', borderBottom: '2px solid #1c252e' }}
+            >
+              {renderRiskColumn('위험정도', row.preventionRiskLevel)}
+            </td>
           </tr>
           <tr>
             <th style={headerCellStyle}>
@@ -215,7 +241,7 @@ export default function RiskTable_1_2_1200({ row = defaultRow }: Props) {
         <tbody>
           {gradeGuideRows.map((guide) => (
             <tr key={guide.grade}>
-              <td style={bodyCellStyle}>{guide.grade}</td>
+              <td style={{ ...bodyCellStyle, textAlign: 'center' }}>{guide.grade}</td>
               <td style={bodyCellStyle}>{guide.risk}</td>
               <td style={bodyCellStyle}>
                 <ul style={{ margin: 0, paddingLeft: 18 }}>
@@ -241,4 +267,3 @@ export default function RiskTable_1_2_1200({ row = defaultRow }: Props) {
     </Box>
   );
 }
-

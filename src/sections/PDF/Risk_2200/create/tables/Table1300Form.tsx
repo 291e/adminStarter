@@ -143,7 +143,7 @@ export default function Table1300Form({
               verticalAlign: 'middle',
             },
             '& th': {
-              backgroundColor: 'transparent',
+              backgroundColor: 'grey.100',
               fontSize: 14,
               fontWeight: 600,
               lineHeight: '22px',
@@ -175,27 +175,23 @@ export default function Table1300Form({
                 재해형태
               </th>
               <th style={{ width: 120 }}>비고</th>
-              <th style={{ width: 46 }}>이동</th>
-              <th style={{ width: 55 }}>삭제</th>
+              <th style={{ width: 30 }}>이동</th>
+              <th style={{ width: 39 }}>삭제</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row, index) => (
               <tr
                 key={row.number}
-                draggable
-                onDragStart={() => handleDragStart(index)}
                 onDragOver={(e) => handleDragOver(e, index)}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, index)}
-                onDragEnd={handleDragEnd}
                 style={{
                   opacity: draggedIndex === index ? 0.5 : 1,
                   backgroundColor:
                     dragOverIndex === index && draggedIndex !== index
                       ? theme.vars.palette.action.hover
                       : 'transparent',
-                  cursor: 'move',
                 }}
               >
                 <td>
@@ -216,6 +212,7 @@ export default function Table1300Form({
                     value={row.name}
                     onChange={(e) => onRowChange(index, 'name', e.target.value)}
                     fullWidth
+                    multiline
                     InputProps={{
                       endAdornment: (
                         <InputAdornment position="end">
@@ -233,6 +230,7 @@ export default function Table1300Form({
                       '& .MuiOutlinedInput-root': {
                         fontSize: 14,
                         height: 'auto',
+                        p: 1,
                       },
                     }}
                   />
@@ -243,10 +241,12 @@ export default function Table1300Form({
                     value={row.id}
                     onChange={(e) => onRowChange(index, 'id', e.target.value)}
                     fullWidth
+                    multiline
                     sx={{
                       '& .MuiOutlinedInput-root': {
                         fontSize: 14,
                         height: 'auto',
+                        p: 1,
                       },
                     }}
                   />
@@ -257,10 +257,12 @@ export default function Table1300Form({
                     value={row.capacity}
                     onChange={(e) => onRowChange(index, 'capacity', e.target.value)}
                     fullWidth
+                    multiline
                     sx={{
                       '& .MuiOutlinedInput-root': {
                         fontSize: 14,
                         height: 'auto',
+                        p: 1,
                       },
                     }}
                   />
@@ -271,10 +273,12 @@ export default function Table1300Form({
                     value={row.location}
                     onChange={(e) => onRowChange(index, 'location', e.target.value)}
                     fullWidth
+                    multiline
                     sx={{
                       '& .MuiOutlinedInput-root': {
                         fontSize: 14,
                         height: 'auto',
+                        p: 1,
                       },
                     }}
                   />
@@ -296,10 +300,12 @@ export default function Table1300Form({
                       );
                     }}
                     fullWidth
+                    multiline
                     sx={{
                       '& .MuiOutlinedInput-root': {
                         fontSize: 14,
                         height: 'auto',
+                        p: 1,
                       },
                     }}
                   />
@@ -321,10 +327,12 @@ export default function Table1300Form({
                       }}
                       placeholder="직접 입력"
                       fullWidth
+                      multiline
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           fontSize: 14,
                           height: 'auto',
+                          p: 1,
                         },
                       }}
                     />
@@ -358,11 +366,11 @@ export default function Table1300Form({
                     onChange={(e) => onRowChange(index, 'safetyDevice', e.target.value)}
                     fullWidth
                     multiline
-                    maxRows={3}
                     sx={{
                       '& .MuiOutlinedInput-root': {
                         fontSize: 14,
                         height: 'auto',
+                        p: 1,
                       },
                     }}
                   />
@@ -373,10 +381,12 @@ export default function Table1300Form({
                     value={row.inspectionCycle}
                     onChange={(e) => onRowChange(index, 'inspectionCycle', e.target.value)}
                     fullWidth
+                    multiline
                     sx={{
                       '& .MuiOutlinedInput-root': {
                         fontSize: 14,
                         height: 'auto',
+                        p: 1,
                       },
                     }}
                   />
@@ -388,11 +398,11 @@ export default function Table1300Form({
                     onChange={(e) => onRowChange(index, 'accidentForm', e.target.value)}
                     fullWidth
                     multiline
-                    maxRows={3}
                     sx={{
                       '& .MuiOutlinedInput-root': {
                         fontSize: 14,
                         height: 'auto',
+                        p: 1,
                       },
                     }}
                   />
@@ -403,10 +413,12 @@ export default function Table1300Form({
                     value={row.remark}
                     onChange={(e) => onRowChange(index, 'remark', e.target.value)}
                     fullWidth
+                    multiline
                     sx={{
                       '& .MuiOutlinedInput-root': {
                         fontSize: 14,
                         height: 'auto',
+                        p: 1,
                       },
                     }}
                   />
@@ -415,6 +427,9 @@ export default function Table1300Form({
                   <Box sx={{ display: 'flex', justifyContent: 'center', px: 1 }}>
                     <IconButton
                       size="small"
+                      draggable
+                      onDragStart={() => handleDragStart(index)}
+                      onDragEnd={handleDragEnd}
                       sx={{
                         p: 0.625,
                         cursor: 'grab',
@@ -438,6 +453,8 @@ export default function Table1300Form({
                       color: 'error.contrastText',
                       fontSize: 13,
                       fontWeight: 700,
+                      width: 23,
+                      px: 1,
                     }}
                   >
                     삭제

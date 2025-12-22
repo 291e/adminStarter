@@ -39,15 +39,6 @@ import type {
   GetCompanyMembersResponse,
   GetServicePlansResponse,
   GetCurrentSubscriptionResponse,
-  GetRegisteredCardsResponse,
-  RegisterCardParams,
-  RegisterCardResponse,
-  UpdateCardParams,
-  UpdateCardResponse,
-  CreateBillingKeyParams,
-  CreateBillingKeyResponse,
-  GetPaymentHistoryParams,
-  GetPaymentHistoryResponse,
 } from './organization.types';
 
 // ----------------------------------------------------------------------
@@ -193,47 +184,6 @@ export async function updateBranch(
   return response.data;
 }
 
-/**
- * 구독 목록 조회
- * GET /companies/{companyIdx}/subscriptions
- */
-export async function getSubscriptions(
-  companyIdx: number,
-  params?: GetSubscriptionsParams
-): Promise<GetSubscriptionsResponse> {
-  const response = await axiosInstance.get<GetSubscriptionsResponse>(
-    `${endpoints.company.subscriptions}/${companyIdx}/subscriptions`,
-    { params }
-  );
-  return response.data;
-}
-
-/**
- * 서비스 구독 (하나만 구독 가능, 기존 구독은 자동 해지)
- * POST /companies/{companyIdx}/subscriptions
- * 빌링키는 회사(CompanyEntity)에서 자동으로 조회됨
- */
-export async function subscribe(params: SubscribeParams): Promise<SubscribeResponse> {
-  const { companyIdx, serviceSettingIdx } = params;
-  const response = await axiosInstance.post<SubscribeResponse>(
-    `${endpoints.company.subscriptions}/${companyIdx}/subscriptions`,
-    {
-      serviceSettingIdx,
-    }
-  );
-  return response.data;
-}
-
-/**
- * 구독 취소
- * DELETE /companies/{companyIdx}/subscriptions/{serviceSettingIdx}
- */
-export async function cancelSubscription(params: CancelSubscriptionParams): Promise<void> {
-  const { companyIdx, serviceSettingIdx } = params;
-  await axiosInstance.delete(
-    `${endpoints.company.subscriptions}/${companyIdx}/subscriptions/${serviceSettingIdx}`
-  );
-}
 
 /**
  * 서비스 업그레이드
@@ -376,89 +326,3 @@ export async function getCurrentSubscription(
   return response.data;
 }
 
-/**
- * 등록된 카드 목록 조회
- * GET /companies/{companyIdx}/cards
- */
-export async function getRegisteredCards(companyIdx: number): Promise<GetRegisteredCardsResponse> {
-  const response = await axiosInstance.get<GetRegisteredCardsResponse>(
-    `${endpoints.company.cards}/${companyIdx}/cards`
-  );
-  return response.data;
-}
-
-/**
- * 카드 등록 (페이플 콜백 후)
- * POST /companies/{companyIdx}/cards
- */
-export async function registerCard(
-  companyIdx: number,
-  params: RegisterCardParams
-): Promise<RegisterCardResponse> {
-  const response = await axiosInstance.post<RegisterCardResponse>(
-    `${endpoints.company.cards}/${companyIdx}/cards`,
-    params
-  );
-  return response.data;
-}
-
-/**
- * 카드 수정 (대표 카드 설정)
- * PATCH /companies/{companyIdx}/cards/{companyCardIdx}
- */
-export async function updateCard(
-  companyIdx: number,
-  companyCardIdx: number,
-  params: UpdateCardParams
-): Promise<UpdateCardResponse> {
-  const response = await axiosInstance.patch<UpdateCardResponse>(
-    `${endpoints.company.cards}/${companyIdx}/cards/${companyCardIdx}`,
-    params
-  );
-  return response.data;
-}
-
-/**
- * 카드 삭제
- * DELETE /companies/{companyIdx}/cards/{companyCardIdx}
- */
-export async function deleteCard(
-  companyIdx: number,
-  companyCardIdx: number
-): Promise<void> {
-  await axiosInstance.delete(`${endpoints.company.cards}/${companyIdx}/cards/${companyCardIdx}`);
-}
-
-/**
- * 빌링키 등록 (회사 단위)
- * POST /companies/billing-key
- */
-export async function createBillingKey(
-  params: CreateBillingKeyParams
-): Promise<CreateBillingKeyResponse> {
-  const response = await axiosInstance.post<CreateBillingKeyResponse>(
-    endpoints.company.billingKey,
-    params
-  );
-  return response.data;
-}
-
-/**
- * 결제 내역 조회
- * GET /companies/{companyIdx}/payment-history
- */
-export async function getPaymentHistory(
-  params: GetPaymentHistoryParams
-): Promise<GetPaymentHistoryResponse> {
-  const { companyIdx, page = 1, pageSize = 20 } = params;
-  const response = await axiosInstance.get<GetPaymentHistoryResponse>(
-    `${endpoints.company.paymentHistory}/${companyIdx}/payment-history`,
-    {
-      params: {
-        page,
-        pageSize,
-      },
-    }
-  );
-  return response.data;
-}

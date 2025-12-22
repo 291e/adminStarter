@@ -116,7 +116,7 @@ export default function OrganizationFilters({
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
-                <Iconify icon="eva:search-fill" width={24} />
+                <Iconify icon="eva:search-fill" width={24} sx={{ color: 'primary.main' }} />
               </InputAdornment>
             ),
           }}

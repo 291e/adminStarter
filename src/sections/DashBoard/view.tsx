@@ -41,7 +41,6 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
   const [periodType, setPeriodType] = useState<'year' | 'month' | 'week'>('month');
   const [periodValue, setPeriodValue] = useState<string>('');
   const [pendingPage, setPendingPage] = useState(1);
-  const [sharedPage, setSharedPage] = useState(1);
   const [educationDetailModalOpen, setEducationDetailModalOpen] = useState(false);
   const [selectedSharedDocumentIdx, setSelectedSharedDocumentIdx] = useState<number | null>(null);
   const [selectedSafetySystemDocumentIdx, setSelectedSafetySystemDocumentIdx] = useState<
@@ -95,7 +94,11 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
     data: sharedDocumentsData,
     isLoading: sharedLoading,
     error: sharedError,
-  } = useSharedDocuments(); // 클라이언트 사이드 페이지네이션을 위해 파라미터 제거
+  } = useSharedDocuments({
+    // 전체 데이터를 가져오기 위해 큰 pageSize 사용
+    page: 1,
+    pageSize: 1000, // 충분히 큰 값으로 설정하여 전체 데이터 가져오기
+  });
   const {
     data: riskStatsData,
     isLoading: riskStatsLoading,
@@ -158,23 +161,22 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
     return sharedDocumentsData.sharedDocumentList;
   }, [sharedDocumentsData]);
 
+  // 공개 문서만 필터링 (SharedDocumentsCard에서 사용)
+  const publicSharedDocuments = useMemo(
+    () => sharedDocuments.filter((doc) => doc.isPublic === 1),
+    [sharedDocuments]
+  );
+
   // 클라이언트 사이드 페이지네이션 계산
-  const pendingPageSize = 2;
-  const sharedPageSize = 7;
+  const pendingPageSize = 5;
 
   // 전체 데이터에서 페이지네이션 계산
   const pendingTotalPages = Math.ceil(pendingSignatures.length / pendingPageSize);
-  const sharedTotalPages = Math.ceil(sharedDocuments.length / sharedPageSize);
 
   const pendingPageData = useMemo(() => {
     const start = (pendingPage - 1) * pendingPageSize;
     return pendingSignatures.slice(start, start + pendingPageSize);
   }, [pendingSignatures, pendingPage]);
-
-  const sharedPageData = useMemo(() => {
-    const start = (sharedPage - 1) * sharedPageSize;
-    return sharedDocuments.slice(start, start + sharedPageSize);
-  }, [sharedDocuments, sharedPage]);
 
   // 사고·위험 보고 현황 통계 (에러 처리 포함)
   // totalCount를 사고 발생 건수로 사용
@@ -196,6 +198,10 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
     profileData?.header?.isSuccess && profileData?.member?.memberRole
       ? profileData.member.memberRole
       : '관리감독자';
+  const profileThumbnail =
+    profileData?.header?.isSuccess && profileData?.member?.memberThumbnail
+      ? profileData.member.memberThumbnail
+      : undefined;
   const profileRoles = ['작업 현장 위험요인 파악 및 보고', '사고 발생 시 보고·조사·후속조치']; // TODO: API에서 가져오기
 
   // 교육 이수율 (응답 구조: educationCompletion.completionRate)
@@ -277,11 +283,6 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
     // 클라이언트 사이드 페이지네이션은 데이터 새로고침 불필요
   };
 
-  const handleSharedPageChange = (page: number) => {
-    setSharedPage(page);
-    // 클라이언트 사이드 페이지네이션은 데이터 새로고침 불필요
-  };
-
   // 로딩 상태
   const isLoading =
     pendingLoading || sharedLoading || riskStatsLoading || profileLoading || educationLoading;
@@ -329,7 +330,9 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
               label={profileLabel}
               roles={profileRoles}
               educationRate={educationRate}
+              memberThumbnail={profileThumbnail}
               onViewDetail={handleViewDetail}
+              isSuperAdmin={profileData?.member?.isSuperAdmin}
             />
           </Box>
           <Box sx={{ flex: 1, minWidth: 0, display: 'flex' }}>
@@ -362,13 +365,7 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
             />
           </Box>
           <Box sx={{ flex: 1, minWidth: 0, display: 'flex' }}>
-            <SharedDocumentsCard
-              rows={sharedPageData}
-              page={sharedPage}
-              totalPages={sharedTotalPages}
-              onPageChange={handleSharedPageChange}
-              onViewAll={handleViewAll}
-            />
+            <SharedDocumentsCard rows={publicSharedDocuments} onViewAll={handleViewAll} />
           </Box>
         </Stack>
       </Stack>
@@ -382,16 +379,21 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
             ? {
                 id: String(profileData.member.memberIdx || user.id || ''),
                 name: profileName,
-                department: '경영관리팀', // TODO: API에서 가져오기
-                joinDate: '2025-10-31', // TODO: API에서 가져오기
+                department:
+                  (profileData.member as unknown as { department?: string }).department || '',
+                joinedAt: (profileData.member as unknown as { joinedAt?: string | null }).joinedAt
+                  ? String(
+                      (profileData.member as unknown as { joinedAt?: string | null }).joinedAt
+                    ).split('T')[0]
+                  : null,
                 role: profileRoles[0] || profileLabel,
               }
             : user
               ? {
                   id: user.id || '',
                   name: profileName,
-                  department: '경영관리팀', // TODO: API에서 가져오기
-                  joinDate: '2025-10-31', // TODO: API에서 가져오기
+                  department: '',
+                  joinedAt: null,
                   role: profileRoles[0] || profileLabel,
                 }
               : null

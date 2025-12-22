@@ -14,7 +14,6 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import type { Dayjs } from 'dayjs';
 
-import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
 import { Iconify } from 'src/components/iconify';
@@ -75,11 +74,29 @@ export default function UpdateCertificationModal({
       // 인증일자는 항상 오늘 날짜로 초기화
       setCertificationDate(dayjs());
       setCertificationFile(null);
-      setPreviewUrl(
-        normalizedDefaultFileUrl && normalizedDefaultFileUrl.startsWith('data:')
-          ? normalizedDefaultFileUrl
-          : null
-      );
+
+      // 기존 파일 URL이 있으면 미리보기로 설정 (이미지 파일인 경우)
+      if (normalizedDefaultFileUrl) {
+        // data: URL인 경우
+        if (normalizedDefaultFileUrl.startsWith('data:')) {
+          setPreviewUrl(normalizedDefaultFileUrl);
+        }
+        // 일반 URL인 경우 이미지 파일인지 확인
+        else {
+          const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+          const isImage = imageExtensions.some((ext) =>
+            normalizedDefaultFileUrl.toLowerCase().includes(ext)
+          );
+          if (isImage) {
+            setPreviewUrl(normalizedDefaultFileUrl);
+          } else {
+            setPreviewUrl(null);
+          }
+        }
+      } else {
+        setPreviewUrl(null);
+      }
+
       setExistingFileUrl(normalizedDefaultFileUrl);
       setIsRemovingFile(false);
       setIsDragging(false);
@@ -167,11 +184,30 @@ export default function UpdateCertificationModal({
 
       if (certificationFile) {
         const uploadResponse = await uploadFile({ files: [certificationFile] });
-        const fileUrls = (uploadResponse as unknown as { fileUrls: string[] }).fileUrls;
-        if (!fileUrls || fileUrls.length === 0) {
+
+        // axios 인터셉터가 응답을 평탄화하므로 여러 형태 확인
+        let fileUrl: string | undefined;
+
+        // 형태 1: fileUrls 배열
+        if ((uploadResponse as any)?.fileUrls && Array.isArray((uploadResponse as any).fileUrls)) {
+          fileUrl = (uploadResponse as any).fileUrls[0];
+        }
+        // 형태 2: files 배열에서 fileUrl 추출
+        else if ((uploadResponse as any)?.files && Array.isArray((uploadResponse as any).files)) {
+          fileUrl = (uploadResponse as any).files[0]?.fileUrl;
+        }
+        // 형태 3: data.fileUrls
+        else if (
+          (uploadResponse as any)?.data?.fileUrls &&
+          Array.isArray((uploadResponse as any).data.fileUrls)
+        ) {
+          fileUrl = (uploadResponse as any).data.fileUrls[0];
+        }
+
+        if (!fileUrl) {
           throw new Error('파일 업로드에 실패했습니다.');
         }
-        accidentFreeFileUrl = fileUrls[0];
+        accidentFreeFileUrl = fileUrl;
       } else if (isRemovingFile) {
         accidentFreeFileUrl = null;
       }
@@ -196,10 +232,6 @@ export default function UpdateCertificationModal({
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const handleDelete = () => {
-    handleRemoveFile();
   };
 
   const handleClose = () => {
@@ -381,29 +413,7 @@ export default function UpdateCertificationModal({
             justifyContent: 'space-between',
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-            {certificationFile && (
-              <Button
-                onClick={handleDelete}
-                sx={{
-                  minHeight: 36,
-                  height: 36,
-                  minWidth: 64,
-                  fontSize: 14,
-                  fontWeight: 700,
-                  lineHeight: '24px',
-                  px: 1,
-                  py: 0.75,
-                  color: 'error.main',
-                  '&:hover': {
-                    bgcolor: 'error.8',
-                  },
-                }}
-              >
-                삭제
-              </Button>
-            )}
-          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', flex: 1 }} />
           <Stack direction="row" spacing={1} sx={{ flex: 1, justifyContent: 'flex-end' }}>
             <DialogBtn variant="outlined" onClick={handleClose}>
               취소

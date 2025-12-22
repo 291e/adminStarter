@@ -4,13 +4,13 @@ import { ServiceSettingView } from 'src/sections/ServiceSetting/view';
 
 // ----------------------------------------------------------------------
 
-const metadata = { title: `서비스 설정 | Dashboard - ${CONFIG.appName}` };
+const metadata = { title: `서비스 관리 | Dashboard - ${CONFIG.appName}` };
 
 export default function ServiceSettingPage() {
   return (
     <>
       <title>{metadata.title}</title>
-      <ServiceSettingView title="서비스 설정" />
+      <ServiceSettingView title="서비스 관리" />
     </>
   );
 }

@@ -14,32 +14,10 @@ import { Iconify } from 'src/components/iconify';
 import type { Table1500Row } from '../../types/table-data';
 import ChemicalNameSearchModal from './modal/ChemicalNameSearchModal';
 import MachineEquipment1500Modal from './modal/MachineEquipment1500Modal';
+import type { ChemicalSummaryData } from 'src/services/safety-system/safety-system.types';
+import type { RiskAssessmentData } from '../../components/RiskAssessmentSettingModal';
 
 // ----------------------------------------------------------------------
-
-// 빈도 옵션 (1-5)
-const FREQ_OPTIONS = [1, 2, 3, 4, 5] as const;
-
-// 심각도 옵션 (1-5)
-const SEV_OPTIONS = [1, 2, 3, 4, 5] as const;
-
-// 평가 옵션 (빈도 × 심각도 결과에 따른 평가)
-const EVAL_OPTIONS = [
-  '1 (낮음)',
-  '2 (낮음)',
-  '3 (낮음)',
-  '4 (낮음)',
-  '5 (낮음)',
-  '6 (관리필요)',
-  '8 (관리필요)',
-  '9 (관리필요)',
-  '10 (관리필요)',
-  '12 (관리필요)',
-  '15 (관리필요)',
-  '16 (관리필요)',
-  '20 (관리필요)',
-  '25 (관리필요)',
-] as const;
 
 // ----------------------------------------------------------------------
 
@@ -49,6 +27,7 @@ type Props = {
   onRowDelete: (index: number) => void;
   onRowMove: (fromIndex: number, toIndex: number) => void;
   onAddRow: () => void;
+  riskAssessmentData: RiskAssessmentData;
 };
 
 export default function Table1500Form({
@@ -57,6 +36,7 @@ export default function Table1500Form({
   onRowDelete,
   onRowMove,
   onAddRow,
+  riskAssessmentData,
 }: Props) {
   const theme = useTheme();
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -101,8 +81,10 @@ export default function Table1500Form({
     setChemicalModalOpenIndex(null);
   };
 
-  const handleChemicalModalConfirm = (index: number, chemicalName: string) => {
-    onRowChange(index, 'chemical', chemicalName);
+  const handleChemicalModalConfirm = (index: number, chemicalData: ChemicalSummaryData) => {
+    // 화학물질명과 CAS No 자동 입력
+    onRowChange(index, 'chemical', chemicalData.chemicalName || '');
+    onRowChange(index, 'casNo', chemicalData.casNo || '');
     handleCloseChemicalModal();
   };
 
@@ -126,6 +108,7 @@ export default function Table1500Form({
       remark: string;
     }
   ) => {
+    // 모든 필드 업데이트
     onRowChange(index, 'machine', data.machine);
     onRowChange(index, 'machineId', data.machineId);
     onRowChange(index, 'accidentForm', data.accidentForm);
@@ -133,6 +116,7 @@ export default function Table1500Form({
     onRowChange(index, 'sev', data.sev);
     onRowChange(index, 'evalLabel', data.evalLabel);
     onRowChange(index, 'remark', data.remark);
+
     handleCloseMachineModal();
   };
 
@@ -147,15 +131,15 @@ export default function Table1500Form({
 
     if (typeof freq === 'number' && typeof sev === 'number' && freq > 0 && sev > 0) {
       const evalValue = freq * sev;
-      // 평가 옵션에서 해당 값 찾기
-      const evalOption = EVAL_OPTIONS.find((opt) => {
-        const num = parseInt(opt.split(' ')[0], 10);
-        return num === evalValue;
-      });
-      if (evalOption) {
-        onRowChange(index, 'evalLabel', evalOption);
+      // 활성화된 위험도 범위에서 해당 값 찾기
+      const enabledRanges = riskAssessmentData.riskRanges.filter((range) => range.enabled);
+      const matchingRange = enabledRanges.find(
+        (range) => evalValue >= range.min && evalValue <= range.max
+      );
+      if (matchingRange) {
+        onRowChange(index, 'evalLabel', `${evalValue} (${matchingRange.label})`);
       } else {
-        // 옵션에 없는 경우 직접 입력 형식으로
+        // 범위에 없는 경우 직접 입력 형식으로
         onRowChange(index, 'evalLabel', `${evalValue}`);
       }
     }
@@ -176,16 +160,17 @@ export default function Table1500Form({
               borderColor: 'text.primary',
               padding: 0,
               textAlign: 'center',
-              verticalAlign: 'middle',
             },
             '& th': {
               backgroundColor: 'grey.100',
               fontSize: 14,
               fontWeight: 600,
-              lineHeight: '22px',
             },
             '& td': {
               padding: '4px',
+            },
+            '& tbody tr': {
+              height: 'auto',
             },
           }}
         >
@@ -220,10 +205,10 @@ export default function Table1500Form({
               <th rowSpan={2} style={{ width: 104 }}>
                 비고
               </th>
-              <th rowSpan={2} style={{ width: 46 }}>
+              <th rowSpan={2} style={{ width: 30 }}>
                 이동
               </th>
-              <th rowSpan={2} style={{ width: 55 }}>
+              <th rowSpan={2} style={{ width: 39 }}>
                 삭제
               </th>
             </tr>
@@ -245,20 +230,15 @@ export default function Table1500Form({
             {rows.map((row, index) => (
               <tr
                 key={index}
-                draggable
-                onDragStart={() => handleDragStart(index)}
                 onDragOver={(e) => handleDragOver(e, index)}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, index)}
-                onDragEnd={handleDragEnd}
                 style={{
                   opacity: draggedIndex === index ? 0.5 : 1,
                   backgroundColor:
                     dragOverIndex === index && draggedIndex !== index
                       ? theme.vars.palette.action.hover
                       : 'transparent',
-                  cursor: 'move',
-                  height: index === 0 ? 96 : index === 1 ? 72 : 48,
                 }}
               >
                 <td>
@@ -267,12 +247,7 @@ export default function Table1500Form({
                     value={row.unit}
                     onChange={(e) => onRowChange(index, 'unit', e.target.value)}
                     fullWidth
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        fontSize: 14,
-                        height: 'auto',
-                      },
-                    }}
+                    multiline
                   />
                 </td>
                 <td>
@@ -282,13 +257,6 @@ export default function Table1500Form({
                     onChange={(e) => onRowChange(index, 'work', e.target.value)}
                     fullWidth
                     multiline
-                    maxRows={3}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        fontSize: 14,
-                        height: 'auto',
-                      },
-                    }}
                   />
                 </td>
                 <td>
@@ -297,12 +265,7 @@ export default function Table1500Form({
                     value={row.hazardCode}
                     onChange={(e) => onRowChange(index, 'hazardCode', e.target.value)}
                     fullWidth
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        fontSize: 14,
-                        height: 'auto',
-                      },
-                    }}
+                    multiline
                   />
                 </td>
                 <td>
@@ -319,6 +282,7 @@ export default function Table1500Form({
                       <TextField
                         {...params}
                         fullWidth
+                        multiline
                         slotProps={{
                           input: {
                             ...params.InputProps,
@@ -351,12 +315,7 @@ export default function Table1500Form({
                     value={row.machineId}
                     onChange={(e) => onRowChange(index, 'machineId', e.target.value)}
                     fullWidth
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        fontSize: 14,
-                        height: 'auto',
-                      },
-                    }}
+                    multiline
                   />
                 </td>
                 <td>
@@ -378,6 +337,7 @@ export default function Table1500Form({
                       <TextField
                         {...params}
                         fullWidth
+                        multiline
                         slotProps={{
                           input: {
                             ...params.InputProps,
@@ -410,12 +370,7 @@ export default function Table1500Form({
                     value={row.casNo}
                     onChange={(e) => onRowChange(index, 'casNo', e.target.value)}
                     fullWidth
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        fontSize: 14,
-                        height: 'auto',
-                      },
-                    }}
+                    multiline
                   />
                 </td>
                 <td>
@@ -424,12 +379,7 @@ export default function Table1500Form({
                     value={row.accidentForm}
                     onChange={(e) => onRowChange(index, 'accidentForm', e.target.value)}
                     fullWidth
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        fontSize: 14,
-                        height: 'auto',
-                      },
-                    }}
+                    multiline
                   />
                 </td>
                 <td>
@@ -438,12 +388,7 @@ export default function Table1500Form({
                     value={row.partner}
                     onChange={(e) => onRowChange(index, 'partner', e.target.value)}
                     fullWidth
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        fontSize: 14,
-                        height: 'auto',
-                      },
-                    }}
+                    multiline
                   />
                 </td>
                 <td>
@@ -466,9 +411,9 @@ export default function Table1500Form({
                       <MenuItem value="" sx={{ fontSize: 14 }}>
                         <em />
                       </MenuItem>
-                      {FREQ_OPTIONS.map((option) => (
-                        <MenuItem key={option} value={option} sx={{ fontSize: 14 }}>
-                          {option}
+                      {riskAssessmentData.frequency.ranges.map((range) => (
+                        <MenuItem key={range.value} value={range.value} sx={{ fontSize: 14 }}>
+                          {range.value} {range.label ? `(${range.label})` : ''}
                         </MenuItem>
                       ))}
                     </Select>
@@ -494,9 +439,9 @@ export default function Table1500Form({
                       <MenuItem value="" sx={{ fontSize: 14 }}>
                         <em />
                       </MenuItem>
-                      {SEV_OPTIONS.map((option) => (
-                        <MenuItem key={option} value={option} sx={{ fontSize: 14 }}>
-                          {option}
+                      {riskAssessmentData.severity.ranges.map((range) => (
+                        <MenuItem key={range.value} value={range.value} sx={{ fontSize: 14 }}>
+                          {range.value} {range.label ? `(${range.label})` : ''}
                         </MenuItem>
                       ))}
                     </Select>
@@ -508,12 +453,7 @@ export default function Table1500Form({
                     value={row.evalLabel}
                     onChange={(e) => onRowChange(index, 'evalLabel', e.target.value)}
                     fullWidth
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        fontSize: 14,
-                        height: 'auto',
-                      },
-                    }}
+                    multiline
                   />
                 </td>
                 <td>
@@ -523,19 +463,15 @@ export default function Table1500Form({
                     onChange={(e) => onRowChange(index, 'remark', e.target.value)}
                     fullWidth
                     multiline
-                    maxRows={3}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        fontSize: 14,
-                        height: 'auto',
-                      },
-                    }}
                   />
                 </td>
-                <td>
+                <td style={{ verticalAlign: 'middle', width: 30 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'center', px: 1 }}>
                     <IconButton
                       size="small"
+                      draggable
+                      onDragStart={() => handleDragStart(index)}
+                      onDragEnd={handleDragEnd}
                       sx={{
                         p: 0.625,
                         cursor: 'grab',
@@ -549,7 +485,7 @@ export default function Table1500Form({
                     </IconButton>
                   </Box>
                 </td>
-                <td>
+                <td style={{ verticalAlign: 'middle', width: 39 }}>
                   <Button
                     variant="contained"
                     size="small"
@@ -562,6 +498,7 @@ export default function Table1500Form({
                       fontWeight: 700,
                       px: 1,
                       py: 0.5,
+                      width: 23,
                       '&:hover': {
                         bgcolor: 'error.dark',
                       },
@@ -599,7 +536,7 @@ export default function Table1500Form({
           key={`chemical-${index}`}
           open={chemicalModalOpenIndex === index}
           onClose={handleCloseChemicalModal}
-          onConfirm={(chemicalName) => handleChemicalModalConfirm(index, chemicalName)}
+          onConfirm={(chemicalData) => handleChemicalModalConfirm(index, chemicalData)}
           initialValue={row.chemical || ''}
         />
       ))}
@@ -619,6 +556,7 @@ export default function Table1500Form({
             evalLabel: row.evalLabel || '',
             remark: row.remark || '',
           }}
+          riskAssessmentData={riskAssessmentData}
         />
       ))}
     </Box>

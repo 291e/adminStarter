@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
@@ -15,48 +15,23 @@ import Stack from '@mui/material/Stack';
 import InputAdornment from '@mui/material/InputAdornment';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
+import CircularProgress from '@mui/material/CircularProgress';
 
 import { Iconify } from 'src/components/iconify';
+import { useCodes } from 'src/sections/CodeSetting/hooks/use-code-setting-api';
+import type { CodeSetting } from 'src/services/code-setting/code-setting.types';
 
 // ----------------------------------------------------------------------
 
 // 카테고리 옵션
 const CATEGORY_OPTIONS = ['물리적', '생물학적', '인간공학적'] as const;
 
-// TODO: 유해인자명 목록 API 호출
-// const { data: hazardFactors } = useQuery({
-//   queryKey: ['hazardFactors', searchTerm],
-//   queryFn: () => getHazardFactors(searchTerm),
-//   enabled: !!searchTerm && searchTerm.length >= 2,
-// });
-
-// 임시 목업 데이터 (API 연동 전까지 사용)
-const MOCK_HAZARD_FACTORS = [
-  '소음',
-  '진동',
-  '방사선',
-  '자외선',
-  '적외선',
-  '전자기파',
-  '고온',
-  '저온',
-  '고압',
-  '저압',
-  '진공',
-  '미생물',
-  '바이러스',
-  '곰팡이',
-  '부적절한 작업자세',
-  '반복작업',
-  '무리한 힘',
-];
-
 type HazardFactorData = {
   factorName: string; // 유해인자명
   category: '물리적' | '생물학적' | '인간공학적'; // 카테고리
   formOrType: string; // 형태 및 유형
   location: string; // 위치
-  department: string; // 대상부서
+  department: string; // 대상소속팀
   exposureRisk: string; // 노출위험
   managementStandard: string; // 관리기준
   managementMeasure: string; // 관리대책
@@ -86,21 +61,73 @@ export default function HazardFactorRegisterModal({
     managementMeasure: initialData?.managementMeasure || '',
   });
 
-  const [searchValue, setSearchValue] = useState<string>(initialData?.factorName || '');
+  const [searchValue, setSearchValue] = useState<CodeSetting | null>(null);
   const [inputValue, setInputValue] = useState<string>('');
 
+  // 유해인자 목록 조회
+  const codesQuery = useCodes({
+    categoryType: 'hazard',
+    status: 'active',
+    page: 1,
+    pageSize: 1000, // 전체 데이터 조회
+  });
+
+  // 유해인자 목록
+  const hazardList = useMemo(() => codesQuery.data?.codeSettingList ?? [], [codesQuery.data]);
+
   // 검색 필터링
-  const filteredOptions = MOCK_HAZARD_FACTORS.filter((option) =>
-    option.toLowerCase().includes(inputValue.toLowerCase())
-  );
+  const filteredOptions = useMemo(() => {
+    if (!inputValue) return hazardList;
+    const lowerInput = inputValue.toLowerCase();
+    return hazardList.filter(
+      (hazard) =>
+        hazard.name?.toLowerCase().includes(lowerInput) ||
+        hazard.code?.toLowerCase().includes(lowerInput)
+    );
+  }, [hazardList, inputValue]);
+
+  // 유해인자 선택 시 자동 입력
+  useEffect(() => {
+    if (searchValue) {
+      const hazard = searchValue;
+
+      setFormData((prev) => ({
+        ...prev,
+        factorName: hazard.name || prev.factorName,
+        formOrType: hazard.formAndType || prev.formOrType,
+        location: hazard.location || prev.location,
+        exposureRisk: hazard.exposureRisk || prev.exposureRisk,
+        managementStandard: hazard.managementStandard || prev.managementStandard,
+        managementMeasure: hazard.managementMeasures || prev.managementMeasure,
+        // department는 API에 없으므로 기존 값 유지
+        // category는 유해인자 카테고리 정보에서 매핑할 수 있지만, 일단 기존 값 유지
+      }));
+    }
+  }, [searchValue]);
 
   const handleFieldChange = (field: keyof HazardFactorData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleConfirm = () => {
-    // TODO: API 호출하여 유해인자 정보 검증 및 저장
-    onConfirm(formData);
+    // searchValue가 있으면 최신 데이터를 기반으로 formData 업데이트
+    let finalFormData = { ...formData };
+
+    if (searchValue) {
+      const hazard = searchValue;
+
+      finalFormData = {
+        ...formData,
+        factorName: hazard.name || formData.factorName,
+        formOrType: hazard.formAndType || formData.formOrType,
+        location: hazard.location || formData.location,
+        exposureRisk: hazard.exposureRisk || formData.exposureRisk,
+        managementStandard: hazard.managementStandard || formData.managementStandard,
+        managementMeasure: hazard.managementMeasures || formData.managementMeasure,
+      };
+    }
+
+    onConfirm(finalFormData);
     handleClose();
   };
 
@@ -115,7 +142,7 @@ export default function HazardFactorRegisterModal({
       managementStandard: initialData?.managementStandard || '',
       managementMeasure: initialData?.managementMeasure || '',
     });
-    setSearchValue(initialData?.factorName || '');
+    setSearchValue(null);
     setInputValue('');
     onClose();
   };
@@ -129,15 +156,25 @@ export default function HazardFactorRegisterModal({
           {/* 유해인자명 (오토컴플리트) */}
           <Autocomplete
             options={filteredOptions}
-            value={searchValue || null}
+            value={searchValue}
             inputValue={inputValue}
             onInputChange={(_, newInputValue) => {
               setInputValue(newInputValue);
             }}
             onChange={(_, newValue) => {
-              setSearchValue(newValue || '');
-              handleFieldChange('factorName', newValue || '');
+              setSearchValue(newValue);
             }}
+            getOptionLabel={(option) => option.name || ''}
+            isOptionEqualToValue={(option, value) => {
+              if (!option || !value) return false;
+              return option.codeSettingIdx === value.codeSettingIdx;
+            }}
+            renderOption={(props, option) => (
+              <li {...props} key={option.codeSettingIdx}>
+                {option.name || ''}
+              </li>
+            )}
+            loading={codesQuery.isLoading}
             renderInput={(params) => (
               <TextField
                 {...params}
@@ -147,6 +184,7 @@ export default function HazardFactorRegisterModal({
                   ...params.InputProps,
                   endAdornment: (
                     <>
+                      {codesQuery.isLoading ? <CircularProgress color="inherit" size={20} /> : null}
                       <InputAdornment position="end">
                         <IconButton size="small" edge="end" sx={{ mr: 1 }}>
                           <Iconify icon="eva:search-fill" width={24} />
@@ -163,17 +201,35 @@ export default function HazardFactorRegisterModal({
                 }}
               />
             )}
-            noOptionsText="검색 결과가 없습니다."
+            noOptionsText={
+              codesQuery.isLoading
+                ? '로딩 중...'
+                : inputValue
+                  ? '검색 결과가 없습니다.'
+                  : '유해인자를 검색하세요'
+            }
             sx={{ width: '100%' }}
           />
 
           {/* 카테고리 (필수) */}
-          <FormControl fullWidth required>
-            <InputLabel>카테고리</InputLabel>
+          <FormControl fullWidth>
+            <InputLabel>
+              카테고리
+              <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
+                *
+              </Typography>
+            </InputLabel>
             <Select
               value={formData.category}
               onChange={(e) => handleFieldChange('category', e.target.value)}
-              label="카테고리"
+              label={
+                <>
+                  카테고리
+                  <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
+                    *
+                  </Typography>
+                </>
+              }
               sx={{
                 fontSize: 15,
               }}
@@ -191,7 +247,7 @@ export default function HazardFactorRegisterModal({
             label={
               <>
                 형태 및 유형
-                <Typography component="span" sx={{ color: 'primary.main', ml: 0.5 }}>
+                <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
                   *
                 </Typography>
               </>
@@ -199,7 +255,6 @@ export default function HazardFactorRegisterModal({
             value={formData.formOrType}
             onChange={(e) => handleFieldChange('formOrType', e.target.value)}
             fullWidth
-            required
             sx={{
               '& .MuiOutlinedInput-root': {
                 fontSize: 15,
@@ -212,7 +267,7 @@ export default function HazardFactorRegisterModal({
             label={
               <>
                 위치
-                <Typography component="span" sx={{ color: 'primary.main', ml: 0.5 }}>
+                <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
                   *
                 </Typography>
               </>
@@ -220,7 +275,6 @@ export default function HazardFactorRegisterModal({
             value={formData.location}
             onChange={(e) => handleFieldChange('location', e.target.value)}
             fullWidth
-            required
             sx={{
               '& .MuiOutlinedInput-root': {
                 fontSize: 15,
@@ -228,12 +282,12 @@ export default function HazardFactorRegisterModal({
             }}
           />
 
-          {/* 대상부서 (필수) */}
+          {/* 대상소속팀 (필수) */}
           <TextField
             label={
               <>
-                대상부서
-                <Typography component="span" sx={{ color: 'primary.main', ml: 0.5 }}>
+                대상소속팀
+                <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
                   *
                 </Typography>
               </>
@@ -241,7 +295,6 @@ export default function HazardFactorRegisterModal({
             value={formData.department}
             onChange={(e) => handleFieldChange('department', e.target.value)}
             fullWidth
-            required
             sx={{
               '& .MuiOutlinedInput-root': {
                 fontSize: 14,
@@ -254,7 +307,7 @@ export default function HazardFactorRegisterModal({
             label={
               <>
                 노출위험
-                <Typography component="span" sx={{ color: 'primary.main', ml: 0.5 }}>
+                <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
                   *
                 </Typography>
               </>
@@ -262,7 +315,6 @@ export default function HazardFactorRegisterModal({
             value={formData.exposureRisk}
             onChange={(e) => handleFieldChange('exposureRisk', e.target.value)}
             fullWidth
-            required
             multiline
             maxRows={3}
             sx={{
@@ -277,7 +329,7 @@ export default function HazardFactorRegisterModal({
             label={
               <>
                 관리기준
-                <Typography component="span" sx={{ color: 'primary.main', ml: 0.5 }}>
+                <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
                   *
                 </Typography>
               </>
@@ -285,7 +337,6 @@ export default function HazardFactorRegisterModal({
             value={formData.managementStandard}
             onChange={(e) => handleFieldChange('managementStandard', e.target.value)}
             fullWidth
-            required
             sx={{
               '& .MuiOutlinedInput-root': {
                 fontSize: 15,
@@ -293,12 +344,12 @@ export default function HazardFactorRegisterModal({
             }}
           />
 
-          {/* 관리대책 (필수) */}
+          {/* 관리대책 (필수) - 자동 입력 */}
           <TextField
             label={
               <>
                 관리대책
-                <Typography component="span" sx={{ color: 'primary.main', ml: 0.5 }}>
+                <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
                   *
                 </Typography>
               </>
@@ -306,7 +357,6 @@ export default function HazardFactorRegisterModal({
             value={formData.managementMeasure}
             onChange={(e) => handleFieldChange('managementMeasure', e.target.value)}
             fullWidth
-            required
             multiline
             maxRows={3}
             sx={{
@@ -331,7 +381,3 @@ export default function HazardFactorRegisterModal({
     </Dialog>
   );
 }
-
-
-
-

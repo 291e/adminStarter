@@ -8,6 +8,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Typography from '@mui/material/Typography';
 
 import { DashboardContent } from 'src/layouts/dashboard';
+import { CONFIG } from 'src/global-config';
 import { getItem, type SafetySystem } from 'src/_mock/_safety-system';
 import type {
   SafetySystemItem,
@@ -28,6 +29,7 @@ import { getRiskAssessmentTableData } from './data/table-data';
 import type { DefaultTableRow } from './tables/Default';
 import SignatureModal from '../edit/components/SignatureModal';
 import PDFDownloadModal from '../components/PDFDownloadModal';
+import SampleViewModal, { parseSampleUrls } from '../components/SampleViewModal';
 
 // ----------------------------------------------------------------------
 
@@ -166,16 +168,6 @@ export function Risk_2200View({
   const handleBack = () => {
     // 이전 페이지로 정확히 복귀 (히스토리 기반)
     navigate(-1);
-  };
-
-  const handleSampleView = () => {
-    // TODO: TanStack Query Hook(useQuery)으로 샘플 문서 조회
-    // const { data: sampleDocument } = useQuery({
-    //   queryKey: ['risk2200SampleDocument', safetyIdx, itemNumber],
-    //   queryFn: () => getRisk2200SampleDocument({ safetyIdx, itemNumber }),
-    //   enabled: !!safetyIdx && !!itemNumber,
-    // });
-    console.log('샘플 보기');
   };
 
   // 서명 패드 모달 상태
@@ -335,6 +327,59 @@ export function Risk_2200View({
     (item && 'safetySystemItemIdx' in item ? item : undefined) ||
     (safetyIdx && itemNumber ? getItem(safetyIdx, itemNumber) : undefined);
 
+  // 파일 URL을 전체 URL로 변환
+  const getFullFileUrl = (url: string | null | undefined): string | null => {
+    if (!url) return null;
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
+    const path = url.startsWith('/') ? url : `/${url}`;
+    return `${baseUrl}${path}`;
+  };
+
+  // 팝업 창 열기 헬퍼 함수
+  const openPopup = (url: string, name: string) => {
+    const width = 1200;
+    const height = 900;
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+    window.open(
+      url,
+      name,
+      `width=${width},height=${height},left=${left},top=${top},menubar=no,status=no,toolbar=no,scrollbars=yes`
+    );
+  };
+
+  // 샘플 보기 모달 상태
+  const [sampleViewModalOpen, setSampleViewModalOpen] = useState(false);
+
+  const handleSampleView = () => {
+    // 활성화된 아이템 정보(resolvedItem)에서 샘플 URL 확인 (타입 단언 추가)
+    const sampleUrl = (resolvedItem as any)?.sample;
+    if (sampleUrl) {
+      const samples = parseSampleUrls(sampleUrl);
+      if (samples.length > 1) {
+        // 여러 개인 경우 모달 표시
+        setSampleViewModalOpen(true);
+      } else if (samples.length === 1) {
+        // 단일 샘플인 경우 바로 열기
+        const fullUrl = getFullFileUrl(samples[0].url);
+        if (fullUrl) {
+          openPopup(fullUrl, 'sample-popup');
+        }
+      }
+    } else {
+      alert('등록된 샘플 파일이 없습니다.');
+    }
+  };
+
+  // 샘플 목록 가져오기 (모달용)
+  const sampleList = useMemo(() => {
+    const sampleUrl = (resolvedItem as any)?.sample;
+    return parseSampleUrls(sampleUrl);
+  }, [resolvedItem]);
+
   // 로딩 상태
   if (isLoadingDocument) {
     return (
@@ -378,7 +423,7 @@ export function Risk_2200View({
                 ? resolvedItem.itemName
                 : resolvedItem?.documentName) ||
               system?.systemName ||
-              '위험요인 제거·대체 및 통제 등록'
+              '위험요인 제거·대체 및 통제'
             }
             onBack={handleBack}
             onSampleView={handleSampleView}
@@ -421,7 +466,7 @@ export function Risk_2200View({
                               : is2300Series
                                 ? '종합대책 수립·이행'
                                 : is2200Series
-                                  ? '위험요인 제거·대체 및 통제 계획'
+                                  ? '위험요인 제거·대체 및 통제'
                                   : is2400TBM
                                     ? 'TBM 일지'
                                     : is2400Education
@@ -569,6 +614,13 @@ export function Risk_2200View({
 
       {/* PDF 다운로드 로딩 모달 */}
       <PDFDownloadModal open={pdfDownloadModalOpen} />
+
+      {/* 샘플 보기 모달 */}
+      <SampleViewModal
+        open={sampleViewModalOpen}
+        onClose={() => setSampleViewModalOpen(false)}
+        samples={sampleList}
+      />
     </>
   );
 }

@@ -21,6 +21,7 @@ import type {
 } from '../../types/table-data';
 import ChemicalNameSearchModal from './modal/ChemicalNameSearchModal';
 import HazardFactorRegisterModal from './modal/HazardFactorRegisterModal';
+import type { ChemicalSummaryData } from 'src/services/safety-system/safety-system.types';
 
 // ----------------------------------------------------------------------
 
@@ -209,9 +210,37 @@ export default function Table1400Form({ data, onDataChange }: Props) {
     setChemicalSearchModalIndex(null);
   };
 
-  const handleChemicalSearchConfirm = (chemicalName: string) => {
+  // 온도 값 추출 헬퍼 함수 (예: "18 ℃(구분2)|   ※출처 : 화학물질정보처리시스템" → "18")
+  const extractTemperature = (value: string | null): string => {
+    if (!value) return '';
+    // 숫자와 소수점을 포함한 패턴 찾기 (온도 값 추출)
+    const match = value.match(/(\d+\.?\d*)/);
+    return match ? match[1] : '';
+  };
+
+  const handleChemicalSearchConfirm = (chemicalData: ChemicalSummaryData) => {
     if (chemicalSearchModalIndex !== null) {
-      handleChemicalRowChange(chemicalSearchModalIndex, 'chemicalName', chemicalName);
+      // API 응답 데이터를 화학적 인자 필드에 매핑
+      const updatedRow: Table1400ChemicalRow = {
+        chemicalName: chemicalData.chemicalName || '',
+        formula: chemicalData.chemicalFormula || '',
+        casNo: chemicalData.casNo || '',
+        lowerLimit: chemicalData.explosionLowerLimit || '',
+        upperLimit: chemicalData.explosionUpperLimit || '',
+        exposureLimit: chemicalData.exposureStandard || '',
+        flashPoint: extractTemperature(chemicalData.flashPoint),
+        ignitionPoint: extractTemperature(chemicalData.autoIgnitionTemperature),
+        hazardRisk: chemicalData.hazardClassification || '',
+        managementStandard: chemicalData.regulationOsha || '',
+        dailyUsage: chemicalData.dailyUsage || '',
+        storage: chemicalData.storageAmount || '',
+        remark: data.chemical[chemicalSearchModalIndex]?.remark || '', // 기존 비고 유지
+      };
+
+      // 한 번에 모든 필드 업데이트
+      const newRows = [...data.chemical];
+      newRows[chemicalSearchModalIndex] = updatedRow;
+      onDataChange({ ...data, chemical: newRows });
     }
     handleCloseChemicalSearchModal();
   };
@@ -325,25 +354,55 @@ export default function Table1400Form({ data, onDataChange }: Props) {
       managementMeasure: string;
     }
   ) => {
-    const currentRow = nonChemicalUnifiedRows[index];
+    // 최신 nonChemicalUnifiedRows를 다시 계산
+    const currentUnifiedRows = dataToNonChemicalUnifiedRows(data);
+    const currentRow = currentUnifiedRows[index];
 
-    // 카테고리 변경이 필요한 경우
-    if (currentRow.category !== modalData.category) {
-      handleNonChemicalCategoryChange(index, modalData.category);
+    // 새로운 행 생성 (카테고리 변경 포함)
+    let newRow: NonChemicalUnifiedRow;
+    if (modalData.category === '물리적') {
+      newRow = {
+        category: '물리적',
+        factorName: modalData.factorName,
+        form: modalData.formOrType,
+        location: modalData.location,
+        department: modalData.department,
+        exposureRisk: modalData.exposureRisk,
+        managementStandard: modalData.managementStandard,
+        managementMeasure: modalData.managementMeasure,
+        remark: currentRow.remark || '',
+      };
+    } else if (modalData.category === '생물학적') {
+      newRow = {
+        category: '생물학적',
+        factorName: modalData.factorName,
+        type: modalData.formOrType,
+        location: modalData.location,
+        department: modalData.department,
+        exposureRisk: modalData.exposureRisk,
+        managementStandard: modalData.managementStandard,
+        managementMeasure: modalData.managementMeasure,
+        remark: currentRow.remark || '',
+      };
+    } else {
+      // 인간공학적
+      newRow = {
+        category: '인간공학적',
+        factorName: modalData.factorName,
+        form: modalData.formOrType,
+        location: modalData.location,
+        department: modalData.department,
+        exposureRisk: modalData.exposureRisk,
+        managementStandard: modalData.managementStandard,
+        managementMeasure: modalData.managementMeasure,
+        remark: currentRow.remark || '',
+      };
     }
 
-    // 모든 필드 업데이트
-    handleNonChemicalRowChange(index, 'factorName', modalData.factorName);
-    if ('form' in currentRow) {
-      handleNonChemicalRowChange(index, 'form', modalData.formOrType);
-    } else if ('type' in currentRow) {
-      handleNonChemicalRowChange(index, 'type', modalData.formOrType);
-    }
-    handleNonChemicalRowChange(index, 'location', modalData.location);
-    handleNonChemicalRowChange(index, 'department', modalData.department);
-    handleNonChemicalRowChange(index, 'exposureRisk', modalData.exposureRisk);
-    handleNonChemicalRowChange(index, 'managementStandard', modalData.managementStandard);
-    handleNonChemicalRowChange(index, 'managementMeasure', modalData.managementMeasure);
+    // 한 번에 모든 필드 업데이트
+    const newRows = [...currentUnifiedRows];
+    newRows[index] = newRow;
+    onDataChange(nonChemicalUnifiedRowsToData(newRows, data));
 
     handleCloseHazardFactorModal();
   };
@@ -379,16 +438,16 @@ export default function Table1400Form({ data, onDataChange }: Props) {
               },
               '& td': {
                 padding: '4px',
+                verticalAlign: 'top',
               },
               '& tbody tr': {
-                height: '48px',
+                height: 'auto',
               },
             }}
           >
             <thead>
               <tr>
                 <th style={{ width: 110 }}>화학물질명</th>
-                <th style={{ width: 135 }}>화학식</th>
                 <th style={{ width: 124 }}>CAS No</th>
                 <th style={{ width: 60 }}>폭발한계(%)하한</th>
                 <th style={{ width: 60 }}>폭발한계(%)상한</th>
@@ -396,31 +455,31 @@ export default function Table1400Form({ data, onDataChange }: Props) {
                 <th style={{ width: 48 }}>인화점(℃)</th>
                 <th style={{ width: 48 }}>발화점(℃)</th>
                 <th style={{ width: 135 }}>유해성 위험성 구분</th>
-                <th style={{ width: 135 }}>산업안전보건법 관리기준</th>
-                <th style={{ width: 48 }}>일일사용량</th>
+                <th style={{ width: 135 }}>
+                  산업안전보건법/ <br /> 관리기준
+                </th>
+                <th style={{ width: 48 }}>
+                  일일/ <br /> 저장량
+                </th>
                 <th style={{ width: 48 }}>저장량</th>
                 <th style={{ width: 135 }}>비고</th>
-                <th style={{ width: 46 }}>이동</th>
-                <th style={{ width: 55 }}>삭제</th>
+                <th style={{ width: 30 }}>이동</th>
+                <th style={{ width: 39 }}>삭제</th>
               </tr>
             </thead>
             <tbody>
               {data.chemical.map((row, index) => (
                 <tr
                   key={index}
-                  draggable
-                  onDragStart={() => handleChemicalDragStart(index)}
                   onDragOver={(e) => handleChemicalDragOver(e, index)}
                   onDragLeave={handleChemicalDragLeave}
                   onDrop={(e) => handleChemicalDrop(e, index)}
-                  onDragEnd={handleChemicalDragEnd}
                   style={{
                     opacity: draggedChemicalIndex === index ? 0.5 : 1,
                     backgroundColor:
                       dragOverChemicalIndex === index && draggedChemicalIndex !== index
                         ? theme.vars.palette.action.hover
                         : 'transparent',
-                    cursor: 'move',
                   }}
                 >
                   <td>
@@ -437,6 +496,7 @@ export default function Table1400Form({ data, onDataChange }: Props) {
                         <TextField
                           {...params}
                           fullWidth
+                          multiline
                           slotProps={{
                             input: {
                               ...params.InputProps,
@@ -457,6 +517,7 @@ export default function Table1400Form({ data, onDataChange }: Props) {
                             '& .MuiOutlinedInput-root': {
                               fontSize: 14,
                               height: 'auto',
+                              p: 1,
                             },
                           }}
                         />
@@ -466,27 +527,15 @@ export default function Table1400Form({ data, onDataChange }: Props) {
                   <td>
                     <TextField
                       size="small"
-                      value={row.formula}
-                      onChange={(e) => handleChemicalRowChange(index, 'formula', e.target.value)}
-                      fullWidth
-                      sx={{
-                        '& .MuiOutlinedInput-root': {
-                          fontSize: 14,
-                          height: 'auto',
-                        },
-                      }}
-                    />
-                  </td>
-                  <td>
-                    <TextField
-                      size="small"
                       value={row.casNo}
                       onChange={(e) => handleChemicalRowChange(index, 'casNo', e.target.value)}
                       fullWidth
+                      multiline
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           fontSize: 14,
                           height: 'auto',
+                          p: 1,
                         },
                       }}
                     />
@@ -497,10 +546,12 @@ export default function Table1400Form({ data, onDataChange }: Props) {
                       value={row.lowerLimit}
                       onChange={(e) => handleChemicalRowChange(index, 'lowerLimit', e.target.value)}
                       fullWidth
+                      multiline
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           fontSize: 14,
                           height: 'auto',
+                          p: 1,
                         },
                       }}
                     />
@@ -511,10 +562,12 @@ export default function Table1400Form({ data, onDataChange }: Props) {
                       value={row.upperLimit}
                       onChange={(e) => handleChemicalRowChange(index, 'upperLimit', e.target.value)}
                       fullWidth
+                      multiline
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           fontSize: 14,
                           height: 'auto',
+                          p: 1,
                         },
                       }}
                     />
@@ -527,10 +580,12 @@ export default function Table1400Form({ data, onDataChange }: Props) {
                         handleChemicalRowChange(index, 'exposureLimit', e.target.value)
                       }
                       fullWidth
+                      multiline
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           fontSize: 14,
                           height: 'auto',
+                          p: 1,
                         },
                       }}
                     />
@@ -541,10 +596,12 @@ export default function Table1400Form({ data, onDataChange }: Props) {
                       value={row.flashPoint}
                       onChange={(e) => handleChemicalRowChange(index, 'flashPoint', e.target.value)}
                       fullWidth
+                      multiline
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           fontSize: 14,
                           height: 'auto',
+                          p: 1,
                         },
                       }}
                     />
@@ -557,10 +614,12 @@ export default function Table1400Form({ data, onDataChange }: Props) {
                         handleChemicalRowChange(index, 'ignitionPoint', e.target.value)
                       }
                       fullWidth
+                      multiline
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           fontSize: 14,
                           height: 'auto',
+                          p: 1,
                         },
                       }}
                     />
@@ -571,10 +630,12 @@ export default function Table1400Form({ data, onDataChange }: Props) {
                       value={row.hazardRisk}
                       onChange={(e) => handleChemicalRowChange(index, 'hazardRisk', e.target.value)}
                       fullWidth
+                      multiline
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           fontSize: 14,
                           height: 'auto',
+                          p: 1,
                         },
                       }}
                     />
@@ -587,10 +648,12 @@ export default function Table1400Form({ data, onDataChange }: Props) {
                         handleChemicalRowChange(index, 'managementStandard', e.target.value)
                       }
                       fullWidth
+                      multiline
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           fontSize: 14,
                           height: 'auto',
+                          p: 1,
                         },
                       }}
                     />
@@ -601,10 +664,12 @@ export default function Table1400Form({ data, onDataChange }: Props) {
                       value={row.dailyUsage}
                       onChange={(e) => handleChemicalRowChange(index, 'dailyUsage', e.target.value)}
                       fullWidth
+                      multiline
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           fontSize: 14,
                           height: 'auto',
+                          p: 1,
                         },
                       }}
                     />
@@ -615,10 +680,12 @@ export default function Table1400Form({ data, onDataChange }: Props) {
                       value={row.storage}
                       onChange={(e) => handleChemicalRowChange(index, 'storage', e.target.value)}
                       fullWidth
+                      multiline
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           fontSize: 14,
                           height: 'auto',
+                          p: 1,
                         },
                       }}
                     />
@@ -629,18 +696,23 @@ export default function Table1400Form({ data, onDataChange }: Props) {
                       value={row.remark}
                       onChange={(e) => handleChemicalRowChange(index, 'remark', e.target.value)}
                       fullWidth
+                      multiline
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           fontSize: 14,
                           height: 'auto',
+                          p: 1,
                         },
                       }}
                     />
                   </td>
-                  <td>
+                  <td style={{ verticalAlign: 'middle', width: 30 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'center', px: 1 }}>
                       <IconButton
                         size="small"
+                        draggable
+                        onDragStart={() => handleChemicalDragStart(index)}
+                        onDragEnd={handleChemicalDragEnd}
                         sx={{
                           p: 0.625,
                           cursor: 'grab',
@@ -654,7 +726,7 @@ export default function Table1400Form({ data, onDataChange }: Props) {
                       </IconButton>
                     </Box>
                   </td>
-                  <td>
+                  <td style={{ verticalAlign: 'middle', width: 39 }}>
                     <Button
                       variant="contained"
                       size="small"
@@ -667,6 +739,7 @@ export default function Table1400Form({ data, onDataChange }: Props) {
                         fontWeight: 700,
                         px: 1,
                         py: 0.5,
+                        width: 23,
                         '&:hover': {
                           bgcolor: 'error.dark',
                         },
@@ -703,7 +776,7 @@ export default function Table1400Form({ data, onDataChange }: Props) {
       {/* 물리적, 생물학적, 인간공학적 인자 테이블 */}
       <Box sx={{ width: '100%' }}>
         <Typography sx={{ mb: 2, fontSize: 16, fontWeight: 600, px: 1 }}>
-          [물리적, 생물학적, 인간공학적 인자]
+          [물리적·생물학적·인간공학적 인자]
         </Typography>
         <Box sx={{ pb: 5, pt: 0, px: 0, width: '100%' }}>
           <Box
@@ -713,6 +786,7 @@ export default function Table1400Form({ data, onDataChange }: Props) {
               border: '2px solid',
               borderColor: 'text.primary',
               borderCollapse: 'collapse',
+              tableLayout: 'fixed',
               '& th, & td': {
                 border: '1px solid',
                 borderColor: 'text.primary',
@@ -729,42 +803,39 @@ export default function Table1400Form({ data, onDataChange }: Props) {
               },
               '& td': {
                 padding: '4px',
+                verticalAlign: 'top',
               },
               '& tbody tr': {
-                height: '48px',
+                height: 'auto',
               },
             }}
           >
             <thead>
               <tr>
                 <th style={{ width: 110 }}>구분</th>
-                <th style={{ flex: 1 }}>유해인자명</th>
-                <th style={{ flex: 1 }}>위치</th>
-                <th style={{ flex: 1 }}>부서</th>
-                <th style={{ flex: 1 }}>노출위험</th>
-                <th style={{ flex: 1 }}>관리대책</th>
-                <th style={{ flex: 1 }}>비고</th>
-                <th style={{ width: 46 }}>이동</th>
-                <th style={{ width: 55 }}>삭제</th>
+                <th style={{ width: 139 }}>유해인자명</th>
+                <th style={{ width: 139 }}>위치</th>
+                <th style={{ width: 139 }}>소속팀</th>
+                <th style={{ width: 139 }}>노출위험</th>
+                <th style={{ width: 139 }}>관리대책</th>
+                <th style={{ width: 139 }}>비고</th>
+                <th style={{ width: 30 }}>이동</th>
+                <th style={{ width: 39 }}>삭제</th>
               </tr>
             </thead>
             <tbody>
               {nonChemicalUnifiedRows.map((row, index) => (
                 <tr
                   key={index}
-                  draggable
-                  onDragStart={() => handleNonChemicalDragStart(index)}
                   onDragOver={(e) => handleNonChemicalDragOver(e, index)}
                   onDragLeave={handleNonChemicalDragLeave}
                   onDrop={(e) => handleNonChemicalDrop(e, index)}
-                  onDragEnd={handleNonChemicalDragEnd}
                   style={{
                     opacity: draggedNonChemicalIndex === index ? 0.5 : 1,
                     backgroundColor:
                       dragOverNonChemicalIndex === index && draggedNonChemicalIndex !== index
                         ? theme.vars.palette.action.hover
                         : 'transparent',
-                    cursor: 'move',
                   }}
                 >
                   <td>
@@ -801,6 +872,7 @@ export default function Table1400Form({ data, onDataChange }: Props) {
                         handleNonChemicalRowChange(index, 'factorName', e.target.value)
                       }
                       fullWidth
+                      multiline
                       InputProps={{
                         endAdornment: (
                           <InputAdornment position="end">
@@ -818,6 +890,7 @@ export default function Table1400Form({ data, onDataChange }: Props) {
                         '& .MuiOutlinedInput-root': {
                           fontSize: 14,
                           height: 'auto',
+                          p: 1,
                         },
                       }}
                     />
@@ -830,10 +903,12 @@ export default function Table1400Form({ data, onDataChange }: Props) {
                         handleNonChemicalRowChange(index, 'location', e.target.value)
                       }
                       fullWidth
+                      multiline
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           fontSize: 14,
                           height: 'auto',
+                          p: 1,
                         },
                       }}
                     />
@@ -846,10 +921,12 @@ export default function Table1400Form({ data, onDataChange }: Props) {
                         handleNonChemicalRowChange(index, 'department', e.target.value)
                       }
                       fullWidth
+                      multiline
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           fontSize: 14,
                           height: 'auto',
+                          p: 1,
                         },
                       }}
                     />
@@ -895,11 +972,11 @@ export default function Table1400Form({ data, onDataChange }: Props) {
                       }
                       fullWidth
                       multiline
-                      maxRows={3}
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           fontSize: 14,
                           height: 'auto',
+                          p: 1,
                         },
                       }}
                     />
@@ -910,18 +987,23 @@ export default function Table1400Form({ data, onDataChange }: Props) {
                       value={row.remark}
                       onChange={(e) => handleNonChemicalRowChange(index, 'remark', e.target.value)}
                       fullWidth
+                      multiline
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           fontSize: 14,
                           height: 'auto',
+                          p: 1,
                         },
                       }}
                     />
                   </td>
-                  <td>
+                  <td style={{ verticalAlign: 'middle', width: 30 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'center', px: 1 }}>
                       <IconButton
                         size="small"
+                        draggable
+                        onDragStart={() => handleNonChemicalDragStart(index)}
+                        onDragEnd={handleNonChemicalDragEnd}
                         sx={{
                           p: 0.625,
                           cursor: 'grab',
@@ -935,7 +1017,7 @@ export default function Table1400Form({ data, onDataChange }: Props) {
                       </IconButton>
                     </Box>
                   </td>
-                  <td>
+                  <td style={{ verticalAlign: 'middle', width: 39 }}>
                     <Button
                       variant="contained"
                       size="small"
@@ -948,6 +1030,7 @@ export default function Table1400Form({ data, onDataChange }: Props) {
                         fontWeight: 700,
                         px: 1,
                         py: 0.5,
+                        width: 23,
                         '&:hover': {
                           bgcolor: 'error.dark',
                         },

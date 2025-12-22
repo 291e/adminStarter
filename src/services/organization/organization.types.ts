@@ -388,7 +388,7 @@ export type VerifyInvitationCodeResponse = BaseResponseDto<{
     expiresAt: string;
     memberName?: string; // 초대 시 저장된 이름
     workType?: 'PRODUCTION' | 'OFFICE'; // 초대 시 저장된 직종
-    department?: string; // 초대 시 저장된 소속
+    department?: string; // 초대 시 저장된 소속팀
     joinedAt?: string; // 초대 시 저장된 입사일 (YYYY-MM-DD 형식)
     description?: string | null; // 초대 시 저장된 메타 정보 (JSON 문자열, 하위 호환성)
   } | null;

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 import type { Dayjs } from 'dayjs';
 
@@ -32,6 +32,7 @@ type Props = {
   memberIdx?: number; // 교육 기록을 추가할 멤버의 Index
   educationReportIdx?: number; // 교육 리포트 Index (단일 멤버용)
   educationReportIdxes?: number[]; // 교육 리포트 Index 배열 (여러 멤버용)
+  selectedMemberNames?: string[]; // 선택된 멤버 이름 배열
 };
 
 export type EducationFormData = {
@@ -52,6 +53,7 @@ export default function AddEducationModal({
   memberIdx,
   educationReportIdx,
   educationReportIdxes,
+  selectedMemberNames = [],
 }: Props) {
   const [formData, setFormData] = useState<EducationFormData>({
     educationType: 'mandatory',
@@ -68,17 +70,25 @@ export default function AddEducationModal({
   const [openDatePicker, setOpenDatePicker] = useState(false);
   const createEducationRecordMutation = useCreateEducationRecord();
 
+  // 모달이 열릴 때 선택된 멤버 이름을 참석자에 자동 추가
+  useEffect(() => {
+    if (open && selectedMemberNames.length > 0) {
+      // 중복 제거하여 참석자에 추가
+      const uniqueNames = selectedMemberNames.filter(
+        (name) => name.trim() && !formData.participants.includes(name.trim())
+      );
+      if (uniqueNames.length > 0) {
+        handleChange('participants', [...formData.participants, ...uniqueNames]);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, selectedMemberNames]);
+
   const handleChange = (field: keyof EducationFormData, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     // 에러 초기화
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: undefined }));
-    }
-  };
-
-  const handleAddParticipant = (name: string) => {
-    if (name.trim() && !formData.participants.includes(name.trim())) {
-      handleChange('participants', [...formData.participants, name.trim()]);
     }
   };
 
@@ -132,17 +142,33 @@ export default function AddEducationModal({
           console.log('📤 [AddEducationModal] 파일 업로드 시작', formData.evidenceFile.name);
         }
         const uploadResponse = await uploadFile({ files: [formData.evidenceFile] });
-        const uploadedUrls =
-          (uploadResponse as unknown as { fileUrls?: string[] }).fileUrls ??
-          uploadResponse?.body?.fileUrls ??
-          [];
-        if (uploadedUrls.length > 0) {
-          fileUrl = uploadedUrls[0];
+
+        // axios 인터셉터가 응답을 평탄화하므로 여러 형태 확인
+        // 형태 1: fileUrls 배열
+        if ((uploadResponse as any)?.fileUrls && Array.isArray((uploadResponse as any).fileUrls)) {
+          fileUrl = (uploadResponse as any).fileUrls[0];
+        }
+        // 형태 2: files 배열에서 fileUrl 추출
+        else if ((uploadResponse as any)?.files && Array.isArray((uploadResponse as any).files)) {
+          fileUrl = (uploadResponse as any).files[0]?.fileUrl;
+        }
+        // 형태 3: data.fileUrls
+        else if (
+          (uploadResponse as any)?.data?.fileUrls &&
+          Array.isArray((uploadResponse as any).data.fileUrls)
+        ) {
+          fileUrl = (uploadResponse as any).data.fileUrls[0];
+        }
+
+        if (!fileUrl) {
           if (import.meta.env.DEV) {
-            console.log('✅ [AddEducationModal] 파일 업로드 성공', fileUrl);
+            console.error('❌ [AddEducationModal] 파일 업로드 응답 구조:', uploadResponse);
           }
-        } else {
           throw new Error('파일 업로드에 실패했습니다.');
+        }
+
+        if (import.meta.env.DEV) {
+          console.log('✅ [AddEducationModal] 파일 업로드 성공', fileUrl);
         }
       }
 
@@ -228,9 +254,11 @@ export default function AddEducationModal({
           {/* 교육 구분 */}
           <Box>
             <FormLabel sx={{ mb: 1.5, display: 'block' }}>
-              교육 구분
-              <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
-                *
+              <Typography variant="subtitle2" sx={{ color: '#000' }}>
+                교육 구분
+                <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
+                  *
+                </Typography>
               </Typography>
             </FormLabel>
             <RadioGroup
@@ -273,9 +301,11 @@ export default function AddEducationModal({
           {/* 교육 방식 */}
           <Box>
             <FormLabel sx={{ mb: 1.5, display: 'block' }}>
-              교육 방식
-              <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
-                *
+              <Typography variant="subtitle2" sx={{ color: '#000' }}>
+                교육 방식
+                <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
+                  *
+                </Typography>
               </Typography>
             </FormLabel>
             <RadioGroup
@@ -417,35 +447,24 @@ export default function AddEducationModal({
             <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600 }}>
               참석자
             </Typography>
-            <Stack spacing={1.5}>
-              <TextField
-                placeholder="참석자 이름을 입력하세요"
-                fullWidth
-                size="small"
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    const input = e.currentTarget as HTMLInputElement;
-                    handleAddParticipant(input.value);
-                    input.value = '';
-                  }
-                }}
-              />
-              {formData.participants.length > 0 && (
-                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                  {formData.participants.map((participant) => (
-                    <Chip
-                      key={participant}
-                      label={participant}
-                      onDelete={() => handleRemoveParticipant(participant)}
-                      color="info"
-                      variant="soft"
-                      size="small"
-                    />
-                  ))}
-                </Stack>
-              )}
-            </Stack>
+            {formData.participants.length > 0 ? (
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                {formData.participants.map((participant) => (
+                  <Chip
+                    key={participant}
+                    label={participant}
+                    onDelete={() => handleRemoveParticipant(participant)}
+                    color="info"
+                    variant="soft"
+                    size="small"
+                  />
+                ))}
+              </Stack>
+            ) : (
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                선택된 참석자가 없습니다.
+              </Typography>
+            )}
           </Box>
 
           {/* 비고 */}

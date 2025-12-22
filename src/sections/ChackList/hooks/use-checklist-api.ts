@@ -6,6 +6,9 @@ import {
   updateHighRiskWork,
   getDisasterFactors,
   saveDisasterFactors,
+  createDisasterFactor,
+  updateDisasterFactor,
+  deleteDisasterFactor,
   getIndustries,
   createIndustry,
   updateIndustry,
@@ -17,6 +20,9 @@ import type {
   UpdateHighRiskWorkParams,
   GetDisasterFactorsParams,
   SaveDisasterFactorsParams,
+  CreateDisasterFactorParams,
+  UpdateDisasterFactorParams,
+  DeleteDisasterFactorParams,
   CreateIndustryParams,
   UpdateIndustryParams,
   DeleteIndustryParams,
@@ -45,7 +51,8 @@ export function useUpdateHighRiskWork() {
   return useMutation({
     mutationFn: (params: UpdateHighRiskWorkParams) => updateHighRiskWork(params),
     onSuccess: (response) => {
-      const resultMessage = response?.header?.resultMessage || '고위험작업/상황이 업데이트되었습니다.';
+      const resultMessage =
+        response?.header?.resultMessage || '고위험작업/상황이 업데이트되었습니다.';
       if (resultMessage && resultMessage !== 'SUCCESS') {
         toast.success(resultMessage);
       } else {
@@ -55,7 +62,9 @@ export function useUpdateHighRiskWork() {
     },
     onError: (error: any) => {
       const resultMessage =
-        error?.response?.data?.header?.resultMessage || error?.message || '고위험작업/상황 업데이트에 실패했습니다.';
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '고위험작업/상황 업데이트에 실패했습니다.';
       toast.error(resultMessage);
     },
   });
@@ -73,7 +82,7 @@ export function useDisasterFactors(params: GetDisasterFactorsParams) {
 }
 
 /**
- * 재해유발요인 목록 저장 Mutation Hook
+ * 재해유발요인 목록 전체 저장 Mutation Hook (PUT)
  */
 export function useSaveDisasterFactors() {
   const queryClient = useQueryClient();
@@ -92,7 +101,82 @@ export function useSaveDisasterFactors() {
     },
     onError: (error: any) => {
       const resultMessage =
-        error?.response?.data?.header?.resultMessage || error?.message || '재해유발요인 저장에 실패했습니다.';
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '재해유발요인 저장에 실패했습니다.';
+      toast.error(resultMessage);
+    },
+  });
+}
+
+/**
+ * 재해유발요인 개별 생성 Mutation Hook (POST)
+ */
+export function useCreateDisasterFactor() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (params: CreateDisasterFactorParams) => createDisasterFactor(params),
+    onSuccess: (response, variables) => {
+      toast.success('재해유발요인이 추가되었습니다.');
+      queryClient.invalidateQueries({ queryKey: ['checklists'] });
+      queryClient.invalidateQueries({ queryKey: ['disasterFactors', variables.checklistIdx] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '재해유발요인 추가에 실패했습니다.';
+      toast.error(resultMessage);
+    },
+  });
+}
+
+/**
+ * 재해유발요인 개별 수정 Mutation Hook (PATCH)
+ */
+export function useUpdateDisasterFactor(checklistIdx?: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (params: UpdateDisasterFactorParams) => updateDisasterFactor(params),
+    onSuccess: () => {
+      toast.success('재해유발요인이 수정되었습니다.');
+      queryClient.invalidateQueries({ queryKey: ['checklists'] });
+      if (checklistIdx) {
+        queryClient.invalidateQueries({ queryKey: ['disasterFactors', checklistIdx] });
+      }
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '재해유발요인 수정에 실패했습니다.';
+      toast.error(resultMessage);
+    },
+  });
+}
+
+/**
+ * 재해유발요인 개별 삭제 Mutation Hook (DELETE)
+ */
+export function useDeleteDisasterFactor(checklistIdx?: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (params: DeleteDisasterFactorParams) => deleteDisasterFactor(params),
+    onSuccess: () => {
+      toast.success('재해유발요인이 삭제되었습니다.');
+      queryClient.invalidateQueries({ queryKey: ['checklists'] });
+      if (checklistIdx) {
+        queryClient.invalidateQueries({ queryKey: ['disasterFactors', checklistIdx] });
+      }
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '재해유발요인 삭제에 실패했습니다.';
       toast.error(resultMessage);
     },
   });
@@ -128,7 +212,9 @@ export function useCreateIndustry() {
     },
     onError: (error: any) => {
       const resultMessage =
-        error?.response?.data?.header?.resultMessage || error?.message || '업종 등록에 실패했습니다.';
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '업종 등록에 실패했습니다.';
       toast.error(resultMessage);
     },
   });
@@ -154,7 +240,9 @@ export function useUpdateIndustry() {
     },
     onError: (error: any) => {
       const resultMessage =
-        error?.response?.data?.header?.resultMessage || error?.message || '업종 수정에 실패했습니다.';
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '업종 수정에 실패했습니다.';
       toast.error(resultMessage);
     },
   });
@@ -175,7 +263,9 @@ export function useDeleteIndustry() {
     },
     onError: (error: any) => {
       const resultMessage =
-        error?.response?.data?.header?.resultMessage || error?.message || '업종 삭제에 실패했습니다.';
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '업종 삭제에 실패했습니다.';
       toast.error(resultMessage);
     },
   });
@@ -200,7 +290,9 @@ export function useCreateChecklist() {
     },
     onError: (error: any) => {
       const resultMessage =
-        error?.response?.data?.header?.resultMessage || error?.message || '체크리스트 등록에 실패했습니다.';
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '체크리스트 등록에 실패했습니다.';
       toast.error(resultMessage);
     },
   });

@@ -56,7 +56,9 @@ export default function ServiceSettingTable({
       <Table size="small" stickyHeader>
         <TableHead>
           <TableRow>
-            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 80 }}>순번</TableCell>
+            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 80 }} align="center">
+              순번
+            </TableCell>
             <TableCell sx={{ bgcolor: 'grey.100', minWidth: 180 }}>등록일</TableCell>
             <TableCell sx={{ bgcolor: 'grey.100', minWidth: 200 }}>서비스명</TableCell>
             <TableCell align="center" sx={{ bgcolor: 'grey.100', minWidth: 120 }}>
@@ -83,7 +85,7 @@ export default function ServiceSettingTable({
         <TableBody>
           {rows.map((row, index) => (
             <TableRow key={row.serviceSettingIdx} hover>
-              <TableCell>
+              <TableCell align="center">
                 <Typography variant="body2">{row.serviceSettingIdx}</Typography>
               </TableCell>
               <TableCell>

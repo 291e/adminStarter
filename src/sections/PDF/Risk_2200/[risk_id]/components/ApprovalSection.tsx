@@ -214,6 +214,8 @@ export default function ApprovalSection({
                           maxWidth: 90,
                           maxHeight: 40,
                           objectFit: 'contain',
+                          filter: 'contrast(1.2) brightness(0.9)',
+                          opacity: 1,
                         }}
                       />
                     ) : null}
@@ -237,7 +239,7 @@ export default function ApprovalSection({
                     }}
                   >
                     {approvalData[col]?.name || ''}
-                    {approvalData[col]?.date && (
+                    {approvalData[col]?.signature && approvalData[col]?.date && (
                       <>
                         <br />
                         {approvalData[col].date}
@@ -366,6 +368,8 @@ export default function ApprovalSection({
                         maxWidth: 90,
                         maxHeight: 40,
                         objectFit: 'contain',
+                        filter: 'contrast(1.2) brightness(0.9)',
+                        opacity: 1,
                       }}
                     />
                   ) : null}
@@ -389,7 +393,7 @@ export default function ApprovalSection({
                   fontWeight: 400,
                 }}
               >
-                {approvalData.approver?.date
+                {approvalData.approver?.signature && approvalData.approver?.date
                   ? dayjs(approvalData.approver.date).format("'YY. M. D")
                   : ''}
               </td>
@@ -527,7 +531,7 @@ export default function ApprovalSection({
                   }}
                 >
                   {approvalData[col]?.name || ''}
-                  {approvalData[col]?.date && (
+                  {approvalData[col]?.signature && approvalData[col]?.date && (
                     <>
                       <br />
                       {approvalData[col].date}

@@ -1,33 +1,44 @@
 import type { BaseResponseDto } from '../common';
 
-export type ApiStatus = 'active' | 'inactive';
+export type ApiStatus = 'ACTIVE' | 'INACTIVE';
+export type KeyStatus = 'NORMAL' | 'ABNORMAL';
 
-export type Api = {
-  id: string;
+// API 설정 정보 (API 응답 구조)
+export type ApiSetting = {
+  apiSettingIdx: number;
   name: string;
   provider: string;
-  apiUrl: string;
-  apiKey?: string; // 마스킹된 값
-  expirationDate?: string;
+  apiUrl: string | null;
+  keyStatus: KeyStatus;
+  lastInterlockedAt: string | null; // ISO date string
+  expiresAt: string | null; // ISO date string
   status: ApiStatus;
-  registrationDate: string;
+  createAt: string; // ISO date string
+  updateAt: string; // ISO date string
 };
 
+// API 목록 조회 파라미터
 export type GetApisParams = {
   page: number;
   pageSize: number;
+  status?: string; // 상태 필터
+  keyStatus?: string; // 키 상태 필터
+  search?: string; // 검색어 (이름, 제공자)
 };
 
+// API 목록 조회 응답
 export type GetApisResponse = BaseResponseDto<{
-  apis: Api[];
-  total: number;
+  apiSettingList: ApiSetting[];
+  totalCount: number;
 }>;
 
+// API 상세 조회 파라미터
 export type GetApiDetailParams = {
-  id: string;
+  apiSettingIdx: number;
 };
 
-export type GetApiDetailResponse = BaseResponseDto<Api>;
+// API 상세 조회 응답
+export type GetApiDetailResponse = BaseResponseDto<ApiSetting>;
 
 export type CreateApiParams = {
   name: string;
@@ -37,22 +48,23 @@ export type CreateApiParams = {
   expirationDate?: string;
 };
 
-export type CreateApiResponse = BaseResponseDto<Api>;
+export type CreateApiResponse = BaseResponseDto<ApiSetting>;
 
+// API 수정 파라미터
 export type UpdateApiParams = {
-  id: string;
+  apiSettingIdx: number;
   name?: string;
   provider?: string;
-  apiUrl?: string;
+  apiUrl?: string | null;
   apiKey?: string; // Key 교체 시에만 전송
-  expirationDate?: string;
+  expiresAt?: string | null; // ISO date string
   status?: ApiStatus;
 };
 
-export type UpdateApiResponse = BaseResponseDto<Api>;
+export type UpdateApiResponse = BaseResponseDto<ApiSetting>;
 
 export type GenerateApiKeyParams = {
-  id: string;
+  apiSettingIdx: number;
 };
 
 export type GenerateApiKeyResponse = BaseResponseDto<{

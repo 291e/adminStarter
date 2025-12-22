@@ -82,7 +82,7 @@ export default function EducationReportTable({
             </TableCell>
             <TableCell sx={{ bgcolor: 'grey.100', minWidth: 144 }}>조직명</TableCell>
             <TableCell sx={{ bgcolor: 'grey.100', minWidth: 128 }}>이름/직급</TableCell>
-            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 148 }}>소속</TableCell>
+            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 148 }}>소속팀</TableCell>
             <TableCell sx={{ bgcolor: 'grey.100', minWidth: 248 }}>역할</TableCell>
             <TableCell align="center" sx={{ bgcolor: 'grey.100', minWidth: 100 }}>
               의무교육(분)
@@ -160,17 +160,8 @@ export default function EducationReportTable({
                   <CompletionRateProgress value={row.completionRate || 0} />
                 </TableCell>
                 <TableCell align="center">
-                  <IconButton
-                    size="small"
-                    onClick={() => onViewDetail?.(row)}
-                    sx={{
-                      bgcolor: 'grey.200',
-                      '&:hover': {
-                        bgcolor: 'grey.300',
-                      },
-                    }}
-                  >
-                    <Iconify icon="solar:eye-bold" width={20} />
+                  <IconButton size="small" onClick={() => onViewDetail?.(row)}>
+                    <Iconify icon="solar:info-circle-bold" width={20} />
                   </IconButton>
                 </TableCell>
               </TableRow>

@@ -15,9 +15,7 @@ import type {
  * 여러 명에게 푸시 알림 전송
  * POST /notification/push
  */
-export async function sendPushNotification(
-  params: SendPushNotificationDto
-): Promise<void> {
+export async function sendPushNotification(params: SendPushNotificationDto): Promise<void> {
   await axiosInstance.post(endpoints.notification.push, params);
 }
 
@@ -34,6 +32,7 @@ export async function getNotificationHistory(
       params,
     }
   );
+  // axios가 자동으로 response.data를 반환하지만, 실제 API는 body.data 구조이므로 그대로 반환
   return response.data;
 }
 
@@ -49,4 +48,3 @@ export async function markNotificationAsRead(
   );
   return response.data;
 }
-

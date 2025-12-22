@@ -5,9 +5,9 @@ import TextField from '@mui/material/TextField';
 import Chip from '@mui/material/Chip';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
+import InputLabel from '@mui/material/InputLabel';
 import FormControl from '@mui/material/FormControl';
 import InputAdornment from '@mui/material/InputAdornment';
-import Typography from '@mui/material/Typography';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -48,7 +48,7 @@ export default function OperationFilters({
 }: Props) {
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
-      <Stack spacing={4}>
+      <Stack>
         <Tabs value={tab} onChange={(_, v) => onChangeTab(v)}>
           <Tab
             value="all"
@@ -95,6 +95,7 @@ export default function OperationFilters({
           }}
         >
           <DatePicker
+            label="시작일"
             value={startDate}
             onChange={(value) => {
               onChangeStartDate(value);
@@ -103,31 +104,13 @@ export default function OperationFilters({
             slotProps={{
               textField: {
                 size: 'small',
-                placeholder: '시작일',
-                sx: {
-                  width: 160,
-                  '& .MuiInputBase-input': {
-                    fontSize: 15,
-                    lineHeight: '24px',
-                    color: startDate ? 'text.primary' : 'text.disabled',
-                    '&::placeholder': {
-                      opacity: 1,
-                      color: 'text.disabled',
-                    },
-                  },
-                },
-              },
-              openPickerIcon: {
-                sx: {
-                  width: 24,
-                  height: 24,
-                  color: 'text.secondary',
-                },
+                sx: { maxWidth: 160 },
               },
             }}
           />
 
           <DatePicker
+            label="종료일"
             value={endDate}
             onChange={(value) => {
               onChangeEndDate(value);
@@ -136,81 +119,22 @@ export default function OperationFilters({
             slotProps={{
               textField: {
                 size: 'small',
-                placeholder: '종료일',
-                sx: {
-                  width: 160,
-                  '& .MuiInputBase-input': {
-                    fontSize: 15,
-                    lineHeight: '24px',
-                    color: endDate ? 'text.primary' : 'text.disabled',
-                    '&::placeholder': {
-                      opacity: 1,
-                      color: 'text.disabled',
-                    },
-                  },
-                },
-              },
-              openPickerIcon: {
-                sx: {
-                  width: 24,
-                  height: 24,
-                  color: 'text.secondary',
-                },
+                sx: { maxWidth: 160 },
               },
             }}
           />
 
-          <FormControl size="small" sx={{ width: 160 }}>
+          <FormControl size="small" sx={{ minWidth: 160 }}>
+            <InputLabel id="search-field-label">검색어 필터</InputLabel>
             <Select
-              displayEmpty
+              labelId="search-field-label"
+              label="검색어 필터"
               value={searchField}
               onChange={(e) => {
                 setSearchField((e.target.value || '') as 'reporter' | 'author' | '');
               }}
-              renderValue={(selected) => {
-                if (!selected) {
-                  return (
-                    <Typography
-                      component="span"
-                      sx={{
-                        color: 'text.disabled',
-                        fontSize: 15,
-                        lineHeight: '24px',
-                      }}
-                    >
-                      검색어 필터
-                    </Typography>
-                  );
-                }
-                return (
-                  <Typography
-                    component="span"
-                    sx={{
-                      fontSize: 15,
-                      lineHeight: '24px',
-                      color: 'text.primary',
-                    }}
-                  >
-                    {selected === 'reporter' ? '보고자' : '작성자'}
-                  </Typography>
-                );
-              }}
-              sx={{
-                bgcolor: 'background.paper',
-                fontSize: 15,
-                lineHeight: '24px',
-                '& .MuiSelect-select': {
-                  fontSize: 15,
-                  lineHeight: '24px',
-                  py: 1,
-                },
-                '& .MuiSelect-icon': {
-                  width: 18,
-                  height: 18,
-                  right: 10,
-                },
-              }}
             >
+              <MenuItem value="">전체</MenuItem>
               <MenuItem value="reporter">보고자</MenuItem>
               <MenuItem value="author">작성자</MenuItem>
             </Select>

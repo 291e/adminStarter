@@ -5,7 +5,7 @@
 //   organizationName: string; // 조직명
 //   name: string; // 이름
 //   position: string; // 직급
-//   department: string; // 소속
+//   department: string; // 소속팀
 //   role: string; // 역할
 //   mandatoryEducation: number; // 의무교육(분)
 //   regularEducation: number; // 정기교육(분)

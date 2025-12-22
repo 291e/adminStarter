@@ -39,6 +39,7 @@ const statusLabels: Record<string, string> = {
 type Props = {
   rows: SafetySystem[];
   onViewGuide?: (system: SafetySystem, item?: SafetySystemItem) => void;
+  onNavigate?: (system: SafetySystem, item?: SafetySystemItem) => void;
 };
 
 function getStatusColor(status: SafetySystemItem['status']): {
@@ -78,10 +79,12 @@ function RowItem({
   item,
   itemIndex,
   onViewGuide,
+  onNavigate,
 }: {
   item: SafetySystemItem;
   itemIndex: number;
   onViewGuide?: () => void;
+  onNavigate?: () => void;
 }) {
   const statusColors = getStatusColor(item.status);
   const itemName = item.itemName || item.documentName || '';
@@ -102,7 +105,7 @@ function RowItem({
         transition: 'background-color 0.2s ease',
       }}
       onClick={() => {
-        onViewGuide?.();
+        onNavigate?.();
       }}
     >
       <Box
@@ -122,11 +125,6 @@ function RowItem({
         </Typography>
         <IconButton
           size="small"
-          onClick={(e) => {
-            e.stopPropagation();
-            onViewGuide?.();
-          }}
-          aria-label="가이드 보기"
           sx={{
             width: 20,
             height: 20,
@@ -218,19 +216,35 @@ function RowItem({
         <IconButton
           size="small"
           onClick={(e) => {
-            e.stopPropagation(); // Box의 onClick 이벤트 전파 방지
+            e.stopPropagation();
+            onViewGuide?.();
           }}
+          disabled={!item.guide}
           aria-label="가이드 보기"
-          sx={{ p: 1 }}
+          sx={{
+            p: 1,
+            color: item.guide ? 'text.secondary' : 'text.disabled',
+            '&:hover': {
+              bgcolor: item.guide ? 'action.hover' : 'transparent',
+            },
+          }}
         >
-          <Iconify icon="solar:eye-bold" width={20} />
+          <Iconify icon={item.guide ? 'solar:eye-bold' : 'solar:close-circle-bold'} width={20} />
         </IconButton>
       </Box>
     </Box>
   );
 }
 
-function Row({ row, onViewGuide }: { row: SafetySystem; onViewGuide?: Props['onViewGuide'] }) {
+function Row({
+  row,
+  onViewGuide,
+  onNavigate,
+}: {
+  row: SafetySystem;
+  onViewGuide?: Props['onViewGuide'];
+  onNavigate?: Props['onNavigate'];
+}) {
   return (
     <>
       <TableRow
@@ -291,12 +305,19 @@ function Row({ row, onViewGuide }: { row: SafetySystem; onViewGuide?: Props['onV
           <IconButton
             size="small"
             onClick={() => {
-              console.log('가이드 열기');
+              onViewGuide?.(row);
             }}
+            disabled={!row.guide}
             aria-label="가이드 보기"
-            sx={{ p: 1 }}
+            sx={{
+              p: 1,
+              color: row.guide ? 'text.secondary' : 'text.disabled',
+              '&:hover': {
+                bgcolor: row.guide ? 'action.hover' : 'transparent',
+              },
+            }}
           >
-            <Iconify icon="solar:eye-bold" width={20} />
+            <Iconify icon={row.guide ? 'solar:eye-bold' : 'solar:close-circle-bold'} width={20} />
           </IconButton>
         </TableCell>
       </TableRow>
@@ -311,6 +332,7 @@ function Row({ row, onViewGuide }: { row: SafetySystem; onViewGuide?: Props['onV
                 item={item}
                 itemIndex={idx}
                 onViewGuide={() => onViewGuide?.(row, item)}
+                onNavigate={() => onNavigate?.(row, item)}
               />
             ))}
           </Box>
@@ -320,7 +342,7 @@ function Row({ row, onViewGuide }: { row: SafetySystem; onViewGuide?: Props['onV
   );
 }
 
-export default function SafetySystemTable({ rows, onViewGuide }: Props) {
+export default function SafetySystemTable({ rows, onViewGuide, onNavigate }: Props) {
   return (
     <TableContainer component={Paper} sx={{ mt: 2, overflowX: 'auto' }}>
       <Table size="small" stickyHeader sx={{ minWidth: 1320 }}>
@@ -408,7 +430,12 @@ export default function SafetySystemTable({ rows, onViewGuide }: Props) {
 
         <TableBody>
           {rows.map((row) => (
-            <Row key={`safety-${row.safetyIdx}`} row={row} onViewGuide={onViewGuide} />
+            <Row
+              key={`safety-${row.safetyIdx}`}
+              row={row}
+              onViewGuide={onViewGuide}
+              onNavigate={onNavigate}
+            />
           ))}
         </TableBody>
       </Table>

@@ -67,9 +67,7 @@ export default function EditDocumentModal({
       const priorityLabelType = document.priorityInformation?.labelType;
 
       // priorities에서 해당 labelType의 id를 찾아서 설정
-      const documentPrioritySetting = priorities.find(
-        (p) => p.labelType === priorityLabelType
-      );
+      const documentPrioritySetting = priorities.find((p) => p.labelType === priorityLabelType);
 
       // 매핑된 prioritySetting의 id를 사용
       const priorityId = documentPrioritySetting?.id || '';
@@ -342,30 +340,29 @@ export default function EditDocumentModal({
                 </Select>
               </FormControl>
             </Stack>
-
-            {/* 공개 여부 */}
-            <Stack spacing={1.5} sx={{ minWidth: 67 }}>
-              <Typography variant="subtitle2" sx={{ fontSize: 14, fontWeight: 600 }}>
-                공개 여부
+          </Stack>
+          {/* 공개 여부 */}
+          <Stack spacing={1.5} sx={{ minWidth: 67 }}>
+            <Typography variant="subtitle2" sx={{ fontSize: 14, fontWeight: 600 }}>
+              공개 여부
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.125, mt: 1 }}>
+              <Switch
+                checked={formData.isPublic}
+                onChange={(e) => handleChange('isPublic', e.target.checked)}
+                sx={{
+                  '& .MuiSwitch-switchBase.Mui-checked': {
+                    color: 'primary.main',
+                  },
+                  '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                    bgcolor: 'primary.main',
+                  },
+                }}
+              />
+              <Typography variant="body2" sx={{ fontSize: 14, color: 'text.secondary' }}>
+                공개
               </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.125, mt: 1 }}>
-                <Switch
-                  checked={formData.isPublic}
-                  onChange={(e) => handleChange('isPublic', e.target.checked)}
-                  sx={{
-                    '& .MuiSwitch-switchBase.Mui-checked': {
-                      color: 'primary.main',
-                    },
-                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                      bgcolor: 'primary.main',
-                    },
-                  }}
-                />
-                <Typography variant="body2" sx={{ fontSize: 14, color: 'text.secondary' }}>
-                  공개
-                </Typography>
-              </Box>
-            </Stack>
+            </Box>
           </Stack>
         </Stack>
       </DialogContent>

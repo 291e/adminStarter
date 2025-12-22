@@ -97,13 +97,10 @@ export default function OrganizationForm({
           <Grid size={{ xs: 12, md: 6 }}>
             {/* 조직 구분 (등록) / 등록일·IP·접속일 (수정) */}
             {mode === 'edit' && (
-              <>
-                <LabeledText
-                  label="등록일"
-                  value={value?.createAt ? fDateTime(value.createAt, 'YYYY-MM-DD HH:mm:ss') : ''}
-                />
-                <LabeledText label="최근 접속 IP" value={lastAccessIp ?? '-'} />
-              </>
+              <LabeledText
+                label="등록일"
+                value={value?.createAt ? fDateTime(value.createAt, 'YYYY-MM-DD HH:mm:ss') : ''}
+              />
             )}
 
             <LabeledRow label="조직명">

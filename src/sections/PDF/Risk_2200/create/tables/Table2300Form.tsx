@@ -203,13 +203,13 @@ export default function Table2300Form({
                   감소대책
                 </th>
                 <th rowSpan={2} style={{ width: 80 }}>
-                  개선후 위험성
+                  개선 후 <br /> 위험성
                 </th>
                 <th rowSpan={2} style={{ width: 73 }}>
                   담당자
                 </th>
                 <th rowSpan={2} style={{ width: 113 }}>
-                  조치요구일
+                  조치 요구일
                 </th>
                 <th rowSpan={2} style={{ width: 117 }}>
                   조치 완료일
@@ -217,10 +217,10 @@ export default function Table2300Form({
                 <th rowSpan={2} style={{ width: 50 }}>
                   완료
                 </th>
-                <th rowSpan={2} style={{ width: 46 }}>
+                <th rowSpan={2} style={{ width: 30 }}>
                   이동
                 </th>
-                <th rowSpan={2} style={{ width: 55 }}>
+                <th rowSpan={2} style={{ width: 39 }}>
                   삭제
                 </th>
               </tr>
@@ -228,27 +228,23 @@ export default function Table2300Form({
                 <th style={{ width: 80 }}>원인</th>
                 <th style={{ width: 120 }}>유해·위험요인</th>
                 <th style={{ width: 120 }}>법규/노출기준 등</th>
-                <th style={{ width: 80 }}>NO</th>
-                <th style={{ width: 73 }}>세부내용</th>
+                <th style={{ width: 50 }}>NO</th>
+                <th style={{ width: 103 }}>세부내용</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row, index) => (
                 <tr
                   key={index}
-                  draggable
-                  onDragStart={() => handleDragStart(index)}
                   onDragOver={(e) => handleDragOver(e, index)}
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, index)}
-                  onDragEnd={handleDragEnd}
                   style={{
                     opacity: draggedIndex === index ? 0.5 : 1,
                     backgroundColor:
                       dragOverIndex === index && draggedIndex !== index
                         ? theme.vars.palette.action.hover
                         : 'transparent',
-                    cursor: 'move',
                   }}
                 >
                   <td>
@@ -282,11 +278,11 @@ export default function Table2300Form({
                       onChange={(e) => onRowChange(index, 'cause', e.target.value)}
                       fullWidth
                       multiline
-                      maxRows={3}
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           fontSize: 14,
                           height: 'auto',
+                          p: 1,
                         },
                       }}
                     />
@@ -297,10 +293,12 @@ export default function Table2300Form({
                       value={row.hazard}
                       onChange={(e) => onRowChange(index, 'hazard', e.target.value)}
                       fullWidth
+                      multiline
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           fontSize: 14,
                           height: 'auto',
+                          p: 1,
                         },
                       }}
                     />
@@ -311,10 +309,12 @@ export default function Table2300Form({
                       value={row.reference}
                       onChange={(e) => onRowChange(index, 'reference', e.target.value)}
                       fullWidth
+                      multiline
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           fontSize: 14,
                           height: 'auto',
+                          p: 1,
                         },
                       }}
                     />
@@ -366,10 +366,12 @@ export default function Table2300Form({
                       value={row.reductionNo}
                       onChange={(e) => onRowChange(index, 'reductionNo', e.target.value)}
                       fullWidth
+                      multiline
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           fontSize: 14,
                           height: 'auto',
+                          p: 1,
                         },
                       }}
                     />
@@ -380,10 +382,12 @@ export default function Table2300Form({
                       value={row.reductionDetail}
                       onChange={(e) => onRowChange(index, 'reductionDetail', e.target.value)}
                       fullWidth
+                      multiline
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           fontSize: 14,
                           height: 'auto',
+                          p: 1,
                         },
                       }}
                     />
@@ -435,11 +439,12 @@ export default function Table2300Form({
                       value={row.owner}
                       onChange={(e) => onRowChange(index, 'owner', e.target.value)}
                       fullWidth
+                      multiline
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           fontSize: 14,
                           height: 'auto',
-                          p: 0,
+                          p: 1,
                         },
                       }}
                       InputProps={{
@@ -455,6 +460,7 @@ export default function Table2300Form({
                   </td>
                   <td>
                     <DatePicker
+                      label="요구일"
                       format="YYYY-MM-DD"
                       open={openDueDatePicker[index] || false}
                       onOpen={() => setOpenDueDatePicker((prev) => ({ ...prev, [index]: true }))}
@@ -494,7 +500,9 @@ export default function Table2300Form({
                   </td>
                   <td>
                     <DatePicker
+                      label="완료일"
                       format="YYYY-MM-DD"
+                      minDate={row.dueDate ? dayjs(row.dueDate) : undefined}
                       open={openCompletedDatePicker[index] || false}
                       onOpen={() =>
                         setOpenCompletedDatePicker((prev) => ({ ...prev, [index]: true }))
@@ -548,14 +556,19 @@ export default function Table2300Form({
                     <Box sx={{ display: 'flex', justifyContent: 'center', px: 1 }}>
                       <IconButton
                         size="small"
+                        draggable
+                        onDragStart={() => handleDragStart(index)}
+                        onDragEnd={handleDragEnd}
                         sx={{
+                          p: 0.625,
                           cursor: 'grab',
                           '&:active': {
                             cursor: 'grabbing',
                           },
                         }}
+                        onMouseDown={(e) => e.stopPropagation()}
                       >
-                        <Iconify icon="eva:more-vertical-fill" width={20} />
+                        <Iconify icon="custom:drag-dots-fill" width={20} />
                       </IconButton>
                     </Box>
                   </td>
@@ -573,6 +586,7 @@ export default function Table2300Form({
                           fontWeight: 700,
                           px: 1,
                           py: 0.5,
+                          width: 23,
                           '&:hover': {
                             bgcolor: 'error.dark',
                           },

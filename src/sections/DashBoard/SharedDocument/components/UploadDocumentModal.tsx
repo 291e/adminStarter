@@ -317,10 +317,10 @@ export default function UploadDocumentModal({ open, onClose, onSave, priorities 
       </DialogContent>
 
       <DialogActions sx={{ px: 3, py: 2.5 }}>
-        <DialogBtn variant="outlined" onClick={handleClose} sx={{ minHeight: 48, fontSize: 15 }}>
+        <DialogBtn variant="outlined" onClick={handleClose} sx={{ fontSize: 15 }}>
           닫기
         </DialogBtn>
-        <DialogBtn variant="contained" onClick={handleSave} sx={{ minHeight: 48, fontSize: 15 }}>
+        <DialogBtn variant="contained" onClick={handleSave} sx={{ fontSize: 15 }}>
           게시
         </DialogBtn>
       </DialogActions>

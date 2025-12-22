@@ -291,7 +291,7 @@ export function CodeSettingView({ title = '코드 관리', description, sx }: Pr
       <CodeSettingBreadcrumbs
         items={[
           { label: '대시보드', href: '/admin/dashboard' },
-          { label: '설정 및 관리', href: '/admin/dashboard/system-setting' },
+          { label: '설정 및 관리', href: '/admin/dashboard' },
           { label: title },
         ]}
         onCreate={handleCreate}

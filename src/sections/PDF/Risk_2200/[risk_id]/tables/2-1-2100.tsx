@@ -81,6 +81,24 @@ export default function RiskAssessmentTable_2_1_2100({ data }: Props) {
 
   const tableData = data || defaultData;
 
+  // 위험요인 분류 빈 행 필터링
+  const filteredClassification = tableData.classification.filter(
+    (row) => row.category?.trim() || row.hazardFactors?.trim()
+  );
+
+  // 위험성 평가 빈 행 필터링
+  const filteredAssessment = tableData.assessment.filter(
+    (row) =>
+      row.hazardFactor?.trim() ||
+      row.dangerousSituation?.trim() ||
+      row.currentSafetyMeasure?.trim() ||
+      row.riskLevel?.value ||
+      row.additionalMeasure?.trim() ||
+      row.responsiblePerson?.trim() ||
+      row.plannedDate?.trim() ||
+      row.completedDate?.trim()
+  );
+
   const tableStyle = {
     width: '100%',
     border: '2px solid',
@@ -94,7 +112,6 @@ export default function RiskAssessmentTable_2_1_2100({ data }: Props) {
       verticalAlign: 'middle',
     },
     '& th': {
-      backgroundColor: 'grey.100',
       fontSize: 14,
       fontWeight: 600,
       lineHeight: '22px',
@@ -107,10 +124,16 @@ export default function RiskAssessmentTable_2_1_2100({ data }: Props) {
       lineHeight: '22px',
       whiteSpace: 'pre-wrap',
     },
+    '& tbody tr': {
+      pageBreakInside: 'avoid',
+      breakInside: 'avoid',
+    },
   };
 
   return (
-    <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
+    <Box
+      sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}
+    >
       {/* 첫 번째 테이블: 위험요인 분류 */}
       <Box sx={{ width: '100%' }}>
         <Typography sx={{ mb: 2, fontSize: 16, fontWeight: 600, px: 1 }}>
@@ -136,7 +159,9 @@ export default function RiskAssessmentTable_2_1_2100({ data }: Props) {
                   <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{row.category}</Typography>
                 </td>
                 <td>
-                  <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{row.hazardFactors}</Typography>
+                  <Typography sx={{ fontSize: 14, fontWeight: 400 }}>
+                    {row.hazardFactors}
+                  </Typography>
                 </td>
               </tr>
             ))}
@@ -150,7 +175,7 @@ export default function RiskAssessmentTable_2_1_2100({ data }: Props) {
         <Box component="table" sx={tableStyle}>
           <thead>
             <tr>
-              <th style={{ width: 160 }}>유해/위험요인</th>
+              <th style={{ width: 160 }}>유해·위험요인</th>
               <th style={{ width: 199 }}>위험한 상황과 결과</th>
               <th style={{ width: 160 }}>현재 안전조치</th>
               <th style={{ width: 120 }}>위험성</th>
@@ -165,7 +190,7 @@ export default function RiskAssessmentTable_2_1_2100({ data }: Props) {
             </tr>
           </thead>
           <tbody>
-            {tableData.assessment.map((row, index) => (
+            {filteredAssessment.map((row, index) => (
               <tr key={index} style={{ height: index === 0 || index === 1 ? 72 : 48 }}>
                 <td>
                   <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{row.hazardFactor}</Typography>
@@ -194,7 +219,9 @@ export default function RiskAssessmentTable_2_1_2100({ data }: Props) {
                           textAlign: 'center',
                         }}
                       >
-                        ({row.riskLevel.label})
+                        {row.riskLevel.label.includes('(')
+                          ? row.riskLevel.label.substring(row.riskLevel.label.indexOf('('))
+                          : `(${row.riskLevel.label})`}
                       </Typography>
                     )}
                   </Box>
@@ -213,7 +240,9 @@ export default function RiskAssessmentTable_2_1_2100({ data }: Props) {
                   <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{row.plannedDate}</Typography>
                 </td>
                 <td>
-                  <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{row.completedDate}</Typography>
+                  <Typography sx={{ fontSize: 14, fontWeight: 400 }}>
+                    {row.completedDate}
+                  </Typography>
                 </td>
               </tr>
             ))}

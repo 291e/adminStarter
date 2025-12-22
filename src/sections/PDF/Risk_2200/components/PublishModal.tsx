@@ -12,9 +12,8 @@ import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import FormControl from '@mui/material/FormControl';
 import Switch from '@mui/material/Switch';
-import FormControlLabel from '@mui/material/FormControlLabel';
+import Stack from '@mui/material/Stack';
 import IconButton from '@mui/material/IconButton';
-import InputAdornment from '@mui/material/InputAdornment';
 import CircularProgress from '@mui/material/CircularProgress';
 
 import { Iconify } from 'src/components/iconify';
@@ -51,6 +50,7 @@ type Props = {
   onConfirm?: () => void; // 선택적, API 성공 후 호출
   documentName?: string;
   documentId?: string; // safetySystemDocumentIdx
+  writtenAt?: string; // 작성일 (YYYY-MM-DD 형식)
 };
 
 export default function PublishModal({
@@ -59,11 +59,12 @@ export default function PublishModal({
   onConfirm,
   documentName: initialDocumentName,
   documentId,
+  writtenAt,
 }: Props) {
   const queryClient = useQueryClient();
   const [documentName, setDocumentName] = useState(initialDocumentName || '');
   const [priorityIdx, setPriorityIdx] = useState<number | ''>('');
-  const [isPublished, setIsPublished] = useState(false); // 기본값: 미게시
+  const [isPublic, setIsPublic] = useState(false); // 기본값: 비공개
 
   // 중요도 설정 목록 조회
   const { data: prioritySettingsResponse, isLoading: isLoadingPriorities } = useQuery({
@@ -83,6 +84,35 @@ export default function PublishModal({
   const activePriorities: PrioritySetting[] = (prioritySettingsResponse || []).filter(
     (p: PrioritySetting) => p.isActive === 1
   );
+
+  // 문서명에 작성일 추가
+  const getDocumentNameWithDate = (name: string): string => {
+    if (!name) return '';
+    if (!writtenAt) return name;
+
+    // 이미 날짜가 포함되어 있는지 확인
+    const datePattern = /_\d{4}-\d{2}-\d{2}$/;
+    if (datePattern.test(name)) {
+      return name;
+    }
+
+    // 작성일을 문서명 뒤에 추가
+    return `${name}_${writtenAt}`;
+  };
+
+  const handleDocumentNameChange = (value: string) => {
+    // 사용자가 입력하는 동안은 그대로 저장 (날짜 자동 추가 안 함)
+    setDocumentName(value);
+  };
+
+  const handleDocumentNameBlur = () => {
+    // 입력이 끝났을 때 날짜가 없으면 자동으로 추가
+    const datePattern = /_\d{4}-\d{2}-\d{2}$/;
+    if (documentName && !datePattern.test(documentName) && writtenAt) {
+      const finalName = `${documentName}_${writtenAt}`;
+      setDocumentName(finalName);
+    }
+  };
 
   // 문서 게시 API Mutation
   const publishMutation = useMutation({
@@ -122,75 +152,74 @@ export default function PublishModal({
       return;
     }
 
+    // 문서명에 작성일이 없으면 추가
+    const finalDocumentName = getDocumentNameWithDate(documentName);
+
     publishMutation.mutate({
       safetySystemDocumentIdx: Number(documentId),
       priorityIdx: Number(priorityIdx),
-      isPublished: isPublished ? 1 : 0,
-      documentName: documentName || undefined,
+      isPublished: isPublic ? 1 : 0,
+      documentName: finalDocumentName || undefined,
     });
   };
 
   const handleClose = () => {
     setDocumentName(initialDocumentName || '');
     setPriorityIdx('');
-    setIsPublished(false);
+    setIsPublic(false);
     onClose();
   };
 
   // 모달이 열릴 때 초기값 설정
   useEffect(() => {
     if (open) {
-      setDocumentName(initialDocumentName || '');
+      const nameWithDate = getDocumentNameWithDate(initialDocumentName || '');
+      setDocumentName(nameWithDate);
       setPriorityIdx('');
-      setIsPublished(false);
+      setIsPublic(false);
     }
-  }, [open, initialDocumentName]);
+  }, [open, initialDocumentName, writtenAt]);
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-      <DialogTitle
-        sx={{
-          fontSize: 18,
-          fontWeight: 600,
-          lineHeight: '28px',
-          color: 'text.primary',
-          pb: 3,
-        }}
-      >
-        문서 공유
+      <DialogTitle>
+        <Typography component="div" variant="h6" sx={{ fontWeight: 600, fontSize: 18 }}>
+          문서 공유
+        </Typography>
+        <IconButton
+          aria-label="close"
+          onClick={handleClose}
+          sx={{
+            position: 'absolute',
+            right: 16,
+            top: 16,
+            color: (theme) => theme.palette.grey[500],
+          }}
+        >
+          <Iconify icon="solar:close-circle-bold" width={24} />
+        </IconButton>
       </DialogTitle>
 
       <DialogContent>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <Stack spacing={2} sx={{ mt: 1, pb: 3 }}>
           {/* 문서명 */}
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-            <Typography
-              variant="subtitle2"
-              sx={{
-                fontSize: 14,
-                fontWeight: 600,
-                lineHeight: '22px',
-                color: 'text.primary',
-              }}
-            >
+          <Box>
+            <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600, fontSize: 14 }}>
               문서명
             </Typography>
             <TextField
               fullWidth
+              placeholder="문서명을 입력해주세요."
               value={documentName}
-              onChange={(e) => setDocumentName(e.target.value)}
-              placeholder="문서명을 입력하세요"
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton edge="end" size="small">
-                      <Iconify icon="solar:pen-bold" width={16} />
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
+              onChange={(e) => handleDocumentNameChange(e.target.value)}
+              onBlur={handleDocumentNameBlur}
+              helperText={
+                writtenAt
+                  ? '입력 후 포커스를 벗어나면 자동으로 날짜가 추가됩니다 (예: 문서1_2025-11-12)'
+                  : '문서명을 입력해주세요'
+              }
               sx={{
-                '& .MuiOutlinedInput-root': {
+                '& .MuiInputBase-input': {
                   fontSize: 15,
                   lineHeight: '24px',
                 },
@@ -199,16 +228,8 @@ export default function PublishModal({
           </Box>
 
           {/* 중요도 */}
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-            <Typography
-              variant="subtitle2"
-              sx={{
-                fontSize: 14,
-                fontWeight: 600,
-                lineHeight: '22px',
-                color: 'text.primary',
-              }}
-            >
+          <Box>
+            <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600, fontSize: 14 }}>
               중요도
             </Typography>
             <FormControl fullWidth>
@@ -224,6 +245,9 @@ export default function PublishModal({
                   sx={{
                     fontSize: 15,
                     lineHeight: '24px',
+                    '& .MuiSelect-select': {
+                      py: 2,
+                    },
                   }}
                 >
                   <MenuItem value="" disabled>
@@ -250,58 +274,38 @@ export default function PublishModal({
           </Box>
 
           {/* 공개 여부 */}
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-            <Typography
-              variant="subtitle2"
-              sx={{
-                fontSize: 14,
-                fontWeight: 600,
-                lineHeight: '22px',
-                color: 'text.primary',
-              }}
-            >
+          <Box>
+            <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600, fontSize: 14 }}>
               공개 여부
             </Typography>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={isPublished}
-                  onChange={(e) => setIsPublished(e.target.checked)}
-                  sx={{
-                    '& .MuiSwitch-switchBase.Mui-checked': {
-                      color: 'primary.main',
-                    },
-                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                      backgroundColor: 'primary.main',
-                    },
-                  }}
-                />
-              }
-              label={
-                <Typography
-                  sx={{
-                    fontSize: 14,
-                    fontWeight: 400,
-                    lineHeight: '22px',
-                    color: 'text.secondary',
-                  }}
-                >
-                  {isPublished ? '게시' : '미게시'}
-                </Typography>
-              }
-            />
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Switch
+                checked={isPublic}
+                onChange={(e) => setIsPublic(e.target.checked)}
+                size="medium"
+              />
+              <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: 14 }}>
+                {isPublic ? '공개' : '비공개'}
+              </Typography>
+            </Stack>
           </Box>
-        </Box>
+        </Stack>
       </DialogContent>
 
-      <DialogActions sx={{ justifyContent: 'flex-end', px: 3, pb: 3 }}>
-        <DialogBtn variant="outlined" onClick={handleClose} disabled={publishMutation.isPending}>
+      <DialogActions sx={{ px: 3, py: 2.5 }}>
+        <DialogBtn
+          variant="outlined"
+          onClick={handleClose}
+          disabled={publishMutation.isPending}
+          sx={{ fontSize: 15 }}
+        >
           닫기
         </DialogBtn>
         <DialogBtn
           variant="contained"
           onClick={handleConfirm}
           disabled={publishMutation.isPending || priorityIdx === ''}
+          sx={{ fontSize: 15 }}
         >
           {publishMutation.isPending ? '게시 중...' : '게시'}
         </DialogBtn>

@@ -40,9 +40,16 @@ type Props = {
   onClose: () => void;
   onSave: (data: ApiEditFormData) => void;
   initialData?: ApiSetting | null;
+  isLoadingDetail?: boolean;
 };
 
-export default function EditApiModal({ open, onClose, onSave, initialData }: Props) {
+export default function EditApiModal({
+  open,
+  onClose,
+  onSave,
+  initialData,
+  isLoadingDetail = false,
+}: Props) {
   const [formData, setFormData] = useState<ApiEditFormData>({
     name: '',
     provider: '',
@@ -65,7 +72,7 @@ export default function EditApiModal({ open, onClose, onSave, initialData }: Pro
       setFormData({
         name: initialData.name,
         provider: initialData.provider,
-        apiUrl: '', // TODO: TanStack Query Hook(useQuery)으로 API URL 가져오기
+        apiUrl: initialData.apiUrl || '', // API 상세 정보에서 가져온 URL 사용
         apiKey: '', // 마스킹된 값이므로 빈 문자열로 시작
         expirationDate: initialData.expirationDate ? dayjs(initialData.expirationDate) : null,
         status: initialData.status,
@@ -152,16 +159,16 @@ export default function EditApiModal({ open, onClose, onSave, initialData }: Pro
   };
 
   const registrationDate = initialData?.registrationDate
-    ? fDateTime(initialData.registrationDate)
+    ? fDateTime(initialData.registrationDate, 'YYYY-MM-DD HH:mm:ss')
     : '-';
-  const modificationDate = initialData?.registrationDate
-    ? fDateTime(initialData.registrationDate)
-    : '-'; // TODO: TanStack Query Hook(useQuery)으로 수정일 가져오기
+  const modificationDate = initialData?.modificationDate
+    ? fDateTime(initialData.modificationDate, 'YYYY-MM-DD HH:mm:ss')
+    : '-';
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
       <DialogTitle>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+        <Typography component="span" variant="h6" sx={{ fontWeight: 600 }}>
           API 설정
         </Typography>
         <IconButton
@@ -286,11 +293,6 @@ export default function EditApiModal({ open, onClose, onSave, initialData }: Pro
                 </InputAdornment>
               ),
             }}
-            sx={{
-              '& .MuiInputBase-root': {
-                bgcolor: showApiKey ? 'background.paper' : 'grey.50',
-              },
-            }}
           />
 
           {/* Key 만료일 */}
@@ -355,7 +357,7 @@ export default function EditApiModal({ open, onClose, onSave, initialData }: Pro
               <Iconify
                 icon={'solar:danger-circle-bold' as any}
                 width={64}
-                sx={{ color: 'warning.main' }}
+                sx={{ color: 'error.main' }}
               />
             </Box>
 

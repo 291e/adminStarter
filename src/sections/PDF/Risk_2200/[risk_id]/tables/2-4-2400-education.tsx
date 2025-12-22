@@ -148,6 +148,38 @@ export default function RiskTable_2_4_2400_Education({
   rows = defaultRows,
   minimumEducationRows = defaultMinimumEducationRows,
 }: Props) {
+  // 연간 교육 계획 빈 행 필터링
+  const filteredRows = rows.filter(
+    (row) =>
+      row.educationType?.trim() ||
+      row.educationCourse?.trim() ||
+      row.scheduleMonths?.some((month) => month === true) ||
+      row.targetCount?.trim() ||
+      row.educationMethod?.trim() ||
+      row.remark?.trim()
+  );
+
+  // 교육대상별·교육유형별 최저 교육시간 빈 행 필터링
+  const filteredMinimumEducationRows = minimumEducationRows.filter(
+    (row) =>
+      row.category?.trim() ||
+      row.subCategory1?.trim() ||
+      row.subCategory2?.trim() ||
+      row.subCategory3?.trim() ||
+      row.newEmployeeEducation1?.trim() ||
+      row.newEmployeeEducation2?.trim() ||
+      row.newEmployeeEducation3?.trim() ||
+      row.regularEducation1?.trim() ||
+      row.regularEducation2?.trim() ||
+      row.regularEducation3?.trim() ||
+      row.workContentChange1?.trim() ||
+      row.workContentChange2?.trim() ||
+      row.workContentChange3?.trim() ||
+      row.specialEducation1?.trim() ||
+      row.specialEducation2?.trim() ||
+      row.specialEducation3?.trim()
+  );
+
   const tableStyle = {
     width: '100%',
     border: '2px solid',
@@ -161,7 +193,6 @@ export default function RiskTable_2_4_2400_Education({
       verticalAlign: 'middle',
     },
     '& th': {
-      backgroundColor: 'grey.100',
       fontSize: 14,
       fontWeight: 600,
       lineHeight: '22px',
@@ -169,6 +200,10 @@ export default function RiskTable_2_4_2400_Education({
     '& td': {
       fontSize: 14,
       height: 48,
+    },
+    '& tbody tr': {
+      pageBreakInside: 'avoid',
+      breakInside: 'avoid',
     },
   };
 
@@ -219,7 +254,7 @@ export default function RiskTable_2_4_2400_Education({
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, index) => (
+            {filteredRows.map((row, index) => (
               <tr key={index}>
                 {/* 순번 */}
                 <td>
@@ -294,7 +329,7 @@ export default function RiskTable_2_4_2400_Education({
               </tr>
             </thead>
             <tbody>
-              {minimumEducationRows.map((row, index) => {
+              {filteredMinimumEducationRows.map((row, index) => {
                 const hasThirdRow = !!row.subCategory3;
                 const rowSpan = hasThirdRow ? 3 : 2;
 

@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -19,8 +20,14 @@ import Stack from '@mui/material/Stack';
 import Pagination from '@mui/material/Pagination';
 import Divider from '@mui/material/Divider';
 
-import { sendNotification } from 'src/services/safety-system/safety-system.service';
-import type { DocumentSignatureInfo } from 'src/services/safety-system/safety-system.types';
+import {
+  sendNotification,
+  getSafetySystemDocument,
+} from 'src/services/safety-system/safety-system.service';
+import type {
+  DocumentSignatureInfo,
+  WorkerSignatureStatusInfo,
+} from 'src/services/safety-system/safety-system.types';
 
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
 import Badge from 'src/components/safeyoui/badge';
@@ -35,6 +42,7 @@ type Props = {
   approvalDeadline?: string;
   documentId?: string;
   signatureList?: DocumentSignatureInfo[]; // 결재 서명 목록
+  workerSignatureList?: WorkerSignatureStatusInfo[]; // 근로자 서명 목록 (추가)
 };
 
 const ROWS_PER_PAGE = 10;
@@ -47,12 +55,20 @@ export default function ProgressModal({
   approvalDeadline,
   documentId,
   signatureList = [],
+  workerSignatureList = [],
 }: Props) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [page, setPage] = useState(1);
 
-  // approvalStep에 따라 역할 결정
-  const getRoleByStep = (step: number) => {
+  // 문서 상세 정보 조회 (실시간 서명 현황 반영을 위해)
+  const { data: documentDetail } = useQuery({
+    queryKey: ['safetySystemDocument', Number(documentId)],
+    queryFn: () => getSafetySystemDocument(Number(documentId)),
+    enabled: !!documentId,
+  });
+
+  // approvalStep에 따라 유형 결정 (결재 유형)
+  const getApprovalTypeByStep = (step: number) => {
     switch (step) {
       case 1:
         return '승인자';
@@ -65,29 +81,91 @@ export default function ProgressModal({
     }
   };
 
-  // signatureList를 UI 타입으로 변환
-  const signatureTargets = useMemo(
-    () =>
-      signatureList.map((sig) => {
-        const status: 'completed' | 'incomplete' =
-          sig.approvalStatus === 'APPROVED' ? 'completed' : 'incomplete';
-        return {
-          id: `${sig.documentApprovalIdx}`,
-          targetMemberIdx: sig.targetMemberIdx,
-          name: sig.memberName,
-          position: '', // API에서 제공되지 않음
-          department: '', // API에서 제공되지 않음
-          role: getRoleByStep(sig.approvalStep),
-          type: 'approval' as const, // signatureList는 모두 결재 관련
-          status,
-          completedAt: sig.approvedAt ? sig.approvedAt.split('T')[0] : undefined,
-          avatar: undefined,
-          approvalStep: sig.approvalStep,
-          approvalOrder: sig.approvalOrder,
-        };
-      }),
-    [signatureList]
-  );
+  // memberRole을 한글로 변환 (슈퍼어드민이면 "최고관리자" 반환)
+  const getMemberRoleLabel = (memberRole?: string, isSuperAdmin?: boolean) => {
+    // 슈퍼어드민이면 무조건 "최고관리자"
+    if (isSuperAdmin) {
+      return '최고관리자';
+    }
+
+    if (!memberRole) return '-';
+
+    const roleMap: Record<string, string> = {
+      OPERATOR_MANAGER: '조직 관리자',
+      MANAGEMENT_SUPERVISOR: '관리 감독자',
+      SAFETY_MANAGER: '안전보건 담당자',
+      WORKER: '근로자',
+      ADMIN: '조직 관리자',
+      MEMBER: '근로자',
+    };
+
+    return roleMap[memberRole.toUpperCase()] || roleMap[memberRole] || memberRole;
+  };
+
+  // signatureList 및 workerSignatureList 병합하여 UI 타입으로 변환
+  const signatureTargets = useMemo(() => {
+    // API 응답 구조 대응: documentDetail이 BaseResponseDto인 경우 body나 직접 속성에 document가 있을 수 있음
+    const detailAny = documentDetail as any;
+    const docData = detailAny?.document || detailAny?.body?.document || detailAny?.data?.document;
+
+    // API에서 가져온 서명 목록이 있으면 사용 (없으면 props)
+    const effectiveSignatureList: DocumentSignatureInfo[] = docData?.signatureList || signatureList;
+    const effectiveWorkerList: WorkerSignatureStatusInfo[] =
+      docData?.workerSignatureList || workerSignatureList;
+
+    // 1. 결재자 목록 변환
+    const approvalTargets = effectiveSignatureList.map((sig) => {
+      const status: 'completed' | 'incomplete' =
+        sig.approvalStatus === 'APPROVED' ? 'completed' : 'incomplete';
+      return {
+        id: `approval-${sig.documentApprovalIdx}`,
+        targetMemberIdx: sig.targetMemberIdx,
+        name: sig.memberName,
+        position: sig.position || '',
+        department: sig.department || '',
+        memberRole: getMemberRoleLabel(sig.memberRole, sig.isSuperAdmin), // 실제 멤버 역할
+        approvalType: getApprovalTypeByStep(sig.approvalStep), // 결재 유형 (승인자, 작성자, 검토자)
+        type: 'approval' as const,
+        status,
+        completedAt: sig.approvedAt ? sig.approvedAt.split('T')[0] : undefined,
+        avatar: undefined,
+      };
+    });
+
+    // 2. 근로자 목록 변환
+    const workerTargets = effectiveWorkerList.map((sig) => {
+      let status: 'completed' | 'incomplete' | 'progress' = 'incomplete';
+      let label = '미완료';
+
+      if (sig.status === 'SIGNED') {
+        status = 'completed';
+        label = '서명완료';
+      } else if (sig.status === 'WATCHED') {
+        status = 'progress' as any;
+        label = '시청완료';
+      } else if (sig.status === 'WATCHING') {
+        status = 'progress' as any;
+        label = '시청중';
+      }
+
+      return {
+        id: `worker-${sig.workerSignatureIdx}`,
+        targetMemberIdx: sig.targetMemberIdx,
+        name: sig.memberName,
+        position: sig.position || '',
+        department: sig.department || '',
+        memberRole: getMemberRoleLabel(sig.memberRole, sig.isSuperAdmin), // 실제 멤버 역할
+        approvalType: '근로자', // 근로자 유형
+        type: 'worker' as const,
+        status,
+        statusLabel: label,
+        completedAt: sig.signedAt ? sig.signedAt.split('T')[0] : undefined,
+        avatar: undefined,
+      };
+    });
+
+    return [...approvalTargets, ...workerTargets];
+  }, [documentDetail, signatureList, workerSignatureList]);
 
   const paginatedTargets = useMemo(() => {
     const startIndex = (page - 1) * ROWS_PER_PAGE;
@@ -169,9 +247,48 @@ export default function ProgressModal({
     onClose();
   };
 
-  const getRoleLabel = (role?: string) => role || '';
+  const getStatusBadge = (target: any) => {
+    if (target.type === 'approval') {
+      return target.status === 'completed' ? (
+        <Box>
+          <Badge label="완료" variant="completed" />
+          {target.completedAt && (
+            <Typography
+              variant="caption"
+              sx={{ color: 'text.secondary', display: 'block', mt: 0.5 }}
+            >
+              {target.completedAt}
+            </Typography>
+          )}
+        </Box>
+      ) : (
+        <Badge label="미완료" variant="incomplete" />
+      );
+    }
 
-  const getTypeLabel = (type: 'approval' | 'signature') => (type === 'approval' ? '결재' : '서명');
+    // 근로자 전용 뱃지 로직
+    if (target.status === 'completed') {
+      return (
+        <Box>
+          <Badge label={target.statusLabel} variant="completed" />
+          {target.completedAt && (
+            <Typography
+              variant="caption"
+              sx={{ color: 'text.secondary', display: 'block', mt: 0.5 }}
+            >
+              {target.completedAt}
+            </Typography>
+          )}
+        </Box>
+      );
+    }
+    return (
+      <Badge
+        label={target.statusLabel || '미완료'}
+        variant={target.status === ('progress' as any) ? 'info' : 'incomplete'}
+      />
+    );
+  };
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
@@ -197,28 +314,30 @@ export default function ProgressModal({
             borderRadius={2}
           >
             <Box sx={{ display: 'flex', gap: 2 }}>
-              <Typography variant="body2" sx={{ color: 'text.secondary', minWidth: 80 }}>
+              <Typography variant="subtitle2" sx={{ color: 'text.primary', minWidth: 80 }}>
                 문서명
               </Typography>
               <Typography variant="body2" sx={{ color: 'text.primary' }}>
                 {documentName || '1-5 위험장소 및 작업형태별 위험요인'}
               </Typography>
             </Box>
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              <Typography variant="body2" sx={{ color: 'text.secondary', minWidth: 80 }}>
-                문서 작성일
-              </Typography>
-              <Typography variant="body2" sx={{ color: 'text.primary' }}>
-                {writtenAt || '2025-10-23'}
-              </Typography>
-            </Box>
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              <Typography variant="body2" sx={{ color: 'text.secondary', minWidth: 80 }}>
-                결재 마감일
-              </Typography>
-              <Typography variant="body2" sx={{ color: 'text.primary' }}>
-                {approvalDeadline || '2025-10-23'}
-              </Typography>
+            <Box sx={{ display: 'flex', gap: '100px', alignItems: 'center' }}>
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <Typography variant="subtitle2" sx={{ color: 'text.primary', minWidth: 80 }}>
+                  문서 작성일
+                </Typography>
+                <Typography variant="body2" sx={{ color: 'text.primary' }}>
+                  {writtenAt || '2025-10-23'}
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <Typography variant="subtitle2" sx={{ color: 'text.primary', minWidth: 80 }}>
+                  결재 마감일
+                </Typography>
+                <Typography variant="body2" sx={{ color: 'text.primary' }}>
+                  {approvalDeadline || '2025-10-23'}
+                </Typography>
+              </Box>
             </Box>
           </Box>
 
@@ -261,7 +380,7 @@ export default function ProgressModal({
                       p: 2,
                     }}
                   >
-                    소속
+                    소속팀
                   </TableCell>
                   <TableCell
                     sx={{
@@ -336,30 +455,16 @@ export default function ProgressModal({
                     </TableCell>
                     <TableCell sx={{ p: 2 }}>
                       <Typography variant="body2" sx={{ color: 'text.primary' }}>
-                        {getRoleLabel(target.role)}
+                        {target.memberRole}
                       </Typography>
                     </TableCell>
                     <TableCell sx={{ p: 2 }}>
                       <Typography variant="body2" sx={{ color: 'text.primary' }}>
-                        {getTypeLabel(target.type)}
+                        {target.approvalType}
                       </Typography>
                     </TableCell>
                     <TableCell sx={{ p: 2, textAlign: 'center' }}>
-                      {target.status === 'completed' ? (
-                        <Box>
-                          <Badge label="완료" variant="completed" />
-                          {target.completedAt && (
-                            <Typography
-                              variant="caption"
-                              sx={{ color: 'text.secondary', display: 'block', mt: 0.5 }}
-                            >
-                              {target.completedAt}
-                            </Typography>
-                          )}
-                        </Box>
-                      ) : (
-                        <Badge label="미완료" variant="incomplete" />
-                      )}
+                      {getStatusBadge(target)}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -381,7 +486,8 @@ export default function ProgressModal({
               spacing={1}
               sx={{
                 flexWrap: 'wrap',
-                justifyContent: 'center',
+                px: 3,
+                pb: 3,
                 gap: 1,
                 width: '100%',
               }}

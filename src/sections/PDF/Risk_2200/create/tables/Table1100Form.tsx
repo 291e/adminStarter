@@ -1,9 +1,14 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useTheme } from '@mui/material/styles';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
 import IconButton from '@mui/material/IconButton';
 import Button from '@mui/material/Button';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
+import type { SelectChangeEvent } from '@mui/material/Select';
 
 import { Iconify } from 'src/components/iconify';
 import type { Table1100Row } from '../../types/table-data';
@@ -11,6 +16,8 @@ import SelectHighRiskWorkModal, { type HighRiskWorkItem } from './modal/SelectHi
 import SelectDisasterFactorModal, {
   type DisasterFactorItem,
 } from './modal/SelectDisasterFactorModal';
+import { useIndustries, useChecklists } from 'src/sections/ChackList/hooks/use-checklist-api';
+import type { IndustryItem, Checklist } from 'src/services/checklist/checklist.types';
 
 // ----------------------------------------------------------------------
 
@@ -22,6 +29,7 @@ type Props = {
   onAddRow: () => void;
   onSelectHighRiskWork?: (index: number) => void;
   onSelectDisasterFactor?: (index: number) => void;
+  onInsertRows?: (index: number, newRows: Table1100Row[]) => void;
 };
 
 export default function Table1100Form({
@@ -32,6 +40,7 @@ export default function Table1100Form({
   onAddRow,
   onSelectHighRiskWork,
   onSelectDisasterFactor,
+  onInsertRows,
 }: Props) {
   const theme = useTheme();
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -39,6 +48,47 @@ export default function Table1100Form({
   const [highRiskWorkModalOpen, setHighRiskWorkModalOpen] = useState(false);
   const [disasterFactorModalOpen, setDisasterFactorModalOpen] = useState(false);
   const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
+  const [selectedIndustry, setSelectedIndustry] = useState<string>('');
+
+  // 업종 목록 조회
+  const { data: industriesData } = useIndustries();
+  const industries: IndustryItem[] = useMemo(() => {
+    const list = industriesData?.industryList || [];
+
+    // 활성화된 업종만 필터링
+    const activeIndustries = list.filter((industry) => industry.status === 'ACTIVE');
+
+    // 중복 제거: 업종명(name)을 키로 하여 같은 이름의 업종 중 첫 번째 항목만 유지
+    const seenByName = new Map<string, IndustryItem>();
+
+    for (const industry of activeIndustries) {
+      if (industry.name) {
+        // 업종명이 이미 있으면 무시 (첫 번째 것만 유지)
+        if (!seenByName.has(industry.name)) {
+          seenByName.set(industry.name, industry);
+        }
+      }
+    }
+
+    const uniqueIndustries = Array.from(seenByName.values());
+
+    return uniqueIndustries;
+  }, [industriesData]);
+
+  // 모든 체크리스트 목록 조회 (클라이언트 사이드 필터링을 위해 모든 데이터 가져오기)
+  const { data: checklistsData } = useChecklists({
+    page: 1,
+    pageSize: 1000, // 충분히 큰 값으로 모든 데이터 가져오기
+    status: 'active',
+  });
+
+  // 체크리스트 데이터 정규화
+  const allChecklists: Checklist[] = useMemo(() => {
+    const list = checklistsData?.checklistList;
+    if (!list || !Array.isArray(list) || list.length === 0) return [];
+    if (typeof list[0] === 'string') return [];
+    return list as Checklist[];
+  }, [checklistsData]);
 
   const handleDragStart = (index: number) => {
     setDraggedIndex(index);
@@ -97,16 +147,59 @@ export default function Table1100Form({
   };
 
   const handleConfirmDisasterFactor = (selectedItems: DisasterFactorItem[]) => {
-    if (selectedRowIndex !== null) {
-      // 중복 선택된 항목들을 줄바꿈으로 구분하여 저장
-      const disasterFactorText = selectedItems.map((item) => item.name).join('\n');
-      onRowChange(selectedRowIndex, 'disasterFactor', disasterFactorText);
+    if (selectedRowIndex !== null && selectedItems.length > 0) {
+      const firstItem = selectedItems[0];
+      const otherItems = selectedItems.slice(1);
+
+      // 첫 번째 항목은 현재 행 업데이트
+      onRowChange(selectedRowIndex, 'disasterFactor', firstItem.name);
+
+      // 나머지 항목들은 새로운 행으로 추가 (고위험작업 및 상황 복사)
+      if (otherItems.length > 0 && onInsertRows) {
+        const currentRow = rows[selectedRowIndex];
+        const newRows = otherItems.map((item) => ({
+          highRiskWork: currentRow.highRiskWork, // 고위험작업 복사
+          disasterFactor: item.name,
+          workplace: '',
+          machineHazard: '',
+          improvementNeeded: '',
+          remark: '',
+        }));
+        onInsertRows(selectedRowIndex, newRows);
+      }
     }
     handleCloseDisasterFactorModal();
   };
 
   return (
     <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      {/* 업종 드롭다운 (테이블 좌측 위) */}
+      <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', mb: 2, gap: 2, px: 2 }}>
+        <FormControl size="small" sx={{ minWidth: 200 }}>
+          <InputLabel id="industry-select-label">업종</InputLabel>
+          <Select
+            labelId="industry-select-label"
+            value={selectedIndustry}
+            onChange={(e: SelectChangeEvent<string>) => setSelectedIndustry(e.target.value)}
+            label="업종 선택"
+            sx={{ fontSize: 14 }}
+          >
+            <MenuItem value="">
+              <em>전체</em>
+            </MenuItem>
+            {industries.map((industry) => (
+              <MenuItem
+                key={industry.industryIdx ?? industry.name}
+                value={industry.name}
+                sx={{ fontSize: 14 }}
+              >
+                {industry.name}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Box>
+
       <Box sx={{ pb: 5, pt: 0, px: 0, width: '100%' }}>
         <Box
           component="table"
@@ -146,16 +239,14 @@ export default function Table1100Form({
               </th>
               <th style={{ maxWidth: 80 }}>개선필요</th>
               <th style={{ maxWidth: 110 }}>비고</th>
-              <th style={{ maxWidth: 30 }}>이동</th>
-              <th style={{ maxWidth: 39 }}>삭제</th>
+              <th style={{ width: 30 }}>이동</th>
+              <th style={{ width: 39 }}>삭제</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row, index) => (
               <tr
                 key={index}
-                draggable
-                onDragStart={() => handleDragStart(index)}
                 onDragOver={(e) => handleDragOver(e, index)}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, index)}
@@ -220,11 +311,13 @@ export default function Table1100Form({
                     value={row.workplace}
                     onChange={(e) => onRowChange(index, 'workplace', e.target.value)}
                     fullWidth
+                    multiline
                     sx={{
                       '& .MuiOutlinedInput-root': {
                         fontSize: 14,
                         height: 'auto',
                         maxWidth: 100,
+                        p: 1,
                       },
                       display: 'flex',
                       justifyContent: 'center',
@@ -238,11 +331,13 @@ export default function Table1100Form({
                     value={row.machineHazard}
                     onChange={(e) => onRowChange(index, 'machineHazard', e.target.value)}
                     fullWidth
+                    multiline
                     sx={{
                       '& .MuiOutlinedInput-root': {
                         fontSize: 14,
                         height: 'auto',
                         maxWidth: 160,
+                        p: 1,
                       },
                       display: 'flex',
                       justifyContent: 'center',
@@ -256,11 +351,13 @@ export default function Table1100Form({
                     value={row.improvementNeeded}
                     onChange={(e) => onRowChange(index, 'improvementNeeded', e.target.value)}
                     fullWidth
+                    multiline
                     sx={{
                       '& .MuiOutlinedInput-root': {
                         fontSize: 14,
                         height: 'auto',
                         maxWidth: 80,
+                        p: 1,
                       },
                       display: 'flex',
                       justifyContent: 'center',
@@ -274,11 +371,13 @@ export default function Table1100Form({
                     value={row.remark}
                     onChange={(e) => onRowChange(index, 'remark', e.target.value)}
                     fullWidth
+                    multiline
                     sx={{
                       '& .MuiOutlinedInput-root': {
                         fontSize: 14,
                         height: 'auto',
                         maxWidth: 110,
+                        p: 1,
                       },
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -296,6 +395,9 @@ export default function Table1100Form({
                   >
                     <IconButton
                       size="small"
+                      draggable
+                      onDragStart={() => handleDragStart(index)}
+                      onDragEnd={handleDragEnd}
                       sx={{
                         p: 0.625,
                         cursor: 'grab',
@@ -322,7 +424,7 @@ export default function Table1100Form({
                       fontWeight: 700,
                       px: 1,
                       py: 0.5,
-                      maxWidth: 39,
+                      width: 23,
                       '&:hover': {
                         bgcolor: 'error.dark',
                       },
@@ -359,6 +461,8 @@ export default function Table1100Form({
         open={highRiskWorkModalOpen}
         onClose={handleCloseHighRiskWorkModal}
         onConfirm={handleConfirmHighRiskWork}
+        industry={selectedIndustry || undefined}
+        allChecklists={allChecklists}
       />
 
       {selectedRowIndex !== null && (
@@ -367,6 +471,7 @@ export default function Table1100Form({
           onClose={handleCloseDisasterFactorModal}
           onConfirm={handleConfirmDisasterFactor}
           highRiskWork={rows[selectedRowIndex]?.highRiskWork}
+          industry={selectedIndustry}
         />
       )}
     </Box>

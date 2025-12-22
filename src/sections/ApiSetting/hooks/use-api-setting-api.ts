@@ -38,9 +38,9 @@ export function useApis(params: GetApisParams) {
  */
 export function useApiDetail(params: GetApiDetailParams) {
   return useQuery({
-    queryKey: ['apiDetail', params.id],
+    queryKey: ['apiDetail', params.apiSettingIdx],
     queryFn: () => getApiDetail(params),
-    enabled: !!params.id,
+    enabled: !!params.apiSettingIdx,
   });
 }
 
@@ -85,7 +85,7 @@ export function useUpdateApi() {
         toast.success('API 정보가 수정되었습니다.');
       }
       queryClient.invalidateQueries({ queryKey: ['apis'] });
-      queryClient.invalidateQueries({ queryKey: ['apiDetail', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['apiDetail', variables.apiSettingIdx] });
     },
     onError: (error: any) => {
       const resultMessage =
@@ -110,7 +110,7 @@ export function useGenerateApiKey() {
       } else {
         toast.success('새 API Key가 생성되었습니다.');
       }
-      queryClient.invalidateQueries({ queryKey: ['apiDetail', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['apiDetail', variables.apiSettingIdx] });
     },
     onError: (error: any) => {
       const resultMessage =

@@ -42,6 +42,24 @@ const defaultRows: Table2300Row[] = [
 ];
 
 export default function RiskTable_2_3_2300({ rows = defaultRows }: Props) {
+  // 빈 행 필터링: 모든 필드가 비어있으면 제외
+  const filteredRows = rows.filter(
+    (row) =>
+      row.division?.trim() ||
+      row.category?.trim() ||
+      row.cause?.trim() ||
+      row.hazard?.trim() ||
+      row.reference?.trim() ||
+      row.law?.trim() ||
+      row.currentRisk?.value ||
+      row.reductionNo?.toString().trim() ||
+      row.reductionDetail?.trim() ||
+      row.postRisk?.value ||
+      row.owner?.trim() ||
+      row.dueDate?.trim() ||
+      row.completedAt?.trim()
+  );
+
   return (
     <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <Box sx={{ pb: 5, pt: 0, px: 0, width: '100%' }}>
@@ -71,6 +89,10 @@ export default function RiskTable_2_3_2300({ rows = defaultRows }: Props) {
               lineHeight: '22px',
               whiteSpace: 'pre-wrap',
             },
+            '& tbody tr': {
+              pageBreakInside: 'avoid',
+              breakInside: 'avoid',
+            },
           }}
         >
           <thead>
@@ -91,13 +113,13 @@ export default function RiskTable_2_3_2300({ rows = defaultRows }: Props) {
                 감소대책
               </th>
               <th rowSpan={2} style={{ width: 80 }}>
-                개선후 위험성
+                개선 후 <br /> 위험성
               </th>
               <th rowSpan={2} style={{ width: 73 }}>
                 담당자
               </th>
               <th rowSpan={2} style={{ width: 113 }}>
-                조치요구일
+                조치 요구일
               </th>
               <th rowSpan={2} style={{ width: 117 }}>
                 조치 완료일
@@ -110,12 +132,12 @@ export default function RiskTable_2_3_2300({ rows = defaultRows }: Props) {
               <th style={{ width: 80 }}>원인</th>
               <th style={{ width: 120 }}>유해·위험요인</th>
               <th style={{ width: 120 }}>법규/노출기준 등</th>
-              <th style={{ width: 80 }}>NO</th>
-              <th style={{ width: 73 }}>세부내용</th>
+              <th style={{ width: 50 }}>NO</th>
+              <th style={{ width: 103 }}>세부내용</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((r, idx) => (
+            {filteredRows.map((r, idx) => (
               <tr key={idx} style={{ height: 96 }}>
                 <td>
                   <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{r.division}</Typography>
@@ -186,7 +208,7 @@ export default function RiskTable_2_3_2300({ rows = defaultRows }: Props) {
                 </td>
                 <td>
                   <Typography sx={{ fontSize: 14, fontWeight: 400 }}>
-                    {r.done ? '●' : '○'}
+                    {r.done ? 'O' : 'X'}
                   </Typography>
                 </td>
               </tr>

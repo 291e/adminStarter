@@ -71,7 +71,7 @@ const getNationality = (member: Member): string => {
 // 직급 매핑 함수
 const getPosition = (member: Member): string => member.position || '-';
 
-// 소속 매핑 함수
+// 소속팀 매핑 함수
 const getDepartment = (member: Member): string => member.department || '-';
 
 export default function MemberTable({ organizationId, rows: initialRows, onEdit }: Props) {
@@ -102,13 +102,13 @@ export default function MemberTable({ organizationId, rows: initialRows, onEdit 
       <Table size="small" stickyHeader>
         <TableHead>
           <TableRow>
-            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 120 }}>등록일</TableCell>
-            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 120 }}>아이디</TableCell>
-            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 160 }}>이름 / 직급</TableCell>
-            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 100 }}>소속</TableCell>
+            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 100 }}>등록일</TableCell>
+            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 100 }}>아이디</TableCell>
+            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 100 }}>이름 / 직급</TableCell>
+            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 100 }}>소속팀</TableCell>
             <TableCell sx={{ bgcolor: 'grey.100', minWidth: 140 }}>역할</TableCell>
             <TableCell sx={{ bgcolor: 'grey.100', minWidth: 100 }}>직종</TableCell>
-            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 292 }}>전화번호 / 이메일</TableCell>
+            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 160 }}>전화번호 / 이메일</TableCell>
             <TableCell align="center" sx={{ bgcolor: 'grey.100', minWidth: 120 }}>
               국적
             </TableCell>
@@ -125,9 +125,14 @@ export default function MemberTable({ organizationId, rows: initialRows, onEdit 
           {rows.map((row) => (
             <TableRow key={row.memberIdx} hover>
               <TableCell>
-                <Typography variant="body2">
-                  {fDateTime(row.createAt, 'YYYY-MM-DD HH:mm:ss')}
-                </Typography>
+                <Stack>
+                  <Typography variant="body2">
+                    {row.createAt ? fDateTime(row.createAt, 'YYYY-MM-DD') : '-'}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {row.createAt ? fDateTime(row.createAt, 'HH:mm:ss') : ''}
+                  </Typography>
+                </Stack>
               </TableCell>
               <TableCell>
                 <Typography variant="body2">{row.memberId}</Typography>
@@ -173,16 +178,7 @@ export default function MemberTable({ organizationId, rows: initialRows, onEdit 
                 )}
               </TableCell>
               <TableCell align="center">
-                <IconButton
-                  size="small"
-                  onClick={() => onEdit?.(row)}
-                  sx={{
-                    bgcolor: 'grey.200',
-                    '&:hover': {
-                      bgcolor: 'grey.300',
-                    },
-                  }}
-                >
+                <IconButton size="small" onClick={() => onEdit?.(row)}>
                   <Iconify icon="solar:pen-bold" width={20} />
                 </IconButton>
               </TableCell>

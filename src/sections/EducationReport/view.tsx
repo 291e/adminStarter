@@ -35,6 +35,7 @@ export function EducationReportView({ title = '교육 이수 현황', descriptio
   const [selectedEducationReportIdxes, setSelectedEducationReportIdxes] = useState<number[] | null>(
     null
   );
+  const [selectedMemberNames, setSelectedMemberNames] = useState<string[]>([]);
 
   // 필터 및 페이지네이션 상태
   const [filters, setFilters] = useState({
@@ -46,23 +47,14 @@ export function EducationReportView({ title = '교육 이수 현황', descriptio
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
   // API 파라미터 구성
-  // role 필터를 클라이언트에서 처리하므로 모든 데이터를 가져와야 함
-  const queryParams = useMemo(() => {
-    const params: any = {
+  // 모든 필터링을 클라이언트에서 처리하므로 모든 데이터를 가져와야 함
+  const queryParams = useMemo(
+    () => ({
       page: 1, // 클라이언트 페이지네이션을 위해 항상 1페이지부터
       pageSize: 1000, // 충분히 큰 값으로 모든 데이터 가져오기
-    };
-
-    // 검색어가 있으면 search 파라미터로 전달
-    if (filters.searchValue) {
-      params.search = filters.searchValue;
-    }
-
-    // role 필터는 클라이언트에서 처리 (API에 전달하지 않음)
-    // 필요시 서버에서도 필터링하도록 추가 가능
-
-    return params;
-  }, [filters.searchValue]);
+    }),
+    []
+  );
 
   // 교육 이수 현황 목록 조회
   const { data, isLoading, isError } = useEducationReports(queryParams);
@@ -75,14 +67,47 @@ export function EducationReportView({ title = '교육 이수 현황', descriptio
     return data.body.educationReports;
   }, [data]);
 
-  // 클라이언트 필터링 (role 필터)
+  // 클라이언트 필터링 (role + search 필터)
+  // eslint-disable-next-line arrow-body-style
   const filteredReports = useMemo(() => {
-    if (filters.role === 'all') return reports;
     return reports.filter((r) => {
+      // 역할 필터
       const role = r.memberInformation?.memberRole || r.role || '';
-      return role === filters.role;
+      const roleMatch = filters.role === 'all' || role === filters.role;
+
+      // 검색 필터
+      if (!filters.searchValue) {
+        return roleMatch;
+      }
+
+      const searchLower = filters.searchValue.toLowerCase();
+      let searchMatch = false;
+
+      const memberInfo = r.memberInformation;
+      const companyInfo = r.companyInformation;
+      const organizationName = companyInfo?.companyName || r.organizationName || '';
+      const memberName = memberInfo?.memberName || r.name || '';
+      const department = memberInfo?.department ?? r.department ?? '';
+      const memberRole = memberInfo?.memberRole || r.role || '';
+
+      if (filters.searchFilter === 'all') {
+        // 전체 검색: 조직명, 이름, 소속팀, 역할 모두 검색
+        searchMatch =
+          organizationName.toLowerCase().includes(searchLower) ||
+          memberName.toLowerCase().includes(searchLower) ||
+          (Boolean(department) && department.toLowerCase().includes(searchLower)) ||
+          memberRole.toLowerCase().includes(searchLower);
+      } else if (filters.searchFilter === 'name') {
+        // 이름으로 검색
+        searchMatch = memberName.toLowerCase().includes(searchLower);
+      } else if (filters.searchFilter === 'department') {
+        // 소속팀으로 검색 (조직명이 아님)
+        searchMatch = Boolean(department) && department.toLowerCase().includes(searchLower);
+      }
+
+      return roleMatch && searchMatch;
     });
-  }, [reports, filters.role]);
+  }, [reports, filters.role, filters.searchFilter, filters.searchValue]);
 
   // 필터링된 전체 개수
   const filteredTotalCount = filteredReports.length;
@@ -179,6 +204,7 @@ export function EducationReportView({ title = '교육 이수 현황', descriptio
           // 선택된 모든 멤버의 educationReportIdx 찾기
           const selectedReportIdxes: number[] = [];
           let firstMemberIdx: number | null = null;
+          const memberNames: string[] = [];
 
           logic.selectedIds.forEach((selectedId) => {
             const selectedReport = reports.find(
@@ -198,6 +224,12 @@ export function EducationReportView({ title = '교육 이수 현황', descriptio
                 selectedReportIdxes.push(reportIdx);
                 if (!firstMemberIdx) {
                   firstMemberIdx = selectedReport.memberIdx || null;
+                }
+                // 선택된 멤버 이름 수집
+                const memberName =
+                  selectedReport.memberInformation?.memberName || selectedReport.name || '';
+                if (memberName && !memberNames.includes(memberName)) {
+                  memberNames.push(memberName);
                 }
               }
             }
@@ -220,6 +252,7 @@ export function EducationReportView({ title = '교육 이수 현황', descriptio
           setSelectedEducationReportIdxes(
             selectedReportIdxes.length > 1 ? selectedReportIdxes : null
           );
+          setSelectedMemberNames(memberNames);
           setModalOpen(true);
         }}
       />
@@ -249,10 +282,12 @@ export function EducationReportView({ title = '교육 이수 현황', descriptio
           setModalOpen(false);
           setSelectedEducationReportIdx(null);
           setSelectedEducationReportIdxes(null);
+          setSelectedMemberNames([]);
         }}
         memberIdx={selectedMemberIdx || undefined}
         educationReportIdx={selectedEducationReportIdx || undefined}
         educationReportIdxes={selectedEducationReportIdxes || undefined}
+        selectedMemberNames={selectedMemberNames}
         onSave={(formData) => {
           // API 연동은 AddEducationModal 내부에서 처리
           if (import.meta.env.DEV) {

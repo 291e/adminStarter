@@ -18,7 +18,7 @@ export type SafetySystemGroup = {
 };
 
 export type SafetySystemItem = {
-  safetyIdx: number; // 소속 그룹 키
+  safetyIdx: number; // 소속팀 그룹 키
   itemNumber: number; // 그룹 내 순번
   documentName: string;
   documentCount: number;
@@ -131,7 +131,7 @@ export const mockSafetySystemItems: SafetySystemItem[] = [
   {
     safetyIdx: 2,
     itemNumber: 2,
-    documentName: '위험요인 제거·대체 및 통제 계획',
+    documentName: '위험요인 제거·대체 및 통제',
     documentCount: 5,
     cycle: 1,
     cycleUnit: 'half',

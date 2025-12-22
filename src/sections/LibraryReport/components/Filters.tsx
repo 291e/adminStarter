@@ -52,11 +52,13 @@ export default function LibraryReportFilters({
             onChange={(e) => onChangeCategory(e.target.value)}
           >
             <MenuItem value="all">전체</MenuItem>
-            {categories.map((cat) => (
-              <MenuItem key={cat.id} value={cat.name}>
-                {cat.name}
-              </MenuItem>
-            ))}
+            {categories
+              .filter((cat) => cat.isActive)
+              .map((cat) => (
+                <MenuItem key={cat.id} value={cat.name}>
+                  {cat.name}
+                </MenuItem>
+              ))}
           </Select>
         </FormControl>
 
@@ -94,9 +96,6 @@ export default function LibraryReportFilters({
             value={searchFilter}
             onChange={(e) => onChangeSearchFilter(e.target.value)}
           >
-            <MenuItem value="all">전체</MenuItem>
-            <MenuItem value="organizationName">조직명</MenuItem>
-            <MenuItem value="category">카테고리</MenuItem>
             <MenuItem value="title">제목</MenuItem>
           </Select>
         </FormControl>

@@ -72,6 +72,7 @@ const normalizeLibraryReport = (item: any, index: number): LibraryReport => {
     id: String(libraryReportIdx ?? `library-${index}`),
     libraryReportIdx:
       typeof libraryReportIdx === 'number' ? libraryReportIdx : Number(libraryReportIdx) || index,
+    vodIdx: item?.vodIdx ?? undefined,
     libraryCategoryIdx: item?.libraryCategoryIdx ?? item?.categoryIdx ?? null,
     libraryReportCategoryInformation: item?.libraryReportCategoryInformation ?? null,
 
@@ -160,12 +161,13 @@ export async function getLibraryReports(
 export async function createLibraryReport(
   params: CreateLibraryReportParams
 ): Promise<CreateLibraryReportResponse> {
-  const { hasSubtitles, ...body } = params;
+  const { hasSubtitles, visibilityType, ...body } = params;
   const response = await axiosInstance.post<CreateLibraryReportResponse>(
     endpoints.library.reports,
     {
       ...body,
       hasSubtitles: hasSubtitles ? 1 : 0,
+      visibilityType: visibilityType ? visibilityType.toUpperCase() : undefined,
     }
   );
   return response.data;
@@ -191,10 +193,13 @@ export async function getLibraryReport(
 export async function updateLibraryReport(
   params: UpdateLibraryReportParams
 ): Promise<UpdateLibraryReportResponse> {
-  const { libraryReportIdx, ...body } = params;
+  const { libraryReportIdx, visibilityType, ...body } = params;
   const response = await axiosInstance.put<UpdateLibraryReportResponse>(
     `${endpoints.library.reports}/${libraryReportIdx}`,
-    body
+    {
+      ...body,
+      visibilityType: visibilityType ? visibilityType.toUpperCase() : undefined,
+    }
   );
   return response.data;
 }

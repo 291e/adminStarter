@@ -88,6 +88,24 @@ export default function EditApprovalSection({
 
   const getSignature = (type: ApprovalType) => signatures.find((item) => item.type === type);
 
+  // 결재 삭제 순서: 승인 -> 작성 -> 검토 이므로 제거는 검토 -> 작성 -> 승인 순
+  const removalOrder: ApprovalType[] = ['reviewer', 'writer', 'approver'];
+
+  const hasPendingSignature = removalOrder.some((type) => {
+    const sig = getSignature(type);
+    return sig && !sig.signature;
+  });
+
+  const handleRemoveNextPending = () => {
+    const nextType = removalOrder.find((type) => {
+      const sig = getSignature(type);
+      return sig && !sig.signature;
+    });
+    if (nextType) {
+      onRemoveSignature(nextType);
+    }
+  };
+
   // 파일 URL을 전체 URL로 변환하는 헬퍼 함수
   const getFullFileUrl = (url: string | null | undefined): string | null => {
     if (!url) return null;
@@ -211,63 +229,77 @@ export default function EditApprovalSection({
 
     return (
       <Box
-        component="button"
-        type="button"
-        onClick={() => onSelectMember(type)}
-        disabled={!!signature?.signature}
         sx={{
-          border: '1px solid',
-          borderColor: 'rgba(145,158,171,0.2)',
-          borderRadius: 1,
-          px: 1.25,
-          py: 0.25,
-          minHeight: 30,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center',
           gap: 0.5,
           width: '100%',
-          background: 'none',
-          cursor: signature?.signature ? 'not-allowed' : 'pointer',
-          '&:hover': {
-            borderColor: signature?.signature ? 'rgba(145,158,171,0.2)' : 'text.primary',
-          },
-          '&:disabled': {
-            cursor: 'not-allowed',
-            opacity: 0.6,
-          },
         }}
       >
         <Box
+          component="button"
+          type="button"
+          onClick={() => {
+            // 서명이 등록된 경우 대상자 변경 불가
+            if (signature?.signature) return;
+            onSelectMember(type);
+          }}
+          disabled={!!signature?.signature}
           sx={{
+            border: '1px solid',
+            borderColor: 'rgba(145,158,171,0.2)',
+            borderRadius: 1,
+            px: 1.25,
+            py: 0.25,
+            minHeight: 30,
             display: 'flex',
-            flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
+            gap: 0.5,
+            flex: 1,
+            background: 'none',
+            cursor: signature?.signature ? 'not-allowed' : 'pointer',
+            '&:hover': {
+              borderColor: signature?.signature ? 'rgba(145,158,171,0.2)' : 'text.primary',
+            },
+            '&:disabled': {
+              cursor: 'not-allowed',
+              opacity: 0.6,
+            },
           }}
         >
-          <Typography
+          <Box
             sx={{
-              fontSize: 14,
-              fontWeight: 600,
-              lineHeight: '20px',
-              color: 'text.primary',
-              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
-            {signature.name}
-          </Typography>
-          {signature.date && (
             <Typography
               sx={{
-                fontSize: 12,
-                lineHeight: '18px',
-                color: 'text.secondary',
+                fontSize: 14,
+                fontWeight: 600,
+                lineHeight: '20px',
+                color: 'text.primary',
+                textAlign: 'center',
               }}
             >
-              {signature.date}
+              {signature.name}
             </Typography>
-          )}
+            {/* 서명이 등록된 경우에만 날짜 표시 */}
+            {signature.signature && signature.date && (
+              <Typography
+                sx={{
+                  fontSize: 12,
+                  lineHeight: '18px',
+                  color: 'text.secondary',
+                }}
+              >
+                {signature.date}
+              </Typography>
+            )}
+          </Box>
         </Box>
       </Box>
     );
@@ -445,23 +477,42 @@ export default function EditApprovalSection({
           </tr>
         </tbody>
       </Box>
-      {canAddSignature && (
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'center' }}>
+        {canAddSignature && (
+          <Button
+            variant="contained"
+            size="small"
+            onClick={onAddSignature}
+            sx={{
+              bgcolor: '#078dee',
+              minHeight: 28,
+              fontSize: 12,
+              fontWeight: 500,
+              px: 1,
+              borderRadius: 0.5,
+            }}
+          >
+            서명 추가
+          </Button>
+        )}
+        {/* 결재칸 오른쪽 화살표: 결재 안 된 결재칸을 검토 -> 작성 -> 승인 순으로 제거 */}
         <Button
           variant="contained"
           size="small"
-          onClick={onAddSignature}
+          onClick={handleRemoveNextPending}
+          disabled={!hasPendingSignature}
           sx={{
-            bgcolor: '#078dee',
             minHeight: 28,
             fontSize: 12,
             fontWeight: 500,
             px: 1,
             borderRadius: 0.5,
+            color: hasPendingSignature ? '#fff' : 'text.secondary',
           }}
         >
-          서명 추가
+          서명 제거
         </Button>
-      )}
+      </Box>
     </Box>
   );
 }

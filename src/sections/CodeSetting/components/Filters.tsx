@@ -57,35 +57,51 @@ export default function CodeSettingFilters({
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ p: 2.5 }}>
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        spacing={2}
+        sx={{
+          pl: 2.5,
+          pr: 2.5,
+          py: 2.5,
+          gap: 2,
+          alignItems: 'center',
+        }}
+      >
         {category === 'hazard' && categoryFilter !== undefined && onChangeCategoryFilter && (
           <FormControl size="small" sx={{ minWidth: 160 }}>
             <InputLabel id="category-filter-label">카테고리</InputLabel>
             <Select
               labelId="category-filter-label"
               label="카테고리"
-              value={categoryFilter}
-              onChange={(e) => onChangeCategoryFilter(e.target.value)}
+              value={categoryFilter || 'all'}
+              onChange={(e) =>
+                onChangeCategoryFilter(e.target.value === '' ? 'all' : e.target.value)
+              }
             >
-              {hazardCategoryOptions.map((option) => (
-                <MenuItem key={option} value={option === '전체' ? 'all' : option}>
-                  {option}
-                </MenuItem>
-              ))}
+              <MenuItem value="all">전체</MenuItem>
+              {hazardCategoryOptions
+                .filter((option) => option !== '전체')
+                .map((option) => (
+                  <MenuItem key={option} value={option}>
+                    {option}
+                  </MenuItem>
+                ))}
             </Select>
           </FormControl>
         )}
 
-        <FormControl size="small" sx={{ minWidth: 80 }}>
+        <FormControl size="small" sx={{ minWidth: 160 }}>
           <InputLabel id="status-filter-label">상태</InputLabel>
           <Select
             labelId="status-filter-label"
             label="상태"
-            value={status || ''}
-            onChange={(e) => onChangeStatus(e.target.value)}
+            value={status || 'all'}
+            onChange={(e) => onChangeStatus(e.target.value === '' ? 'all' : e.target.value)}
           >
+            <MenuItem value="all">전체</MenuItem>
             {statusOptions.map((option) => (
-              <MenuItem key={option} value={option}>
+              <MenuItem key={option} value={option === '활성' ? 'active' : 'inactive'}>
                 {option}
               </MenuItem>
             ))}
@@ -123,9 +139,10 @@ export default function CodeSettingFilters({
           <Select
             labelId="search-filter-label"
             label="검색어 필터"
-            value={searchFilter || ''}
-            onChange={(e) => onChangeSearchFilter(e.target.value)}
+            value={searchFilter || 'all'}
+            onChange={(e) => onChangeSearchFilter(e.target.value === '' ? 'all' : e.target.value)}
           >
+            <MenuItem value="all">전체</MenuItem>
             {searchOptions.map((option) => (
               <MenuItem key={option} value={option}>
                 {option}
@@ -139,13 +156,24 @@ export default function CodeSettingFilters({
           placeholder="검색어"
           value={searchValue}
           onChange={(e) => onChangeSearchValue(e.target.value)}
-          sx={{ flexGrow: 1, minWidth: 200 }}
           InputProps={{
             startAdornment: (
-              <InputAdornment position="start">
-                <Iconify icon="eva:search-fill" width={24} />
+              <InputAdornment position="start" sx={{ mr: 1 }}>
+                <Iconify icon="eva:search-fill" width={24} sx={{ color: 'primary.main' }} />
               </InputAdornment>
             ),
+          }}
+          sx={{
+            flex: 1,
+            minWidth: 200,
+            '& .MuiInputBase-input': {
+              fontSize: 15,
+              lineHeight: '24px',
+              '&::placeholder': {
+                opacity: 1,
+                color: 'text.disabled',
+              },
+            },
           }}
         />
       </Stack>

@@ -9,6 +9,7 @@ import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import InputAdornment from '@mui/material/InputAdornment';
@@ -225,9 +226,20 @@ export default function InviteMemberModal({
               <TextField
                 fullWidth
                 variant="outlined"
-                placeholder="이름*"
+                label={
+                  <>
+                    이름
+                    <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
+                      *
+                    </Typography>
+                  </>
+                }
+                placeholder="이름"
                 value={formData.memberName || ''}
                 onChange={handleChange('memberName')}
+                slotProps={{
+                  inputLabel: { shrink: true },
+                }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: 56,
@@ -246,11 +258,22 @@ export default function InviteMemberModal({
               <TextField
                 fullWidth
                 variant="outlined"
-                placeholder="이메일*"
+                label={
+                  <>
+                    이메일
+                    <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
+                      *
+                    </Typography>
+                  </>
+                }
+                placeholder="이메일"
                 value={formData.email}
                 onChange={handleChange('email')}
                 error={!!errors.email}
                 helperText={errors.email}
+                slotProps={{
+                  inputLabel: { shrink: true },
+                }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: 56,
@@ -268,14 +291,25 @@ export default function InviteMemberModal({
               />
             </Stack>
 
-            {/* 소속 + 역할 (2개 한 줄) */}
+            {/* 소속팀 + 역할 (2개 한 줄) */}
             <Stack direction="row" spacing={2}>
               <TextField
                 fullWidth
                 variant="outlined"
-                placeholder="소속*"
+                label={
+                  <>
+                    소속팀
+                    <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
+                      *
+                    </Typography>
+                  </>
+                }
+                placeholder="소속팀"
                 value={formData.department || ''}
                 onChange={handleChange('department')}
+                slotProps={{
+                  inputLabel: { shrink: true },
+                }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     height: 56,
@@ -292,20 +326,28 @@ export default function InviteMemberModal({
                 }}
               />
               <FormControl fullWidth error={!!errors.role}>
+                <InputLabel id="role-label" shrink>
+                  역할
+                  <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
+                    *
+                  </Typography>
+                </InputLabel>
                 <Select
+                  labelId="role-label"
+                  label={
+                    <>
+                      역할
+                      <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
+                        *
+                      </Typography>
+                    </>
+                  }
                   value={formData.role}
                   onChange={(e) => handleChange('role')(e as React.ChangeEvent<HTMLInputElement>)}
                   displayEmpty
                   renderValue={(value) => {
                     if (!value) {
-                      return (
-                        <Typography
-                          component="span"
-                          sx={{ color: 'text.disabled', fontSize: 15, lineHeight: '24px' }}
-                        >
-                          역할<span style={{ color: '#00a76f' }}>*</span>
-                        </Typography>
-                      );
+                      return '';
                     }
                     return roles.find((r) => r.value === value)?.label || value;
                   }}
@@ -333,7 +375,22 @@ export default function InviteMemberModal({
             <Stack direction="row" spacing={2}>
               {/* 직종 필드 */}
               <FormControl fullWidth>
+                <InputLabel id="workType-label" shrink>
+                  직종
+                  <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
+                    *
+                  </Typography>
+                </InputLabel>
                 <Select
+                  labelId="workType-label"
+                  label={
+                    <>
+                      직종
+                      <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
+                        *
+                      </Typography>
+                    </>
+                  }
                   value={formData.workType || ''}
                   onChange={(e) =>
                     handleChange('workType')(e as React.ChangeEvent<HTMLInputElement>)
@@ -341,14 +398,7 @@ export default function InviteMemberModal({
                   displayEmpty
                   renderValue={(value) => {
                     if (!value) {
-                      return (
-                        <Typography
-                          component="span"
-                          sx={{ color: 'text.disabled', fontSize: 15, lineHeight: '24px' }}
-                        >
-                          직종<span style={{ color: '#00a76f' }}>*</span>
-                        </Typography>
-                      );
+                      return '';
                     }
                     return value === 'PRODUCTION' ? '생산직' : '사무직';
                   }}
@@ -363,7 +413,14 @@ export default function InviteMemberModal({
                 </Select>
               </FormControl>
               <DatePicker
-                label="입사일*"
+                label={
+                  <>
+                    입사일
+                    <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
+                      *
+                    </Typography>
+                  </>
+                }
                 value={formData.joinedAt}
                 onChange={handleDateChange}
                 format="YYYY-MM-DD"
@@ -371,6 +428,7 @@ export default function InviteMemberModal({
                   textField: {
                     fullWidth: true,
                     variant: 'outlined',
+                    InputLabelProps: { shrink: true },
                     sx: {
                       '& .MuiOutlinedInput-root': {
                         height: 56,

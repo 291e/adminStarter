@@ -30,11 +30,11 @@ import { signInWithPassword } from '../../context/jwt';
 export type SignInSchemaType = zod.infer<typeof SignInSchema>;
 
 export const SignInSchema = zod.object({
-  email: zod.string().min(1, { message: 'Email is required!' }),
+  email: zod.string().min(1, { message: '아이디를 입력해주세요.' }),
   password: zod
     .string()
-    .min(1, { message: 'Password is required!' })
-    .min(6, { message: 'Password must be at least 6 characters!' }),
+    .min(1, { message: '비밀번호를 입력해주세요.' })
+    .min(6, { message: '비밀번호는 최소 6자 이상이어야 합니다.' }),
 });
 
 // ----------------------------------------------------------------------
@@ -58,7 +58,7 @@ export function JwtSignInView() {
         return saved;
       }
     }
-    return 'member14';
+    return 'member11';
   };
 
   const defaultValues: SignInSchemaType = {
@@ -122,7 +122,7 @@ export function JwtSignInView() {
         <Field.Text
           name="password"
           label="비밀번호"
-          placeholder="6+ characters"
+          placeholder="6자 이상"
           type={showPassword.value ? 'text' : 'password'}
           slotProps={{
             inputLabel: { shrink: true, required: true },

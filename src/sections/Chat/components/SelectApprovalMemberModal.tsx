@@ -25,7 +25,10 @@ import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
 import { Iconify } from 'src/components/iconify';
 import { useAuthContext } from 'src/auth/hooks/use-auth-context';
 import { useMyInfo } from 'src/sections/Chat/hooks/use-my-info';
-import { getCompanyMembers } from 'src/services/organization/organization.service';
+import {
+  getCompanyMembers,
+  getOrganizations,
+} from 'src/services/organization/organization.service';
 import type { ApprovalType } from './ApprovalSection';
 
 // ----------------------------------------------------------------------
@@ -42,12 +45,14 @@ type InvitableUser = {
 
 const getRoleLabel = (role: string): string => {
   const roleMap: Record<string, string> = {
-    ADMIN: '관리자',
-    MANAGER: '관리자',
-    MEMBER: '멤버',
+    ADMIN: '조직 관리자',
+    MANAGER: '관리 감독자',
+    MEMBER: '근로자',
     WORKER: '근로자',
-    SAFETY_MANAGER: '안전관리자',
+    SAFETY_MANAGER: '안전보건 담당자',
     SAFETY_WORKER: '안전근로자',
+    OPERATOR_MANAGER: '조직 관리자',
+    MANAGEMENT_SUPERVISOR: '관리 감독자',
   };
   return roleMap[role] || role;
 };
@@ -71,8 +76,29 @@ export default function SelectApprovalMemberModal({
   const [searchQuery, setSearchQuery] = useState('');
   const rowsPerPage = 5;
 
-  // 내 정보 조회 (companyIdx 추출용)
+  // 내 정보 조회 (companyIdx 및 superAdmin 확인용)
   const { data: myInfoData } = useMyInfo();
+
+  // superAdmin 여부 확인 (실제 슈퍼어드민 정보가 있는 경우에만 true)
+  const isSuperAdmin = useMemo(() => {
+    // isSuperAdmin 플래그가 명시적으로 true인 경우
+    if ((myInfoData as any)?.isSuperAdmin === true || (user as any)?.isSuperAdmin === true) {
+      return true;
+    }
+
+    // memberSuperAdminInformation이 실제로 존재하고 유효한 객체인 경우
+    const superAdminInfo = (myInfoData as any)?.memberSuperAdminInformation;
+    if (
+      superAdminInfo !== undefined &&
+      superAdminInfo !== null &&
+      typeof superAdminInfo === 'object' &&
+      Object.keys(superAdminInfo).length > 0
+    ) {
+      return true;
+    }
+
+    return false;
+  }, [myInfoData, user]);
 
   // companyIdx 추출
   const companyIdx = useMemo(() => {
@@ -96,23 +122,73 @@ export default function SelectApprovalMemberModal({
     return 0;
   }, [myInfoData, user]);
 
-  // 회사 멤버 조회
+  // superAdmin인 경우 모든 조직 목록 조회
+  const { data: organizationsData } = useQuery({
+    queryKey: ['organizations', 'all'],
+    queryFn: () =>
+      getOrganizations({
+        status: 'active',
+        page: 1,
+        pageSize: 1000, // 모든 조직 가져오기
+      }),
+    enabled: open && isSuperAdmin,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // 회사 멤버 조회 (superAdmin이 아닌 경우)
   const { data: membersData, isLoading: isMembersLoading } = useQuery({
     queryKey: ['companyMembers', companyIdx],
     queryFn: () => getCompanyMembers(companyIdx),
-    enabled: open && !!companyIdx,
+    enabled: open && !!companyIdx && !isSuperAdmin,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // superAdmin인 경우 모든 조직의 멤버 조회
+  const { data: allMembersData, isLoading: isAllMembersLoading } = useQuery({
+    queryKey: ['allCompanyMembers', organizationsData],
+    queryFn: async () => {
+      // axios 인터셉터가 평탄화하므로 직접 접근
+      const companyList =
+        (organizationsData as any)?.companyList ||
+        (organizationsData as any)?.body?.companyList ||
+        [];
+      if (!companyList || companyList.length === 0) return { memberList: [] };
+
+      // 모든 조직의 멤버를 병렬로 가져오기
+      const memberPromises = companyList.map((org: any) =>
+        getCompanyMembers(org.companyIdx).catch(() => ({ memberList: [] }))
+      );
+      const memberResults = await Promise.all(memberPromises);
+
+      // 모든 멤버를 하나의 배열로 합치기
+      const allMembers = memberResults.flatMap((result: any) => {
+        const members =
+          result?.memberList ||
+          result?.members ||
+          result?.body?.memberList ||
+          result?.body?.members ||
+          [];
+        return members;
+      });
+
+      return { memberList: allMembers };
+    },
+    enabled: open && isSuperAdmin && !!organizationsData,
     staleTime: 5 * 60 * 1000,
   });
 
   // API 데이터에서 멤버 목록 추출 및 매핑
   const invitableUsers: InvitableUser[] = useMemo(() => {
-    if (!membersData) return [];
+    // superAdmin인 경우 모든 멤버, 아닌 경우 해당 회사 멤버
+    const dataSource = isSuperAdmin ? allMembersData : membersData;
+    if (!dataSource) return [];
 
+    // axios 인터셉터가 평탄화하므로 body를 거치지 않고 직접 접근
     const rawMembers =
-      (membersData as any).memberList ||
-      (membersData as any).members ||
-      (membersData as any).body?.memberList ||
-      (membersData as any).body?.members ||
+      (dataSource as any).memberList ||
+      (dataSource as any).members ||
+      (dataSource as any).body?.memberList ||
+      (dataSource as any).body?.members ||
       [];
 
     return rawMembers.map((member: any): InvitableUser => {
@@ -127,7 +203,7 @@ export default function SelectApprovalMemberModal({
         avatar: member.memberThumbnail || member.profileImage || '',
       };
     });
-  }, [membersData]);
+  }, [isSuperAdmin, allMembersData, membersData]);
 
   // 검색 필터링
   const filteredUsers = useMemo(
@@ -212,7 +288,7 @@ export default function SelectApprovalMemberModal({
           {/* 검색 필드 */}
           <TextField
             fullWidth
-            placeholder="이름, 부서, 역할로 검색"
+            placeholder="이름, 소속팀, 역할로 검색"
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
@@ -235,7 +311,7 @@ export default function SelectApprovalMemberModal({
           />
 
           {/* 멤버 목록 */}
-          {isMembersLoading ? (
+          {isMembersLoading || isAllMembersLoading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 6 }}>
               <CircularProgress size={32} />
             </Box>
@@ -247,7 +323,7 @@ export default function SelectApprovalMemberModal({
                     <TableRow>
                       <TableCell padding="checkbox" sx={{ width: 50 }} />
                       <TableCell sx={{ fontSize: 14, fontWeight: 600 }}>이름</TableCell>
-                      <TableCell sx={{ fontSize: 14, fontWeight: 600 }}>부서</TableCell>
+                      <TableCell sx={{ fontSize: 14, fontWeight: 600 }}>소속팀</TableCell>
                       <TableCell sx={{ fontSize: 14, fontWeight: 600 }}>역할</TableCell>
                     </TableRow>
                   </TableHead>

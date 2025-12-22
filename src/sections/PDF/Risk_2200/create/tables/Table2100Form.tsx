@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTheme } from '@mui/material/styles';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -25,6 +25,45 @@ import InvestigationTeamSelectModal from './modal/InvestigationTeamSelectModal';
 import type { RiskAssessmentData } from '../../components/RiskAssessmentSettingModal';
 
 // ----------------------------------------------------------------------
+
+// 유해·위험요인 분류 기본 데이터
+const DEFAULT_CLASSIFICATION_ROWS: Table2100ClassificationRow[] = [
+  {
+    number: 1,
+    category: '기계적 요인',
+    hazardFactors: '협착, 끼임, 절단, 충돌, 낙하, 비래, 감김 등',
+  },
+  {
+    number: 2,
+    category: '전기적 요인',
+    hazardFactors: '감전, 누전, 정전기, 아크, 과열 등',
+  },
+  {
+    number: 3,
+    category: '화학적 요인',
+    hazardFactors: '가스, 분진, 미스트, 증기, 중독, 질식, 폭발 등',
+  },
+  {
+    number: 4,
+    category: '물리적 요인',
+    hazardFactors: '소음, 진동, 방사선, 온도, 조도 등',
+  },
+  {
+    number: 5,
+    category: '생물학적 요인',
+    hazardFactors: '바이러스, 박테리아, 곰팡이, 기생충, 체액 등',
+  },
+  {
+    number: 6,
+    category: '인간공학적 요인',
+    hazardFactors: '반복동작, 중량물 취급, 부적절한 자세, 과로 등',
+  },
+  {
+    number: 7,
+    category: '작업환경 요인',
+    hazardFactors: '미끄럼, 넘어짐, 환기불량, 고온·저온, 공기질도 등',
+  },
+];
 
 // 위험성 옵션
 const RISK_LEVEL_OPTIONS = [
@@ -69,6 +108,24 @@ export default function Table2100Form({ data, onDataChange, riskAssessmentData }
   const [responsiblePersonModalIndex, setResponsiblePersonModalIndex] = useState<number | null>(
     null
   );
+
+  // 기본 분류 데이터가 없으면 초기화 (마운트 시 한 번만 실행)
+  useEffect(() => {
+    const hasEmptyClassification =
+      !data.classification ||
+      data.classification.length === 0 ||
+      (data.classification.length === 1 &&
+        !data.classification[0].category &&
+        !data.classification[0].hazardFactors);
+
+    if (hasEmptyClassification) {
+      onDataChange({
+        ...data,
+        classification: [...DEFAULT_CLASSIFICATION_ROWS],
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // 마운트 시 한 번만 실행
 
   // 위험요인 분류 테이블 핸들러
   const handleClassificationDragStart = (index: number) => {
@@ -229,9 +286,9 @@ export default function Table2100Form({ data, onDataChange, riskAssessmentData }
 
   const handleAssessmentResponsiblePersonSearchConfirm = (members: InvestigationTeamMember[]) => {
     if (responsiblePersonModalIndex !== null) {
-      const selected = members[0];
-      if (selected) {
-        handleAssessmentChange(responsiblePersonModalIndex, 'responsiblePerson', selected.name);
+      if (members.length > 0) {
+        const names = members.map((member) => member.name).join(', ');
+        handleAssessmentChange(responsiblePersonModalIndex, 'responsiblePerson', names);
       }
     }
     handleCloseResponsiblePersonModal();
@@ -276,27 +333,23 @@ export default function Table2100Form({ data, onDataChange, riskAssessmentData }
               <th style={{ width: 94 }}>번호</th>
               <th style={{ width: 164 }}>구분</th>
               <th style={{ flex: 1 }}>해당 유해·위험요인</th>
-              <th style={{ width: 46 }}>이동</th>
-              <th style={{ width: 55 }}>삭제</th>
+              <th style={{ width: 30 }}>이동</th>
+              <th style={{ width: 39 }}>삭제</th>
             </tr>
           </thead>
           <tbody>
             {data.classification.map((row, index) => (
               <tr
                 key={index}
-                draggable
-                onDragStart={() => handleClassificationDragStart(index)}
                 onDragOver={(e) => handleClassificationDragOver(e, index)}
                 onDragLeave={handleClassificationDragLeave}
                 onDrop={(e) => handleClassificationDrop(e, index)}
-                onDragEnd={handleClassificationDragEnd}
                 style={{
                   opacity: draggedClassificationIndex === index ? 0.5 : 1,
                   backgroundColor:
                     dragOverClassificationIndex === index && draggedClassificationIndex !== index
                       ? theme.vars.palette.action.hover
                       : 'transparent',
-                  cursor: 'move',
                   height: 48,
                 }}
               >
@@ -346,6 +399,9 @@ export default function Table2100Form({ data, onDataChange, riskAssessmentData }
                   <Box sx={{ display: 'flex', justifyContent: 'center', px: 1 }}>
                     <IconButton
                       size="small"
+                      draggable
+                      onDragStart={() => handleClassificationDragStart(index)}
+                      onDragEnd={handleClassificationDragEnd}
                       sx={{
                         p: 0.625,
                         cursor: 'grab',
@@ -372,6 +428,7 @@ export default function Table2100Form({ data, onDataChange, riskAssessmentData }
                       fontWeight: 700,
                       px: 1,
                       py: 0.5,
+                      width: 23,
                       '&:hover': {
                         bgcolor: 'error.dark',
                       },
@@ -409,7 +466,7 @@ export default function Table2100Form({ data, onDataChange, riskAssessmentData }
         <Box component="table" sx={tableStyle}>
           <thead>
             <tr>
-              <th style={{ width: 160 }}>유해/위험요인</th>
+              <th style={{ width: 160 }}>유해·위험요인</th>
               <th style={{ width: 199 }}>위험한 상황과 결과</th>
               <th style={{ width: 160 }}>현재 안전조치</th>
               <th style={{ width: 120 }}>위험성</th>
@@ -421,16 +478,14 @@ export default function Table2100Form({ data, onDataChange, riskAssessmentData }
               <th style={{ width: 120 }}>담당자</th>
               <th style={{ width: 120 }}>예정일</th>
               <th style={{ width: 120 }}>완료일</th>
-              <th style={{ width: 46 }}>이동</th>
-              <th style={{ width: 55 }}>삭제</th>
+              <th style={{ width: 30 }}>이동</th>
+              <th style={{ width: 39 }}>삭제</th>
             </tr>
           </thead>
           <tbody>
             {data.assessment.map((row, index) => (
               <tr
                 key={index}
-                draggable
-                onDragStart={() => handleAssessmentDragStart(index)}
                 onDragOver={(e) => handleAssessmentDragOver(e, index)}
                 onDragLeave={handleAssessmentDragLeave}
                 onDrop={(e) => handleAssessmentDrop(e, index)}
@@ -451,10 +506,12 @@ export default function Table2100Form({ data, onDataChange, riskAssessmentData }
                     value={row.hazardFactor}
                     onChange={(e) => handleAssessmentChange(index, 'hazardFactor', e.target.value)}
                     fullWidth
+                    multiline
                     sx={{
                       '& .MuiOutlinedInput-root': {
                         fontSize: 14,
                         height: 'auto',
+                        p: 1,
                       },
                     }}
                   />
@@ -485,10 +542,12 @@ export default function Table2100Form({ data, onDataChange, riskAssessmentData }
                       handleAssessmentChange(index, 'currentSafetyMeasure', e.target.value)
                     }
                     fullWidth
+                    multiline
                     sx={{
                       '& .MuiOutlinedInput-root': {
                         fontSize: 14,
                         height: 'auto',
+                        p: 1,
                       },
                     }}
                   />
@@ -546,10 +605,12 @@ export default function Table2100Form({ data, onDataChange, riskAssessmentData }
                       handleAssessmentChange(index, 'additionalMeasure', e.target.value)
                     }
                     fullWidth
+                    multiline
                     sx={{
                       '& .MuiOutlinedInput-root': {
                         fontSize: 14,
                         height: 'auto',
+                        p: 1,
                       },
                     }}
                   />
@@ -562,11 +623,12 @@ export default function Table2100Form({ data, onDataChange, riskAssessmentData }
                       handleAssessmentChange(index, 'responsiblePerson', e.target.value)
                     }
                     fullWidth
+                    multiline
                     sx={{
                       '& .MuiOutlinedInput-root': {
                         fontSize: 14,
                         height: 'auto',
-                        p: 0,
+                        p: 1,
                       },
                     }}
                     InputProps={{
@@ -586,6 +648,7 @@ export default function Table2100Form({ data, onDataChange, riskAssessmentData }
                 <td>
                   <LocalizationProvider dateAdapter={AdapterDayjs}>
                     <DatePicker
+                      label="예정일"
                       format="YYYY-MM-DD"
                       open={openPlannedDatePicker[index] || false}
                       onOpen={() =>
@@ -631,7 +694,9 @@ export default function Table2100Form({ data, onDataChange, riskAssessmentData }
                 <td>
                   <LocalizationProvider dateAdapter={AdapterDayjs}>
                     <DatePicker
+                      label="완료일"
                       format="YYYY-MM-DD"
+                      minDate={row.plannedDate ? dayjs(row.plannedDate) : undefined}
                       open={openCompletedDatePicker[index] || false}
                       onOpen={() =>
                         setOpenCompletedDatePicker((prev) => ({ ...prev, [index]: true }))
@@ -677,6 +742,9 @@ export default function Table2100Form({ data, onDataChange, riskAssessmentData }
                   <Box sx={{ display: 'flex', justifyContent: 'center', px: 1 }}>
                     <IconButton
                       size="small"
+                      draggable
+                      onDragStart={() => handleAssessmentDragStart(index)}
+                      onDragEnd={handleAssessmentDragEnd}
                       sx={{
                         p: 0.625,
                         cursor: 'grab',
@@ -703,6 +771,7 @@ export default function Table2100Form({ data, onDataChange, riskAssessmentData }
                       fontWeight: 700,
                       px: 1,
                       py: 0.5,
+                      width: 23,
                       '&:hover': {
                         bgcolor: 'error.dark',
                       },

@@ -100,9 +100,9 @@ export function ServiceSettingView({ title = '서비스 관리', description, sx
             const statusValue =
               status === 'all' || status === '전체'
                 ? undefined
-                : status === '활성'
+                : status === 'active' || status === '활성'
                   ? 'ACTIVE'
-                  : status === '비활성'
+                  : status === 'inactive' || status === '비활성'
                     ? 'INACTIVE'
                     : (status as 'ACTIVE' | 'INACTIVE');
             setFilters((prev) => ({ ...prev, status: statusValue }));
@@ -251,7 +251,7 @@ export function ServiceSettingView({ title = '서비스 관리', description, sx
       <ServiceSettingBreadcrumbs
         items={[
           { label: '대시보드', href: '/admin/dashboard' },
-          { label: '설정 및 관리', href: '/admin/dashboard/system-setting' },
+          { label: '설정 및 관리', href: '/admin/dashboard' },
           { label: title },
         ]}
         onCreate={handleCreate}

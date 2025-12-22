@@ -48,7 +48,7 @@ export default function ApiSettingTable({ rows, onEdit }: Props) {
 
         <TableBody>
           {rows.map((row) => (
-            <TableRow key={row.id} hover>
+            <TableRow key={row.id || row.apiSettingIdx} hover>
               <TableCell>
                 <Typography variant="body2">{row.order}</Typography>
               </TableCell>

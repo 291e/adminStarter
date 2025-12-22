@@ -72,13 +72,30 @@ export default function CategorySettingsModal({
   };
 
   const handleToggleActive = (id: string) => {
-    setCategories(
-      categories.map((cat) => (cat.id === id ? { ...cat, isActive: !cat.isActive } : cat))
+    setCategories((prev) =>
+      prev.map((cat) => {
+        if (cat.id === id) {
+          const newIsActive = !cat.isActive;
+          if (import.meta.env.DEV) {
+            console.log('🔄 [CategorySettingsModal] 카테고리 활성화 토글:', {
+              id,
+              name: cat.name,
+              oldIsActive: cat.isActive,
+              newIsActive,
+            });
+          }
+          return { ...cat, isActive: newIsActive };
+        }
+        return cat;
+      })
     );
   };
 
   const handleSave = async () => {
     try {
+      if (import.meta.env.DEV) {
+        console.log('💾 [CategorySettingsModal] 저장할 카테고리 목록:', categories);
+      }
       await onSave(categories);
       onClose();
     } catch (error) {

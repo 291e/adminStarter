@@ -26,8 +26,9 @@ export default function DocumentSettingPagination({
         onPageChange={(_, p) => onChangePage(p)}
         onRowsPerPageChange={(e) => onChangeRowsPerPage(parseInt(e.target.value, 10))}
         rowsPerPageOptions={[10, 20, 50]}
+        labelRowsPerPage="표시 행 수 :"
+        labelDisplayedRows={({ from, to, count: total }) => `${from}-${to} / ${total}`}
       />
     </Box>
   );
 }
-

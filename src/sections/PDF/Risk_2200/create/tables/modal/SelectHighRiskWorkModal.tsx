@@ -9,14 +9,18 @@ import RadioGroup from '@mui/material/RadioGroup';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
+import CircularProgress from '@mui/material/CircularProgress';
+import Alert from '@mui/material/Alert';
 
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
+import type { Checklist } from 'src/services/checklist/checklist.types';
 
 // ----------------------------------------------------------------------
 
 export type HighRiskWorkItem = {
   id: string;
   name: string;
+  checklistIdx?: number; // API에서 사용하는 체크리스트 ID
 };
 
 type Props = {
@@ -24,49 +28,56 @@ type Props = {
   onClose: () => void;
   onConfirm: (selectedItem: HighRiskWorkItem | null) => void;
   industry?: string; // 업종: 제조업, 운수‧창고‧통신업, 임업, 건물 등의 종합관리사업, 위생 및 유사서비스업
+  allChecklists?: Checklist[]; // 모든 체크리스트 데이터 (클라이언트 사이드 필터링용)
 };
 
-// TODO: TanStack Query Hook(useQuery)으로 고위험작업 목록 조회
-// 임시 목업 데이터
-const mockHighRiskWorks: HighRiskWorkItem[] = [
-  { id: '1', name: '기계⋅설비 정비, 수리, 교체, 청소 등 비정형 작업' },
-  { id: '2', name: '크레인 취급 작업 (이동식크레인 포함)' },
-  { id: '3', name: '차량계 하역운반, 건설기계 (지게차 등) 이용 작업' },
-  { id: '4', name: '추락⋅전도 등 위험장소 통행, 이동' },
-  { id: '5', name: '재료가공기계 작업(프레스, 절단기, 전단기, 분쇄⋅파쇄기, 공작기계 등)' },
-  { id: '6', name: '용접, 절단 작업' },
-  { id: '7', name: '기계⋅기구 및 설비 설치, 철거 작업' },
-  { id: '8', name: '리프트(승강기) 점검, 수리작업' },
-  { id: '9', name: '밀폐공간 작업' },
-  { id: '10', name: '사다리 이용 통행 및 작업' },
-  { id: '11', name: '위험물질 취급 작업' },
-  { id: '12', name: '중량물 적재⋅이동 등 인력취급 작업 (크레인, 지게차 등 동력기계 미사용)' },
-  { id: '13', name: '차량 적재물 상⋅하차 작업' },
-  { id: '14', name: '수공구 이용 작업' },
-  { id: '15', name: '도장 작업' },
-  { id: '16', name: '콘크리트 타설, 양생 작업' },
-  { id: '17', name: '고소작업대 이용 작업' },
-  { id: '18', name: '전기점검, 정비, 조작관련 작업' },
-  { id: '19', name: '고열설비 취급 작업' },
-  { id: '20', name: '채석장 발파작업' },
-  { id: '21', name: '기타 위험작업' },
-];
-
-export default function SelectHighRiskWorkModal({ open, onClose, onConfirm, industry }: Props) {
+export default function SelectHighRiskWorkModal({
+  open,
+  onClose,
+  onConfirm,
+  industry,
+  allChecklists,
+}: Props) {
   const [selectedId, setSelectedId] = useState<string>('');
 
-  // TODO: TanStack Query Hook(useQuery)으로 업종별 고위험작업 목록 조회
-  // const { data: highRiskWorks } = useQuery({
-  //   queryKey: ['highRiskWorks', industry],
-  //   queryFn: () => getHighRiskWorks({ industry }),
-  //   enabled: open && !!industry,
-  // });
+  // 체크리스트에서 고위험작업 목록 추출 (클라이언트 사이드 필터링)
+  const highRiskWorks = useMemo<HighRiskWorkItem[]>(() => {
+    if (!allChecklists || !Array.isArray(allChecklists) || allChecklists.length === 0) {
+      return [];
+    }
 
-  // TODO: 업종별 필터링 로직 추가
-  // if (industry) {
-  //   return mockHighRiskWorks.filter((work) => work.industry === industry);
-  // }
-  const highRiskWorks = useMemo(() => mockHighRiskWorks, [industry]);
+    // 업종별 필터링 (클라이언트 사이드)
+    let filteredChecklists = allChecklists;
+    if (industry) {
+      filteredChecklists = allChecklists.filter((checklist) => {
+        // industryName 필드로 비교 (업종명으로 비교)
+        const checklistIndustryName = checklist.industryName || checklist.industry;
+        return checklistIndustryName === industry;
+      });
+    }
+
+    // 활성화된 체크리스트만 필터링
+    filteredChecklists = filteredChecklists.filter(
+      (checklist) => checklist.status === 'ACTIVE' || checklist.status === 'active'
+    );
+
+    // 고위험작업 이름 기준으로 중복 제거 및 변환
+    const uniqueWorks = new Map<string, HighRiskWorkItem>();
+    filteredChecklists.forEach((checklist) => {
+      if (checklist.highRiskWork && !uniqueWorks.has(checklist.highRiskWork)) {
+        uniqueWorks.set(checklist.highRiskWork, {
+          id: checklist.checklistIdx?.toString() || `work-${uniqueWorks.size + 1}`,
+          name: checklist.highRiskWork,
+          checklistIdx: checklist.checklistIdx,
+        });
+      }
+    });
+
+    return Array.from(uniqueWorks.values());
+  }, [allChecklists, industry]);
+
+  const isLoading = false; // 클라이언트 사이드 필터링이므로 로딩 없음
+  const isError = false; // 클라이언트 사이드 필터링이므로 에러 없음
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSelectedId(event.target.value);
@@ -98,36 +109,52 @@ export default function SelectHighRiskWorkModal({ open, onClose, onConfirm, indu
       </DialogTitle>
 
       <DialogContent>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          <RadioGroup value={selectedId} onChange={handleChange}>
-            {highRiskWorks.map((work) => (
-              <FormControlLabel
-                key={work.id}
-                value={work.id}
-                control={<Radio />}
-                label={
-                  <Typography
-                    sx={{
-                      fontSize: 14,
-                      fontWeight: 400,
-                      lineHeight: '22px',
-                      color: 'text.primary',
-                    }}
-                  >
-                    {work.name}
-                  </Typography>
-                }
-                sx={{
-                  alignItems: 'center',
-                  py: 1,
-                  '& .MuiFormControlLabel-label': {
-                    flex: 1,
-                  },
-                }}
-              />
-            ))}
-          </RadioGroup>
-        </Box>
+        {isLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : isError ? (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            데이터를 불러오는 중 오류가 발생했습니다.
+          </Alert>
+        ) : highRiskWorks.length === 0 ? (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            {industry
+              ? `선택한 업종(${industry})에 해당하는 고위험작업이 없습니다.`
+              : '업종을 선택해주세요.'}
+          </Alert>
+        ) : (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <RadioGroup value={selectedId} onChange={handleChange}>
+              {highRiskWorks.map((work) => (
+                <FormControlLabel
+                  key={work.id}
+                  value={work.id}
+                  control={<Radio />}
+                  label={
+                    <Typography
+                      sx={{
+                        fontSize: 14,
+                        fontWeight: 400,
+                        lineHeight: '22px',
+                        color: 'text.primary',
+                      }}
+                    >
+                      {work.name}
+                    </Typography>
+                  }
+                  sx={{
+                    alignItems: 'center',
+                    py: 1,
+                    '& .MuiFormControlLabel-label': {
+                      flex: 1,
+                    },
+                  }}
+                />
+              ))}
+            </RadioGroup>
+          </Box>
+        )}
       </DialogContent>
 
       <DialogActions sx={{ justifyContent: 'flex-end', px: 3, pb: 3 }}>

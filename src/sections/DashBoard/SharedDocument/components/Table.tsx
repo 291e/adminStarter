@@ -31,6 +31,8 @@ export type SharedDocument = ApiSharedDocument;
 type Props = {
   rows: SharedDocument[];
   prioritySettings?: PrioritySetting[];
+  page?: number;
+  rowsPerPage?: number;
   onShareToChat?: (row: SharedDocument) => void;
   onEdit?: (row: SharedDocument) => void;
   onDelete?: (row: SharedDocument) => void;
@@ -39,6 +41,8 @@ type Props = {
 export default function SharedDocumentTable({
   rows,
   prioritySettings = [],
+  page = 1,
+  rowsPerPage = 10,
   onShareToChat,
   onEdit,
   onDelete,
@@ -131,11 +135,14 @@ export default function SharedDocumentTable({
             const rowId = String(row.sharedDocumentIdx);
             const isMenuOpen = openMenuId === rowId;
 
+            // 전체 데이터 기준 순번 계산
+            const rowNumber = (page - 1) * rowsPerPage + index + 1;
+
             return (
               <TableRow key={rowId} hover>
                 <TableCell>
                   <Typography variant="body2" sx={{ fontSize: 14, textAlign: 'center' }}>
-                    {index + 1}
+                    {rowNumber}
                   </Typography>
                 </TableCell>
                 <TableCell>

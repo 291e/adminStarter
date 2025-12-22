@@ -38,7 +38,7 @@
 페이지 추가 절차(예: `/dashboard/seven`):
 1. `src/pages/dashboard/seven.tsx` 생성
 2. `src/routes/sections/dashboard.tsx`의 `children`에 `{ path: 'seven', element: <PageSeven /> }` 추가
-3. 메뉴 노출 시 `src/layouts/nav-config-dashboard.tsx`에 항목 추가
+3. 메뉴 노출 시 `src/layouts/nav-config-dashboard.tsx`에 항목추가
 
 인증 없이 개발하려면 `src/global-config.ts`에서 `auth.skip = true`로 설정합니다.
 

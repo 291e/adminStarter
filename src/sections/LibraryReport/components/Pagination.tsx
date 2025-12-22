@@ -5,6 +5,7 @@ import IconButton from '@mui/material/IconButton';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import FormControl from '@mui/material/FormControl';
+import Button from '@mui/material/Button';
 
 import { Iconify } from 'src/components/iconify';
 
@@ -14,6 +15,8 @@ type Props = {
   rowsPerPage: number;
   onChangePage: (page: number) => void;
   onChangeRowsPerPage: (rows: number) => void;
+  onDownload?: () => void;
+  selectedCount?: number;
 };
 
 export default function LibraryReportPagination({
@@ -22,6 +25,8 @@ export default function LibraryReportPagination({
   rowsPerPage,
   onChangePage,
   onChangeRowsPerPage,
+  onDownload,
+  selectedCount = 0,
 }: Props) {
   const start = page * rowsPerPage + 1;
   const end = Math.min((page + 1) * rowsPerPage, count);
@@ -50,6 +55,19 @@ export default function LibraryReportPagination({
         px: 2,
       }}
     >
+      {onDownload && (
+        <Button
+          variant="contained"
+          startIcon={<Iconify icon="solar:download-bold" />}
+          onClick={onDownload}
+          disabled={selectedCount === 0}
+          size="small"
+          sx={{ mr: 'auto' }}
+        >
+          다운로드 ({selectedCount})
+        </Button>
+      )}
+
       <Typography variant="body2">표시행 수</Typography>
 
       <FormControl size="small" sx={{ minWidth: 60 }}>
@@ -70,7 +88,7 @@ export default function LibraryReportPagination({
       </FormControl>
 
       <Typography variant="body2">
-        {start}-{end} of {count}
+        {start}-{end} / {count}
       </Typography>
 
       <Stack direction="row" spacing={0}>
@@ -98,4 +116,3 @@ export default function LibraryReportPagination({
     </Box>
   );
 }
-

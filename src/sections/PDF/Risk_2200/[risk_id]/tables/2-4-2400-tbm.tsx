@@ -28,6 +28,20 @@ const defaultData: Table2400TBMData = {
 };
 
 export default function RiskTable_2_4_2400_TBM({ data = defaultData }: Props) {
+  // 점검내용 빈 행 필터링
+  const filteredInspectionRows = data.inspectionRows.filter(
+    (row) => row.inspectionContent?.trim() || row.result?.trim()
+  );
+
+  // 교육영상 빈 행 필터링
+  const filteredEducationVideoRows = data.educationVideoRows.filter(
+    (row) =>
+      row.participant?.name?.trim() ||
+      row.participant?.department?.trim() ||
+      row.educationVideo?.trim() ||
+      row.signature?.trim()
+  );
+
   const tableStyle = {
     width: '100%',
     border: '2px solid',
@@ -41,7 +55,6 @@ export default function RiskTable_2_4_2400_TBM({ data = defaultData }: Props) {
       verticalAlign: 'middle',
     },
     '& th': {
-      backgroundColor: 'grey.100',
       fontSize: 14,
       fontWeight: 600,
       lineHeight: '22px',
@@ -141,7 +154,7 @@ export default function RiskTable_2_4_2400_TBM({ data = defaultData }: Props) {
             </tr>
           </thead>
           <tbody>
-            {data.educationVideoRows.map((row, index) => (
+            {filteredEducationVideoRows.map((row, index) => (
               <tr key={index} style={{ height: 48 }}>
                 <td>
                   <Typography sx={{ fontSize: 14, fontWeight: 400 }}>

@@ -125,8 +125,15 @@ export default function InviteParticipantModal({ open, onClose, onConfirm, room 
       room?.participants ||
       [];
 
+    // rawParticipants가 배열인지 확인
+    const participantsArray = Array.isArray(rawParticipants)
+      ? rawParticipants
+      : typeof rawParticipants === 'object' && rawParticipants !== null
+        ? Object.values(rawParticipants)
+        : [];
+
     const indexes = new Set<string>();
-    rawParticipants.forEach((p: ChatParticipantDto | any) => {
+    participantsArray.forEach((p: ChatParticipantDto | any) => {
       const memberIdx = p.memberIdx || (p as any)?.memberIndex;
       if (memberIdx) {
         indexes.add(memberIdx.toString());
@@ -344,7 +351,7 @@ export default function InviteParticipantModal({ open, onClose, onConfirm, room 
                       py: 1.75,
                     }}
                   >
-                    소속
+                    소속팀
                   </TableCell>
                   <TableCell
                     sx={{

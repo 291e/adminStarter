@@ -1,17 +1,23 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useTheme } from '@mui/material/styles';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
-import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import Button from '@mui/material/Button';
 
 import { Iconify } from 'src/components/iconify';
-import { uploadFile } from 'src/services/system/system.service';
 
 import type { Table2400TBMData, InvestigationTeamMember } from '../../types/table-data';
 import InvestigationTeamSelectModal from './modal/InvestigationTeamSelectModal';
 import EducationVideoSelectModal from './modal/EducationVideoSelectModal';
+import SignatureModal from '../../edit/components/SignatureModal';
+import {
+  createWorkerSignature,
+  addWorkerSignature,
+} from 'src/services/safety-system/safety-system.service';
 
 // ----------------------------------------------------------------------
 
@@ -29,12 +35,13 @@ type Props = {
   onEducationContentChange: (value: string) => void;
   onEducationVideoRowChange: (
     index: number,
-    field: 'participant' | 'educationVideo' | 'signature',
-    value: InvestigationTeamMember | null | string
+    field: 'participant' | 'educationVideo' | 'signature' | 'vodIdx' | 'workerSignatureIdx',
+    value: InvestigationTeamMember | null | string | number | undefined
   ) => void;
   onEducationVideoRowDelete: (index: number) => void;
   onEducationVideoRowMove: (fromIndex: number, toIndex: number) => void;
   onEducationVideoAddRow: () => void;
+  safetySystemDocumentIdx?: number; // 문서 Index (근로자 서명 API 호출용)
 };
 
 export default function Table2400TBMForm({
@@ -49,15 +56,17 @@ export default function Table2400TBMForm({
   onEducationVideoRowDelete,
   onEducationVideoRowMove,
   onEducationVideoAddRow,
+  safetySystemDocumentIdx,
 }: Props) {
   const theme = useTheme();
+  const queryClient = useQueryClient();
   const [draggedInspectionIndex, setDraggedInspectionIndex] = useState<number | null>(null);
   const [dragOverInspectionIndex, setDragOverInspectionIndex] = useState<number | null>(null);
   const [draggedVideoIndex, setDraggedVideoIndex] = useState<number | null>(null);
   const [dragOverVideoIndex, setDragOverVideoIndex] = useState<number | null>(null);
   const [participantModalIndex, setParticipantModalIndex] = useState<number | null>(null);
   const [educationVideoModalIndex, setEducationVideoModalIndex] = useState<number | null>(null);
-  const videoInputRef = useRef<HTMLInputElement>(null);
+  const [signatureModalIndex, setSignatureModalIndex] = useState<number | null>(null);
 
   // 점검내용 테이블 드래그 핸들러
   const handleInspectionDragStart = (index: number) => {
@@ -128,29 +137,285 @@ export default function Table2400TBMForm({
     setParticipantModalIndex(null);
   };
 
+  // 교육영상 선택 모달 핸들러
+  const handleCloseEducationVideoModal = () => {
+    setEducationVideoModalIndex(null);
+  };
+
+  // 근로자 대상자 등록 API Mutation
+  const createWorkerSignatureMutation = useMutation({
+    mutationFn: async ({
+      documentIdx,
+      workerList,
+      rowIndex,
+    }: {
+      documentIdx: number;
+      workerList: Array<{ targetMemberIdx: number; vodIdx?: number }>;
+      rowIndex: number;
+    }) => {
+      if (import.meta.env.DEV) {
+        console.log('🔵 [Table2400TBMForm] 근로자 대상자 등록 API 호출 시작:', {
+          documentIdx,
+          workerList,
+          rowIndex,
+          requestBody: { workerList },
+        });
+      }
+
+      try {
+        const response = await createWorkerSignature(documentIdx, { workerList });
+
+        if (import.meta.env.DEV) {
+          console.log('✅ [Table2400TBMForm] 근로자 대상자 등록 API 성공:', {
+            documentIdx,
+            response,
+            workerSignatureIdx: response?.workerSignatureIdx,
+          });
+        }
+
+        return { response, rowIndex };
+      } catch (error) {
+        if (import.meta.env.DEV) {
+          console.error('❌ [Table2400TBMForm] 근로자 대상자 등록 API 실패:', {
+            documentIdx,
+            workerList,
+            error,
+            errorMessage: error instanceof Error ? error.message : String(error),
+            errorStack: error instanceof Error ? error.stack : undefined,
+          });
+        }
+        throw error;
+      }
+    },
+    onSuccess: (result) => {
+      if (import.meta.env.DEV) {
+        console.log('✅ [Table2400TBMForm] 근로자 대상자 등록 Mutation 성공:', {
+          result,
+          workerSignatureIdx: result.response?.workerSignatureIdx,
+          rowIndex: result.rowIndex,
+        });
+      }
+
+      toast.success('근로자 대상자가 등록되었습니다.');
+
+      // workerSignatureIdx가 응답에 포함되어 있으면 저장
+      if (result.response?.workerSignatureIdx) {
+        onEducationVideoRowChange(
+          result.rowIndex,
+          'workerSignatureIdx',
+          result.response.workerSignatureIdx
+        );
+      }
+
+      // 알림 쿼리 무효화 (근로자 등록 후 알림 자동 발송됨)
+      queryClient.invalidateQueries({ queryKey: ['notificationHistory'] });
+    },
+    onError: (error: Error) => {
+      if (import.meta.env.DEV) {
+        console.error('❌ [Table2400TBMForm] 근로자 대상자 등록 Mutation 실패:', {
+          error,
+          errorMessage: error.message,
+          errorStack: error.stack,
+        });
+      }
+      toast.error(`근로자 대상자 등록 실패: ${error.message}`);
+    },
+  });
+
+  // 근로자 서명 등록 API Mutation
+  const addWorkerSignatureMutation = useMutation({
+    mutationFn: async ({
+      documentIdx,
+      workerSignatureIdx,
+      signatureData,
+      description,
+    }: {
+      documentIdx: number;
+      workerSignatureIdx: number;
+      signatureData: string;
+      description?: string;
+    }) => {
+      // Base64 데이터 URL을 Base64 문자열로 변환
+      const base64Data = signatureData.includes(',') ? signatureData.split(',')[1] : signatureData;
+      await addWorkerSignature(documentIdx, workerSignatureIdx, {
+        signatureData: base64Data,
+        description,
+      });
+    },
+    onSuccess: () => {
+      toast.success('서명이 등록되었습니다.');
+    },
+    onError: (error: Error) => {
+      toast.error(`서명 등록 실패: ${error.message}`);
+    },
+  });
+
+  const handleEducationVideoConfirm = (video: {
+    title: string;
+    summary: string;
+    vodIdx?: number;
+  }) => {
+    if (educationVideoModalIndex !== null) {
+      // 교육영상 제목 설정
+      onEducationVideoRowChange(educationVideoModalIndex, 'educationVideo', video.title);
+      // vodIdx 저장
+      if (video.vodIdx) {
+        onEducationVideoRowChange(educationVideoModalIndex, 'vodIdx', video.vodIdx);
+      }
+      // 교육내용에 요약 자동 입력
+      onEducationContentChange(video.summary);
+
+      // 문서가 이미 생성된 경우에만 별도로 근로자 대상자 등록 API 호출
+      // 문서 생성 시에는 workerList를 함께 전송하므로 별도 호출 불필요
+      const row = data.educationVideoRows[educationVideoModalIndex];
+      if (import.meta.env.DEV) {
+        console.log('🔍 [Table2400TBMForm] 교육영상 선택 완료:', {
+          educationVideoModalIndex,
+          safetySystemDocumentIdx,
+          participant: row.participant,
+          participantMemberIdx: row.participant?.memberIdx,
+          videoVodIdx: video.vodIdx,
+          note: safetySystemDocumentIdx
+            ? '문서가 이미 생성되었으므로 별도로 근로자 등록 API 호출 가능'
+            : '문서 생성 시 workerList와 함께 전송됩니다',
+        });
+      }
+
+      // 문서가 이미 생성된 경우에만 별도로 근로자 대상자 등록 API 호출
+      // (문서 생성 후 추가로 근로자를 등록하는 경우)
+      if (safetySystemDocumentIdx && row.participant?.memberIdx && video.vodIdx) {
+        if (import.meta.env.DEV) {
+          console.log(
+            '🚀 [Table2400TBMForm] 근로자 대상자 등록 API 호출 (문서 생성 후 추가 등록):',
+            {
+              documentIdx: safetySystemDocumentIdx,
+              workerList: [
+                {
+                  targetMemberIdx: row.participant.memberIdx,
+                  vodIdx: video.vodIdx,
+                },
+              ],
+              rowIndex: educationVideoModalIndex,
+            }
+          );
+        }
+
+        createWorkerSignatureMutation.mutate({
+          documentIdx: safetySystemDocumentIdx,
+          workerList: [
+            {
+              targetMemberIdx: row.participant.memberIdx,
+              vodIdx: video.vodIdx,
+            },
+          ],
+          rowIndex: educationVideoModalIndex,
+        });
+      }
+    }
+    handleCloseEducationVideoModal();
+  };
+
+  // 대상자 선택 완료 핸들러 (근로자 대상자 등록 API 호출)
   const handleParticipantConfirm = (members: InvestigationTeamMember[]) => {
-    if (participantModalIndex !== null) {
-      const selected = members[0];
-      if (selected) {
-        onEducationVideoRowChange(participantModalIndex, 'participant', selected);
+    if (participantModalIndex !== null && members.length > 0) {
+      const currentRows = [...data.educationVideoRows];
+      const currentRowTemplate = currentRows[participantModalIndex];
+
+      // 1. 첫 번째 선택된 대상자는 현재 행에 업데이트
+      const firstMember = members[0];
+      currentRows[participantModalIndex] = {
+        ...currentRowTemplate,
+        participant: firstMember,
+      };
+
+      // 2. 추가 선택된 대상자들에 대해 새 행 생성 및 삽입
+      if (members.length > 1) {
+        const additionalRows = members.slice(1).map((member) => ({
+          ...currentRowTemplate,
+          participant: member,
+          signature: '', // 새 행이므로 서명은 비움
+          workerSignatureIdx: undefined, // API 호출 전이므로 비움
+        }));
+        currentRows.splice(participantModalIndex + 1, 0, ...additionalRows);
+      }
+
+      // 상위 상태 일괄 업데이트
+      onDataChange({
+        ...data,
+        educationVideoRows: currentRows,
+      });
+
+      // 3. 문서가 이미 생성된 경우, 선택된 모든 대상자에 대해 근로자 대상자 등록 API 호출
+      if (safetySystemDocumentIdx) {
+        members.forEach((member, indexOffset) => {
+          const targetRowIndex = participantModalIndex + indexOffset;
+          // 해당 행의 vodIdx 확인 (템플릿에서 복사되었으므로 모두 같거나 이미 있을 것)
+          const vodIdx = currentRowTemplate.vodIdx;
+
+          if (member.memberIdx && vodIdx) {
+            if (import.meta.env.DEV) {
+              console.log(
+                `🚀 [Table2400TBMForm] 근로자 등록 API 호출 (${indexOffset + 1}/${members.length}):`,
+                {
+                  documentIdx: safetySystemDocumentIdx,
+                  memberIdx: member.memberIdx,
+                  vodIdx,
+                  rowIndex: targetRowIndex,
+                }
+              );
+            }
+
+            createWorkerSignatureMutation.mutate({
+              documentIdx: safetySystemDocumentIdx,
+              workerList: [
+                {
+                  targetMemberIdx: member.memberIdx,
+                  vodIdx,
+                },
+              ],
+              rowIndex: targetRowIndex,
+            });
+          }
+        });
       }
     }
     handleCloseParticipantModal();
   };
 
-  // 교육영상 선택 모달 핸들러 (동영상 업로드로 대체되었지만, 모달이 여전히 사용될 수 있으므로 유지)
-  const handleCloseEducationVideoModal = () => {
-    setEducationVideoModalIndex(null);
+  // 서명 모달 핸들러
+  const handleOpenSignatureModal = (index: number) => {
+    setSignatureModalIndex(index);
   };
 
-  const handleEducationVideoConfirm = (video: { title: string; summary: string }) => {
-    if (educationVideoModalIndex !== null) {
-      // 교육영상 제목 설정
-      onEducationVideoRowChange(educationVideoModalIndex, 'educationVideo', video.title);
-      // 교육내용에 요약 자동 입력
-      onEducationContentChange(video.summary);
+  const handleCloseSignatureModal = () => {
+    setSignatureModalIndex(null);
+  };
+
+  const handleSignatureConfirm = async (signatureDataUrl: string) => {
+    if (signatureModalIndex === null || !safetySystemDocumentIdx) {
+      return;
     }
-    handleCloseEducationVideoModal();
+
+    const row = data.educationVideoRows[signatureModalIndex];
+    if (!row.workerSignatureIdx) {
+      toast.error('근로자 서명 정보를 찾을 수 없습니다. 대상자와 교육영상을 먼저 선택해주세요.');
+      handleCloseSignatureModal();
+      return;
+    }
+
+    try {
+      await addWorkerSignatureMutation.mutateAsync({
+        documentIdx: safetySystemDocumentIdx,
+        workerSignatureIdx: row.workerSignatureIdx,
+        signatureData: signatureDataUrl,
+      });
+
+      // 서명 데이터 저장
+      onEducationVideoRowChange(signatureModalIndex, 'signature', signatureDataUrl);
+      handleCloseSignatureModal();
+    } catch {
+      // 에러는 mutation의 onError에서 처리됨
+    }
   };
 
   const tableStyle = {
@@ -185,27 +450,23 @@ export default function Table2400TBMForm({
             <tr style={{ height: 60 }}>
               <th style={{ flex: 1 }}>점검내용</th>
               <th style={{ flex: 1 }}>결과</th>
-              <th style={{ width: 46 }}>이동</th>
-              <th style={{ width: 55 }}>삭제</th>
+              <th style={{ width: 30 }}>이동</th>
+              <th style={{ width: 39 }}>삭제</th>
             </tr>
           </thead>
           <tbody>
             {data.inspectionRows.map((row, index) => (
               <tr
                 key={index}
-                draggable
-                onDragStart={() => handleInspectionDragStart(index)}
                 onDragOver={(e) => handleInspectionDragOver(e, index)}
                 onDragLeave={handleInspectionDragLeave}
                 onDrop={(e) => handleInspectionDrop(e, index)}
-                onDragEnd={handleInspectionDragEnd}
                 style={{
                   opacity: draggedInspectionIndex === index ? 0.5 : 1,
                   backgroundColor:
                     dragOverInspectionIndex === index && draggedInspectionIndex !== index
                       ? theme.vars.palette.action.hover
                       : 'transparent',
-                  cursor: 'move',
                 }}
               >
                 <td>
@@ -216,10 +477,12 @@ export default function Table2400TBMForm({
                       onInspectionRowChange(index, 'inspectionContent', e.target.value)
                     }
                     fullWidth
+                    multiline
                     sx={{
                       '& .MuiOutlinedInput-root': {
                         fontSize: 14,
                         height: 'auto',
+                        p: 1,
                       },
                     }}
                   />
@@ -230,10 +493,12 @@ export default function Table2400TBMForm({
                     value={row.result}
                     onChange={(e) => onInspectionRowChange(index, 'result', e.target.value)}
                     fullWidth
+                    multiline
                     sx={{
                       '& .MuiOutlinedInput-root': {
                         fontSize: 14,
                         height: 'auto',
+                        p: 1,
                       },
                     }}
                   />
@@ -242,14 +507,19 @@ export default function Table2400TBMForm({
                   <Box sx={{ display: 'flex', justifyContent: 'center', px: 1 }}>
                     <IconButton
                       size="small"
+                      draggable
+                      onDragStart={() => handleInspectionDragStart(index)}
+                      onDragEnd={handleInspectionDragEnd}
                       sx={{
+                        p: 0.625,
                         cursor: 'grab',
                         '&:active': {
                           cursor: 'grabbing',
                         },
                       }}
+                      onMouseDown={(e) => e.stopPropagation()}
                     >
-                      <Iconify icon="eva:more-vertical-fill" width={20} />
+                      <Iconify icon="custom:drag-dots-fill" width={20} />
                     </IconButton>
                   </Box>
                 </td>
@@ -267,6 +537,7 @@ export default function Table2400TBMForm({
                         fontWeight: 700,
                         px: 1,
                         py: 0.5,
+                        width: 23,
                         '&:hover': {
                           bgcolor: 'error.dark',
                         },
@@ -286,7 +557,7 @@ export default function Table2400TBMForm({
             variant="outlined"
             size="medium"
             onClick={onInspectionAddRow}
-            startIcon={<Iconify icon="mingcute:add-line" width={20} />}
+            startIcon={<Iconify icon="solar:add-circle-bold" width={20} />}
             sx={{
               minHeight: 36,
               fontSize: 14,
@@ -346,6 +617,7 @@ export default function Table2400TBMForm({
                     '& .MuiOutlinedInput-root': {
                       fontSize: 14,
                       height: 'auto',
+                      p: 1,
                     },
                   }}
                 />
@@ -362,28 +634,24 @@ export default function Table2400TBMForm({
             <tr style={{ height: 60 }}>
               <th style={{ width: '30%' }}>대상자</th>
               <th style={{ width: '35%' }}>교육영상</th>
-              <th style={{ width: '25%' }}>서명</th>
-              <th style={{ width: 46 }}>이동</th>
-              <th style={{ width: 55 }}>삭제</th>
+              {safetySystemDocumentIdx && <th style={{ width: '25%' }}>서명</th>}
+              <th style={{ width: 30 }}>이동</th>
+              <th style={{ width: 39 }}>삭제</th>
             </tr>
           </thead>
           <tbody>
             {data.educationVideoRows.map((row, index) => (
               <tr
                 key={index}
-                draggable
-                onDragStart={() => handleVideoDragStart(index)}
                 onDragOver={(e) => handleVideoDragOver(e, index)}
                 onDragLeave={handleVideoDragLeave}
                 onDrop={(e) => handleVideoDrop(e, index)}
-                onDragEnd={handleVideoDragEnd}
                 style={{
                   opacity: draggedVideoIndex === index ? 0.5 : 1,
                   backgroundColor:
                     dragOverVideoIndex === index && draggedVideoIndex !== index
                       ? theme.vars.palette.action.hover
                       : 'transparent',
-                  cursor: 'move',
                 }}
               >
                 <td>
@@ -414,46 +682,50 @@ export default function Table2400TBMForm({
                         px: 1,
                         py: 0.5,
                       }}
+                      color="primary"
                     >
-                      대상자선택
+                      대상자 선택
                     </Button>
                   )}
                 </td>
                 <td>
                   {row.educationVideo ? (
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography
-                        variant="body2"
+                      <TextField
+                        size="small"
+                        value={row.educationVideo}
+                        onClick={() => setEducationVideoModalIndex(index)}
+                        InputProps={{
+                          readOnly: true,
+                        }}
                         sx={{
                           flex: 1,
-                          fontSize: 14,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
+                          '& .MuiOutlinedInput-root': {
+                            fontSize: 14,
+                            height: 30,
+                            cursor: 'pointer',
+                            '& fieldset': {
+                              borderColor: 'grey.300',
+                            },
+                            '&:hover fieldset': {
+                              borderColor: 'primary.main',
+                            },
+                          },
                         }}
-                      >
-                        {row.educationVideo}
-                      </Typography>
-                      <Button
-                        variant="outlined"
+                      />
+                      <IconButton
                         size="small"
-                        onClick={() => videoInputRef.current?.click()}
-                        sx={{
-                          minHeight: 30,
-                          fontSize: 13,
-                          fontWeight: 700,
-                          px: 1,
-                          py: 0.5,
-                        }}
+                        onClick={() => onEducationVideoRowChange(index, 'educationVideo', '')}
+                        sx={{}}
                       >
-                        변경
-                      </Button>
+                        <Iconify icon="solar:close-circle-bold" width={16} />
+                      </IconButton>
                     </Box>
                   ) : (
                     <Button
-                      variant="outlined"
+                      variant="contained"
                       size="small"
-                      onClick={() => videoInputRef.current?.click()}
+                      onClick={() => setEducationVideoModalIndex(index)}
                       sx={{
                         minHeight: 30,
                         fontSize: 13,
@@ -462,70 +734,63 @@ export default function Table2400TBMForm({
                         py: 0.5,
                       }}
                     >
-                      동영상 업로드
+                      교육영상 선택
                     </Button>
                   )}
-                  <input
-                    ref={videoInputRef}
-                    type="file"
-                    accept="video/*"
-                    style={{ display: 'none' }}
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-
-                      try {
-                        // 동영상 업로드
-                        const uploadResponse = await uploadFile({ files: [file] });
-                        const uploadedFiles = (uploadResponse as any).files || [];
-                        const videoUrl = uploadedFiles[0]?.fileUrl || uploadedFiles[0]?.url;
-
-                        if (videoUrl) {
-                          onEducationVideoRowChange(index, 'educationVideo', videoUrl);
-                        }
-                      } catch (error) {
-                        console.error('동영상 업로드 실패:', error);
-                        // TODO: 에러 토스트 표시
-                      }
-
-                      // input 초기화
-                      if (videoInputRef.current) {
-                        videoInputRef.current.value = '';
-                      }
-                    }}
-                  />
                 </td>
-                <td>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={() => {
-                      // TODO: 서명 추가 모달 또는 파일 업로드
-                      onEducationVideoRowChange(index, 'signature', 'signature-placeholder');
-                    }}
-                    sx={{
-                      minHeight: 30,
-                      fontSize: 13,
-                      fontWeight: 700,
-                      px: 1,
-                      py: 0.5,
-                    }}
-                  >
-                    추가 +
-                  </Button>
-                </td>
+                {safetySystemDocumentIdx && (
+                  <td>
+                    {row.signature ? (
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={() => handleOpenSignatureModal(index)}
+                        sx={{
+                          minHeight: 30,
+                          fontSize: 13,
+                          fontWeight: 700,
+                          px: 1,
+                          py: 0.5,
+                        }}
+                      >
+                        서명보기
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => handleOpenSignatureModal(index)}
+                        disabled={!row.participant?.memberIdx || !row.vodIdx}
+                        sx={{
+                          minHeight: 30,
+                          fontSize: 13,
+                          fontWeight: 700,
+                          px: 1,
+                          py: 0.5,
+                        }}
+                      >
+                        추가 +
+                      </Button>
+                    )}
+                  </td>
+                )}
                 <td>
                   <Box sx={{ display: 'flex', justifyContent: 'center', px: 1 }}>
                     <IconButton
                       size="small"
+                      draggable
+                      onDragStart={() => handleVideoDragStart(index)}
+                      onDragEnd={handleVideoDragEnd}
                       sx={{
+                        p: 0.625,
                         cursor: 'grab',
                         '&:active': {
                           cursor: 'grabbing',
                         },
                       }}
+                      onMouseDown={(e) => e.stopPropagation()}
                     >
-                      <Iconify icon="eva:more-vertical-fill" width={20} />
+                      <Iconify icon="custom:drag-dots-fill" width={20} />
                     </IconButton>
                   </Box>
                 </td>
@@ -543,6 +808,7 @@ export default function Table2400TBMForm({
                         fontWeight: 700,
                         px: 1,
                         py: 0.5,
+                        width: 23,
                         '&:hover': {
                           bgcolor: 'error.dark',
                         },
@@ -562,7 +828,7 @@ export default function Table2400TBMForm({
             variant="outlined"
             size="medium"
             onClick={onEducationVideoAddRow}
-            startIcon={<Iconify icon="mingcute:add-line" width={20} />}
+            startIcon={<Iconify icon="solar:add-circle-bold" width={20} />}
             sx={{
               minHeight: 36,
               fontSize: 14,
@@ -594,6 +860,18 @@ export default function Table2400TBMForm({
           open={educationVideoModalIndex === index}
           onClose={handleCloseEducationVideoModal}
           onConfirm={handleEducationVideoConfirm}
+        />
+      ))}
+
+      {/* 서명 모달 */}
+      {data.educationVideoRows.map((row, index) => (
+        <SignatureModal
+          key={`signature-${index}`}
+          open={signatureModalIndex === index}
+          onClose={handleCloseSignatureModal}
+          onConfirm={handleSignatureConfirm}
+          targetLabel="근로자"
+          initialSignature={row.signature || undefined}
         />
       ))}
     </Box>

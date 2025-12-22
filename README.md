@@ -72,7 +72,7 @@ VITE_SUPABASE_ANON_KEY=
 { path: 'seven', element: <PageSeven /> }
 ```
 
-3. 사이드바에 경로 추가(선택): `src/layouts/nav-config-dashboard.tsx`에 항목 추가
+3. 사이드바에 경로 추가(선택): `src/layouts/nav-config-dashboard.tsx`에 항목추가
 
 ## 인증(JWT) 토글/연동
 

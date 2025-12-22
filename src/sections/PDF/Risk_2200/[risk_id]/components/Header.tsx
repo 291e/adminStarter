@@ -36,7 +36,7 @@ export default function DetailHeader({ title, onBack, onSampleView }: Props) {
           lineHeight: '36px',
         }}
       >
-        {title || '위험요인 제거·대체 및 통제 등록'}
+        {title || '위험요인 제거·대체 및 통제'}
       </Typography>
       <Button
         variant="contained"

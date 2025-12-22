@@ -141,7 +141,7 @@ export default function ParticipantList({ room, participants, onInvite, onRemove
       {/* 헤더 */}
       <Box
         sx={{
-          bgcolor: 'grey.50',
+          bgcolor: '#F4F6F8',
           px: 2,
           py: 1,
           minHeight: 40,
@@ -160,12 +160,13 @@ export default function ParticipantList({ room, participants, onInvite, onRemove
               variant="outlined"
               size="small"
               onClick={handleOpenInviteModal}
-              startIcon={<Iconify icon="solar:add-circle-bold" width={18} />}
+              startIcon={<Iconify icon={`mingcute:add-line` as any} width={18} />}
               sx={{
                 minHeight: 30,
                 py: 0.5,
                 px: 1,
                 borderColor: 'grey.300',
+                bgcolor: 'white',
                 color: 'primary.main',
                 fontSize: 13,
                 fontWeight: 700,
@@ -249,7 +250,20 @@ export default function ParticipantList({ room, participants, onInvite, onRemove
                 >
                   {filteredParticipants[0].name}
                 </Typography>
-                {/* TODO: role 필드가 ChatParticipantDto에 없으므로 필요시 추가 */}
+                {((filteredParticipants[0] as any)?.position ||
+                  (filteredParticipants[0] as any)?.positionName) && (
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      fontSize: 12,
+                      color: 'text.secondary',
+                      lineHeight: '18px',
+                    }}
+                  >
+                    {(filteredParticipants[0] as any)?.positionName ||
+                      (filteredParticipants[0] as any)?.position}
+                  </Typography>
+                )}
               </Stack>
             </Box>
           ) : (
@@ -319,7 +333,21 @@ export default function ParticipantList({ room, participants, onInvite, onRemove
                       >
                         {participant.name}
                       </Typography>
-                      {/* TODO: role 필드가 ChatParticipantDto에 없으므로 필요시 추가 */}
+                      {((participant as any)?.position || (participant as any)?.positionName) && (
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontSize: 12,
+                            color: 'text.secondary',
+                            lineHeight: '18px',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {(participant as any)?.positionName || (participant as any)?.position}
+                        </Typography>
+                      )}
                     </Stack>
                   </ListItem>
                 );

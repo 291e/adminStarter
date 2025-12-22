@@ -58,7 +58,12 @@ export async function getEducationReports(
   // 실제 API 응답 구조에 맞게 매핑
   // 응답이 { header, educationReportList, totalCount } 형태일 수 있음
   const rawData = response.data;
-  
+
+  // 디버깅: 실제 API 응답 구조 확인
+  if (import.meta.env.DEV && rawData?.educationReportList?.length > 0) {
+    console.log('🔍 [getEducationReports] API 응답 샘플:', rawData.educationReportList[0]);
+  }
+
   // BaseResponseDto 구조로 변환
   const mappedResponse: GetEducationReportsResponse = {
     header: rawData.header || {
@@ -72,24 +77,44 @@ export async function getEducationReports(
         ? rawData.educationReportList.map((item: any) => ({
             educationReportIdx: item.educationReportIdx,
             educationReportId: item.educationReportIdx || item.educationReportId || item.id,
-            id: String(item.educationReportIdx || item.educationReportId || item.id || item.memberIdx || ''),
+            id: String(
+              item.educationReportIdx || item.educationReportId || item.id || item.memberIdx || ''
+            ),
             memberIdx: item.memberIdx,
             companyIdx: item.companyIdx,
-            mandatoryEducation: item.mandatoryEducation || 0,
-            regularEducation: item.regularEducation || 0,
-            totalEducation: item.totalEducation || 0,
-            standardEducation: item.standardEducation || 0,
-            completionRate: item.completionRate || 0,
+            // 여러 가능한 필드명 확인 (API 응답 구조가 다를 수 있음)
+            mandatoryEducation:
+              item.mandatoryEducation ?? item.mandatoryTotal ?? item.mandatoryEducationTime ?? 0,
+            regularEducation:
+              item.regularEducation ?? item.regularTotal ?? item.regularEducationTime ?? 0,
+            totalEducation:
+              item.totalEducation ??
+              item.totalTime ??
+              item.totalEducationTime ??
+              (item.mandatoryEducation || item.mandatoryTotal || 0) +
+                (item.regularEducation || item.regularTotal || 0),
+            standardEducation: item.standardEducation ?? item.standardHours ?? 0,
+            completionRate: item.completionRate ?? 0,
             createAt: item.createAt,
-            memberInformation: item.memberInformation || {
-              memberIdx: item.memberIdx || 0,
-              memberName: item.name || item.memberInformation?.memberName || '',
-              position: item.position || item.memberInformation?.position || null,
-              department: item.department || item.memberInformation?.department || null,
-              memberRole: item.role || item.memberInformation?.memberRole || 'WORKER',
-              memberEmail: item.memberInformation?.memberEmail,
-              memberPhone: item.memberInformation?.memberPhone,
-            },
+            memberInformation: item.memberInformation
+              ? {
+                  ...item.memberInformation,
+                  // memberInformation이 존재하더라도 department가 없으면 상위 레벨에서 가져오기
+                  department: item.memberInformation.department ?? item.department ?? null,
+                  // 다른 필드도 동일하게 처리
+                  memberName: item.memberInformation.memberName ?? item.name ?? '',
+                  position: item.memberInformation.position ?? item.position ?? null,
+                  memberRole: item.memberInformation.memberRole ?? item.role ?? 'WORKER',
+                }
+              : {
+                  memberIdx: item.memberIdx || 0,
+                  memberName: item.name || item.memberInformation?.memberName || '',
+                  position: item.position || item.memberInformation?.position || null,
+                  department: item.department || item.memberInformation?.department || null,
+                  memberRole: item.role || item.memberInformation?.memberRole || 'WORKER',
+                  memberEmail: item.memberInformation?.memberEmail,
+                  memberPhone: item.memberInformation?.memberPhone,
+                },
             companyInformation: item.companyInformation || {
               companyIdx: item.companyIdx || 0,
               companyName: item.organizationName || item.companyInformation?.companyName || '',
@@ -287,9 +312,7 @@ export async function updateEducationRecord(
  * 교육 기록 삭제
  * DELETE /education/records/{educationRecordId}
  */
-export async function deleteEducationRecord(
-  params: DeleteEducationRecordParams
-): Promise<void> {
+export async function deleteEducationRecord(params: DeleteEducationRecordParams): Promise<void> {
   // 디버깅: 요청 파라미터 로그
   if (import.meta.env.DEV) {
     console.log('📤 API Request: deleteEducationRecord', {
@@ -351,7 +374,7 @@ export async function getEducationDetail(
 
   // 실제 API 응답 구조에 맞게 매핑
   const rawData = response.data;
-  
+
   // BaseResponseDto 구조로 변환
   const mappedResponse: GetEducationDetailStatisticsResponse = {
     header: rawData.header || {
@@ -361,8 +384,14 @@ export async function getEducationDetail(
       timestamp: new Date().toISOString(),
     },
     body: {
-      mandatoryEducation: rawData.educationDetail?.mandatoryEducation || rawData.educationDetail?.mandatoryEducationList || [],
-      regularEducation: rawData.educationDetail?.regularEducation || rawData.educationDetail?.regularEducationList || [],
+      mandatoryEducation:
+        rawData.educationDetail?.mandatoryEducation ||
+        rawData.educationDetail?.mandatoryEducationList ||
+        [],
+      regularEducation:
+        rawData.educationDetail?.regularEducation ||
+        rawData.educationDetail?.regularEducationList ||
+        [],
       mandatoryTotal: rawData.educationDetail?.mandatoryTotal || 0,
       regularTotal: rawData.educationDetail?.regularTotal || 0,
       totalTime: rawData.educationDetail?.totalTime || 0,

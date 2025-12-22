@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useBoolean } from 'minimal-shared/hooks';
 
 import Box from '@mui/material/Box';
@@ -18,6 +18,7 @@ import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 import { useAuthContext } from 'src/auth/hooks/use-auth-context';
 import { useMyInfo } from 'src/sections/Chat/hooks/use-my-info';
+import { CONFIG } from 'src/global-config';
 import CreateChatRoomModal from './CreateChatRoomModal';
 import type { ChatRoomDto, ChatParticipantDto } from 'src/services/chat/chat.types';
 
@@ -112,15 +113,61 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom, onCre
 
   const emergencyRoom = filteredRooms.find((r) => r.type === 'EMERGENCY');
 
+  // 내 프로필 정보 추출
+  const myProfileImage = useMemo(() => {
+    const memberThumbnail =
+      (myInfoData as any)?.memberThumbnail ||
+      (myInfoData as any)?.member?.memberThumbnail ||
+      (myInfoData as any)?.avatar ||
+      null;
+    return memberThumbnail;
+  }, [myInfoData]);
+
+  const myName = useMemo(
+    () =>
+      (myInfoData as any)?.memberName ||
+      (myInfoData as any)?.member?.memberName ||
+      (myInfoData as any)?.name ||
+      user?.name ||
+      '',
+    [myInfoData, user]
+  );
+
+  // 파일 URL을 전체 URL로 변환하는 헬퍼 함수 (ProfileCard.tsx와 동일한 로직)
+  const getFullFileUrl = (url: string | null | undefined): string | null => {
+    if (!url) return null;
+    // 잘못된 형식: data:image/png;base64,data/admin/... 같은 경우 처리
+    if (
+      url.startsWith('data:image/png;base64,data/admin/') ||
+      url.startsWith('data:image/png;base64,/data/admin/')
+    ) {
+      // base64 접두사를 제거하고 URL로 처리
+      const cleanUrl = url.replace(/^data:image\/png;base64,/, '');
+      const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
+      const path = cleanUrl.startsWith('/') ? cleanUrl : `/${cleanUrl}`;
+      return `${baseUrl}${path}`;
+    }
+    // 이미 전체 URL인 경우 (http:// 또는 https://로 시작)
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    // base64 데이터 URL인 경우 그대로 반환 (실제 base64 데이터인 경우)
+    if (url.startsWith('data:image/') && !url.includes('data/admin/')) {
+      return url;
+    }
+    // 상대 경로인 경우 CONFIG.serverUrl과 결합
+    // data/admin/로 시작하는 경우도 처리
+    const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
+    const path = url.startsWith('/') ? url : `/${url}`;
+    return `${baseUrl}${path}`;
+  };
+
   // Avatar 렌더링 헬퍼 함수 (프로필 이미지가 있으면 사용, 없으면 아이콘)
   const renderAvatar = (participant: ChatParticipantDto, size: number = 40) => {
-    if (participant.profileImage) {
+    const profileImageUrl = getFullFileUrl(participant.profileImage);
+    if (profileImageUrl) {
       return (
-        <Avatar
-          sx={{ width: size, height: size }}
-          src={participant.profileImage}
-          alt={participant.name}
-        >
+        <Avatar sx={{ width: size, height: size }} src={profileImageUrl} alt={participant.name}>
           {participant.name?.[0] || '?'}
         </Avatar>
       );
@@ -206,7 +253,7 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom, onCre
               sx={{
                 position: 'absolute',
                 left: '50%',
-                top: 0,
+                top: 3.5,
                 transform: 'translateX(-50%)',
                 width: 20,
                 height: 20,
@@ -224,7 +271,6 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom, onCre
                 bottom: 0,
                 width: 20,
                 height: 20,
-                transform: 'translateX(-7.5%)',
               }}
             >
               {renderAvatar(filteredParticipants[1], 20)}
@@ -238,7 +284,6 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom, onCre
                 right: 0,
                 bottom: 0,
                 width: 20,
-                transform: 'translateX(7.5%)',
                 height: 20,
               }}
             >
@@ -352,7 +397,13 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom, onCre
     >
       {/* 헤더 */}
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ p: 2.5 }}>
-        <Avatar sx={{ width: 48, height: 48 }} />
+        <Avatar
+          sx={{ width: 48, height: 48 }}
+          src={getFullFileUrl(myProfileImage) || undefined}
+          alt={myName}
+        >
+          {myName?.[0] || <Iconify icon="solar:user-rounded-bold" width={24} />}
+        </Avatar>
         <Tooltip title="채팅방 만들기" arrow>
           <IconButton size="small" onClick={() => setCreateModalOpen(true)}>
             <Iconify icon="solar:add-circle-bold" width={24} />
@@ -386,7 +437,13 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom, onCre
               sx={{ px: 2.5, py: 1.5 }}
             >
               <ListItemAvatar>
-                <Avatar sx={{ width: 40, height: 40 }} />
+                <Avatar
+                  sx={{ width: 40, height: 40 }}
+                  src={CONFIG.assetsDir ? `${CONFIG.assetsDir}/bot.svg` : '/bot.svg'}
+                  alt="챗봇"
+                >
+                  <Iconify icon="solar:user-rounded-bold" width={24} />
+                </Avatar>
               </ListItemAvatar>
               <ListItemText
                 primary="챗봇"

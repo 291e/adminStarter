@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
@@ -12,11 +12,13 @@ import MenuItem from '@mui/material/MenuItem';
 import InputLabel from '@mui/material/InputLabel';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
+import CircularProgress from '@mui/material/CircularProgress';
+import Typography from '@mui/material/Typography';
+
+import { useCodes } from 'src/sections/CodeSetting/hooks/use-code-setting-api';
+import type { CodeSetting } from 'src/services/code-setting/code-setting.types';
 
 // ----------------------------------------------------------------------
-
-// 기계 설비명 옵션 (프레스, 펀치 프레스만)
-const MACHINE_EQUIPMENT_OPTIONS = ['프레스', '펀치 프레스'] as const;
 
 // 검사 대상 옵션 목록
 const INSPECTION_TARGET_OPTIONS = [
@@ -74,13 +76,65 @@ export default function MachineEquipmentSelectModal({
     remark: initialData?.remark || '',
   });
 
-  const [searchValue, setSearchValue] = useState<string>('');
+  const [searchValue, setSearchValue] = useState<CodeSetting | null>(null);
   const [inputValue, setInputValue] = useState<string>('');
 
+  // 기계 설비 목록 조회
+  const codesQuery = useCodes({
+    categoryType: 'machine',
+    status: 'active',
+    page: 1,
+    pageSize: 1000, // 전체 데이터 조회
+  });
+
+  // 기계 설비 목록
+  const machineList = useMemo(() => codesQuery.data?.codeSettingList ?? [], [codesQuery.data]);
+
   // 검색 필터링
-  const filteredOptions = MACHINE_EQUIPMENT_OPTIONS.filter((option) =>
-    option.toLowerCase().includes(inputValue.toLowerCase())
-  );
+  const filteredOptions = useMemo(() => {
+    if (!inputValue) return machineList;
+    const lowerInput = inputValue.toLowerCase();
+    return machineList.filter(
+      (machine) =>
+        machine.name?.toLowerCase().includes(lowerInput) ||
+        machine.code?.toLowerCase().includes(lowerInput)
+    );
+  }, [machineList, inputValue]);
+
+  // 기계 설비 선택 시 자동 입력
+  useEffect(() => {
+    if (searchValue) {
+      const machine = searchValue;
+
+      // 검사 대상 매칭: API 값이 옵션 목록에 있으면 사용, 없으면 기본값
+      const matchedInspectionTarget = machine.inspectionTarget
+        ? INSPECTION_TARGET_OPTIONS.includes(
+            machine.inspectionTarget as (typeof INSPECTION_TARGET_OPTIONS)[number]
+          )
+          ? machine.inspectionTarget
+          : '산업안전보건법'
+        : '산업안전보건법';
+
+      setFormData((prev) => ({
+        ...prev,
+        name: machine.name || prev.name,
+        id: machine.code || prev.id,
+        inspectionTarget: matchedInspectionTarget,
+        safetyDevice: Array.isArray(machine.protectiveDevices)
+          ? machine.protectiveDevices.join(', ')
+          : typeof machine.protectiveDevices === 'string'
+            ? machine.protectiveDevices
+            : prev.safetyDevice,
+        inspectionCycle: machine.inspectionCycle || prev.inspectionCycle,
+        accidentForm: Array.isArray(machine.riskTypes)
+          ? machine.riskTypes.join(', ')
+          : typeof machine.riskTypes === 'string'
+            ? machine.riskTypes
+            : prev.accidentForm,
+        // capacity, location, quantity, remark는 API에 없으므로 기존 값 유지
+      }));
+    }
+  }, [searchValue]);
 
   const handleFieldChange = (field: keyof MachineEquipmentData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -105,7 +159,7 @@ export default function MachineEquipmentSelectModal({
       accidentForm: initialData?.accidentForm || '',
       remark: initialData?.remark || '',
     });
-    setSearchValue('');
+    setSearchValue(null);
     setInputValue('');
     onClose();
   };
@@ -118,20 +172,41 @@ export default function MachineEquipmentSelectModal({
         <Stack spacing={3} sx={{ pt: 1 }}>
           {/* 기계·설비명 (오토컴플리트) */}
           <Autocomplete
-            options={MACHINE_EQUIPMENT_OPTIONS}
-            value={searchValue || null}
+            options={filteredOptions}
+            value={searchValue}
             inputValue={inputValue}
             onInputChange={(_, newInputValue) => {
               setInputValue(newInputValue);
             }}
             onChange={(_, newValue) => {
-              setSearchValue(newValue || '');
-              handleFieldChange('name', newValue || '');
+              setSearchValue(newValue);
             }}
+            getOptionLabel={(option) => option.name || ''}
+            isOptionEqualToValue={(option, value) => option.codeSettingIdx === value.codeSettingIdx}
+            loading={codesQuery.isLoading}
             renderInput={(params) => (
-              <TextField {...params} label="기계·설비명" placeholder="기계·설비명을 검색하세요" />
+              <TextField
+                {...params}
+                label="기계·설비명"
+                placeholder="기계·설비명을 검색하세요"
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {codesQuery.isLoading ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
             )}
-            noOptionsText="검색 결과가 없습니다."
+            noOptionsText={
+              codesQuery.isLoading
+                ? '로딩 중...'
+                : inputValue
+                  ? '검색 결과가 없습니다.'
+                  : '기계·설비를 검색하세요'
+            }
             sx={{
               '& .MuiOutlinedInput-root': {
                 fontSize: 15,
@@ -141,7 +216,14 @@ export default function MachineEquipmentSelectModal({
 
           {/* 관리번호 (필수) */}
           <TextField
-            label={<>관리번호</>}
+            label={
+              <>
+                관리번호
+                <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
+                  *
+                </Typography>
+              </>
+            }
             value={formData.id}
             onChange={(e) => handleFieldChange('id', e.target.value)}
             fullWidth
@@ -150,7 +232,14 @@ export default function MachineEquipmentSelectModal({
 
           {/* 용량 (필수) */}
           <TextField
-            label={<>용량</>}
+            label={
+              <>
+                용량
+                <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
+                  *
+                </Typography>
+              </>
+            }
             value={formData.capacity}
             onChange={(e) => handleFieldChange('capacity', e.target.value)}
             fullWidth
@@ -159,7 +248,14 @@ export default function MachineEquipmentSelectModal({
 
           {/* 단위작업장소 (필수) */}
           <TextField
-            label={<>단위작업장소</>}
+            label={
+              <>
+                단위작업장소
+                <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
+                  *
+                </Typography>
+              </>
+            }
             value={formData.location}
             onChange={(e) => handleFieldChange('location', e.target.value)}
             fullWidth
@@ -168,7 +264,14 @@ export default function MachineEquipmentSelectModal({
 
           {/* 수량 (필수) */}
           <TextField
-            label={<>수량</>}
+            label={
+              <>
+                수량
+                <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
+                  *
+                </Typography>
+              </>
+            }
             value={formData.quantity}
             onChange={(e) => handleFieldChange('quantity', e.target.value)}
             fullWidth
@@ -263,6 +366,3 @@ export default function MachineEquipmentSelectModal({
     </Dialog>
   );
 }
-
-
-

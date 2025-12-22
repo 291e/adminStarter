@@ -11,23 +11,12 @@ import { useParams } from 'react-router';
 
 import { Iconify } from 'src/components/iconify';
 import { CONFIG } from 'src/global-config';
-import {
-  useRegisteredCards,
-  useSubscribe,
-  useCancelService,
-  usePaymentHistory,
-  useCreateBillingKey,
-  useRegisterCard,
-  useUpdateCard,
-  useDeleteCard,
-} from '../../hooks/use-organization-api';
+import { useCreateBillingKey, usePaymentHistory } from '../../hooks/use-payment-api';
 import { useServices } from 'src/sections/ServiceSetting/hooks/use-service-setting-api';
-import type { RegisteredCard as ApiRegisteredCard } from 'src/services/organization/organization.types';
 import type { ServiceSetting } from 'src/services/service-setting/service-setting.types';
 import { PaypleSdkLoader } from './payple/PaypleSdkLoader';
 import { usePaypleCardRegister } from './payple/usePaypleCardRegister';
 import { ServicePlanCard } from './ServicePlanCard';
-import { RegisteredCard } from './RegisteredCard';
 import { PaymentInfo } from './PaymentInfo';
 import PaymentHistoryTable, { type PaymentHistoryItem } from './PaymentHistoryTable';
 import PaymentHistoryPagination from './PaymentHistoryPagination';
@@ -44,9 +33,6 @@ export default function SubscriptionService({ organizationId }: Props) {
   const companyIdx = organizationId ? parseInt(organizationId, 10) : id ? parseInt(id, 10) : 0;
 
   const [selectedServiceSettingIdx, setSelectedServiceSettingIdx] = useState<number | null>(null);
-  const [cardMenuAnchor, setCardMenuAnchor] = useState<{
-    [key: number]: HTMLElement | null;
-  }>({});
   const [paymentHistoryPage, setPaymentHistoryPage] = useState(0);
   const [paymentHistoryRowsPerPage, setPaymentHistoryRowsPerPage] = useState(5);
 
@@ -62,33 +48,19 @@ export default function SubscriptionService({ organizationId }: Props) {
     status: 'ACTIVE', // 활성화된 서비스만
   });
 
-  const {
-    data: registeredCardsData,
-    isLoading: isLoadingCards,
-    isError: isErrorCards,
-  } = useRegisteredCards(companyIdx);
-
   // 결제 내역 조회
   const {
     data: paymentHistoryData,
     isLoading: isLoadingPaymentHistory,
     isError: isErrorPaymentHistory,
   } = usePaymentHistory({
-    companyIdx,
+    searchingDateKey: 'paymentRequestDate',
     page: paymentHistoryPage + 1, // API는 1부터 시작
     pageSize: paymentHistoryRowsPerPage,
   });
 
-  // Mutations
-  const subscribeMutation = useSubscribe();
-  const cancelServiceMutation = useCancelService();
-  const registerCardMutation = useRegisterCard();
-  const updateCardMutation = useUpdateCard();
-  const deleteCardMutation = useDeleteCard();
-
   // API 응답 데이터 추출 (axios interceptor가 평탄화하므로 직접 접근)
   const servicesInfo = servicesData as any;
-  const registeredCardsInfo = registeredCardsData as any;
 
   // 서비스 설정 목록을 ServicePlan 형태로 변환
   type Plan = {
@@ -156,12 +128,6 @@ export default function SubscriptionService({ organizationId }: Props) {
     };
   }, [currentSubscription, companyIdx]);
 
-  // 등록된 카드 목록
-  const registeredCards: ApiRegisteredCard[] = useMemo(
-    () => registeredCardsInfo?.cardList || [],
-    [registeredCardsInfo]
-  );
-
   // 디버깅
   useEffect(() => {
     if (import.meta.env.DEV) {
@@ -172,13 +138,8 @@ export default function SubscriptionService({ organizationId }: Props) {
         plans,
         currentSubscription,
         paymentInfo,
-        registeredCardsData,
-        registeredCardsInfo,
-        registeredCards,
         isLoadingServices,
-        isLoadingCards,
         isErrorServices,
-        isErrorCards,
       });
     }
   }, [
@@ -188,13 +149,8 @@ export default function SubscriptionService({ organizationId }: Props) {
     plans,
     currentSubscription,
     paymentInfo,
-    registeredCardsData,
-    registeredCardsInfo,
-    registeredCards,
     isLoadingServices,
-    isLoadingCards,
     isErrorServices,
-    isErrorCards,
   ]);
 
   // 빌링키 등록 Mutation
@@ -207,82 +163,43 @@ export default function SubscriptionService({ organizationId }: Props) {
       const billingKey = params.PCD_PAYER_ID || '';
       const cardName = params.PCD_PAY_CARDNAME || '';
       const cardNo = params.PCD_PAY_CARDNUM || '';
-      const isAlreadyAuthenticated = params.PCD_PAY_MSG?.includes('기 인증고객');
-      const isCardAuthCompleted = params.PCD_PAY_MSG?.includes('카드인증완료');
 
-      // 카드 정보가 있는 경우에만 처리
-      if (!cardName && !cardNo && !billingKey) {
-        throw new Error('카드 정보를 받지 못했습니다.');
+      // 빌링키와 선택된 서비스가 없으면 에러
+      if (!billingKey) {
+        throw new Error('빌링키를 받지 못했습니다.');
+      }
+
+      if (!selectedServiceSettingIdx) {
+        throw new Error('서비스를 선택해주세요.');
       }
 
       try {
-        // 1. 빌링키 등록 (회사 단위) - POST /companies/billing-key
-        // 빌링키가 있는 경우에만 등록 시도
-        if (billingKey) {
-          try {
-            await createBillingKeyMutation.mutateAsync({
-              PCD_PAYER_ID: billingKey,
-              memberBillingType: 'card',
-              memberBillingInfo: JSON.stringify({
-                cardName,
-                cardNo,
-                orderNo: params.PCD_PAY_OID || '',
-                amount: params.PCD_PAY_TOTAL || '0',
-              }),
-            });
+        // 빌링키 등록 + serviceSettingIdx로 첫 결제/구독 생성
+        // POST /payment/billingKey
+        await createBillingKeyMutation.mutateAsync({
+          PCD_PAYER_ID: billingKey,
+          memberBillingType: 'card',
+          memberBillingInfo: JSON.stringify({
+            cardName,
+            cardNo,
+            orderNo: params.PCD_PAY_OID || '',
+            amount: params.PCD_PAY_TOTAL || '0',
+          }),
+          serviceSettingIdx: selectedServiceSettingIdx,
+        });
 
-            if (import.meta.env.DEV) {
-              console.log('✅ [빌링키 등록 성공]', { billingKey });
-            }
-          } catch (error: any) {
-            // 이미 등록된 빌링키인 경우 에러가 발생할 수 있지만,
-            // "기 인증고객 입니다." 또는 "카드인증완료" 메시지가 있으면 계속 진행
-            if (isAlreadyAuthenticated || isCardAuthCompleted) {
-              if (import.meta.env.DEV) {
-                console.log('⚠️ [빌링키 등록 스킵 - 이미 등록됨]', {
-                  billingKey,
-                  errorMessage: error?.message,
-                });
-              }
-            } else {
-              throw error;
-            }
-          }
+        if (import.meta.env.DEV) {
+          console.log('✅ [빌링키 등록 및 구독 생성 성공]', {
+            billingKey,
+            serviceSettingIdx: selectedServiceSettingIdx,
+          });
         }
 
-        // 2. 카드 등록 (등록된 카드 목록에 추가) - POST /companies/{companyIdx}/cards
-        // 카드 정보가 있으면 등록된 카드 목록에 추가
-        if (cardName && cardNo) {
-          try {
-            await registerCardMutation.mutateAsync({
-              companyIdx,
-              billingKey: billingKey || undefined, // 빌링키가 없으면 undefined
-              cardName,
-              cardNo,
-              orderNo: params.PCD_PAY_OID || undefined,
-              amount: params.PCD_PAY_TOTAL || undefined,
-              isCardAuthCompleted: isCardAuthCompleted ? 1 : 0,
-              isAlreadyAuthenticated: isAlreadyAuthenticated ? 1 : 0,
-              resultMsg: params.PCD_PAY_MSG || undefined,
-            });
-
-            if (import.meta.env.DEV) {
-              console.log('✅ [카드 등록 성공]', { cardName, cardNo });
-            }
-          } catch (error: any) {
-            if (import.meta.env.DEV) {
-              console.error('❌ [카드 등록 실패]', {
-                error,
-                errorMessage: error?.message,
-                errorResponse: error?.response?.data,
-              });
-            }
-            // 카드 등록 실패는 에러로 처리하지 않고 경고만 (빌링키는 이미 등록됨)
-          }
-        }
+        // 구독 성공 후 선택 해제
+        setSelectedServiceSettingIdx(null);
       } catch (error: any) {
         if (import.meta.env.DEV) {
-          console.error('❌ [카드/빌링키 등록 실패]', {
+          console.error('❌ [빌링키 등록 및 구독 생성 실패]', {
             error,
             errorMessage: error?.message,
             errorResponse: error?.response?.data,
@@ -291,7 +208,7 @@ export default function SubscriptionService({ organizationId }: Props) {
         throw error;
       }
     },
-    [companyIdx, createBillingKeyMutation, registerCardMutation]
+    [selectedServiceSettingIdx, createBillingKeyMutation]
   );
 
   // 페이플 카드 등록 훅
@@ -310,30 +227,6 @@ export default function SubscriptionService({ organizationId }: Props) {
     [plans]
   );
 
-  const handleCardMenuOpen = useCallback(
-    (event: React.MouseEvent<HTMLElement>, companyCardIdx: number) => {
-      setCardMenuAnchor((prev) => ({ ...prev, [companyCardIdx]: event.currentTarget }));
-    },
-    []
-  );
-
-  const handleCardMenuClose = useCallback((companyCardIdx: number) => {
-    setCardMenuAnchor((prev) => ({ ...prev, [companyCardIdx]: null }));
-  }, []);
-
-  const getCardIcon = useCallback((type: string) => {
-    switch (type) {
-      case 'visa':
-        return 'logos:visa';
-      case 'mastercard':
-        return 'logos:mastercard';
-      case 'amex':
-        return 'logos:american-express';
-      default:
-        return 'solar:card-bold';
-    }
-  }, []);
-
   const formatPrice = useCallback(
     (price: number) => String(price).replace(/\B(?=(\d{3})+(?!\d))/g, ','),
     []
@@ -342,31 +235,102 @@ export default function SubscriptionService({ organizationId }: Props) {
   // 결제 내역 데이터 변환
   const paymentHistory: PaymentHistoryItem[] = useMemo(() => {
     const paymentHistoryInfo = paymentHistoryData as any;
-    const paymentList = paymentHistoryInfo?.paymentList || [];
-    const totalCount = paymentHistoryInfo?.totalCount || 0;
+    // 새로운 API 응답 구조: data 배열에 직접 결제 내역이 있음
+    const paymentList = Array.isArray(paymentHistoryInfo?.data)
+      ? paymentHistoryInfo.data
+      : paymentHistoryInfo?.paymentList || [];
+    const totalCount = paymentHistoryInfo?.totalCount || paymentList.length;
 
     return paymentList.map((payment: any, index: number) => {
-      // 상태 매핑: SUCCESS -> COMPLETED, FAILED/CANCELLED -> CANCELLED, 그 외 -> PENDING
+      // 상태 매핑: 한글 문자열로 오는 paymentStatus 처리
       let status: PaymentHistoryItem['status'] = 'PENDING';
-      if (payment.paymentStatus === 'SUCCESS') {
+      const paymentStatus = payment.paymentStatus || '';
+      if (paymentStatus.includes('완료') || paymentStatus === 'SUCCESS') {
         status = 'COMPLETED';
-      } else if (payment.paymentStatus === 'FAILED' || payment.paymentStatus === 'CANCELLED') {
+      } else if (
+        paymentStatus.includes('실패') ||
+        paymentStatus.includes('취소') ||
+        paymentStatus === 'FAILED' ||
+        paymentStatus === 'CANCELLED'
+      ) {
         status = 'CANCELLED';
       }
 
-      // 결제수단 매핑
+      // 결제수단 매핑: paypleResponse JSON에서 추출 시도
       let paymentMethod = '미등록';
-      if (payment.paymentMethod === 'card') {
-        paymentMethod = '카드';
-      } else if (payment.paymentMethod === 'transfer') {
-        paymentMethod = '계좌이체';
+      try {
+        if (payment.paypleResponse) {
+          const paypleData = JSON.parse(payment.paypleResponse);
+          if (paypleData.PCD_PAY_TYPE === 'card') {
+            const cardName = paypleData.PCD_PAY_CARDNAME || '';
+            const cardNum = paypleData.PCD_PAY_CARDNUM || '';
+            if (cardName) {
+              paymentMethod = cardName;
+            } else if (cardNum) {
+              // 카드번호 마스킹 처리 (뒤 4자리만 표시)
+              const maskedCardNum = cardNum.replace(
+                /(\d{4})-?(\d{4})-?(\d{4})-?(\d{4})/,
+                '****-****-****-$4'
+              );
+              paymentMethod = `카드 ${maskedCardNum}`;
+            } else {
+              paymentMethod = '카드';
+            }
+          } else if (paypleData.PCD_PAY_TYPE === 'transfer') {
+            paymentMethod = '계좌이체';
+          }
+        }
+      } catch {
+        // JSON 파싱 실패 시 기본값 사용
       }
 
-      // 결제일: payplePaymentDate 우선, 없으면 paymentDate, 없으면 createAt 사용
-      const finalPaymentDate = payment.payplePaymentDate || payment.paymentDate || payment.createAt;
+      // 결제수단이 여전히 미등록이면 paymentMethod 필드 확인
+      if (paymentMethod === '미등록') {
+        if (payment.paymentMethod === 'card') {
+          paymentMethod = '카드';
+        } else if (payment.paymentMethod === 'transfer') {
+          paymentMethod = '계좌이체';
+        }
+      }
 
-      // 결제 번호: payplePaymentNumber 우선, 없으면 paymentIdx 사용
-      const finalPaymentNumber = payment.payplePaymentNumber || String(payment.paymentIdx);
+      // 결제일: paymentDate 우선, 없으면 paymentRequestDate 사용
+      const finalPaymentDate = payment.paymentDate || payment.paymentRequestDate || '';
+
+      // 결제 번호: paymentId 우선, 없으면 paymentIdx 사용
+      const finalPaymentNumber = payment.paymentId || String(payment.paymentIdx);
+
+      // 서비스명: paypleResponse에서 추출 시도
+      let serviceName = '';
+      try {
+        if (payment.paypleResponse) {
+          const paypleData = JSON.parse(payment.paypleResponse);
+          serviceName = paypleData.PCD_PAY_GOODS || '';
+        }
+      } catch {
+        // JSON 파싱 실패 시 기본값 사용
+      }
+      // paypleResponse에서 추출 실패 시 기본값 사용
+      if (!serviceName) {
+        serviceName = payment.serviceName || '서비스명 없음';
+      }
+
+      // 결제 금액: paymentAmount 우선, 없으면 paymentRequestAmount 사용
+      const finalAmount = payment.paymentAmount || payment.paymentRequestAmount || 0;
+
+      // 영수증 URL: paypleResponse에서 추출 시도
+      let receiptUrl: string | undefined;
+      try {
+        if (payment.paypleResponse) {
+          const paypleData = JSON.parse(payment.paypleResponse);
+          receiptUrl = paypleData.PCD_PAY_CARDRECEIPT || undefined;
+        }
+      } catch {
+        // JSON 파싱 실패 시 기본값 사용
+      }
+      // paypleReceipt 필드도 확인
+      if (!receiptUrl) {
+        receiptUrl = payment.paypleReceipt || undefined;
+      }
 
       return {
         id: payment.paymentIdx,
@@ -375,11 +339,11 @@ export default function SubscriptionService({ organizationId }: Props) {
           : index + 1,
         paymentDate: finalPaymentDate,
         paymentNumber: finalPaymentNumber,
-        serviceName: payment.serviceName,
-        amount: payment.paymentAmount || 0,
+        serviceName,
+        amount: finalAmount,
         paymentMethod,
         status,
-        receiptUrl: payment.paypleReceipt || undefined, // Payple 영수증 URL
+        receiptUrl,
       };
     });
   }, [paymentHistoryData, paymentHistoryPage, paymentHistoryRowsPerPage]);
@@ -405,58 +369,8 @@ export default function SubscriptionService({ organizationId }: Props) {
     [isPlanSubscribed]
   );
 
-  const handleCardAction = async (companyCardIdx: number, action: string) => {
-    if (import.meta.env.DEV) {
-      console.log('🔍 [SubscriptionService] 카드 액션', {
-        companyCardIdx,
-        action,
-        companyIdx,
-      });
-    }
-
-    try {
-      if (action === 'setPrimary') {
-        // 대표 카드 설정 - PATCH /companies/{companyIdx}/cards/{companyCardIdx}
-        await updateCardMutation.mutateAsync({
-          companyIdx,
-          companyCardIdx,
-          isDefaultCard: 1,
-        });
-        if (import.meta.env.DEV) {
-          console.log('✅ [대표 카드 설정 성공]', { companyCardIdx });
-        }
-      } else if (action === 'delete') {
-        // 카드 삭제 - DELETE /companies/{companyIdx}/cards/{companyCardIdx}
-        await deleteCardMutation.mutateAsync({
-          companyIdx,
-          companyCardIdx,
-        });
-        if (import.meta.env.DEV) {
-          console.log('✅ [카드 삭제 성공]', { companyCardIdx });
-        }
-      } else if (action === 'edit') {
-        // TODO: 카드 수정 모달 열기
-        if (import.meta.env.DEV) {
-          console.log('📝 [카드 수정]', companyCardIdx);
-        }
-      }
-    } catch (error: any) {
-      if (import.meta.env.DEV) {
-        console.error('❌ [카드 액션 실패]', {
-          error,
-          errorMessage: error?.message,
-          errorResponse: error?.response?.data,
-          companyCardIdx,
-          action,
-        });
-      }
-    }
-
-    handleCardMenuClose(companyCardIdx);
-  };
-
   // 로딩 상태
-  if (isLoadingServices || isLoadingCards || isLoadingPaymentHistory) {
+  if (isLoadingServices || isLoadingPaymentHistory) {
     return (
       <Box sx={{ p: 3 }}>
         <Box
@@ -473,78 +387,8 @@ export default function SubscriptionService({ organizationId }: Props) {
     );
   }
 
-  // 구독하기 핸들러
-  const handleSubscribe = async (serviceSettingIdx: number) => {
-    if (import.meta.env.DEV) {
-      console.log('🔍 [구독하기]', {
-        companyIdx,
-        serviceSettingIdx,
-      });
-    }
-
-    try {
-      // 3단계: 구독 신청
-      // 빌링키는 백엔드에서 자동으로 조회하므로 프론트엔드에서는 serviceSettingIdx만 전송
-      // 빌링키가 없으면 백엔드에서 "먼저 빌링키를 등록해주세요." 에러 반환
-      await subscribeMutation.mutateAsync({
-        companyIdx,
-        serviceSettingIdx,
-      });
-      if (import.meta.env.DEV) {
-        console.log('✅ [구독 성공]', {
-          companyIdx,
-          serviceSettingIdx,
-        });
-      }
-      setSelectedServiceSettingIdx(null); // 구독 성공 후 선택 해제
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error('❌ [구독 실패]', error);
-      }
-    }
-  };
-
-  // 구독 취소 핸들러
-  const handleCancelSubscription = async () => {
-    // currentSubscription에서 serviceSettingIdx 가져오기
-    if (!currentSubscription || !currentSubscription.serviceSettingIdx) {
-      if (import.meta.env.DEV) {
-        console.error('❌ [구독 취소] 구독 정보를 찾을 수 없습니다.', {
-          currentSubscription,
-          companyIdx,
-        });
-      }
-      alert('구독 정보를 찾을 수 없습니다. 페이지를 새로고침한 후 다시 시도해주세요.');
-      return;
-    }
-
-    const serviceSettingIdx = currentSubscription.serviceSettingIdx;
-
-    if (import.meta.env.DEV) {
-      console.log('🔍 [구독 취소]', {
-        companyIdx,
-        serviceSettingIdx,
-        currentSubscription,
-      });
-    }
-
-    try {
-      await cancelServiceMutation.mutateAsync({
-        companyIdx,
-        serviceSettingIdx,
-      });
-      if (import.meta.env.DEV) {
-        console.log('✅ [구독 취소 성공]');
-      }
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error('❌ [구독 취소 실패]', error);
-      }
-    }
-  };
-
   // 에러 상태
-  if (isErrorServices || isErrorCards || isErrorPaymentHistory) {
+  if (isErrorServices || isErrorPaymentHistory) {
     return (
       <Box sx={{ p: 3 }}>
         <Alert severity="error">구독 서비스 정보를 불러오는 중 오류가 발생했습니다.</Alert>
@@ -594,56 +438,38 @@ export default function SubscriptionService({ organizationId }: Props) {
           hasSelectedPlan={
             !!selectedServiceSettingIdx && !isPlanSubscribed(selectedServiceSettingIdx)
           }
-          onCancelSubscription={currentSubscription ? handleCancelSubscription : undefined}
-          onSubscribe={
-            selectedServiceSettingIdx && !isPlanSubscribed(selectedServiceSettingIdx)
-              ? () => handleSubscribe(selectedServiceSettingIdx)
-              : undefined
-          }
-          isCancelling={cancelServiceMutation.isPending}
-          isSubscribing={subscribeMutation.isPending}
+          onCancelSubscription={undefined} // 구독 취소는 빌링키 삭제로 처리 (추후 구현)
+          onSubscribe={undefined} // 구독은 빌링키 등록 시 자동으로 처리됨
+          isCancelling={false}
+          isSubscribing={createBillingKeyMutation.isPending}
         />
       </Box>
 
       <Divider />
 
-      {/* 등록된 카드 */}
+      {/* 카드 등록 */}
       <Box sx={{ p: 3 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2.5 }}>
           <Typography variant="h6" sx={{ fontWeight: 600 }}>
-            등록된 카드
+            결제 카드 등록
           </Typography>
           <Button
             variant="text"
             size="small"
             onClick={handleAddCard}
             startIcon={<Iconify icon="solar:add-circle-bold" width={20} />}
+            disabled={!selectedServiceSettingIdx}
           >
             카드 추가
           </Button>
         </Stack>
-
-        <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap', gap: 2 }}>
-          {registeredCards.length === 0 ? (
-            <Box sx={{ width: '100%', py: 4, textAlign: 'center' }}>
-              <Typography variant="body2" color="text.secondary">
-                등록된 카드가 없습니다.
-              </Typography>
-            </Box>
-          ) : (
-            registeredCards.map((card) => (
-              <RegisteredCard
-                key={card.companyCardIdx}
-                card={card}
-                cardMenuAnchor={cardMenuAnchor[card.companyCardIdx] || null}
-                onMenuOpen={(e) => handleCardMenuOpen(e, card.companyCardIdx)}
-                onMenuClose={() => handleCardMenuClose(card.companyCardIdx)}
-                onCardAction={handleCardAction}
-                getCardIcon={getCardIcon}
-              />
-            ))
-          )}
-        </Stack>
+        {!selectedServiceSettingIdx && (
+          <Box sx={{ py: 2, textAlign: 'center' }}>
+            <Typography variant="body2" color="text.secondary">
+              먼저 구독할 서비스를 선택해주세요.
+            </Typography>
+          </Box>
+        )}
       </Box>
 
       <Divider />
@@ -651,9 +477,13 @@ export default function SubscriptionService({ organizationId }: Props) {
       {/* 결제 내역 */}
       <Box sx={{ p: 3 }}>
         <PaymentHistoryTable rows={paymentHistory} onViewReceipt={handleViewReceipt} />
-        {paymentHistoryData && (paymentHistoryData as any)?.totalCount > 0 && (
+        {paymentHistory.length > 0 && (
           <PaymentHistoryPagination
-            count={(paymentHistoryData as any).totalCount}
+            count={
+              (paymentHistoryData as any)?.totalCount ||
+              (paymentHistoryData as any)?.data?.length ||
+              paymentHistory.length
+            }
             page={paymentHistoryPage}
             rowsPerPage={paymentHistoryRowsPerPage}
             onChangePage={setPaymentHistoryPage}

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router';
+import { useQueryClient } from '@tanstack/react-query';
 
 import type { SxProps, Theme } from '@mui/material/styles';
 
@@ -58,6 +59,7 @@ type ChatbotMessage = {
 
 export function ChatView({ title = '채팅', description, sx }: Props) {
   const [searchParams] = useSearchParams();
+  const queryClient = useQueryClient();
   const [selectedRoom, setSelectedRoom] = useState<ChatRoomDto | null>(null);
   const [messageInput, setMessageInput] = useState('');
   const [isChatbotRoom, setIsChatbotRoom] = useState(false);
@@ -275,10 +277,11 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     }
   }, [selectedRoom?.chatRoomIdx, isChatbotRoom]);
 
-  const handleSendMessage = async () => {
-    if (!messageInput.trim()) return;
+  const handleSendMessage = async (attachments?: string[]) => {
+    // 메시지가 없고 첨부파일도 없으면 전송하지 않음
+    if (!messageInput.trim() && !attachments?.length) return;
 
-    // 챗봇방인 경우
+    // 챗봇방인 경우 (이미지는 지원하지 않음)
     if (isChatbotRoom) {
       if (!currentMemberIdx) {
         console.error('현재 사용자 식별자를 확인할 수 없습니다.');
@@ -329,7 +332,9 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     if (!selectedRoom) return;
 
     try {
-      await sendMessage(messageInput);
+      // 첨부파일이 있으면 IMAGE 타입으로, 없으면 TEXT 타입으로 전송
+      const messageType = attachments?.length ? 'IMAGE' : 'TEXT';
+      await sendMessage(messageInput.trim() || '', messageType, attachments);
       setMessageInput('');
     } catch (error) {
       console.error('Failed to send message:', error);
@@ -415,35 +420,73 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     setSelectedDocumentIdx(null);
   };
 
-  const handleCreateRoom = (_roomName: string, memberIndexes: number[]) => {
-    // API 요청 바디에는 memberIndexes만 전송
-    createChatRoomMutation.mutate(
-      {
+  const handleCreateRoom = async (roomName: string, memberIndexes: number[]) => {
+    try {
+      // 채팅방 생성
+      const createResponse = await createChatRoomMutation.mutateAsync({
         memberIndexes,
-      },
-      {
-        onError: (error: any) => {
-          // API 응답에서 에러 메시지 추출
-          const errorMessage =
-            error?.response?.data?.header?.resultMessage ||
-            error?.response?.data?.resultMessage ||
-            error?.message ||
-            '채팅방 생성에 실패했습니다.';
+      });
 
-          // resultCode가 500이면 중복 채팅방 생성 시도로 간주
-          const resultCode =
-            error?.response?.data?.header?.resultCode || error?.response?.data?.resultCode;
-          const isDuplicateError = resultCode === 500;
+      // axios 인터셉터가 평탄화하므로 body를 거치지 않고 직접 접근
+      // 응답 구조: { header: {...}, chatRoomIdx: number, chatRoomId: string }
+      const chatRoomIdx =
+        (createResponse as any).chatRoomIdx ||
+        (createResponse as any).body?.chatRoomIdx ||
+        (createResponse as any).data?.chatRoomIdx;
 
+      if (!chatRoomIdx) {
+        console.warn('채팅방 생성 응답에서 chatRoomIdx를 찾을 수 없습니다:', createResponse);
+        return;
+      }
+
+      // 채팅방 생성 후 쿼리 무효화가 완료될 때까지 기다림
+      await queryClient.invalidateQueries({ queryKey: ['chatRooms'] });
+      // 쿼리 리패치 완료 대기
+      await queryClient.refetchQueries({ queryKey: ['chatRooms'] });
+
+      // 생성 성공 후 채팅방 이름이 있으면 이름 변경
+      if (roomName.trim()) {
+        // 추가 지연을 두어 트랜잭션이 완전히 커밋되도록 함
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        try {
+          await updateChatRoomMutation.mutateAsync({
+            chatRoomIdx: Number(chatRoomIdx),
+            name: roomName.trim(),
+          });
+        } catch (updateError: any) {
+          // 이름 변경 실패는 별도로 처리 (채팅방은 이미 생성됨)
+          console.error('채팅방 이름 변경 실패:', updateError);
+          const updateErrorMessage =
+            updateError?.response?.data?.header?.resultMessage ||
+            updateError?.message ||
+            '채팅방은 생성되었지만 이름 변경에 실패했습니다.';
           setErrorSnackbar({
             open: true,
-            message: isDuplicateError
-              ? '이미 존재하는 채팅방입니다. 중복 채팅방을 생성할 수 없습니다.'
-              : errorMessage,
+            message: updateErrorMessage,
           });
-        },
+        }
       }
-    );
+    } catch (error: any) {
+      // API 응답에서 에러 메시지 추출
+      const errorMessage =
+        error?.response?.data?.header?.resultMessage ||
+        error?.response?.data?.resultMessage ||
+        error?.message ||
+        '채팅방 생성에 실패했습니다.';
+
+      // resultCode가 500이면 중복 채팅방 생성 시도로 간주
+      const resultCode =
+        error?.response?.data?.header?.resultCode || error?.response?.data?.resultCode;
+      const isDuplicateError = resultCode === 500;
+
+      setErrorSnackbar({
+        open: true,
+        message: isDuplicateError
+          ? '이미 존재하는 채팅방입니다. 중복 채팅방을 생성할 수 없습니다.'
+          : errorMessage,
+      });
+    }
   };
 
   // LeftSection용 ChatRoomDto 배열 (customRoomName 우선 사용)

@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { Theme, SxProps } from '@mui/material/styles';
 import { useLocation } from 'react-router';
 import dayjs from 'dayjs';
+import { toast } from 'sonner';
 
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -11,7 +12,9 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
+import { CONFIG } from 'src/global-config';
 import { getSafetySystemItem } from 'src/services/safety-system/safety-system.service';
+import { getSafetySystemDocumentDetail } from 'src/services/dashboard/dashboard.service';
 import type {
   SafetySystem,
   SafetySystemItem,
@@ -28,6 +31,7 @@ import PDFDownloadModal from './components/PDFDownloadModal';
 import { useRisk_2200 } from './hooks/use-risk-2200';
 import { getTableDataByDocument } from 'src/_mock/_safety-system';
 import { downloadDocumentPDF } from './utils/download-pdf';
+import SampleViewModal, { parseSampleUrls } from './components/SampleViewModal';
 
 // ----------------------------------------------------------------------
 
@@ -46,6 +50,7 @@ export function Risk_2200View({ safetyId, title = 'Blank', description, sx }: Pr
     | undefined;
   const [riskAssessmentModalOpen, setRiskAssessmentModalOpen] = useState(false);
   const [pdfDownloadModalOpen, setPdfDownloadModalOpen] = useState(false);
+  const [sampleViewModalOpen, setSampleViewModalOpen] = useState(false);
 
   // 아이템 상세 정보 조회 (문서 목록 포함)
   const { data: itemDetailResponse, isLoading: isItemLoading } = useQuery({
@@ -208,28 +213,45 @@ export function Risk_2200View({ safetyId, title = 'Blank', description, sx }: Pr
     }
   };
 
-  const handleCopy = (id: string) => {
-    if (safetyId) {
-      // TODO: TanStack Query Hook(useQuery)으로 문서 상세 정보 가져오기 (복사용)
-      // const { data: documentDetail } = useQuery({
-      //   queryKey: ['risk2200DocumentDetail', id],
-      //   queryFn: () => getRisk2200DocumentDetail(id),
-      //   enabled: !!id,
-      // });
-      // 문서 ID에서 정보 추출 (형식: safetyIdx-itemNumber-documentNumber)
-      const parts = id.split('-');
-      if (parts.length >= 3) {
-        // create 페이지로 이동 시 system, item, 그리고 복사할 문서 데이터를 함께 전달
-        navigate(`/dashboard/safety-system/${safetyId}/risk-2200/create`, {
-          state: {
-            system: state?.system,
-            item: state?.item,
-            copyFrom: id, // 복사할 문서 ID
-            // TODO: API 연동 시 documentDetail 데이터도 함께 전달
-            // documentData: documentDetail,
-          },
-        });
+  const handleCopy = async (id: string) => {
+    if (!safetyId) return;
+
+    try {
+      // id는 safetySystemDocumentIdx를 문자열로 변환한 값
+      const safetySystemDocumentIdx = Number(id);
+      if (!safetySystemDocumentIdx || isNaN(safetySystemDocumentIdx)) {
+        toast.error('문서 ID가 유효하지 않습니다.');
+        return;
       }
+
+      // 문서 상세 정보 조회
+      const response = await getSafetySystemDocumentDetail({
+        safetySystemDocumentIdx,
+      });
+
+      // axios 인터셉터에서 평탄화되므로 직접 접근
+      const originalDocument =
+        (response as any).originalDocument ||
+        (response as any).body?.data?.originalDocument ||
+        (response as any).body?.originalDocument;
+
+      if (!originalDocument) {
+        toast.error('문서 정보를 가져올 수 없습니다.');
+        return;
+      }
+
+      // create 페이지로 이동 시 system, item, 그리고 복사할 문서 데이터를 함께 전달
+      navigate(`/dashboard/safety-system/${safetyId}/risk-2200/create`, {
+        state: {
+          system: state?.system,
+          item: state?.item,
+          copyFrom: id, // 복사할 문서 ID (참고용)
+          documentData: originalDocument, // 복사할 문서 데이터
+        },
+      });
+    } catch (error: any) {
+      console.error('문서 복사 실패:', error);
+      toast.error(error?.response?.data?.header?.resultMessage || '문서 복사에 실패했습니다.');
     }
   };
 
@@ -246,10 +268,55 @@ export function Risk_2200View({ safetyId, title = 'Blank', description, sx }: Pr
     console.log('게시 상태 변경:', id, published);
   };
 
-  const handleViewSample = () => {
-    // TODO: 샘플 보기 기능 구현
-    console.log('샘플 보기');
+  // 파일 URL을 전체 URL로 변환
+  const getFullFileUrl = (url: string | null | undefined): string | null => {
+    if (!url) return null;
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
+    const path = url.startsWith('/') ? url : `/${url}`;
+    return `${baseUrl}${path}`;
   };
+
+  // 팝업 창 열기 헬퍼 함수
+  const openPopup = (url: string, name: string) => {
+    const width = 1200;
+    const height = 900;
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+    window.open(
+      url,
+      name,
+      `width=${width},height=${height},left=${left},top=${top},menubar=no,status=no,toolbar=no,scrollbars=yes`
+    );
+  };
+
+  const handleViewSample = () => {
+    // 활성화된 아이템 정보(itemDetail) 또는 전달받은 상태(state.item)에서 샘플 URL 확인
+    const sampleUrl = itemDetail?.sample || state?.item?.sample;
+    if (sampleUrl) {
+      const samples = parseSampleUrls(sampleUrl);
+      if (samples.length > 1) {
+        // 여러 개인 경우 모달 표시
+        setSampleViewModalOpen(true);
+      } else if (samples.length === 1) {
+        // 단일 샘플인 경우 바로 열기
+        const fullUrl = getFullFileUrl(samples[0].url);
+        if (fullUrl) {
+          openPopup(fullUrl, 'sample-popup');
+        }
+      }
+    } else {
+      toast.error('등록된 샘플 파일이 없습니다.');
+    }
+  };
+
+  // 샘플 목록 가져오기 (모달용)
+  const sampleList = useMemo(() => {
+    const sampleUrl = itemDetail?.sample || state?.item?.sample;
+    return parseSampleUrls(sampleUrl);
+  }, [itemDetail, state?.item]);
 
   // 1200번대 문서 여부 확인 (safetyIdx=1, itemNumber=2)
   const is1200Series = state?.system?.safetyIdx === 1 && state?.item?.itemNumber === 2;
@@ -422,6 +489,13 @@ export function Risk_2200View({ safetyId, title = 'Blank', description, sx }: Pr
 
       {/* PDF 다운로드 로딩 모달 */}
       <PDFDownloadModal open={pdfDownloadModalOpen} />
+
+      {/* 샘플 보기 모달 */}
+      <SampleViewModal
+        open={sampleViewModalOpen}
+        onClose={() => setSampleViewModalOpen(false)}
+        samples={sampleList}
+      />
     </DashboardContent>
   );
 }

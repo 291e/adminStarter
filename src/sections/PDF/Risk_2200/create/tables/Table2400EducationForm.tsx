@@ -108,7 +108,7 @@ export default function Table2400EducationForm({
     },
     '& td': {
       padding: '4px',
-      height: 48,
+      minHeight: 48,
     },
   };
 
@@ -118,7 +118,7 @@ export default function Table2400EducationForm({
         <Box component="table" sx={tableStyle}>
           <thead>
             <tr style={{ height: 60 }}>
-              <th style={{ width: 46 }} rowSpan={2}>
+              <th style={{ width: 30 }} rowSpan={2}>
                 순번
               </th>
               <th style={{ width: 112 }} colSpan={2}>
@@ -139,10 +139,10 @@ export default function Table2400EducationForm({
               <th style={{ width: 108 }} rowSpan={2}>
                 비고
               </th>
-              <th style={{ width: 46 }} rowSpan={2}>
+              <th style={{ width: 30 }} rowSpan={2}>
                 이동
               </th>
-              <th style={{ width: 55 }} rowSpan={2}>
+              <th style={{ width: 39 }} rowSpan={2}>
                 삭제
               </th>
             </tr>
@@ -167,19 +167,15 @@ export default function Table2400EducationForm({
             {rows.map((row, index) => (
               <tr
                 key={index}
-                draggable
-                onDragStart={() => handleDragStart(index)}
                 onDragOver={(e) => handleDragOver(e, index)}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, index)}
-                onDragEnd={handleDragEnd}
                 style={{
                   opacity: draggedIndex === index ? 0.5 : 1,
                   backgroundColor:
                     dragOverIndex === index && draggedIndex !== index
                       ? theme.vars.palette.action.hover
                       : 'transparent',
-                  cursor: 'move',
                 }}
               >
                 {/* 순번 */}
@@ -238,6 +234,7 @@ export default function Table2400EducationForm({
                 <td>
                   <TextField
                     size="small"
+                    multiline
                     value={row.educationCourse || ''}
                     onChange={(e) => onRowChange(index, 'educationCourse', e.target.value)}
                     fullWidth
@@ -245,6 +242,7 @@ export default function Table2400EducationForm({
                       '& .MuiOutlinedInput-root': {
                         fontSize: 14,
                         height: 'auto',
+                        padding: '8px',
                       },
                     }}
                   />
@@ -272,6 +270,7 @@ export default function Table2400EducationForm({
                 <td>
                   <TextField
                     size="small"
+                    multiline
                     value={row.targetCount || ''}
                     onChange={(e) => onRowChange(index, 'targetCount', e.target.value)}
                     fullWidth
@@ -279,6 +278,7 @@ export default function Table2400EducationForm({
                       '& .MuiOutlinedInput-root': {
                         fontSize: 14,
                         height: 'auto',
+                        padding: '8px',
                       },
                     }}
                   />
@@ -287,6 +287,7 @@ export default function Table2400EducationForm({
                 <td>
                   <TextField
                     size="small"
+                    multiline
                     value={row.educationMethod || ''}
                     onChange={(e) => onRowChange(index, 'educationMethod', e.target.value)}
                     fullWidth
@@ -294,6 +295,7 @@ export default function Table2400EducationForm({
                       '& .MuiOutlinedInput-root': {
                         fontSize: 14,
                         height: 'auto',
+                        padding: '8px',
                       },
                     }}
                   />
@@ -302,6 +304,7 @@ export default function Table2400EducationForm({
                 <td>
                   <TextField
                     size="small"
+                    multiline
                     value={row.remark || ''}
                     onChange={(e) => onRowChange(index, 'remark', e.target.value)}
                     fullWidth
@@ -309,6 +312,7 @@ export default function Table2400EducationForm({
                       '& .MuiOutlinedInput-root': {
                         fontSize: 14,
                         height: 'auto',
+                        padding: '8px',
                       },
                     }}
                   />
@@ -318,14 +322,19 @@ export default function Table2400EducationForm({
                   <Box sx={{ display: 'flex', justifyContent: 'center', px: 1 }}>
                     <IconButton
                       size="small"
+                      draggable
+                      onDragStart={() => handleDragStart(index)}
+                      onDragEnd={handleDragEnd}
                       sx={{
+                        p: 0.625,
                         cursor: 'grab',
                         '&:active': {
                           cursor: 'grabbing',
                         },
                       }}
+                      onMouseDown={(e) => e.stopPropagation()}
                     >
-                      <Iconify icon="eva:more-vertical-fill" width={20} />
+                      <Iconify icon="custom:drag-dots-fill" width={20} />
                     </IconButton>
                   </Box>
                 </td>
@@ -344,6 +353,7 @@ export default function Table2400EducationForm({
                         fontWeight: 700,
                         px: 1,
                         py: 0.5,
+                        width: 23,
                         '&:hover': {
                           bgcolor: 'error.dark',
                         },
@@ -408,6 +418,7 @@ export default function Table2400EducationForm({
                       <td style={{ width: 119 }} rowSpan={rowSpan}>
                         <TextField
                           size="small"
+                          multiline
                           value={row.category || ''}
                           onChange={(e) =>
                             onMinimumEducationRowChange(index, 'category', e.target.value)
@@ -418,6 +429,7 @@ export default function Table2400EducationForm({
                             '& .MuiOutlinedInput-root': {
                               fontSize: 14,
                               height: 'auto',
+                              padding: '8px',
                             },
                           }}
                         />
@@ -426,17 +438,18 @@ export default function Table2400EducationForm({
                       <td style={{ width: 120 }}>
                         <TextField
                           size="small"
+                          multiline
                           value={row.subCategory1 || ''}
                           onChange={(e) =>
                             onMinimumEducationRowChange(index, 'subCategory1', e.target.value)
                           }
                           fullWidth
-                          multiline
                           placeholder="세부"
                           sx={{
                             '& .MuiOutlinedInput-root': {
                               fontSize: 14,
                               height: 'auto',
+                              padding: '8px',
                             },
                           }}
                         />
@@ -445,6 +458,7 @@ export default function Table2400EducationForm({
                       <td style={{ width: 239 }}>
                         <TextField
                           size="small"
+                          multiline
                           value={row.newEmployeeEducation1 || ''}
                           onChange={(e) =>
                             onMinimumEducationRowChange(
@@ -458,6 +472,7 @@ export default function Table2400EducationForm({
                             '& .MuiOutlinedInput-root': {
                               fontSize: 14,
                               height: 'auto',
+                              padding: '8px',
                             },
                           }}
                         />
@@ -466,6 +481,7 @@ export default function Table2400EducationForm({
                       <td style={{ width: 239 }}>
                         <TextField
                           size="small"
+                          multiline
                           value={row.regularEducation1 || ''}
                           onChange={(e) =>
                             onMinimumEducationRowChange(index, 'regularEducation1', e.target.value)
@@ -475,6 +491,7 @@ export default function Table2400EducationForm({
                             '& .MuiOutlinedInput-root': {
                               fontSize: 14,
                               height: 'auto',
+                              padding: '8px',
                             },
                           }}
                         />
@@ -483,6 +500,7 @@ export default function Table2400EducationForm({
                       <td style={{ width: 239 }}>
                         <TextField
                           size="small"
+                          multiline
                           value={row.workContentChange1 || ''}
                           onChange={(e) =>
                             onMinimumEducationRowChange(index, 'workContentChange1', e.target.value)
@@ -492,6 +510,7 @@ export default function Table2400EducationForm({
                             '& .MuiOutlinedInput-root': {
                               fontSize: 14,
                               height: 'auto',
+                              padding: '8px',
                             },
                           }}
                         />
@@ -500,6 +519,7 @@ export default function Table2400EducationForm({
                       <td style={{ width: 263 }}>
                         <TextField
                           size="small"
+                          multiline
                           value={row.specialEducation1 || ''}
                           onChange={(e) =>
                             onMinimumEducationRowChange(index, 'specialEducation1', e.target.value)
@@ -509,6 +529,7 @@ export default function Table2400EducationForm({
                             '& .MuiOutlinedInput-root': {
                               fontSize: 14,
                               height: 'auto',
+                              padding: '8px',
                             },
                           }}
                         />
@@ -520,17 +541,18 @@ export default function Table2400EducationForm({
                       <td style={{ width: 120 }}>
                         <TextField
                           size="small"
+                          multiline
                           value={row.subCategory2 || ''}
                           onChange={(e) =>
                             onMinimumEducationRowChange(index, 'subCategory2', e.target.value)
                           }
                           fullWidth
-                          multiline
                           placeholder="세부"
                           sx={{
                             '& .MuiOutlinedInput-root': {
                               fontSize: 14,
                               height: 'auto',
+                              padding: '8px',
                             },
                           }}
                         />
@@ -539,6 +561,7 @@ export default function Table2400EducationForm({
                       <td style={{ width: 239 }}>
                         <TextField
                           size="small"
+                          multiline
                           value={row.newEmployeeEducation2 || ''}
                           onChange={(e) =>
                             onMinimumEducationRowChange(
@@ -552,6 +575,7 @@ export default function Table2400EducationForm({
                             '& .MuiOutlinedInput-root': {
                               fontSize: 14,
                               height: 'auto',
+                              padding: '8px',
                             },
                           }}
                         />
@@ -560,6 +584,7 @@ export default function Table2400EducationForm({
                       <td style={{ width: 239 }}>
                         <TextField
                           size="small"
+                          multiline
                           value={row.regularEducation2 || ''}
                           onChange={(e) =>
                             onMinimumEducationRowChange(index, 'regularEducation2', e.target.value)
@@ -569,6 +594,7 @@ export default function Table2400EducationForm({
                             '& .MuiOutlinedInput-root': {
                               fontSize: 14,
                               height: 'auto',
+                              padding: '8px',
                             },
                           }}
                         />
@@ -577,6 +603,7 @@ export default function Table2400EducationForm({
                       <td style={{ width: 239 }}>
                         <TextField
                           size="small"
+                          multiline
                           value={row.workContentChange2 || ''}
                           onChange={(e) =>
                             onMinimumEducationRowChange(index, 'workContentChange2', e.target.value)
@@ -586,6 +613,7 @@ export default function Table2400EducationForm({
                             '& .MuiOutlinedInput-root': {
                               fontSize: 14,
                               height: 'auto',
+                              padding: '8px',
                             },
                           }}
                         />
@@ -594,6 +622,7 @@ export default function Table2400EducationForm({
                       <td style={{ width: 263 }}>
                         <TextField
                           size="small"
+                          multiline
                           value={row.specialEducation2 || ''}
                           onChange={(e) =>
                             onMinimumEducationRowChange(index, 'specialEducation2', e.target.value)
@@ -603,6 +632,7 @@ export default function Table2400EducationForm({
                             '& .MuiOutlinedInput-root': {
                               fontSize: 14,
                               height: 'auto',
+                              padding: '8px',
                             },
                           }}
                         />
@@ -615,17 +645,18 @@ export default function Table2400EducationForm({
                         <td style={{ width: 120 }}>
                           <TextField
                             size="small"
+                            multiline
                             value={row.subCategory3 || ''}
                             onChange={(e) =>
                               onMinimumEducationRowChange(index, 'subCategory3', e.target.value)
                             }
                             fullWidth
-                            multiline
                             placeholder="세부"
                             sx={{
                               '& .MuiOutlinedInput-root': {
                                 fontSize: 14,
                                 height: 'auto',
+                                padding: '8px',
                               },
                             }}
                           />
@@ -634,6 +665,7 @@ export default function Table2400EducationForm({
                         <td style={{ width: 239 }}>
                           <TextField
                             size="small"
+                            multiline
                             value={row.newEmployeeEducation3 || ''}
                             onChange={(e) =>
                               onMinimumEducationRowChange(
@@ -647,6 +679,7 @@ export default function Table2400EducationForm({
                               '& .MuiOutlinedInput-root': {
                                 fontSize: 14,
                                 height: 'auto',
+                                padding: '8px',
                               },
                             }}
                           />
@@ -655,6 +688,7 @@ export default function Table2400EducationForm({
                         <td style={{ width: 239 }}>
                           <TextField
                             size="small"
+                            multiline
                             value={row.regularEducation3 || ''}
                             onChange={(e) =>
                               onMinimumEducationRowChange(
@@ -668,6 +702,7 @@ export default function Table2400EducationForm({
                               '& .MuiOutlinedInput-root': {
                                 fontSize: 14,
                                 height: 'auto',
+                                padding: '8px',
                               },
                             }}
                           />
@@ -676,6 +711,7 @@ export default function Table2400EducationForm({
                         <td style={{ width: 239 }}>
                           <TextField
                             size="small"
+                            multiline
                             value={row.workContentChange3 || ''}
                             onChange={(e) =>
                               onMinimumEducationRowChange(
@@ -689,6 +725,7 @@ export default function Table2400EducationForm({
                               '& .MuiOutlinedInput-root': {
                                 fontSize: 14,
                                 height: 'auto',
+                                padding: '8px',
                               },
                             }}
                           />
@@ -697,6 +734,7 @@ export default function Table2400EducationForm({
                         <td style={{ width: 263 }}>
                           <TextField
                             size="small"
+                            multiline
                             value={row.specialEducation3 || ''}
                             onChange={(e) =>
                               onMinimumEducationRowChange(
@@ -710,6 +748,7 @@ export default function Table2400EducationForm({
                               '& .MuiOutlinedInput-root': {
                                 fontSize: 14,
                                 height: 'auto',
+                                padding: '8px',
                               },
                             }}
                           />

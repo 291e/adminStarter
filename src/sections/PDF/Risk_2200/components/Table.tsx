@@ -117,11 +117,11 @@ export default function Risk_2200Table({
       case 'COMPLETED':
         return '완료';
       case 'DRAFT':
-        return '작성중';
+        return '결재 진행중';
       case 'IN_PROGRESS':
-        return '진행중';
+        return '결재 대기중';
       case 'PENDING':
-        return '대기중';
+        return '임시 저장';
       default:
         return status || '';
     }
@@ -144,8 +144,16 @@ export default function Risk_2200Table({
     }
   };
 
-  const isAllSelected = rows.length > 0 && selectedIds.length === rows.length;
-  const isIndeterminate = selectedIds.length > 0 && selectedIds.length < rows.length;
+  // 완료되지 않은 문서만 필터링하여 전체 선택 상태 계산
+  const nonCompletedRows = rows.filter((row) => row.status !== 'COMPLETED');
+  const selectedNonCompletedIds = selectedIds.filter((id) => {
+    const row = rows.find((r) => r.id === id);
+    return row && row.status !== 'COMPLETED';
+  });
+  const isAllSelected =
+    nonCompletedRows.length > 0 && selectedNonCompletedIds.length === nonCompletedRows.length;
+  const isIndeterminate =
+    selectedNonCompletedIds.length > 0 && selectedNonCompletedIds.length < nonCompletedRows.length;
 
   return (
     <>
@@ -165,7 +173,27 @@ export default function Risk_2200Table({
                 <Checkbox
                   checked={isAllSelected}
                   indeterminate={isIndeterminate}
-                  onChange={(e) => onSelectAll(e.target.checked)}
+                  onChange={(e) => {
+                    // 완료되지 않은 문서만 선택/해제
+                    const nonCompletedIds = rows
+                      .filter((row) => row.status !== 'COMPLETED')
+                      .map((row) => row.id);
+                    if (e.target.checked) {
+                      // 완료되지 않은 문서만 선택
+                      nonCompletedIds.forEach((id) => {
+                        if (!selectedIds.includes(id)) {
+                          onSelectRow(id);
+                        }
+                      });
+                    } else {
+                      // 완료되지 않은 문서만 해제
+                      nonCompletedIds.forEach((id) => {
+                        if (selectedIds.includes(id)) {
+                          onSelectRow(id);
+                        }
+                      });
+                    }
+                  }}
                   size="small"
                 />
               </TableCell>
@@ -179,6 +207,7 @@ export default function Risk_2200Table({
                   color: 'text.secondary',
                   p: 2,
                 }}
+                align="center"
               >
                 순번
               </TableCell>
@@ -348,6 +377,7 @@ export default function Risk_2200Table({
                   <Checkbox
                     checked={selectedIds.includes(row.id)}
                     onChange={() => onSelectRow(row.id)}
+                    disabled={row.status === 'COMPLETED'}
                     size="small"
                   />
                 </TableCell>
@@ -358,6 +388,7 @@ export default function Risk_2200Table({
                     fontSize: 14,
                     p: 2,
                   }}
+                  align="center"
                 >
                   {row.sequence}
                 </TableCell>
@@ -459,7 +490,7 @@ export default function Risk_2200Table({
                     </Typography>
                   </Box>
                 </TableCell>
-                <TableCell sx={{ width: 86, minWidth: 86, p: 2, textAlign: 'center' }}>
+                <TableCell sx={{ width: 100, minWidth: 100, p: 2, textAlign: 'center' }}>
                   <Badge
                     label={getStatusLabel(row.status)}
                     variant={getStatusVariant(row.status)}
@@ -489,12 +520,9 @@ export default function Risk_2200Table({
                       onClick={() => handleOpenPublishModal(row)}
                       sx={{
                         color: row.published ? 'primary.main' : 'text.secondary',
-                        '&:hover': {
-                          bgcolor: 'action.hover',
-                        },
                       }}
                     >
-                      <Iconify icon={'solar:share-bold' as any} width={20} />
+                      <Iconify icon={'heroicons:user-group-solid' as any} width={20} />
                     </IconButton>
                   </Tooltip>
                 </TableCell>
@@ -533,13 +561,18 @@ export default function Risk_2200Table({
                     }}
                   >
                     {onEdit && (
-                      <MenuItem onClick={() => handleMenuItemClick('edit', row.id)} sx={{ px: 2 }}>
+                      <MenuItem
+                        onClick={() => handleMenuItemClick('edit', row.id)}
+                        disabled={row.status === 'COMPLETED'}
+                        sx={{ px: 2 }}
+                      >
                         수정
                       </MenuItem>
                     )}
                     {onDelete && (
                       <MenuItem
                         onClick={() => handleMenuItemClick('delete', row.id)}
+                        disabled={row.status === 'COMPLETED'}
                         sx={{ color: 'error.main', px: 2 }}
                       >
                         삭제
@@ -572,6 +605,7 @@ export default function Risk_2200Table({
           onConfirm={handlePublishSuccess}
           documentName={selectedPublishRow.documentName}
           documentId={selectedPublishRow.id}
+          writtenAt={selectedPublishRow.writtenAt}
         />
       )}
     </>

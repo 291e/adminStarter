@@ -20,12 +20,7 @@ import Divider from '@mui/material/Divider';
 import Switch from '@mui/material/Switch';
 
 import { Iconify } from 'src/components/iconify';
-import {
-  useUpdateOrganization,
-  useDeactivateOrganization,
-  useSubscribe,
-  useCancelService,
-} from '../hooks/use-organization-api';
+import { useUpdateOrganization, useDeactivateOrganization } from '../hooks/use-organization-api';
 import { useServices } from 'src/sections/ServiceSetting/hooks/use-service-setting-api';
 import DeactivateMemberModal from './DeactivateMemberModal';
 
@@ -131,8 +126,6 @@ export default function EditOrganizationModal({ open, organization, onClose, onU
 
   const updateOrganizationMutation = useUpdateOrganization();
   const deactivateOrganizationMutation = useDeactivateOrganization();
-  const subscribeMutation = useSubscribe();
-  const cancelServiceMutation = useCancelService();
 
   const {
     data: servicesData,
@@ -205,16 +198,13 @@ export default function EditOrganizationModal({ open, organization, onClose, onU
       subscriptionService: derivedSubscriptionId,
       managerName: organization.manager?.memberName || '',
     });
-    setIsActive(organization.status !== 'inactive');
+    setIsActive(organization.isActive === 1 || organization.status === 'active');
     setErrorMessage(null);
     setBusinessNumberError(null);
   }, [open, organization, derivedSubscriptionId]);
 
   const isSubmitting =
-    updateOrganizationMutation.isPending ||
-    deactivateOrganizationMutation.isPending ||
-    subscribeMutation.isPending ||
-    cancelServiceMutation.isPending;
+    updateOrganizationMutation.isPending || deactivateOrganizationMutation.isPending;
 
   const handleChange = (field: keyof EditFormState, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -294,24 +284,15 @@ export default function EditOrganizationModal({ open, organization, onClose, onU
     }
   };
 
+  // 참고: 구독 변경은 빌링키 등록/삭제를 통해 처리됩니다.
+  // 조직 정보 수정에서는 구독 변경을 처리하지 않습니다.
   const syncSubscription = async () => {
-    if (!organization) return;
-    if (formData.subscriptionService === derivedSubscriptionId) {
-      return;
-    }
-
-    if (formData.subscriptionService) {
-      await subscribeMutation.mutateAsync({
-        companyIdx: organization.companyIdx,
-        serviceSettingIdx: Number(formData.subscriptionService),
-      });
-      return;
-    }
-
-    if (derivedSubscriptionId) {
-      await cancelServiceMutation.mutateAsync({
-        companyIdx: organization.companyIdx,
-        serviceSettingIdx: Number(derivedSubscriptionId),
+    // 구독 변경은 SubscriptionService에서 빌링키를 통해 처리됩니다.
+    // 여기서는 구독 정보를 표시만 하고 변경하지 않습니다.
+    if (import.meta.env.DEV) {
+      console.log('📝 [EditOrganizationModal] 구독 변경은 빌링키 등록/삭제를 통해 처리됩니다.', {
+        currentSubscription: derivedSubscriptionId,
+        selectedSubscription: formData.subscriptionService,
       });
     }
   };
@@ -353,6 +334,7 @@ export default function EditOrganizationModal({ open, organization, onClose, onU
           [formData.address, formData.detailAddress].filter(Boolean).join(' ').trim() || undefined,
         phone: formData.phone?.trim() || undefined,
         email: formData.email?.trim() || undefined,
+        isActive: isActive ? 1 : 0,
       });
 
       await syncSubscription();

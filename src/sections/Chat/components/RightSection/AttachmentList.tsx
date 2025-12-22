@@ -38,9 +38,9 @@ export default function AttachmentList({ attachments }: Props) {
         direction="row"
         alignItems="center"
         justifyContent="space-between"
-        sx={{ p: 2, minHeight: 40 }}
+        sx={{ px: 2, py: 1.25, minHeight: 48, bgcolor: '#F4F6F8' }}
       >
-        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+        <Typography variant="overline" sx={{ fontWeight: 700, color: 'text.secondary' }}>
           첨부 파일 ({attachments.length})
         </Typography>
         <IconButton

@@ -24,9 +24,8 @@ export default function ChecklistPagination({
       onPageChange={onChangePage}
       onRowsPerPageChange={onChangeRowsPerPage}
       rowsPerPageOptions={[10, 25, 50, 100]}
-      labelRowsPerPage="페이지당 행 수:"
+      labelRowsPerPage="표시 행 수 :"
       labelDisplayedRows={({ from, to, count: total }) => `${from}-${to} / ${total}`}
     />
   );
 }
-

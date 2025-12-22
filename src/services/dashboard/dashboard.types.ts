@@ -145,6 +145,10 @@ export type MemberProfile = {
   memberThumbnail?: string;
   companyIdx?: number;
   isAccidentFreeWorksite?: 0 | 1; // 무재해 사업장 여부
+  joinedAt?: string | null; // 입사일 (YYYY-MM-DD 또는 ISO 형식)
+  department?: string; // 소속팀
+  position?: string; // 직급
+  isSuperAdmin?: boolean; // 슈퍼관리자 여부
   // ... 기타 필드
 };
 

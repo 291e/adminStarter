@@ -12,6 +12,7 @@ import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Checkbox from '@mui/material/Checkbox';
+import Radio from '@mui/material/Radio';
 import Avatar from '@mui/material/Avatar';
 import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
@@ -26,6 +27,8 @@ import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
 import { useAuthContext } from 'src/auth/hooks/use-auth-context';
 import { useMyInfo } from 'src/sections/Chat/hooks/use-my-info';
 import { getCompanyMembers } from 'src/services/organization/organization.service';
+import { getEducationReports } from 'src/services/education-report/education-report.service';
+import { getOrganizations } from 'src/services/organization/organization.service';
 import type { InvestigationTeamMember } from '../../../types/table-data';
 
 // ----------------------------------------------------------------------
@@ -45,6 +48,8 @@ type Props = {
   onClose: () => void;
   onConfirm: (members: InvestigationTeamMember[]) => void;
   is2400Series?: boolean; // 2400번대 여부
+  isNearMiss?: boolean; // 아차사고 여부 (1명만 선택 가능)
+  isSingleSelect?: boolean; // 1명만 선택 가능 여부 (라디오 버튼 사용)
 };
 
 const getRoleLabel = (role: string): string => {
@@ -79,6 +84,8 @@ export default function InvestigationTeamSelectModal({
   onClose,
   onConfirm,
   is2400Series = false,
+  isNearMiss = false,
+  isSingleSelect = false,
 }: Props) {
   const { user } = useAuthContext();
   const [searchQuery, setSearchQuery] = useState('');
@@ -86,65 +93,175 @@ export default function InvestigationTeamSelectModal({
   const [page, setPage] = useState(1);
   const rowsPerPage = 5;
 
-  // 내 정보 조회 (companyIdx 추출용)
+  // 내 정보 조회 (companyIdx 및 superAdmin 확인용)
   const { data: myInfoData } = useMyInfo();
+
+  // superAdmin 여부 확인 (truthy 값으로 확인하도록 수정)
+  const isSuperAdmin = useMemo(
+    () =>
+      !!(myInfoData as any)?.isSuperAdmin ||
+      !!(myInfoData as any)?.memberSuperAdminInformation ||
+      !!(user as any)?.isSuperAdmin,
+    [myInfoData, user]
+  );
 
   // companyIdx 추출
   const companyIdx = useMemo(() => {
-    if (!myInfoData && !user) return 0;
-
-    const candidates = [
-      (myInfoData as any)?.companyIdx,
-      (myInfoData as any)?.companyIndex,
-      (myInfoData as any)?.company?.companyIdx,
-      (myInfoData as any)?.company?.companyIndex,
-      user?.companyIdx,
-      (user as any)?.companyIndex,
-    ];
-
-    for (const candidate of candidates) {
-      const parsed = Number(candidate);
-      if (!Number.isNaN(parsed) && parsed > 0) {
-        return parsed;
-      }
+    // 1. myInfoData에서 확인
+    if (myInfoData) {
+      const idx =
+        (myInfoData as any).companyIdx ??
+        (myInfoData as any).companyIndex ??
+        (myInfoData as any).company?.companyIdx ??
+        (myInfoData as any).company?.companyIndex;
+      if (idx && !Number.isNaN(Number(idx))) return Number(idx);
     }
+
+    // 2. user(AuthContext)에서 확인
+    if (user) {
+      const idx = (user as any).companyIdx ?? (user as any).companyIndex;
+      if (idx && !Number.isNaN(Number(idx))) return Number(idx);
+    }
+
     return 0;
   }, [myInfoData, user]);
 
-  // 회사 멤버 조회
+  // superAdmin인 경우 모든 조직 목록 조회
+  const { data: organizationsData } = useQuery({
+    queryKey: ['organizations', 'all'],
+    queryFn: () =>
+      getOrganizations({
+        status: 'active',
+        page: 1,
+        pageSize: 1000, // 모든 조직 가져오기
+      }),
+    enabled: open && isSuperAdmin,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // 회사 멤버 조회 (superAdmin이 아닌 경우)
   const { data: membersData, isLoading: isMembersLoading } = useQuery({
     queryKey: ['companyMembers', companyIdx],
     queryFn: () => getCompanyMembers(companyIdx),
-    enabled: open && !!companyIdx,
+    enabled: open && !!companyIdx && !isSuperAdmin,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // superAdmin인 경우 모든 조직의 멤버 조회
+  const { data: allMembersData, isLoading: isAllMembersLoading } = useQuery({
+    queryKey: ['allCompanyMembers', organizationsData],
+    queryFn: async () => {
+      // axios 인터셉터가 평탄화하므로 직접 접근
+      const companyList =
+        (organizationsData as any)?.companyList ||
+        (organizationsData as any)?.body?.companyList ||
+        [];
+      if (!companyList || companyList.length === 0) return { memberList: [] };
+
+      // 모든 조직의 멤버를 병렬로 가져오기
+      const memberPromises = companyList.map((org: any) =>
+        getCompanyMembers(org.companyIdx).catch(() => ({ memberList: [] }))
+      );
+      const memberResults = await Promise.all(memberPromises);
+
+      // 모든 멤버를 하나의 배열로 합치기
+      const allMembers = memberResults.flatMap((result: any) => {
+        const members =
+          result?.memberList ||
+          result?.members ||
+          result?.body?.memberList ||
+          result?.body?.members ||
+          [];
+        return members;
+      });
+
+      return { memberList: allMembers };
+    },
+    enabled: open && isSuperAdmin && !!organizationsData,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // 교육 이수 현황 조회 (2400번대인 경우)
+  const { data: educationReportsData } = useQuery({
+    queryKey: ['educationReports', 'all'],
+    queryFn: () =>
+      getEducationReports({
+        page: 1,
+        pageSize: 10000, // 모든 멤버의 교육 이수 현황 가져오기
+      }),
+    enabled: open && is2400Series,
     staleTime: 5 * 60 * 1000,
   });
 
   // API 데이터에서 멤버 목록 추출 및 매핑
   const invitableMembers: InvitableMember[] = useMemo(() => {
-    if (!membersData) return [];
+    // superAdmin인 경우 모든 멤버, 아닌 경우 해당 회사 멤버
+    const dataSource = isSuperAdmin ? allMembersData : membersData;
+    if (!dataSource) return [];
 
     // axios 인터셉터가 평탄화하므로 body를 거치지 않고 직접 접근
     // 응답 구조: { header: {...}, memberList: [...], totalCount: 4 }
     const rawMembers =
-      (membersData as any).memberList ||
-      (membersData as any).members ||
-      (membersData as any).body?.memberList ||
-      (membersData as any).body?.members ||
+      (dataSource as any).memberList ||
+      (dataSource as any).members ||
+      (dataSource as any).body?.memberList ||
+      (dataSource as any).body?.members ||
       [];
+
+    // 교육 이수 현황 맵 생성 (2400번대인 경우)
+    const educationMap = new Map<number, { completedHours: number; totalHours: number }>();
+    if (is2400Series && educationReportsData) {
+      // axios 인터셉터가 평탄화하므로 직접 접근
+      // getEducationReports는 BaseResponseDto<{ educationReports: [...] }> 형태를 반환
+      // 인터셉터가 평탄화하면 body가 사라지고 educationReports가 최상위로 올라감
+      let educationReports: any[] = [];
+      const data = educationReportsData as any;
+
+      if (Array.isArray(data?.educationReports)) {
+        educationReports = data.educationReports;
+      } else if (Array.isArray(data?.educationReportList)) {
+        educationReports = data.educationReportList;
+      } else if (Array.isArray(data?.body?.educationReports)) {
+        educationReports = data.body.educationReports;
+      } else if (Array.isArray(data?.body?.educationReportList)) {
+        educationReports = data.body.educationReportList;
+      } else if (Array.isArray(data)) {
+        educationReports = data;
+      }
+
+      educationReports.forEach((report: any) => {
+        const memberIdx = report.memberIdx || report.memberInformation?.memberIdx;
+        if (memberIdx) {
+          const completedHours = report.totalEducation || 0;
+          const totalHours = report.standardEducation || 120;
+
+          educationMap.set(memberIdx, {
+            completedHours, // 총 이수 시간
+            totalHours, // 이수 기준 시간
+          });
+        }
+      });
+    }
 
     return rawMembers.map((member: any): InvitableMember => {
       const rawRole = member.memberRole || member.role || '';
+      const memberIdx = member.memberIdx || member.memberIndex || Number(member.id);
+      const educationInfo = educationMap.get(memberIdx);
+
       return {
-        id: member.memberIdx?.toString() || member.memberIndex?.toString() || member.id,
+        id: memberIdx?.toString() || member.id,
         name: member.memberName || member.name,
         department: member.deptName || member.departmentName || member.department || '',
         role: rawRole,
         roleLabel: getRoleLabel(rawRole),
-        completedHours: member.completedHours,
-        totalHours: member.totalHours || 120,
+        // 실제 교육 이수 현황 사용 (2400번대인 경우)
+        completedHours: is2400Series
+          ? (educationInfo?.completedHours ?? 0)
+          : (member.completedHours ?? 0),
+        totalHours: is2400Series ? (educationInfo?.totalHours ?? 120) : member.totalHours || 120,
       };
     });
-  }, [membersData]);
+  }, [membersData, allMembersData, isSuperAdmin, is2400Series, educationReportsData]);
 
   // 검색 필터링
   const filteredMembers = useMemo(
@@ -182,10 +299,19 @@ export default function InvestigationTeamSelectModal({
     }
   };
 
+  // 단일 선택 모드인지 확인 (아차사고 또는 단일 선택 모드)
+  const shouldSingleSelect = isNearMiss || isSingleSelect;
+
   const handleSelect = (id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
+    if (shouldSingleSelect) {
+      // 1명만 선택 가능 (라디오 버튼 방식)
+      setSelectedIds([id]);
+    } else {
+      // 여러 명 선택 가능 (체크박스 방식)
+      setSelectedIds((prev) =>
+        prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+      );
+    }
   };
 
   const handlePageChange = (_: React.ChangeEvent<unknown>, value: number) => {
@@ -226,39 +352,53 @@ export default function InvestigationTeamSelectModal({
           InputProps={{
             endAdornment: (
               <InputAdornment position="end">
-                <Iconify icon="eva:search-fill" width={24} sx={{ color: 'text.disabled' }} />
+                <Iconify icon="eva:search-fill" width={24} sx={{ color: 'primary.main' }} />
               </InputAdornment>
             ),
           }}
           sx={{ mb: 2.75, px: 3 }}
         />
 
-        {isMembersLoading ? (
+        {isMembersLoading || isAllMembersLoading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 6 }}>
             <CircularProgress size={32} />
           </Box>
         ) : (
-          <TableContainer>
+          <TableContainer sx={{ minHeight: 350 }}>
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell
-                    sx={{
-                      bgcolor: 'grey.100',
-                      minWidth: 72,
-                      width: 72,
-                      px: 1,
-                      py: 2,
-                    }}
-                  >
-                    <Checkbox
-                      checked={isAllSelected}
-                      indeterminate={isIndeterminate}
-                      onChange={handleSelectAll}
-                      size="small"
-                      sx={{ p: 1 }}
+                  {!shouldSingleSelect && (
+                    <TableCell
+                      sx={{
+                        bgcolor: 'grey.100',
+                        minWidth: 72,
+                        width: 72,
+                        px: 1,
+                        py: 2,
+                      }}
+                      align="center"
+                    >
+                      <Checkbox
+                        checked={isAllSelected}
+                        indeterminate={isIndeterminate}
+                        onChange={handleSelectAll}
+                        size="small"
+                        sx={{ p: 1 }}
+                      />
+                    </TableCell>
+                  )}
+                  {shouldSingleSelect && (
+                    <TableCell
+                      sx={{
+                        bgcolor: 'grey.100',
+                        minWidth: 72,
+                        width: 72,
+                        px: 1,
+                        py: 2,
+                      }}
                     />
-                  </TableCell>
+                  )}
                   <TableCell
                     sx={{
                       bgcolor: 'grey.100',
@@ -283,7 +423,7 @@ export default function InvestigationTeamSelectModal({
                       py: 2,
                     }}
                   >
-                    소속
+                    소속팀
                   </TableCell>
                   <TableCell
                     sx={{
@@ -318,7 +458,13 @@ export default function InvestigationTeamSelectModal({
               <TableBody>
                 {paginatedMembers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={is2400Series ? 5 : 4} align="center" sx={{ py: 4 }}>
+                    <TableCell
+                      colSpan={
+                        is2400Series ? (shouldSingleSelect ? 4 : 5) : shouldSingleSelect ? 3 : 4
+                      }
+                      align="center"
+                      sx={{ py: 4 }}
+                    >
                       <Typography variant="body2" color="text.secondary">
                         검색 결과가 없습니다.
                       </Typography>
@@ -337,13 +483,22 @@ export default function InvestigationTeamSelectModal({
                           '&:last-child': { borderBottom: 'none' },
                         }}
                       >
-                        <TableCell sx={{ px: 1, py: 2 }}>
-                          <Checkbox
-                            checked={isSelected}
-                            onChange={() => handleSelect(member.id)}
-                            size="small"
-                            sx={{ p: 1 }}
-                          />
+                        <TableCell sx={{ px: 1, py: 2 }} align="center">
+                          {shouldSingleSelect ? (
+                            <Radio
+                              checked={isSelected}
+                              onChange={() => handleSelect(member.id)}
+                              size="small"
+                              sx={{ p: 1 }}
+                            />
+                          ) : (
+                            <Checkbox
+                              checked={isSelected}
+                              onChange={() => handleSelect(member.id)}
+                              size="small"
+                              sx={{ p: 1 }}
+                            />
+                          )}
                         </TableCell>
                         <TableCell sx={{ px: 2, py: 2 }}>
                           <Stack direction="row" spacing={2} alignItems="center">

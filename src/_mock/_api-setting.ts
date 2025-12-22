@@ -4,14 +4,17 @@ import { fSub } from 'src/utils/format-time';
 
 export type ApiSetting = {
   id: string;
+  apiSettingIdx?: number; // API 설정 Index (실제 API 연동 시 사용)
   order: number; // 순번
   registrationDate: string; // 등록일 (YYYY-MM-DD HH:mm:ss)
+  modificationDate?: string; // 수정일 (YYYY-MM-DD HH:mm:ss)
   name: string; // API 이름
   provider: string; // 제공기관
   keyStatus: 'normal' | 'abnormal'; // Key 상태
   lastInterlocked: string; // 최근 연동일 (YYYY-MM-DD)
   expirationDate: string; // 만료일 (YYYY-MM-DD)
   status: 'active' | 'inactive'; // 상태
+  apiUrl?: string; // API URL (상세 조회 시 사용)
 };
 
 const apiNames = [

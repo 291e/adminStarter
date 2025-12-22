@@ -385,10 +385,10 @@ export function JwtSignUpView() {
               />
             </Stack>
 
-            {/* 소속 + 역할 */}
+            {/* 소속팀 + 역할 */}
             <Stack direction="row" spacing={2}>
               <TextField
-                label="소속"
+                label="소속팀"
                 value={invitation.department || ''}
                 disabled
                 fullWidth

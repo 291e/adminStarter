@@ -43,15 +43,13 @@ export type UseLibraryReportResult = {
   totalCount: number;
 };
 
-export function useLibraryReport(
-  allRows: LibraryReport[] = []
-): UseLibraryReportResult {
+export function useLibraryReport(allRows: LibraryReport[] = []): UseLibraryReportResult {
   const [filters, setFilters] = useState<LibraryReportFilters>({
     tab: 'all',
     category: 'all',
     startDate: null,
     endDate: null,
-    searchFilter: 'all',
+    searchFilter: 'title',
     searchValue: '',
   });
   const [page, setPage] = useState<number>(0);
@@ -98,13 +96,13 @@ export function useLibraryReport(
   }, []);
 
   const onSelectAll = useCallback(
-    (
-      rows: Array<{ id?: string; libraryReportIdx?: number | null }>,
-      checked: boolean
-    ) => {
+    (rows: Array<{ id?: string; libraryReportIdx?: number | null }>, checked: boolean) => {
       if (checked) {
         const ids = rows
-          .map((row) => row.id ?? (row.libraryReportIdx !== undefined ? String(row.libraryReportIdx) : null))
+          .map(
+            (row) =>
+              row.id ?? (row.libraryReportIdx !== undefined ? String(row.libraryReportIdx) : null)
+          )
           .filter((value): value is string => Boolean(value));
         setSelectedIds(ids);
       } else {
@@ -129,14 +127,60 @@ export function useLibraryReport(
 
   // 탭별 필터링
   const filteredRows = useMemo(() => {
-    if (filters.tab === 'all') {
-      return allRows;
+    let filtered = allRows;
+
+    // 탭 필터 (활성/비활성)
+    if (filters.tab !== 'all') {
+      filtered = filtered.filter((row) => {
+        const status = row.status ?? (row.isActive === 0 ? 'inactive' : 'active');
+        return status === filters.tab;
+      });
     }
-    return allRows.filter((row) => {
-      const status = row.status ?? (row.isActive === 0 ? 'inactive' : 'active');
-      return status === filters.tab;
-    });
-  }, [allRows, filters.tab]);
+
+    // 카테고리 필터
+    if (filters.category !== 'all') {
+      filtered = filtered.filter((row) => {
+        const categoryName =
+          row.libraryReportCategoryInformation?.name ||
+          (row as any).categoryName ||
+          (row as any).category?.name ||
+          '';
+        return categoryName === filters.category;
+      });
+    }
+
+    // 날짜 필터
+    if (filters.startDate) {
+      filtered = filtered.filter((row) => {
+        const rowDate =
+          row.registrationDate || (row as any).createAt || (row as any).createdAt || '';
+        return rowDate >= filters.startDate!;
+      });
+    }
+    if (filters.endDate) {
+      filtered = filtered.filter((row) => {
+        const rowDate =
+          row.registrationDate || (row as any).createAt || (row as any).createdAt || '';
+        return rowDate <= filters.endDate!;
+      });
+    }
+
+    // 검색 필터 (제목만 검색)
+    if (filters.searchValue) {
+      const searchLower = filters.searchValue.toLowerCase();
+      filtered = filtered.filter((row) => (row.title || '').toLowerCase().includes(searchLower));
+    }
+
+    return filtered;
+  }, [
+    allRows,
+    filters.tab,
+    filters.category,
+    filters.startDate,
+    filters.endDate,
+    filters.searchFilter,
+    filters.searchValue,
+  ]);
 
   // 페이지네이션 적용
   const paginatedRows = useMemo(() => {
@@ -187,4 +231,3 @@ export function useLibraryReport(
     totalCount,
   };
 }
-

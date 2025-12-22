@@ -25,7 +25,7 @@ export default function DocumentSettingTable({ rows, onViewGuide, onViewSample, 
   return (
     <TableContainer
       component={Paper}
-      sx={{ overflowX: 'auto', borderTopLeftRadius: 0, borderTopRightRadius: 0 }}
+      sx={{ overflowX: 'auto', borderTopLeftRadius: 0, borderTopRightRadius: 0, minHeight: 600 }}
     >
       <Table size="small" stickyHeader>
         <TableHead>
