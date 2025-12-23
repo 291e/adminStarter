@@ -100,6 +100,17 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom, onCre
   const getFilteredParticipants = (participants?: ChatParticipantDto[]) =>
     getOtherParticipants(participants);
 
+  // lastMessage가 객체일 경우 text를 추출하는 헬퍼 함수
+  const getLastMessageText = (
+    lastMessage?:
+      | string
+      | { text: string; senderId?: string; translations?: Record<string, string> }
+  ): string => {
+    if (!lastMessage) return '';
+    if (typeof lastMessage === 'string') return lastMessage;
+    return lastMessage.text || '';
+  };
+
   // 챗봇방은 항상 표시 (API 응답에 없어도)
   const chatbotRoom: ChatRoomDto = {
     chatRoomIdx: 0,
@@ -575,7 +586,7 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom, onCre
                           </ListItemAvatar>
                           <ListItemText
                             primary={room.name}
-                            secondary={room.lastMessage}
+                            secondary={getLastMessageText(room.lastMessage)}
                             primaryTypographyProps={{
                               fontSize: 14,
                               fontWeight: 600,
@@ -664,7 +675,7 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom, onCre
                               {room.name}
                             </Typography>
                           }
-                          secondary={room.lastMessage}
+                          secondary={getLastMessageText(room.lastMessage)}
                           secondaryTypographyProps={{
                             fontSize: 12,
                             color: 'text.secondary',

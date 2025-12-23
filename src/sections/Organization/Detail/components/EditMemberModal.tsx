@@ -28,7 +28,7 @@ import dayjs from 'dayjs';
 
 import { Iconify } from 'src/components/iconify';
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
-import { updateMember } from 'src/services/member/member.service';
+import { updateMember, deleteMember } from 'src/services/member/member.service';
 import type { UpdateMemberDto } from 'src/services/member/member.types';
 import type { Member } from 'src/sections/Organization/types/member';
 import { fDateTime } from 'src/utils/format-time';
@@ -40,6 +40,14 @@ type Props = {
   onClose: () => void;
   member: Member | null;
   onUpdated?: () => void;
+  onDeleted?: () => void;
+  currentUserRole?:
+    | 'OPERATOR_MANAGER'
+    | 'MANAGEMENT_SUPERVISOR'
+    | 'SAFETY_MANAGER'
+    | 'WORKER'
+    | null;
+  isSuperAdmin?: boolean;
   organization?: {
     isAccidentFreeWorksite?: number;
     accidentFreeStatus?: string;
@@ -193,8 +201,18 @@ const isAccidentFreeWorksite = (
   return false;
 };
 
-export default function EditMemberModal({ open, onClose, member, onUpdated, organization }: Props) {
+export default function EditMemberModal({
+  open,
+  onClose,
+  member,
+  onUpdated,
+  onDeleted,
+  currentUserRole,
+  isSuperAdmin,
+  organization,
+}: Props) {
   const queryClient = useQueryClient();
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [formData, setFormData] = useState<EditFormState>({
     memberId: '',
     memberName: '',
@@ -292,6 +310,23 @@ export default function EditMemberModal({ open, onClose, member, onUpdated, orga
       setSubmitError(error?.response?.data?.resultMessage || '멤버 수정에 실패했습니다.');
     },
   });
+
+  const deleteMemberMutation = useMutation({
+    mutationFn: (memberIdx: number) => deleteMember(memberIdx),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['organizations'] });
+      queryClient.invalidateQueries({ queryKey: ['organizationDetail'] });
+      queryClient.invalidateQueries({ queryKey: ['companyMembers'] });
+      onDeleted?.();
+      onClose();
+    },
+    onError: (error: any) => {
+      setSubmitError(error?.response?.data?.resultMessage || '멤버 삭제에 실패했습니다.');
+    },
+  });
+
+  // 조직 관리자 또는 슈퍼 어드민인 경우 수정/삭제 가능
+  const canEdit = currentUserRole === 'OPERATOR_MANAGER' || isSuperAdmin === true;
 
   const handleChange =
     (field: keyof EditFormState) =>
@@ -869,10 +904,11 @@ export default function EditMemberModal({ open, onClose, member, onUpdated, orga
         <DialogActions sx={{ px: 3, py: 3, justifyContent: 'space-between' }}>
           <DialogBtn
             variant="outlined"
-            onClick={handleClose}
+            onClick={() => setDeleteConfirmOpen(true)}
+            disabled={!canEdit || deleteMemberMutation.isPending}
             sx={{ color: 'error.main', fontWeight: 700, borderColor: 'transparent' }}
           >
-            삭제
+            {deleteMemberMutation.isPending ? '삭제 중...' : '삭제'}
           </DialogBtn>
           <Stack direction="row" spacing={1.5}>
             <DialogBtn variant="outlined" onClick={handleClose}>
@@ -881,11 +917,46 @@ export default function EditMemberModal({ open, onClose, member, onUpdated, orga
             <DialogBtn
               variant="contained"
               onClick={handleSave}
-              disabled={updateMemberMutation.isPending}
+              disabled={!canEdit || updateMemberMutation.isPending}
             >
               {updateMemberMutation.isPending ? '저장 중...' : '저장'}
             </DialogBtn>
           </Stack>
+        </DialogActions>
+      </Dialog>
+
+      {/* 삭제 확인 다이얼로그 */}
+      <Dialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>회원 삭제</DialogTitle>
+        <DialogContent>
+          <Typography>
+            <strong>{member?.memberName}</strong> 회원을 정말 삭제하시겠습니까?
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            삭제된 회원은 복구할 수 없습니다.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <DialogBtn variant="outlined" onClick={() => setDeleteConfirmOpen(false)}>
+            취소
+          </DialogBtn>
+          <DialogBtn
+            variant="contained"
+            color="error"
+            onClick={() => {
+              if (member) {
+                deleteMemberMutation.mutate(member.memberIdx);
+              }
+              setDeleteConfirmOpen(false);
+            }}
+          >
+            삭제
+          </DialogBtn>
         </DialogActions>
       </Dialog>
     </LocalizationProvider>

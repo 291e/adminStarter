@@ -12,6 +12,7 @@ import type {
   UpdateMyInfoResponse,
   UpdateMemberDto,
   UpdateMemberResponse,
+  DeleteMemberResponse,
   SendMessageDto,
   SendChatbotMessageDto,
   SendHelpMessageDto,
@@ -37,10 +38,7 @@ export async function checkId(params: CheckIdParams): Promise<CheckIdResponse> {
  * POST /member
  */
 export async function createMember(params: CreateMemberDto): Promise<CreateMemberResponse> {
-  const response = await axiosInstance.post<CreateMemberResponse>(
-    endpoints.member.base,
-    params
-  );
+  const response = await axiosInstance.post<CreateMemberResponse>(endpoints.member.base, params);
   return response.data;
 }
 
@@ -82,10 +80,7 @@ export async function getMyInfo(): Promise<GetMyInfoResponse> {
  * PUT /member/my-info
  */
 export async function updateMyInfo(params: UpdateMyInfoDto): Promise<UpdateMyInfoResponse> {
-  const response = await axiosInstance.put<UpdateMyInfoResponse>(
-    endpoints.member.myInfo,
-    params
-  );
+  const response = await axiosInstance.put<UpdateMyInfoResponse>(endpoints.member.myInfo, params);
   return response.data;
 }
 
@@ -144,3 +139,13 @@ export async function updatePushSettings(params: UpdatePushSettingsDto): Promise
   await axiosInstance.patch(endpoints.member.pushSettings, params);
 }
 
+/**
+ * 회원 삭제
+ * DELETE /member/{memberIdx}
+ */
+export async function deleteMember(memberIdx: number): Promise<DeleteMemberResponse> {
+  const response = await axiosInstance.delete<DeleteMemberResponse>(
+    `${endpoints.member.base}/${memberIdx}`
+  );
+  return response.data;
+}

@@ -312,7 +312,7 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
         businessNumber: digitsOnly(formData.businessNumber),
         businessType: businessTypeNumber, // 필수 필드
         representativeName: sanitizeField(formData.representativeName, 100),
-        phone: digitsOnly(formData.representativePhone),
+        phone: formData.representativePhone?.trim() || undefined,
         email: formData.representativeEmail?.trim() || undefined,
         businessCategory: sanitizeField(formData.businessCategory, 100),
         businessItem: sanitizeField(formData.businessItem, 100),

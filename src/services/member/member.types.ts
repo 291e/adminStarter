@@ -155,6 +155,9 @@ export type UpdateMemberDto = {
 // 회원 수정 응답
 export type UpdateMemberResponse = BaseResponseDto<Member>;
 
+// 회원 삭제 응답
+export type DeleteMemberResponse = BaseResponseDto<void>;
+
 // 메시지 전송 요청
 export type SendMessageDto = {
   memberIndexes: number[];

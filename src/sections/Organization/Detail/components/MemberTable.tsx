@@ -19,6 +19,13 @@ type Props = {
   organizationId?: string | number;
   rows?: (Member & { order?: number })[];
   onEdit?: (member: Member) => void;
+  currentUserRole?:
+    | 'OPERATOR_MANAGER'
+    | 'MANAGEMENT_SUPERVISOR'
+    | 'SAFETY_MANAGER'
+    | 'WORKER'
+    | null;
+  isSuperAdmin?: boolean;
 };
 
 // 역할 매핑 함수 (역할은 조직 관리자, 관리 감독자, 안전보건 담당자, 근로자 4개만)
@@ -74,7 +81,15 @@ const getPosition = (member: Member): string => member.position || '-';
 // 소속팀 매핑 함수
 const getDepartment = (member: Member): string => member.department || '-';
 
-export default function MemberTable({ organizationId, rows: initialRows, onEdit }: Props) {
+export default function MemberTable({
+  organizationId,
+  rows: initialRows,
+  onEdit,
+  currentUserRole,
+  isSuperAdmin,
+}: Props) {
+  // 조직 관리자 또는 슈퍼 어드민인 경우 수정 가능
+  const canEdit = currentUserRole === 'OPERATOR_MANAGER' || isSuperAdmin === true;
   // TODO: TanStack Query Hook(useQuery)으로 조직원 초대로 초대받아 회원가입한 멤버 목록 조회
   // const { data: invitedMembers, isLoading, isError } = useQuery({
   //   queryKey: ['organization', organizationId, 'invited-members'],
@@ -178,7 +193,7 @@ export default function MemberTable({ organizationId, rows: initialRows, onEdit 
                 )}
               </TableCell>
               <TableCell align="center">
-                <IconButton size="small" onClick={() => onEdit?.(row)}>
+                <IconButton size="small" onClick={() => onEdit?.(row)} disabled={!canEdit}>
                   <Iconify icon="solar:pen-bold" width={20} />
                 </IconButton>
               </TableCell>

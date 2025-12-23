@@ -93,6 +93,17 @@ export default function ShareToChatModal({
     return { normalRooms: normal, groupRooms: group };
   }, [rooms, searchQuery]);
 
+  // lastMessage가 객체일 경우 text를 추출하는 헬퍼 함수
+  const getLastMessageText = (
+    lastMessage?:
+      | string
+      | { text: string; senderId?: string; translations?: Record<string, string> }
+  ): string => {
+    if (!lastMessage) return '';
+    if (typeof lastMessage === 'string') return lastMessage;
+    return lastMessage.text || '';
+  };
+
   const handleToggleRoom = (chatRoomIdx: number) => {
     setSelectedRoomIndices((prev) =>
       prev.includes(chatRoomIdx)
@@ -317,7 +328,7 @@ export default function ShareToChatModal({
                                       </Typography>
                                     }
                                     secondary={
-                                      room.lastMessage && (
+                                      getLastMessageText(room.lastMessage) && (
                                         <Typography
                                           variant="caption"
                                           sx={{
@@ -330,7 +341,7 @@ export default function ShareToChatModal({
                                             mt: 0.5,
                                           }}
                                         >
-                                          {room.lastMessage}
+                                          {getLastMessageText(room.lastMessage)}
                                         </Typography>
                                       )
                                     }
@@ -697,7 +708,7 @@ export default function ShareToChatModal({
                                       </Typography>
                                     }
                                     secondary={
-                                      room.lastMessage && (
+                                      getLastMessageText(room.lastMessage) && (
                                         <Typography
                                           variant="caption"
                                           sx={{
@@ -710,7 +721,7 @@ export default function ShareToChatModal({
                                             mt: 0.5,
                                           }}
                                         >
-                                          {room.lastMessage}
+                                          {getLastMessageText(room.lastMessage)}
                                         </Typography>
                                       )
                                     }

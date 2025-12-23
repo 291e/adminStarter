@@ -13,7 +13,13 @@ export type ChatRoomDto = {
   isGroup: number; // 0 or 1
   createdAt?: string;
   updatedAt?: string;
-  lastMessage?: string;
+  lastMessage?:
+    | string
+    | {
+        text: string;
+        senderId?: string;
+        translations?: Record<string, string>;
+      };
   lastMessageAt?: string;
   lastSenderMemberIdx?: number;
   unreadCount?: number;

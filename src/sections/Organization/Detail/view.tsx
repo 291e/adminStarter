@@ -14,6 +14,7 @@ import { DashboardContent } from 'src/layouts/dashboard';
 import { Iconify } from 'src/components/iconify';
 import { useOrganizationDetail as useOrganizationDetailApi } from 'src/sections/Organization/hooks/use-organization-api';
 import { useOrganizationDetail } from './hooks/use-organization-detail';
+import { useAuthContext } from 'src/auth/hooks/use-auth-context';
 import OrganizationInfo from './components/OrganizationInfo';
 import MemberTabs from './components/MemberTabs';
 import MemberFilters from './components/MemberFilters';
@@ -34,9 +35,19 @@ type Props = {
 export function OrganizationDetailView({ title = '조직 관리', description, sx }: Props) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuthContext();
   const [activeTab, setActiveTab] = useState(0);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
+
+  // 현재 사용자 역할 및 슈퍼 어드민 여부 추출
+  const currentUserRole = (user as any)?.memberRole as
+    | 'OPERATOR_MANAGER'
+    | 'MANAGEMENT_SUPERVISOR'
+    | 'SAFETY_MANAGER'
+    | 'WORKER'
+    | null;
+  const isSuperAdmin = (user as any)?.isSuperAdmin === true || (user as any)?.isSuperAdmin === 1;
 
   const organizationId = id ? parseInt(id, 10) : null;
 
@@ -168,6 +179,8 @@ export function OrganizationDetailView({ title = '조직 관리', description, s
                 <MemberTable
                   organizationId={organizationId?.toString()}
                   rows={logic.filtered}
+                  currentUserRole={currentUserRole}
+                  isSuperAdmin={isSuperAdmin}
                   onEdit={(member) => {
                     setSelectedMember(member);
                     setEditModalOpen(true);
@@ -182,7 +195,12 @@ export function OrganizationDetailView({ title = '조직 관리', description, s
                   }}
                   member={selectedMember}
                   organization={organization}
+                  currentUserRole={currentUserRole}
+                  isSuperAdmin={isSuperAdmin}
                   onUpdated={() => {
+                    // 쿼리 무효화는 모달 내부에서 처리됨
+                  }}
+                  onDeleted={() => {
                     // 쿼리 무효화는 모달 내부에서 처리됨
                   }}
                 />
