@@ -32,6 +32,40 @@ type Props = {
   onInsertRows?: (index: number, newRows: Table1100Row[]) => void;
 };
 
+// 고위험작업별로 행을 그룹화하는 함수
+type GroupedRow = {
+  highRiskWork: string;
+  startIndex: number; // 원본 rows 배열에서의 시작 인덱스
+  rows: Array<{ row: Table1100Row; originalIndex: number }>;
+  rowSpan: number;
+};
+
+function groupRowsByHighRiskWork(rows: Table1100Row[]): GroupedRow[] {
+  const groups: GroupedRow[] = [];
+  let currentGroup: GroupedRow | null = null;
+
+  rows.forEach((row, index) => {
+    const highRiskWork = row.highRiskWork?.trim() || '';
+
+    if (currentGroup && currentGroup.highRiskWork === highRiskWork) {
+      // 같은 고위험작업이면 현재 그룹에 추가
+      currentGroup.rows.push({ row, originalIndex: index });
+      currentGroup.rowSpan += 1;
+    } else {
+      // 다른 고위험작업이면 새 그룹 시작
+      currentGroup = {
+        highRiskWork,
+        startIndex: index,
+        rows: [{ row, originalIndex: index }],
+        rowSpan: 1,
+      };
+      groups.push(currentGroup);
+    }
+  });
+
+  return groups;
+}
+
 export default function Table1100Form({
   rows,
   onRowChange,
@@ -49,6 +83,9 @@ export default function Table1100Form({
   const [disasterFactorModalOpen, setDisasterFactorModalOpen] = useState(false);
   const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
   const [selectedIndustry, setSelectedIndustry] = useState<string>('');
+
+  // 고위험작업별로 그룹화
+  const groupedRows = useMemo(() => groupRowsByHighRiskWork(rows), [rows]);
 
   // 업종 목록 조회
   const { data: industriesData } = useIndustries();
@@ -171,6 +208,26 @@ export default function Table1100Form({
     handleCloseDisasterFactorModal();
   };
 
+  // 그룹 내 모든 행의 고위험작업 변경
+  const handleGroupHighRiskWorkChange = (group: GroupedRow) => {
+    // 그룹의 첫 번째 행에서 고위험작업 모달 열기
+    handleOpenHighRiskWorkModal(group.startIndex);
+  };
+
+  // 그룹 전체의 고위험작업 업데이트 (모달 확인 시)
+  const handleConfirmGroupHighRiskWork = (selectedItem: HighRiskWorkItem | null) => {
+    if (selectedItem && selectedRowIndex !== null) {
+      // 현재 선택된 행과 같은 그룹의 모든 행 업데이트
+      const currentHighRiskWork = rows[selectedRowIndex]?.highRiskWork;
+      rows.forEach((row, index) => {
+        if (row.highRiskWork === currentHighRiskWork) {
+          onRowChange(index, 'highRiskWork', selectedItem.name);
+        }
+      });
+    }
+    handleCloseHighRiskWorkModal();
+  };
+
   return (
     <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       {/* 업종 드롭다운 (테이블 좌측 위) */}
@@ -244,197 +301,204 @@ export default function Table1100Form({
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, index) => (
-              <tr
-                key={index}
-                onDragOver={(e) => handleDragOver(e, index)}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, index)}
-                onDragEnd={handleDragEnd}
-                style={{
-                  opacity: draggedIndex === index ? 0.5 : 1,
-                  backgroundColor:
-                    dragOverIndex === index && draggedIndex !== index
-                      ? theme.vars.palette.action.hover
-                      : 'transparent',
-                  cursor: 'move',
-                }}
-              >
-                <td>
-                  <Button
-                    variant={row.highRiskWork ? 'text' : 'contained'}
-                    size="medium"
-                    onClick={() => handleOpenHighRiskWorkModal(index)}
-                    sx={{
-                      minHeight: 36,
-                      fontSize: 14,
-                      fontWeight: row.highRiskWork ? 400 : 700,
-                      px: row.highRiskWork ? 1 : 3,
-                      py: 0.75,
-                      justifyContent: 'flex-start',
-                      textTransform: 'none',
-                      textAlign: 'left',
-                      overflow: 'hidden',
-                      maxWidth: 200,
-                    }}
-                  >
-                    {row.highRiskWork || '선택하기'}
-                  </Button>
-                </td>
-                <td>
-                  <Button
-                    variant={row.disasterFactor ? 'text' : 'contained'}
-                    size="medium"
-                    onClick={() => handleOpenDisasterFactorModal(index)}
-                    disabled={!row.highRiskWork}
-                    sx={{
-                      minHeight: 36,
-                      fontSize: 14,
-                      fontWeight: row.disasterFactor ? 400 : 700,
-                      px: row.disasterFactor ? 1 : 3,
-                      py: 0.75,
-                      maxWidth: 361,
-                      justifyContent: 'flex-start',
-                      textTransform: 'none',
-                      textAlign: 'left',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: row.disasterFactor ? 'pre-wrap' : 'nowrap',
-                    }}
-                  >
-                    {row.disasterFactor || '선택하기'}
-                  </Button>
-                </td>
-                <td>
-                  <TextField
-                    size="small"
-                    value={row.workplace}
-                    onChange={(e) => onRowChange(index, 'workplace', e.target.value)}
-                    fullWidth
-                    multiline
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        fontSize: 14,
-                        height: 'auto',
-                        maxWidth: 100,
-                        p: 1,
-                      },
-                      display: 'flex',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                    }}
-                  />
-                </td>
-                <td>
-                  <TextField
-                    size="small"
-                    value={row.machineHazard}
-                    onChange={(e) => onRowChange(index, 'machineHazard', e.target.value)}
-                    fullWidth
-                    multiline
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        fontSize: 14,
-                        height: 'auto',
-                        maxWidth: 160,
-                        p: 1,
-                      },
-                      display: 'flex',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                    }}
-                  />
-                </td>
-                <td>
-                  <TextField
-                    size="small"
-                    value={row.improvementNeeded}
-                    onChange={(e) => onRowChange(index, 'improvementNeeded', e.target.value)}
-                    fullWidth
-                    multiline
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        fontSize: 14,
-                        height: 'auto',
-                        maxWidth: 80,
-                        p: 1,
-                      },
-                      display: 'flex',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                    }}
-                  />
-                </td>
-                <td>
-                  <TextField
-                    size="small"
-                    value={row.remark}
-                    onChange={(e) => onRowChange(index, 'remark', e.target.value)}
-                    fullWidth
-                    multiline
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        fontSize: 14,
-                        height: 'auto',
-                        maxWidth: 110,
-                        p: 1,
-                      },
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      display: 'flex',
-                    }}
-                  />
-                </td>
-                <td>
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      justifyContent: 'center',
-                      px: 1,
-                    }}
-                  >
-                    <IconButton
-                      size="small"
-                      draggable
-                      onDragStart={() => handleDragStart(index)}
-                      onDragEnd={handleDragEnd}
+            {groupedRows.map((group, groupIndex) =>
+              group.rows.map(({ row, originalIndex }, rowIndexInGroup) => (
+                <tr
+                  key={originalIndex}
+                  onDragOver={(e) => handleDragOver(e, originalIndex)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, originalIndex)}
+                  onDragEnd={handleDragEnd}
+                  style={{
+                    opacity: draggedIndex === originalIndex ? 0.5 : 1,
+                    backgroundColor:
+                      dragOverIndex === originalIndex && draggedIndex !== originalIndex
+                        ? theme.vars.palette.action.hover
+                        : 'transparent',
+                    cursor: 'move',
+                  }}
+                >
+                  {/* 그룹의 첫 번째 행에만 고위험작업 셀 렌더링 (rowSpan 적용) */}
+                  {rowIndexInGroup === 0 && (
+                    <td rowSpan={group.rowSpan}>
+                      <Button
+                        variant={row.highRiskWork ? 'text' : 'contained'}
+                        size="medium"
+                        onClick={() => handleOpenHighRiskWorkModal(originalIndex)}
+                        sx={{
+                          minHeight: 36,
+                          fontSize: 14,
+                          fontWeight: row.highRiskWork ? 400 : 700,
+                          px: row.highRiskWork ? 1 : 3,
+                          py: 0.75,
+                          justifyContent: 'flex-start',
+                          textTransform: 'none',
+                          textAlign: 'left',
+                          overflow: 'hidden',
+                          maxWidth: 200,
+                        }}
+                      >
+                        {row.highRiskWork || '선택하기'}
+                      </Button>
+                    </td>
+                  )}
+                  <td>
+                    <Button
+                      variant={row.disasterFactor ? 'text' : 'contained'}
+                      size="medium"
+                      onClick={() => handleOpenDisasterFactorModal(originalIndex)}
+                      disabled={!row.highRiskWork}
                       sx={{
-                        p: 0.625,
-                        cursor: 'grab',
-                        '&:active': {
-                          cursor: 'grabbing',
+                        minHeight: 36,
+                        fontSize: 14,
+                        fontWeight: row.disasterFactor ? 400 : 700,
+                        px: row.disasterFactor ? 1 : 3,
+                        py: 0.75,
+                        maxWidth: 361,
+                        justifyContent: 'flex-start',
+                        textTransform: 'none',
+                        textAlign: 'left',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: row.disasterFactor ? 'pre-wrap' : 'nowrap',
+                      }}
+                    >
+                      {row.disasterFactor || '선택하기'}
+                    </Button>
+                  </td>
+                  <td>
+                    <TextField
+                      size="small"
+                      value={row.workplace}
+                      onChange={(e) => onRowChange(originalIndex, 'workplace', e.target.value)}
+                      fullWidth
+                      multiline
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          fontSize: 14,
+                          height: 'auto',
+                          maxWidth: 100,
+                          p: 1,
+                        },
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                      }}
+                    />
+                  </td>
+                  <td>
+                    <TextField
+                      size="small"
+                      value={row.machineHazard}
+                      onChange={(e) => onRowChange(originalIndex, 'machineHazard', e.target.value)}
+                      fullWidth
+                      multiline
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          fontSize: 14,
+                          height: 'auto',
+                          maxWidth: 160,
+                          p: 1,
+                        },
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                      }}
+                    />
+                  </td>
+                  <td>
+                    <TextField
+                      size="small"
+                      value={row.improvementNeeded}
+                      onChange={(e) =>
+                        onRowChange(originalIndex, 'improvementNeeded', e.target.value)
+                      }
+                      fullWidth
+                      multiline
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          fontSize: 14,
+                          height: 'auto',
+                          maxWidth: 80,
+                          p: 1,
+                        },
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                      }}
+                    />
+                  </td>
+                  <td>
+                    <TextField
+                      size="small"
+                      value={row.remark}
+                      onChange={(e) => onRowChange(originalIndex, 'remark', e.target.value)}
+                      fullWidth
+                      multiline
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          fontSize: 14,
+                          height: 'auto',
+                          maxWidth: 110,
+                          p: 1,
+                        },
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        display: 'flex',
+                      }}
+                    />
+                  </td>
+                  <td>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'center',
+                        px: 1,
+                      }}
+                    >
+                      <IconButton
+                        size="small"
+                        draggable
+                        onDragStart={() => handleDragStart(originalIndex)}
+                        onDragEnd={handleDragEnd}
+                        sx={{
+                          p: 0.625,
+                          cursor: 'grab',
+                          '&:active': {
+                            cursor: 'grabbing',
+                          },
+                        }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                      >
+                        <Iconify icon="custom:drag-dots-fill" width={20} />
+                      </IconButton>
+                    </Box>
+                  </td>
+                  <td>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      onClick={() => onRowDelete(originalIndex)}
+                      sx={{
+                        bgcolor: 'error.main',
+                        color: 'error.contrastText',
+                        minHeight: 30,
+                        fontSize: 13,
+                        fontWeight: 700,
+                        px: 1,
+                        py: 0.5,
+                        width: 23,
+                        '&:hover': {
+                          bgcolor: 'error.dark',
                         },
                       }}
-                      onMouseDown={(e) => e.stopPropagation()}
                     >
-                      <Iconify icon="custom:drag-dots-fill" width={20} />
-                    </IconButton>
-                  </Box>
-                </td>
-                <td>
-                  <Button
-                    variant="contained"
-                    size="small"
-                    onClick={() => onRowDelete(index)}
-                    sx={{
-                      bgcolor: 'error.main',
-                      color: 'error.contrastText',
-                      minHeight: 30,
-                      fontSize: 13,
-                      fontWeight: 700,
-                      px: 1,
-                      py: 0.5,
-                      width: 23,
-                      '&:hover': {
-                        bgcolor: 'error.dark',
-                      },
-                    }}
-                  >
-                    삭제
-                  </Button>
-                </td>
-              </tr>
-            ))}
+                      삭제
+                    </Button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </Box>
       </Box>

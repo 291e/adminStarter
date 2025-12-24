@@ -97,11 +97,11 @@ export default function UpdateCertificationModal({
         setPreviewUrl(null);
       }
 
-      setExistingFileUrl(normalizedDefaultFileUrl);
+      setExistingFileUrl(defaultFileUrl ?? null);
       setIsRemovingFile(false);
       setIsDragging(false);
     }
-  }, [open, defaultCertifiedAt, normalizedDefaultFileUrl]);
+  }, [open, defaultCertifiedAt, normalizedDefaultFileUrl, defaultFileUrl]);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -213,7 +213,8 @@ export default function UpdateCertificationModal({
       }
 
       const params = {
-        accidentFreeStatus: defaultStatus ?? 'APPROVED',
+        isAccidentFreeWorksite: 1,
+        accidentFreeStatus: 'PENDING',
         accidentFreeCertifiedAt: certificationDate ? certificationDate.toISOString() : null,
         accidentFreeExpiresAt: computedExpiresAt ? computedExpiresAt.toISOString() : null,
         accidentFreeFileUrl: accidentFreeFileUrl ?? null,

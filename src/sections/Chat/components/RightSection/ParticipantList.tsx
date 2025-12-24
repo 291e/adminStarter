@@ -16,6 +16,32 @@ import RemoveParticipantModal from './RemoveParticipantModal';
 import InviteParticipantModal from './InviteParticipantModal';
 import type { ChatRoomDto, ChatParticipantDto } from 'src/services/chat/chat.types';
 
+// 역할 한글 맵핑 함수 (EducationDetailModal.tsx 참고)
+const getRoleLabel = (role?: string): string => {
+  if (!role) return '';
+
+  const roleUpper = role.toUpperCase();
+  const roleMap: { [key: string]: string } = {
+    SUPER_ADMIN: '최고 관리자',
+    OPERATOR_MANAGER: '조직 관리자',
+    MANAGEMENT_SUPERVISOR: '관리 감독자',
+    SAFETY_MANAGER: '안전보건 담당자',
+    WORKER: '근로자',
+    ADMIN: '조직 관리자',
+    MEMBER: '근로자',
+    // 소문자 키 (하위 호환성)
+    super_admin: '최고 관리자',
+    operator_manager: '조직 관리자',
+    management_supervisor: '관리 감독자',
+    safety_manager: '안전보건 담당자',
+    worker: '근로자',
+    admin: '조직 관리자',
+    member: '근로자',
+  };
+
+  return roleMap[roleUpper] || roleMap[role] || role;
+};
+
 type Props = {
   room?: ChatRoomDto | null;
   participants: ChatParticipantDto[];
@@ -250,8 +276,9 @@ export default function ParticipantList({ room, participants, onInvite, onRemove
                 >
                   {filteredParticipants[0].name}
                 </Typography>
-                {((filteredParticipants[0] as any)?.position ||
-                  (filteredParticipants[0] as any)?.positionName) && (
+                {(filteredParticipants[0].memberRole ||
+                  filteredParticipants[0].positionName ||
+                  filteredParticipants[0].position) && (
                   <Typography
                     variant="caption"
                     sx={{
@@ -260,8 +287,12 @@ export default function ParticipantList({ room, participants, onInvite, onRemove
                       lineHeight: '18px',
                     }}
                   >
-                    {(filteredParticipants[0] as any)?.positionName ||
-                      (filteredParticipants[0] as any)?.position}
+                    {[
+                      getRoleLabel(filteredParticipants[0].memberRole),
+                      filteredParticipants[0].positionName || filteredParticipants[0].position,
+                    ]
+                      .filter(Boolean)
+                      .join(' / ')}
                   </Typography>
                 )}
               </Stack>
@@ -333,7 +364,9 @@ export default function ParticipantList({ room, participants, onInvite, onRemove
                       >
                         {participant.name}
                       </Typography>
-                      {((participant as any)?.position || (participant as any)?.positionName) && (
+                      {(participant.memberRole ||
+                        participant.positionName ||
+                        participant.position) && (
                         <Typography
                           variant="caption"
                           sx={{
@@ -345,7 +378,12 @@ export default function ParticipantList({ room, participants, onInvite, onRemove
                             whiteSpace: 'nowrap',
                           }}
                         >
-                          {(participant as any)?.positionName || (participant as any)?.position}
+                          {[
+                            getRoleLabel(participant.memberRole),
+                            participant.positionName || participant.position,
+                          ]
+                            .filter(Boolean)
+                            .join(' / ')}
                         </Typography>
                       )}
                     </Stack>

@@ -33,6 +33,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { getEducationDetail } from 'src/services/education-report/education-report.service';
 import { useUserProfile } from '../hooks/use-dashboard-api';
+import { useMyInfo } from 'src/sections/Chat/hooks/use-my-info';
 
 // 역할 한글 맵핑 함수
 const getRoleLabel = (role: string): string => {
@@ -88,6 +89,8 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
 
   // 사용자 프로필 정보 조회 (조직 정보 포함)
   const { data: profileData } = useUserProfile();
+  // 내 정보 조회 (isSuperAdmin 포함)
+  const { data: myInfoData } = useMyInfo();
 
   // 교육 상세 현황 조회
   const {
@@ -202,12 +205,24 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
     if (!joinedAtDayjs) {
       return [{ value: 'current', label: '현재' }];
     }
-    return [
-      { value: 'current', label: '현재' },
-      { value: 'year-1', label: '1년차' },
-      { value: 'year-2', label: '2년차' },
-      { value: 'year-3', label: '3년차' },
-    ];
+
+    const current = dayjs();
+    const diffYears = current.diff(joinedAtDayjs, 'year');
+
+    const options = [{ value: 'current', label: '현재' }];
+
+    // 1년차는 입사 시점부터 시작하므로 항상 포함
+    options.push({ value: 'year-1', label: '1년차' });
+
+    // 2년차, 3년차 등은 경과 연수에 따라 추가 (diff는 소수점 버림이므로 >= 1이면 2년차 진입 상태)
+    if (diffYears >= 1) {
+      options.push({ value: 'year-2', label: '2년차' });
+    }
+    if (diffYears >= 2) {
+      options.push({ value: 'year-3', label: '3년차' });
+    }
+
+    return options;
   }, [joinedAtDayjs]);
 
   // 선택된 연도 범위 계산
@@ -352,9 +367,11 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
                       역할
                     </Typography>
                     <Typography variant="body2" sx={{ fontSize: 14 }}>
-                      {profileData?.header?.isSuccess && profileData?.member?.memberRole
-                        ? getRoleLabel(profileData.member.memberRole) || '-'
-                        : getRoleLabel(user?.role || '') || '-'}
+                      {(myInfoData as any)?.isSuperAdmin
+                        ? '최고관리자'
+                        : profileData?.header?.isSuccess && profileData?.member?.memberRole
+                          ? getRoleLabel(profileData.member.memberRole) || '-'
+                          : getRoleLabel(user?.role || '') || '-'}
                     </Typography>
                   </Stack>
                 </Stack>

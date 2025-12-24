@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
+import { ref, get, query, orderByChild, startAt, endAt } from 'firebase/database';
+import { database } from 'src/config/firebase';
 
 import type { SxProps, Theme } from '@mui/material/styles';
 
@@ -174,6 +176,9 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
         lastSeen: p.lastReadAt,
         online: p.isActive === 1 ? 1 : 0,
         memberRole: p.memberRole, // 원본 memberRole 저장
+        position: p.position,
+        positionName: p.positionName || p.position,
+        department: p.department,
       };
     });
   }, [participantsData]);
@@ -519,6 +524,62 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     });
   }, [participantsFromRoom, currentMemberIdx]);
 
+  // EMERGENCY 타입의 채팅방 찾기
+  const emergencyRoom = useMemo(
+    () => rooms.find((room: any) => room.type === 'EMERGENCY'),
+    [rooms]
+  );
+
+  // 응급 통계 집계 (Firebase 기반)
+  const [emergencyCount, setEmergencyCount] = useState(0);
+
+  useEffect(() => {
+    if (!emergencyRoom?.chatRoomId || !database) return;
+
+    const fetchMonthlyEmergencyCount = async () => {
+      const db = database;
+      if (!db || !emergencyRoom?.chatRoomId) return;
+
+      try {
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime().toString();
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
+          .getTime()
+          .toString();
+
+        const messagesRef = ref(db, `chatRooms/${emergencyRoom.chatRoomId}/messages`);
+        const messagesQuery = query(
+          messagesRef,
+          orderByChild('timestamp'),
+          startAt(startOfMonth),
+          endAt(endOfMonth)
+        );
+
+        const snapshot = await get(messagesQuery);
+        let count = 0;
+        snapshot.forEach((child) => {
+          const val = child.val();
+          if (val.messageType === 'EMERGENCY') {
+            count += 1;
+          }
+        });
+        setEmergencyCount(count);
+      } catch (error) {
+        console.error('Failed to fetch emergency count:', error);
+      }
+    };
+
+    fetchMonthlyEmergencyCount();
+  }, [emergencyRoom?.chatRoomId]);
+
+  const currentEmergencyStats = useMemo(() => {
+    const now = new Date();
+    return {
+      month: now.getMonth() + 1,
+      count: emergencyCount,
+    };
+  }, [emergencyCount]);
+
   // 첨부파일 조회
   const { data: attachmentsData } = useGetAttachments(selectedRoom?.chatRoomIdx || 0);
   const attachments: ChatAttachmentDto[] = useMemo(() => {
@@ -656,7 +717,7 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
                   onMessageInputChange={setMessageInput}
                   onSendMessage={handleSendMessage}
                   emergencyStats={
-                    selectedRoom?.type === 'EMERGENCY' ? { month: 8, count: 3 } : undefined
+                    selectedRoom?.type === 'EMERGENCY' ? currentEmergencyStats : undefined
                   }
                   onFileMessageClick={handleFileMessageClick}
                 />

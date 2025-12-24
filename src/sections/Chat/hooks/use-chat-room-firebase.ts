@@ -22,7 +22,7 @@ export type FirebaseMessage = {
   chatRoomId: string;
   senderMemberIdx: number;
   message: string;
-  messageType: 'TEXT' | 'IMAGE' | 'FILE' | 'SYSTEM';
+  messageType: 'TEXT' | 'IMAGE' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
   signalType?: 'RISK' | 'RESCUE' | 'EVACUATION' | null;
   attachments?: string[] | null;
   sharedDocumentIdx?: number; // FILE 타입 메시지의 공유 문서 인덱스
@@ -213,6 +213,11 @@ export function useChatRoomFirebase({
           });
 
           queryClient.invalidateQueries({ queryKey: ['chatRooms'] });
+          // EMERGENCY 메시지인 경우 대시보드 사고 발생 카운트 최신화
+          if (messageType === 'EMERGENCY') {
+            queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
+            queryClient.invalidateQueries({ queryKey: ['riskReports'] });
+          }
         }
       } catch (error) {
         console.error('Failed to send message:', error);

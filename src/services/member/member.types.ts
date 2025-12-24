@@ -136,6 +136,7 @@ export type UpdateMyInfoResponse = BaseResponseDto<Member>;
 export type UpdateMemberDto = {
   memberId: string; // 필수
   memberName?: string;
+  memberNameOrg?: string; // 원어성명
   memberEmail?: string;
   memberPhone?: string;
   memberAddress?: string;

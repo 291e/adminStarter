@@ -15,6 +15,7 @@ import { Iconify } from 'src/components/iconify';
 import { useOrganizationDetail as useOrganizationDetailApi } from 'src/sections/Organization/hooks/use-organization-api';
 import { useOrganizationDetail } from './hooks/use-organization-detail';
 import { useAuthContext } from 'src/auth/hooks/use-auth-context';
+import { useMyInfo } from 'src/sections/Chat/hooks/use-my-info';
 import OrganizationInfo from './components/OrganizationInfo';
 import MemberTabs from './components/MemberTabs';
 import MemberFilters from './components/MemberFilters';
@@ -36,18 +37,20 @@ export function OrganizationDetailView({ title = '조직 관리', description, s
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuthContext();
+  const { data: myInfo } = useMyInfo();
   const [activeTab, setActiveTab] = useState(0);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
 
   // 현재 사용자 역할 및 슈퍼 어드민 여부 추출
-  const currentUserRole = (user as any)?.memberRole as
+  const currentUserRole = ((myInfo as any)?.memberRole || (user as any)?.memberRole) as
     | 'OPERATOR_MANAGER'
     | 'MANAGEMENT_SUPERVISOR'
     | 'SAFETY_MANAGER'
     | 'WORKER'
     | null;
-  const isSuperAdmin = (user as any)?.isSuperAdmin === true || (user as any)?.isSuperAdmin === 1;
+  const isSuperAdmin =
+    (myInfo as any)?.isSuperAdmin === true || (user as any)?.isSuperAdmin === true;
 
   const organizationId = id ? parseInt(id, 10) : null;
 

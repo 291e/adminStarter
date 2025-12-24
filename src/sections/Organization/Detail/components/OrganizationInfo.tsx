@@ -76,6 +76,31 @@ const numberToBusinessType = (value: number | string | null | undefined): string
   return '';
 };
 
+// 핸드폰 번호 포맷팅 함수
+const formatPhoneNumber = (value: string) => {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+  if (digits.startsWith('02')) {
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 5) return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+    const middle = digits.slice(2, digits.length - 4);
+    const last = digits.slice(-4);
+    return `${digits.slice(0, 2)}-${middle}-${last}`;
+  }
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  const middle = digits.slice(3, digits.length - 4);
+  const last = digits.slice(-4);
+  return `${digits.slice(0, 3)}-${middle}-${last}`;
+};
+
+// 사업자 번호 포맷팅 함수
+const formatBusinessNumber = (value: string) => {
+  const digits = value.replace(/\D/g, '').slice(0, 10);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 5) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`;
+};
+
 type Props = {
   organization: Organization;
   organizationId: number;
@@ -95,6 +120,12 @@ export default function OrganizationInfo({
   const [tabValue, setTabValue] = useState(0);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+
+  // 수정 권한 확인 (슈퍼 어드민 또는 조직 관리자)
+  const canEdit = useMemo(
+    () => myInfo?.isSuperAdmin === true || myInfo?.memberRole === 'OPERATOR_MANAGER',
+    [myInfo]
+  );
 
   // 슈퍼 어드민 여부 확인
   const isSuperAdmin = useMemo(() => myInfo?.isSuperAdmin === true, [myInfo]);
@@ -159,7 +190,15 @@ export default function OrganizationInfo({
   }, [orgData]);
 
   const handleChange = (field: keyof typeof formData, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    let processedValue = value;
+
+    if (field === 'representativePhone') {
+      processedValue = formatPhoneNumber(value);
+    } else if (field === 'businessNumber') {
+      processedValue = formatBusinessNumber(value);
+    }
+
+    setFormData((prev) => ({ ...prev, [field]: processedValue }));
   };
 
   const handleEditClick = () => {
@@ -675,9 +714,11 @@ export default function OrganizationInfo({
                   {updateOrganizationMutation.isPending ? '저장 중...' : '저장'}
                 </DialogBtn>
               ) : (
-                <DialogBtn variant="contained" onClick={handleEditClick}>
-                  조직정보 수정
-                </DialogBtn>
+                canEdit && (
+                  <DialogBtn variant="contained" onClick={handleEditClick}>
+                    조직정보 수정
+                  </DialogBtn>
+                )
               )}
             </Stack>
           </Stack>

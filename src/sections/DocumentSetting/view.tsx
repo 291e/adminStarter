@@ -25,6 +25,9 @@ import EditDocumentSettingModal, {
   type DocumentEditFormData,
 } from './components/EditDocumentSettingModal';
 import type { DocumentSettingItem } from './hooks/use-document-setting';
+import SampleViewModal, {
+  parseSampleUrls,
+} from 'src/sections/PDF/Risk_2200/components/SampleViewModal';
 
 type Props = {
   title?: string;
@@ -36,6 +39,10 @@ export function DocumentSettingView({ title = '문서 설정 관리', sx }: Prop
   const queryClient = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState<DocumentSettingItem | null>(null);
+  const [sampleModalOpen, setSampleModalOpen] = useState(false);
+  const [sampleModalItems, setSampleModalItems] = useState<Array<{ url: string; name: string }>>(
+    []
+  );
 
   // 시스템 수정 Mutation
   const updateSystemMutation = useMutation({
@@ -115,13 +122,16 @@ export function DocumentSettingView({ title = '문서 설정 관리', sx }: Prop
         // 기존 유지된 URL + 새로 업로드된 URL 합치기
         const allSamples = [...data.existingSampleUrls, ...newlyUploadedUrls];
         if (allSamples.length > 0) {
-          // JSON 배열 형태로 저장 (parseSampleUrls에서 지원함)
-          finalSampleUrl = JSON.stringify(allSamples);
+          // 단일 파일: 문자열 그대로, 다중 파일: 콤마 구분 문자열 (가이드와 동일한 형식)
+          finalSampleUrl = allSamples.length === 1 ? allSamples[0] : allSamples.join(',');
         }
       } else if (!isSystem) {
         // 새로 추가된 파일은 없지만 기존 것들 중 유지된 것이 있는 경우
         if (data.existingSampleUrls.length > 0) {
-          finalSampleUrl = JSON.stringify(data.existingSampleUrls);
+          finalSampleUrl =
+            data.existingSampleUrls.length === 1
+              ? data.existingSampleUrls[0]
+              : data.existingSampleUrls.join(',');
         }
       }
 
@@ -264,9 +274,11 @@ export function DocumentSettingView({ title = '문서 설정 관리', sx }: Prop
             }}
             onViewSample={(row) => {
               if (row.sampleUrl) {
-                const fullUrl = getFullFileUrl(row.sampleUrl);
-                if (fullUrl) {
-                  openPopup(fullUrl, 'sample-popup');
+                const samples = parseSampleUrls(row.sampleUrl);
+                if (samples.length > 0) {
+                  // 단일/다중 샘플 모두 모달로 표시
+                  setSampleModalItems(samples);
+                  setSampleModalOpen(true);
                 }
               }
             }}
@@ -288,6 +300,12 @@ export function DocumentSettingView({ title = '문서 설정 관리', sx }: Prop
         onClose={handleCloseEdit}
         onSave={handleSaveEdit}
         initialData={selectedRow}
+      />
+
+      <SampleViewModal
+        open={sampleModalOpen}
+        onClose={() => setSampleModalOpen(false)}
+        samples={sampleModalItems}
       />
     </DashboardContent>
   );

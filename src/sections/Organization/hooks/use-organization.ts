@@ -152,16 +152,9 @@ export function useOrganization(): UseOrganizationResult {
     });
   }, [organizationsData]);
 
-  // 클라이언트 필터링
-  const filteredOrganizations = useMemo(() => {
+  // 클라이언트 필터링 (탭 필터 제외)
+  const baseFiltered = useMemo(() => {
     let result = [...allOrganizations];
-
-    // 상태 필터 (tab)
-    if (tab === 'active') {
-      result = result.filter((org) => org.status === 'active');
-    } else if (tab === 'inactive') {
-      result = result.filter((org) => org.status === 'inactive');
-    }
 
     // 검색 필터 (클라이언트에서 추가 필터링)
     if (filters.searchValue) {
@@ -185,7 +178,21 @@ export function useOrganization(): UseOrganizationResult {
     }
 
     return result;
-  }, [allOrganizations, tab, filters.searchValue, searchField]);
+  }, [allOrganizations, filters.searchValue, searchField]);
+
+  // 클라이언트 필터링 (탭 필터 적용)
+  const filteredOrganizations = useMemo(() => {
+    let result = [...baseFiltered];
+
+    // 상태 필터 (tab)
+    if (tab === 'active') {
+      result = result.filter((org) => org.status === 'active');
+    } else if (tab === 'inactive') {
+      result = result.filter((org) => org.status === 'inactive');
+    }
+
+    return result;
+  }, [baseFiltered, tab]);
 
   // 클라이언트 페이지네이션
   const organizations = useMemo(() => {
@@ -193,20 +200,16 @@ export function useOrganization(): UseOrganizationResult {
     return filteredOrganizations.slice(start, start + rowsPerPage);
   }, [filteredOrganizations, page, rowsPerPage]);
 
-  // 카운트 계산 (필터링된 전체 데이터 기준)
+  // 카운트 계산 (탭 필터가 적용되지 않은 baseFiltered 데이터 기준)
   const counts = useMemo(() => {
-    const active = filteredOrganizations.filter(
-      (org: Organization) => org.status === 'active'
-    ).length;
-    const inactive = filteredOrganizations.filter(
-      (org: Organization) => org.status === 'inactive'
-    ).length;
+    const active = baseFiltered.filter((org: Organization) => org.status === 'active').length;
+    const inactive = baseFiltered.filter((org: Organization) => org.status === 'inactive').length;
     return {
-      all: filteredOrganizations.length,
+      all: baseFiltered.length,
       active,
       inactive,
     };
-  }, [filteredOrganizations]);
+  }, [baseFiltered]);
 
   const total = filteredOrganizations.length;
 

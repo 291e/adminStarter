@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import type { Table1100Row } from '../../types/table-data';
@@ -9,23 +10,69 @@ type Props = { rows?: Table1100Row[] };
 const defaultRows: Table1100Row[] = [
   {
     highRiskWork: '기계⋅설비 정비, 수리, 교체, 청소 등 비정형 작업',
-    disasterFactor:
-      '작업 중 기계⋅기구에 안전장치(방호장치 등) 미설치·미흡·무효화 8대 위험요인\n정비, 수리, 교체 및 청소 등의 작업 시 설비⋅기계의 운전 정지 미실시',
+    disasterFactor: '작업 중 기계⋅기구에 안전장치(방호장치 등) 미설치·미흡·무효화 8대 위험요인',
     workplace: '1공장',
     machineHazard: '프레스',
     improvementNeeded: '안전장치 설치',
     remark: '긴급 조치 필요',
   },
   {
+    highRiskWork: '기계⋅설비 정비, 수리, 교체, 청소 등 비정형 작업',
+    disasterFactor: '정비, 수리, 교체 및 청소 등의 작업 시 설비⋅기계의 운전 정지 미실시',
+    workplace: '1공장',
+    machineHazard: '절단기',
+    improvementNeeded: '작업 절차 수립',
+    remark: '',
+  },
+  {
     highRiskWork: '크레인 취급 작업 (이동식크레인 포함)',
-    disasterFactor:
-      '중량물, 시설 등에 의한 크레인 조작자 시야 미확보 8대 위험요인\n작업자(작업지휘자와 크레인 조작자 등) 간 신호방법 지정·실시 미흡 8대 위험요인',
+    disasterFactor: '중량물, 시설 등에 의한 크레인 조작자 시야 미확보 8대 위험요인',
     workplace: '2공장',
     machineHazard: '크레인',
     improvementNeeded: '신호 방법 표준화',
     remark: '교육 실시',
   },
+  {
+    highRiskWork: '크레인 취급 작업 (이동식크레인 포함)',
+    disasterFactor: '작업자(작업지휘자와 크레인 조작자 등) 간 신호방법 지정·실시 미흡 8대 위험요인',
+    workplace: '2공장',
+    machineHazard: '크레인',
+    improvementNeeded: '신호수 배치',
+    remark: '',
+  },
 ];
+
+// 고위험작업별로 행을 그룹화하는 함수
+type GroupedRow = {
+  highRiskWork: string;
+  rows: Table1100Row[];
+  rowSpan: number;
+};
+
+function groupRowsByHighRiskWork(rows: Table1100Row[]): GroupedRow[] {
+  const groups: GroupedRow[] = [];
+  let currentGroup: GroupedRow | null = null;
+
+  for (const row of rows) {
+    const highRiskWork = row.highRiskWork?.trim() || '';
+
+    if (currentGroup && currentGroup.highRiskWork === highRiskWork) {
+      // 같은 고위험작업이면 현재 그룹에 추가
+      currentGroup.rows.push(row);
+      currentGroup.rowSpan += 1;
+    } else {
+      // 다른 고위험작업이면 새 그룹 시작
+      currentGroup = {
+        highRiskWork,
+        rows: [row],
+        rowSpan: 1,
+      };
+      groups.push(currentGroup);
+    }
+  }
+
+  return groups;
+}
 
 export default function RiskTable_1_1_1100({ rows = defaultRows }: Props) {
   // 빈 행 필터링: 모든 필드가 비어있으면 제외
@@ -38,6 +85,9 @@ export default function RiskTable_1_1_1100({ rows = defaultRows }: Props) {
       row.improvementNeeded?.trim() ||
       row.remark?.trim()
   );
+
+  // 고위험작업별로 그룹화
+  const groupedRows = useMemo(() => groupRowsByHighRiskWork(filteredRows), [filteredRows]);
 
   return (
     <Box sx={{ width: '100%', maxWidth: 1240, mt: 4 }}>
@@ -88,80 +138,85 @@ export default function RiskTable_1_1_1100({ rows = defaultRows }: Props) {
           </tr>
         </thead>
         <tbody>
-          {filteredRows.map((row, index) => (
-            <tr key={index}>
-              <td>
-                <Typography
-                  sx={{
-                    fontSize: 14,
-                    fontWeight: 400,
-                    lineHeight: '22px',
-                    textAlign: 'left',
-                    px: 1,
-                  }}
-                >
-                  {row.highRiskWork}
-                </Typography>
-              </td>
-              <td>
-                <Typography
-                  sx={{
-                    fontSize: 14,
-                    fontWeight: 400,
-                    lineHeight: '22px',
-                    textAlign: 'left',
-                    px: 1,
-                  }}
-                >
-                  {row.disasterFactor}
-                </Typography>
-              </td>
-              <td>
-                <Typography
-                  sx={{
-                    fontSize: 14,
-                    fontWeight: 400,
-                    lineHeight: '22px',
-                  }}
-                >
-                  {row.workplace}
-                </Typography>
-              </td>
-              <td>
-                <Typography
-                  sx={{
-                    fontSize: 14,
-                    fontWeight: 400,
-                    lineHeight: '22px',
-                  }}
-                >
-                  {row.machineHazard}
-                </Typography>
-              </td>
-              <td>
-                <Typography
-                  sx={{
-                    fontSize: 14,
-                    fontWeight: 400,
-                    lineHeight: '22px',
-                  }}
-                >
-                  {row.improvementNeeded}
-                </Typography>
-              </td>
-              <td>
-                <Typography
-                  sx={{
-                    fontSize: 14,
-                    fontWeight: 400,
-                    lineHeight: '22px',
-                  }}
-                >
-                  {row.remark}
-                </Typography>
-              </td>
-            </tr>
-          ))}
+          {groupedRows.map((group, groupIndex) =>
+            group.rows.map((row, rowIndex) => (
+              <tr key={`${groupIndex}-${rowIndex}`}>
+                {/* 그룹의 첫 번째 행에만 고위험작업 셀 렌더링 (rowSpan 적용) */}
+                {rowIndex === 0 && (
+                  <td rowSpan={group.rowSpan}>
+                    <Typography
+                      sx={{
+                        fontSize: 14,
+                        fontWeight: 400,
+                        lineHeight: '22px',
+                        textAlign: 'left',
+                        px: 1,
+                      }}
+                    >
+                      {row.highRiskWork}
+                    </Typography>
+                  </td>
+                )}
+                <td>
+                  <Typography
+                    sx={{
+                      fontSize: 14,
+                      fontWeight: 400,
+                      lineHeight: '22px',
+                      textAlign: 'left',
+                      px: 1,
+                    }}
+                  >
+                    {row.disasterFactor}
+                  </Typography>
+                </td>
+                <td>
+                  <Typography
+                    sx={{
+                      fontSize: 14,
+                      fontWeight: 400,
+                      lineHeight: '22px',
+                    }}
+                  >
+                    {row.workplace}
+                  </Typography>
+                </td>
+                <td>
+                  <Typography
+                    sx={{
+                      fontSize: 14,
+                      fontWeight: 400,
+                      lineHeight: '22px',
+                    }}
+                  >
+                    {row.machineHazard}
+                  </Typography>
+                </td>
+                <td>
+                  <Typography
+                    sx={{
+                      fontSize: 14,
+                      fontWeight: 400,
+                      lineHeight: '22px',
+                    }}
+                  >
+                    {row.improvementNeeded}
+                  </Typography>
+                </td>
+                <td>
+                  <Typography
+                    sx={{
+                      fontSize: 14,
+                      fontWeight: 400,
+                      lineHeight: '22px',
+                    }}
+                  >
+                    {row.remark}
+                  </Typography>
+                </td>
+              </tr>
+            ))
+          )}
         </tbody>
       </Box>
     </Box>

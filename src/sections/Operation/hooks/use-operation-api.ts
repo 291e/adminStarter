@@ -59,10 +59,14 @@ export function useCreateRiskReport() {
         toast.success('위험 보고가 등록되었습니다.');
       }
       queryClient.invalidateQueries({ queryKey: ['riskReports'] });
+      // 대시보드 위험보고 카운트 최신화
+      queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
     },
     onError: (error: any) => {
       const resultMessage =
-        error?.response?.data?.header?.resultMessage || error?.message || '위험 보고 등록에 실패했습니다.';
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '위험 보고 등록에 실패했습니다.';
       toast.error(resultMessage);
     },
   });
@@ -79,10 +83,14 @@ export function useDeleteRiskReport() {
     onSuccess: (_, variables) => {
       toast.success('위험 보고가 삭제되었습니다.');
       queryClient.invalidateQueries({ queryKey: ['riskReports'] });
+      // 대시보드 위험보고 카운트 최신화
+      queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
     },
     onError: (error: any) => {
       const resultMessage =
-        error?.response?.data?.header?.resultMessage || error?.message || '위험 보고 삭제에 실패했습니다.';
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '위험 보고 삭제에 실패했습니다.';
       toast.error(resultMessage);
     },
   });
@@ -104,10 +112,14 @@ export function useUpdateRiskReport() {
       }
       queryClient.invalidateQueries({ queryKey: ['riskReports'] });
       queryClient.invalidateQueries({ queryKey: ['riskReportDetail', variables.riskReportIdx] });
+      // 대시보드 위험보고 카운트 최신화
+      queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
     },
     onError: (error: any) => {
       const resultMessage =
-        error?.response?.data?.header?.resultMessage || error?.message || '위험 보고 수정에 실패했습니다.';
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '위험 보고 수정에 실패했습니다.';
       toast.error(resultMessage);
     },
   });
@@ -128,10 +140,14 @@ export function useCreateRiskReportFromChat() {
         toast.success('채팅 위험 보고가 생성되었습니다.');
       }
       queryClient.invalidateQueries({ queryKey: ['riskReports'] });
+      // 대시보드 위험보고 카운트 최신화
+      queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
     },
     onError: (error: any) => {
       const resultMessage =
-        error?.response?.data?.header?.resultMessage || error?.message || '채팅 위험 보고 생성에 실패했습니다.';
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '채팅 위험 보고 생성에 실패했습니다.';
       toast.error(resultMessage);
     },
   });

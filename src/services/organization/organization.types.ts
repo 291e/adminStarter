@@ -351,6 +351,7 @@ export type GetAccidentFreeResponse = BaseResponseDto<{
 
 // 무재해 인증 정보 수정 요청
 export type UpdateAccidentFreeParams = {
+  isAccidentFreeWorksite?: number;
   accidentFreeStatus: 'PENDING' | 'APPROVED' | 'REJECTED';
   accidentFreeCertifiedAt?: string | null;
   accidentFreeExpiresAt?: string | null;

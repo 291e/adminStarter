@@ -64,8 +64,11 @@ export default function ProfileCard({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
 
+  // 슈퍼어드민 여부 (truthy 값이면 슈퍼어드민)
+  const isSuperAdminFlag = !!isSuperAdmin;
+
   // label을 한글로 변환 (슈퍼어드민이면 '최고관리자')
-  const labelKorean = isSuperAdmin ? '최고관리자' : getRoleLabel(label);
+  const labelKorean = isSuperAdminFlag ? '최고관리자' : getRoleLabel(label);
 
   // 파일 URL을 전체 URL로 변환하는 헬퍼 함수
   const getFullFileUrl = (url: string | null | undefined): string | null => {
@@ -301,16 +304,27 @@ export default function ProfileCard({
             },
           }}
         >
-          {roles.map((role, index) => (
-            <li key={index}>
+          {isSuperAdminFlag ? (
+            <li>
               <Typography
                 variant="body2"
                 sx={{ color: 'text.secondary', fontSize: { xs: 13, sm: 14 } }}
               >
-                {role}
+                최고관리자
               </Typography>
             </li>
-          ))}
+          ) : (
+            roles.map((role, index) => (
+              <li key={index}>
+                <Typography
+                  variant="body2"
+                  sx={{ color: 'text.secondary', fontSize: { xs: 13, sm: 14 } }}
+                >
+                  {role}
+                </Typography>
+              </li>
+            ))
+          )}
         </Box>
 
         {/* 교육이수율 */}

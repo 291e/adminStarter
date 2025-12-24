@@ -55,7 +55,6 @@ export const navData: NavSectionProps['data'] = [
         title: '대시보드',
         path: paths.dashboard.root,
         icon: ICONS.dashboard,
-        deepMatch: true,
       },
     ],
   },

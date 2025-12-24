@@ -302,14 +302,12 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
     }
 
     const sanitizeField = (value: string, maxLen = 100) => value.trim().slice(0, maxLen);
-    const digitsOnly = (value: string | undefined) =>
-      value ? value.replace(/\D/g, '') : undefined;
 
     try {
       setErrorMessage(null);
       const payload = {
         companyName: sanitizeField(formData.companyName, 100),
-        businessNumber: digitsOnly(formData.businessNumber),
+        businessNumber: formData.businessNumber.trim() || undefined,
         businessType: businessTypeNumber, // 필수 필드
         representativeName: sanitizeField(formData.representativeName, 100),
         phone: formData.representativePhone?.trim() || undefined,

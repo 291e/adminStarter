@@ -199,11 +199,13 @@ export default function InviteParticipantModal({ open, onClose, onConfirm, room 
     return rawMembers
       .map((member: any): InvitableUser => {
         const rawRole = member.memberRole || member.role || '';
+        // 슈퍼 어드민이면 '최고관리자'로 표시
+        const roleLabel = member.isSuperAdmin ? '최고관리자' : getRoleLabel(rawRole);
         return {
           id: member.memberIdx?.toString() || member.memberIndex?.toString() || member.id,
           name: member.memberName || member.name,
           role: rawRole,
-          roleLabel: getRoleLabel(rawRole), // 한글 역할명
+          roleLabel, // 한글 역할명
           department: member.deptName || member.department || '',
           position: member.positionName || member.position || '',
           avatar: member.memberThumbnail || member.profileImage || '',

@@ -14,6 +14,24 @@ import Avatar from '@mui/material/Avatar';
 import type { Member } from 'src/sections/Organization/types/member';
 import { fDateTime } from 'src/utils/format-time';
 import { Iconify } from 'src/components/iconify';
+import { CONFIG } from 'src/global-config';
+
+// 파일 URL을 전체 URL로 변환하는 헬퍼 함수
+const getFullFileUrl = (url: string | null | undefined): string | null => {
+  if (!url) return null;
+  // 이미 전체 URL인 경우 (http:// 또는 https://로 시작)
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  // base64 데이터 URL인 경우 그대로 반환
+  if (url.startsWith('data:image/')) {
+    return url;
+  }
+  // 상대 경로인 경우 CONFIG.serverUrl과 결합
+  const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
+  const path = url.startsWith('/') ? url : `/${url}`;
+  return `${baseUrl}${path}`;
+};
 
 type Props = {
   organizationId?: string | number;
@@ -154,8 +172,11 @@ export default function MemberTable({
               </TableCell>
               <TableCell>
                 <Stack direction="row" spacing={1.5} alignItems="center">
-                  <Avatar src={row.memberThumbnail} sx={{ width: 32, height: 32 }}>
-                    {row.memberName.charAt(0)}
+                  <Avatar
+                    src={getFullFileUrl(row.memberThumbnail) || undefined}
+                    sx={{ width: 32, height: 32, bgcolor: 'grey.300' }}
+                  >
+                    {row.memberName?.charAt(0) || '?'}
                   </Avatar>
                   <Stack spacing={0.5}>
                     <Typography variant="body2">{row.memberName}</Typography>
@@ -169,7 +190,9 @@ export default function MemberTable({
                 <Typography variant="body2">{getDepartment(row)}</Typography>
               </TableCell>
               <TableCell>
-                <Typography variant="body2">{getRoleLabel(row.memberRole)}</Typography>
+                <Typography variant="body2">
+                  {(row as any).isSuperAdmin ? '최고관리자' : getRoleLabel(row.memberRole)}
+                </Typography>
               </TableCell>
               <TableCell>
                 <Typography variant="body2">{getJobType(row)}</Typography>

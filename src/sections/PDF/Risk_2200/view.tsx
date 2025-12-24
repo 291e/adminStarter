@@ -297,15 +297,9 @@ export function Risk_2200View({ safetyId, title = 'Blank', description, sx }: Pr
     const sampleUrl = itemDetail?.sample || state?.item?.sample;
     if (sampleUrl) {
       const samples = parseSampleUrls(sampleUrl);
-      if (samples.length > 1) {
-        // 여러 개인 경우 모달 표시
+      if (samples.length > 0) {
+        // 단일/다중 샘플 모두 모달로 표시
         setSampleViewModalOpen(true);
-      } else if (samples.length === 1) {
-        // 단일 샘플인 경우 바로 열기
-        const fullUrl = getFullFileUrl(samples[0].url);
-        if (fullUrl) {
-          openPopup(fullUrl, 'sample-popup');
-        }
       }
     } else {
       toast.error('등록된 샘플 파일이 없습니다.');

@@ -303,6 +303,10 @@ export default function EditMemberModal({
       queryClient.invalidateQueries({ queryKey: ['organizations'] });
       queryClient.invalidateQueries({ queryKey: ['organizationDetail'] });
       queryClient.invalidateQueries({ queryKey: ['companyMembers'] });
+      // 교육 현황 관련 쿼리 무효화
+      queryClient.invalidateQueries({ queryKey: ['educationCompletionRate'] });
+      queryClient.invalidateQueries({ queryKey: ['educationDetail'] });
+      queryClient.invalidateQueries({ queryKey: ['educationReports'] });
       onUpdated?.();
       onClose();
     },
@@ -317,6 +321,10 @@ export default function EditMemberModal({
       queryClient.invalidateQueries({ queryKey: ['organizations'] });
       queryClient.invalidateQueries({ queryKey: ['organizationDetail'] });
       queryClient.invalidateQueries({ queryKey: ['companyMembers'] });
+      // 교육 현황 관련 쿼리 무효화
+      queryClient.invalidateQueries({ queryKey: ['educationCompletionRate'] });
+      queryClient.invalidateQueries({ queryKey: ['educationDetail'] });
+      queryClient.invalidateQueries({ queryKey: ['educationReports'] });
       onDeleted?.();
       onClose();
     },
@@ -422,7 +430,7 @@ export default function EditMemberModal({
       memberId: formData.memberId.trim(),
       memberName: formData.memberName.trim() || undefined,
       memberEmail: formData.memberEmail.trim() || undefined,
-      memberPhone: formData.memberPhone.replace(/\D/g, '') || undefined, // 하이픈 제거
+      memberPhone: formData.memberPhone.trim() || undefined,
       memberAddress: formData.memberAddress.trim() || undefined,
       memberAddressDetail: formData.memberAddressDetail.trim() || undefined,
       position: formData.position.trim() || undefined,
@@ -430,6 +438,7 @@ export default function EditMemberModal({
       memberStatus: formData.memberStatus,
       memberRole: formData.memberRole,
       memberThumbnail: formData.memberThumbnail.trim() || undefined,
+      memberNameOrg: formData.memberNameOrg.trim() || undefined,
       ...(formData.password && { password: formData.password }),
       ...(formData.companyIdx && { companyIdx: Number(formData.companyIdx) }),
       ...(formData.companyBranchIdx && { companyBranchIdx: Number(formData.companyBranchIdx) }),
@@ -655,6 +664,14 @@ export default function EditMemberModal({
                 onChange={handleChange('memberName')}
                 error={!!errors.memberName}
                 helperText={errors.memberName}
+                slotProps={{ inputLabel: { shrink: true } }}
+              />
+              <TextField
+                fullWidth
+                label="원어 성명"
+                value={formData.memberNameOrg}
+                onChange={handleChange('memberNameOrg')}
+                placeholder="예: Nguyen Van A"
                 slotProps={{ inputLabel: { shrink: true } }}
               />
               <TextField

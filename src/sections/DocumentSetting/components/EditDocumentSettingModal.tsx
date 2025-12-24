@@ -173,15 +173,18 @@ export default function EditDocumentSettingModal({ open, onClose, onSave, initia
         reader.onloadend = () => {
           newPreviews.push({ url: reader.result as string, name: file.name });
           if (newPreviews.length === formData.sampleFiles.length) {
-            // 기존 서버 샘플 + 새 파일 샘플
-            const existingSamples = parseSampleUrls(initialData?.sampleUrl);
-            setSamplePreviews([...existingSamples, ...newPreviews]);
+            // 현재 유지되고 있는 기존 샘플 URL들을 기반으로 미리보기 생성 (제거된 것은 포함되지 않음)
+            const existingPreviews = formData.existingSampleUrls.map((url) => ({
+              url,
+              name: url.split('/').pop() || '샘플',
+            }));
+            setSamplePreviews([...existingPreviews, ...newPreviews]);
           }
         };
         reader.readAsDataURL(file);
       });
     }
-  }, [formData.sampleFiles, initialData?.sampleUrl]);
+  }, [formData.sampleFiles, formData.existingSampleUrls]);
 
   const handleChange = (field: keyof DocumentEditFormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value as DocumentEditFormData[typeof field] }));
@@ -290,11 +293,15 @@ export default function EditDocumentSettingModal({ open, onClose, onSave, initia
 
   const handleRemoveSample = (index: number) => {
     // 인덱스로 특정 샘플 제거
-    const existingSamples = parseSampleUrls(initialData?.sampleUrl);
-    const existingCount = existingSamples.length;
+    const existingCount = formData.existingSampleUrls.length;
 
     if (index < existingCount) {
-      // 서버에 저장된 샘플 제거 - UI에서만 제거 (저장 시 반영됨)
+      // 서버에 저장된 샘플 제거 - existingSampleUrls에서도 제거
+      const urlToRemove = formData.existingSampleUrls[index];
+      setFormData((prev) => ({
+        ...prev,
+        existingSampleUrls: prev.existingSampleUrls.filter((url) => url !== urlToRemove),
+      }));
       setSamplePreviews((prev) => prev.filter((_, i) => i !== index));
     } else {
       // 새로 추가된 파일 제거

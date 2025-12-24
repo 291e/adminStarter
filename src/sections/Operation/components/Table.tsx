@@ -95,11 +95,12 @@ export default function OperationTable({
         return (
           <Grid key={key} size={{ xs: 12, md: 6 }}>
             <Card
+              onClick={() => onEdit?.(row)}
               sx={{
                 display: 'flex',
                 width: '100%',
                 borderRadius: 2,
-                overflow: 'hidden', // Menu가 Card 밖으로 나올 수 있도록
+                overflow: 'visible', // Menu가 Card 밖으로 나올 수 있도록
                 boxShadow:
                   '0px 0px 2px 0px rgba(145, 158, 171, 0.2), 0px 12px 24px -4px rgba(145, 158, 171, 0.12)',
                 transition: 'box-shadow 0.3s ease, transform 0.3s ease',

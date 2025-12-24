@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect } from 'react';
+import type { ChangeEvent } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
 
 import Stack from '@mui/material/Stack';
@@ -16,7 +17,7 @@ import IconButton from '@mui/material/IconButton';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Alert from '@mui/material/Alert';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import Tooltip from '@mui/material/Tooltip';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
@@ -28,6 +29,13 @@ import { useAccidentFree } from '../../hooks/use-organization-api';
 import AccidentFreeWorkplacePagination from './AccidentFreeWorkplacePagination';
 import UpdateCertificationModal from './UpdateCertificationModal';
 import EditCertificationRecordModal from './EditCertificationRecordModal';
+
+// 적용 연도에서 연도 추출 (예: "2026년" -> 2026)
+const extractYear = (applicationYear: string | undefined): number | null => {
+  if (!applicationYear) return null;
+  const match = applicationYear.match(/(\d{4})년/);
+  return match ? parseInt(match[1], 10) : null;
+};
 
 // ----------------------------------------------------------------------
 
@@ -49,8 +57,6 @@ type Props = {
 };
 
 export default function AccidentFreeWorkplace({ organizationId }: Props) {
-  const [startDate, setStartDate] = useState<Dayjs | null>(null);
-  const [achievementDate, setAchievementDate] = useState<Dayjs | null>(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [uploadedFiles, setUploadedFiles] = useState<{ [key: string]: File | null }>({});
@@ -89,27 +95,76 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
   const accidentFreeCertifiedAt = accidentFreeInfo?.accidentFreeCertifiedAt
     ? dayjs(accidentFreeInfo.accidentFreeCertifiedAt)
     : null;
-  const accidentFreeExpiresAt = accidentFreeInfo?.accidentFreeExpiresAt
-    ? dayjs(accidentFreeInfo.accidentFreeExpiresAt)
-    : null;
   const industrialAccidents = accidentFreeInfo?.industrialAccidentCount || 0;
   const nearMissAccidents = accidentFreeInfo?.nearMissCount || 0;
 
-  // 무재해 시작일 설정 (인증일자 기준)
-  const initialStartDate = useMemo(() => {
-    if (accidentFreeCertifiedAt) {
-      return accidentFreeCertifiedAt;
-    }
-    return null;
-  }, [accidentFreeCertifiedAt]);
+  // 현재 연도 가져오기
+  const currentYear = useMemo(() => new Date().getFullYear(), []);
 
-  // 다음 달성일 설정 (만료일 기준)
-  const initialAchievementDate = useMemo(() => {
-    if (accidentFreeExpiresAt) {
-      return accidentFreeExpiresAt;
-    }
-    return null;
-  }, [accidentFreeExpiresAt]);
+  // 상태 계산 함수
+  const getStatus = useCallback(
+    (record: CertificationRecord): StatusType => {
+      // API 응답의 status 필드가 있으면 우선 사용
+      if (record.status) {
+        const statusUpper = record.status.toUpperCase();
+
+        // PENDING 상태는 항상 검토 대기
+        if (statusUpper === 'PENDING') {
+          return 'pending';
+        }
+
+        // REJECTED 상태는 항상 만료
+        if (statusUpper === 'REJECTED') {
+          return 'expired';
+        }
+
+        // APPROVED인 경우 적용 연도로 유효/만료 판단
+        if (statusUpper === 'APPROVED') {
+          // 적용 연도가 없으면 검토 대기
+          if (!record.applicationYear) {
+            return 'pending';
+          }
+
+          const applicationYearNum = extractYear(record.applicationYear);
+
+          // 적용 연도를 추출할 수 없으면 검토 대기
+          if (applicationYearNum === null) {
+            return 'pending';
+          }
+
+          // 적용 연도가 현재 연도와 같거나 미래이면 유효
+          if (applicationYearNum >= currentYear) {
+            return 'valid';
+          }
+
+          // 적용 연도가 현재 연도보다 과거이면 만료
+          return 'expired';
+        }
+      }
+
+      // status 필드가 없으면 기존 로직 사용
+      // 적용 연도가 없으면 검토 대기
+      if (!record.applicationYear) {
+        return 'pending';
+      }
+
+      const applicationYearNum = extractYear(record.applicationYear);
+
+      // 적용 연도를 추출할 수 없으면 검토 대기
+      if (applicationYearNum === null) {
+        return 'pending';
+      }
+
+      // 적용 연도가 현재 연도와 같거나 미래이면 유효
+      if (applicationYearNum >= currentYear) {
+        return 'valid';
+      }
+
+      // 적용 연도가 현재 연도보다 과거이면 만료
+      return 'expired';
+    },
+    [currentYear]
+  );
 
   // 인증 상태 표시
   const currentStatus = useMemo(() => {
@@ -119,41 +174,6 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
     }
     return null;
   }, [accidentFreeStatus, accidentFreeCertifiedAt]);
-
-  // 무재해 일수 계산 (시작일부터 현재 날짜까지, 단 다음 달성일이 있으면 그 날짜까지만)
-  const accidentFreeDays = useMemo(() => {
-    if (!startDate) return 0;
-
-    // 현재 날짜 (자정으로 정규화)
-    const today = dayjs().startOf('day');
-
-    // 시작일을 자정으로 정규화
-    const normalizedStartDate = startDate.startOf('day');
-
-    // 다음 달성일(만료일)이 있고, 현재 날짜보다 이전이면 만료일까지만 카운트
-    // 다음 달성일이 없거나 현재 날짜보다 이후면 현재 날짜까지 카운트
-    const endDate =
-      accidentFreeExpiresAt && accidentFreeExpiresAt.startOf('day').isBefore(today)
-        ? accidentFreeExpiresAt.startOf('day')
-        : today;
-
-    const days = endDate.diff(normalizedStartDate, 'day');
-    return Math.max(0, days);
-  }, [startDate, accidentFreeExpiresAt]);
-
-  // 시작일 초기화
-  useEffect(() => {
-    if (initialStartDate && !startDate) {
-      setStartDate(initialStartDate);
-    }
-  }, [initialStartDate, startDate]);
-
-  // 다음 달성일 초기화
-  useEffect(() => {
-    if (initialAchievementDate && !achievementDate) {
-      setAchievementDate(initialAchievementDate);
-    }
-  }, [initialAchievementDate, achievementDate]);
 
   // API 응답의 historyList를 CertificationRecord 타입으로 변환
   const certificationRecords: CertificationRecord[] = useMemo(() => {
@@ -212,19 +232,21 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
     return records;
   }, [accidentFreeInfo?.historyList]);
 
+  const isCurrentlyValid = useMemo(() => {
+    if (certificationRecords.length === 0) return false;
+    // 최신 기록 중 하나라도 유효한 상태가 있으면 감면 중으로 판단
+    return certificationRecords.some((record) => getStatus(record) === 'valid');
+  }, [certificationRecords, getStatus]);
+
   const paginatedRecords = certificationRecords.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
 
   const handleChangePage = (newPage: number) => {
     setPage(newPage);
-    // TODO: 페이지 변경 시 TanStack Query로 인증 이력 목록 새로고침
-    // queryClient.invalidateQueries({ queryKey: ['certificationRecords', organizationId, newPage, rowsPerPage] });
   };
 
   const handleChangeRowsPerPage = (rows: number) => {
     setRowsPerPage(rows);
     setPage(0);
-    // TODO: 페이지 크기 변경 시 TanStack Query로 인증 이력 목록 새로고침
-    // queryClient.invalidateQueries({ queryKey: ['certificationRecords', organizationId, page, rows] });
   };
 
   const handleUpdate = () => {
@@ -237,23 +259,6 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
   };
 
   const handleUpdateSave = (data: { certificationDate: Dayjs | null; file: File | null }) => {
-    // TODO: TanStack Query Hook(useMutation)으로 인증 이력 업데이트 API 호출
-    // const updateMutation = useMutation({
-    //   mutationFn: (data: { certificationDate: string; file: File | null }) =>
-    //     updateCertificationRecord(organizationId, data),
-    //   onSuccess: () => {
-    //     queryClient.invalidateQueries({ queryKey: ['certificationRecords', organizationId] });
-    //     // 성공 토스트 메시지 표시
-    //   },
-    //   onError: (error) => {
-    //     console.error('인증 이력 업데이트 실패:', error);
-    //     // 에러 토스트 메시지 표시
-    //   },
-    // });
-    // updateMutation.mutate({
-    //   certificationDate: data.certificationDate?.format('YYYY-MM-DD') || '',
-    //   file: data.file,
-    // });
     console.log('인증 이력 업데이트:', data);
   };
 
@@ -263,101 +268,16 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
     fileInputRefs[recordId]?.click();
   };
 
-  const handleFileSelect = (recordId: string, event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (recordId: string, event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      // TODO: TanStack Query Hook(useMutation)으로 인증서 파일 업로드
-      // const uploadMutation = useMutation({
-      //   mutationFn: (file: File) => uploadCertificateFile(organizationId, recordId, file),
-      //   onSuccess: () => {
-      //     queryClient.invalidateQueries({ queryKey: ['certificationRecords', organizationId] });
-      //   },
-      // });
-      // uploadMutation.mutate(file);
       setUploadedFiles((prev) => ({ ...prev, [recordId]: file }));
       console.log('파일 업로드:', recordId, file.name);
     }
   };
 
   const handleDownload = (recordId: string) => {
-    // TODO: 인증서 파일 다운로드
-    // const downloadMutation = useMutation({
-    //   mutationFn: () => downloadCertificateFile(organizationId, recordId),
-    // });
-    // downloadMutation.mutate();
     console.log('다운로드:', recordId);
-  };
-
-  // 현재 연도 가져오기
-  const currentYear = new Date().getFullYear();
-
-  // 적용 연도에서 연도 추출 (예: "2026년" -> 2026)
-  const extractYear = (applicationYear: string | undefined): number | null => {
-    if (!applicationYear) return null;
-    const match = applicationYear.match(/(\d{4})년/);
-    return match ? parseInt(match[1], 10) : null;
-  };
-
-  // 상태 계산 함수
-  const getStatus = (record: CertificationRecord): StatusType => {
-    // API 응답의 status 필드가 있으면 우선 사용
-    if (record.status) {
-      const statusUpper = record.status.toUpperCase();
-
-      // PENDING 상태는 항상 검토 대기
-      if (statusUpper === 'PENDING') {
-        return 'pending';
-      }
-
-      // REJECTED 상태는 항상 만료
-      if (statusUpper === 'REJECTED') {
-        return 'expired';
-      }
-
-      // APPROVED인 경우 적용 연도로 유효/만료 판단
-      if (statusUpper === 'APPROVED') {
-        // 적용 연도가 없으면 검토 대기
-        if (!record.applicationYear) {
-          return 'pending';
-        }
-
-        const applicationYearNum = extractYear(record.applicationYear);
-
-        // 적용 연도를 추출할 수 없으면 검토 대기
-        if (applicationYearNum === null) {
-          return 'pending';
-        }
-
-        // 적용 연도가 현재 연도와 같거나 미래이면 유효
-        if (applicationYearNum >= currentYear) {
-          return 'valid';
-        }
-
-        // 적용 연도가 현재 연도보다 과거이면 만료
-        return 'expired';
-      }
-    }
-
-    // status 필드가 없으면 기존 로직 사용
-    // 적용 연도가 없으면 검토 대기
-    if (!record.applicationYear) {
-      return 'pending';
-    }
-
-    const applicationYearNum = extractYear(record.applicationYear);
-
-    // 적용 연도를 추출할 수 없으면 검토 대기
-    if (applicationYearNum === null) {
-      return 'pending';
-    }
-
-    // 적용 연도가 현재 연도와 같거나 미래이면 유효
-    if (applicationYearNum >= currentYear) {
-      return 'valid';
-    }
-
-    // 적용 연도가 현재 연도보다 과거이면 만료
-    return 'expired';
   };
 
   // 상태 Badge 렌더링 함수
@@ -413,54 +333,48 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
       <Box bgcolor="grey.50">
         <Stack spacing={3} p={3}>
           {/* 상단 입력 필드 섹션 */}
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
-            {/* 왼쪽 열 */}
-            <Stack spacing={2} sx={{ flex: 1 }}>
-              <Stack direction="row" spacing={2} alignItems="center">
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, minWidth: 100 }}>
-                  무재해 시작일
-                </Typography>
-                <DatePicker
-                  label="시작일"
-                  value={startDate}
-                  onChange={setStartDate}
-                  format="YYYY-MM-DD"
-                  disabled
-                  slotProps={{
-                    textField: {
-                      size: 'small',
-                      sx: {
-                        flex: 1,
-                        bgcolor: 'common.white',
-                        pointerEvents: 'none',
-                        '& .MuiOutlinedInput-root': {
-                          bgcolor: 'common.white',
-                        },
-                      },
-                    },
-                  }}
-                />
+          <Stack spacing={2.5}>
+            {/* 첫 번째 행 - 인증 상태 단독 */}
+            <Stack direction="row" spacing={2} alignItems="center" height={40}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, minWidth: 100 }}>
+                인증 상태
+              </Typography>
+              <Stack direction="row" spacing={1} alignItems="center">
+                {currentStatus ? (
+                  <Chip label={currentStatus} variant="outlined" color="info" size="medium" />
+                ) : accidentFreeStatus === 'PENDING' ? (
+                  renderStatusBadge('pending')
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    인증 정보 없음
+                  </Typography>
+                )}
+                <Tooltip
+                  title={
+                    isCurrentlyValid
+                      ? '무재해 감면 혜택을 받고 있어 업데이트가 불가능합니다.'
+                      : '무재해 인증 정보를 업데이트합니다.'
+                  }
+                  arrow
+                  placement="top"
+                >
+                  <Box component="span" sx={{ display: 'inline-flex' }}>
+                    <IconButton
+                      onClick={handleUpdate}
+                      size="small"
+                      sx={{ color: 'text.secondary' }}
+                      disabled={isCurrentlyValid}
+                    >
+                      <Iconify icon="solar:pen-bold" width={18} />
+                    </IconButton>
+                  </Box>
+                </Tooltip>
               </Stack>
-              <Stack direction="row" spacing={2} alignItems="center" height={40}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, minWidth: 100 }}>
-                  인증 상태
-                </Typography>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  {currentStatus ? (
-                    <Chip label={currentStatus} variant="outlined" color="info" size="medium" />
-                  ) : accidentFreeStatus === 'PENDING' ? (
-                    renderStatusBadge('pending')
-                  ) : (
-                    <Typography variant="body2" color="text.secondary">
-                      인증 정보 없음
-                    </Typography>
-                  )}
-                  <IconButton onClick={handleUpdate} size="small" sx={{ color: 'text.secondary' }}>
-                    <Iconify icon="solar:pen-bold" width={18} />
-                  </IconButton>
-                </Stack>
-              </Stack>
-              <Stack direction="row" spacing={2} alignItems="center">
+            </Stack>
+
+            {/* 두 번째 행 - 산업재해 및 아차사고 나란히 배치 */}
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
+              <Stack direction="row" spacing={2} alignItems="center" sx={{ flex: 1 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, minWidth: 100 }}>
                   산업 재해
                 </Typography>
@@ -481,57 +395,7 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
                   }}
                 />
               </Stack>
-            </Stack>
-
-            {/* 오른쪽 열 */}
-            <Stack spacing={2} sx={{ flex: 1 }}>
-              <Stack direction="row" spacing={2} alignItems="center">
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, minWidth: 100 }}>
-                  무재해 일수
-                </Typography>
-                <TextField
-                  size="small"
-                  value={`${accidentFreeDays}일`}
-                  InputProps={{
-                    readOnly: true,
-                  }}
-                  disabled
-                  sx={{
-                    flex: 1,
-                    bgcolor: 'common.white',
-                    pointerEvents: 'none',
-                    '& .MuiOutlinedInput-root': {
-                      bgcolor: 'common.white',
-                    },
-                  }}
-                />
-              </Stack>
-              <Stack direction="row" spacing={2} alignItems="center">
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, minWidth: 100 }}>
-                  다음 달성일
-                </Typography>
-                <DatePicker
-                  label="달성일"
-                  value={achievementDate}
-                  onChange={setAchievementDate}
-                  format="YYYY-MM-DD"
-                  disabled
-                  slotProps={{
-                    textField: {
-                      size: 'small',
-                      sx: {
-                        flex: 1,
-                        bgcolor: 'common.white',
-                        pointerEvents: 'none',
-                        '& .MuiOutlinedInput-root': {
-                          bgcolor: 'common.white',
-                        },
-                      },
-                    },
-                  }}
-                />
-              </Stack>
-              <Stack direction="row" spacing={2} alignItems="center">
+              <Stack direction="row" spacing={2} alignItems="center" sx={{ flex: 1 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, minWidth: 100 }}>
                   아차 사고
                 </Typography>
@@ -573,9 +437,26 @@ export default function AccidentFreeWorkplace({ organizationId }: Props) {
               <Typography variant="h6" sx={{ fontWeight: 600 }}>
                 인증 이력
               </Typography>
-              <Button variant="contained" onClick={handleUpdate} size="medium">
-                업데이트
-              </Button>
+              <Tooltip
+                title={
+                  isCurrentlyValid
+                    ? '무재해 감면 혜택을 받고 있어 업데이트가 불가능합니다.'
+                    : '무재해 인증 정보를 업데이트합니다.'
+                }
+                arrow
+                placement="top"
+              >
+                <Box component="span" sx={{ display: 'inline-flex' }}>
+                  <Button
+                    variant="contained"
+                    onClick={handleUpdate}
+                    size="medium"
+                    disabled={isCurrentlyValid}
+                  >
+                    업데이트
+                  </Button>
+                </Box>
+              </Tooltip>
             </Box>
 
             <TableContainer

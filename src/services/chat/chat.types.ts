@@ -36,6 +36,10 @@ export type ChatParticipantDto = {
   lastSeen?: string | number;
   online?: number;
   customRoomName?: string; // 참가자별 커스텀 채팅방 이름
+  memberRole?: string;
+  position?: string;
+  positionName?: string;
+  department?: string;
   // 기타 필요한 필드
 };
 

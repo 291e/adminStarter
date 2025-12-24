@@ -217,7 +217,8 @@ export default function EditCertificationRecordModal({
       // 실제 API 호출 (여기서는 전체 수정을 호출하거나, 이력 수정 API가 있다면 그것을 사용)
       await updateAccidentFreeMutation.mutateAsync({
         companyIdx,
-        accidentFreeStatus: (record?.status as any) || 'APPROVED',
+        isAccidentFreeWorksite: 1,
+        accidentFreeStatus: 'PENDING',
         accidentFreeCertifiedAt: certificationDate ? certificationDate.toISOString() : null,
         accidentFreeFileUrl: finalFileUrl ?? null,
       });

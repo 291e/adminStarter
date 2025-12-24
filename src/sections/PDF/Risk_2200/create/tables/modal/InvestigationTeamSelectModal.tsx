@@ -247,13 +247,15 @@ export default function InvestigationTeamSelectModal({
       const rawRole = member.memberRole || member.role || '';
       const memberIdx = member.memberIdx || member.memberIndex || Number(member.id);
       const educationInfo = educationMap.get(memberIdx);
+      // 슈퍼 어드민이면 '최고관리자'로 표시
+      const roleLabel = member.isSuperAdmin ? '최고관리자' : getRoleLabel(rawRole);
 
       return {
         id: memberIdx?.toString() || member.id,
         name: member.memberName || member.name,
         department: member.deptName || member.departmentName || member.department || '',
         role: rawRole,
-        roleLabel: getRoleLabel(rawRole),
+        roleLabel,
         // 실제 교육 이수 현황 사용 (2400번대인 경우)
         completedHours: is2400Series
           ? (educationInfo?.completedHours ?? 0)

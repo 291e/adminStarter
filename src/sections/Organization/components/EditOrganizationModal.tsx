@@ -111,7 +111,6 @@ const formatBusinessNumberValue = (value: string) => {
   return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`;
 };
 
-const digitsOnly = (value?: string) => (value ? value.replace(/\D/g, '') : undefined);
 const sanitizeField = (value?: string, maxLen = 100) =>
   value ? value.trim().slice(0, maxLen) : undefined;
 
@@ -323,7 +322,7 @@ export default function EditOrganizationModal({ open, organization, onClose, onU
         companyIdx: organization.companyIdx,
         companyType: formData.companyType,
         companyName: sanitizeField(formData.companyName),
-        businessNumber: digitsOnly(formData.businessNumber),
+        businessNumber: formData.businessNumber.trim() || undefined,
         businessType:
           typeof businessTypeNumber === 'number' && !Number.isNaN(businessTypeNumber)
             ? businessTypeNumber

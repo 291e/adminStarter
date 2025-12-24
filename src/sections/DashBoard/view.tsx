@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { Theme, SxProps } from '@mui/material/styles';
 
 import Box from '@mui/material/Box';
@@ -19,12 +19,19 @@ import SharedDocumentDetailModal from 'src/sections/Chat/components/SharedDocume
 import {
   usePendingSignatures,
   useSharedDocuments,
-  useAccidentRiskStats,
   useUserProfile,
   useEducationCompletionRate,
 } from './hooks/use-dashboard-api';
+import { useMyInfo } from 'src/sections/Chat/hooks/use-my-info';
 import { useNavigate } from 'react-router';
+import dayjs from 'dayjs';
 import { paths } from 'src/routes/paths';
+
+import { useRiskReports } from 'src/sections/Operation/hooks/use-operation-api';
+import { useGetChatRooms } from 'src/sections/Chat/hooks/use-chat-api';
+import { ref, get, query, orderByChild, startAt, endAt } from 'firebase/database';
+import { database } from 'src/config/firebase';
+import type { RiskReport } from 'src/services/operation/operation.types';
 
 // ----------------------------------------------------------------------
 
@@ -50,35 +57,32 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
   const navigate = useNavigate();
   // 기간 계산 (periodType과 periodValue에 따라 startDate, endDate 계산)
   const getDateRange = () => {
-    const now = new Date();
-    let startDate: Date;
-    let endDate: Date = now;
+    const now = dayjs();
+    let start = dayjs();
+    let end = dayjs();
 
     if (periodType === 'year') {
-      const year = periodValue ? parseInt(periodValue.replace('년', '')) : now.getFullYear();
-      startDate = new Date(year, 0, 1);
-      endDate = new Date(year, 11, 31, 23, 59, 59);
+      const year = periodValue ? parseInt(periodValue.replace('년', '')) : now.year();
+      start = dayjs().year(year).startOf('year');
+      end = dayjs().year(year).endOf('year');
     } else if (periodType === 'month') {
-      const month = periodValue ? parseInt(periodValue.replace('월', '')) - 1 : now.getMonth();
-      const year = now.getFullYear();
-      startDate = new Date(year, month, 1);
-      endDate = new Date(year, month + 1, 0, 23, 59, 59);
+      const month = periodValue ? parseInt(periodValue.replace('월', '')) - 1 : now.month();
+      start = dayjs().month(month).startOf('month');
+      end = dayjs().month(month).endOf('month');
     } else {
       // week
       const week = periodValue ? parseInt(periodValue.replace('주차', '')) : 1;
-      const year = now.getFullYear();
-      const firstDay = new Date(year, 0, 1);
-      const days = (week - 1) * 7;
-      startDate = new Date(firstDay);
-      startDate.setDate(firstDay.getDate() + days);
-      endDate = new Date(startDate);
-      endDate.setDate(startDate.getDate() + 6);
-      endDate.setHours(23, 59, 59);
+      // 해당 연도의 n주차 계산
+      start = dayjs()
+        .startOf('year')
+        .add(week - 1, 'week')
+        .startOf('week');
+      end = start.endOf('week');
     }
 
     return {
-      startDate: startDate.toISOString().split('T')[0],
-      endDate: endDate.toISOString().split('T')[0],
+      startDate: start.format('YYYY-MM-DD'),
+      endDate: end.format('YYYY-MM-DD'),
     };
   };
 
@@ -99,15 +103,69 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
     page: 1,
     pageSize: 1000, // 충분히 큰 값으로 설정하여 전체 데이터 가져오기
   });
-  const {
-    data: riskStatsData,
-    isLoading: riskStatsLoading,
-    error: riskStatsError,
-  } = useAccidentRiskStats({
-    startDate: dateRange.startDate,
-    endDate: dateRange.endDate,
-  });
   const { data: profileData, isLoading: profileLoading, error: profileError } = useUserProfile();
+
+  const { data: reportsData, isLoading: reportsLoading } = useRiskReports({
+    page: 1,
+    pageSize: 1000,
+  });
+
+  const allReports = useMemo(() => (reportsData as any)?.body?.riskReportList || [], [reportsData]);
+
+  // 사고 발생 건수 동기화를 위한 채팅방 및 통계 조회 (Firebase 기반)
+  const { data: chatRoomsData } = useGetChatRooms();
+  const rooms = useMemo(() => {
+    const list =
+      (chatRoomsData as any)?.chatRoomList || (chatRoomsData as any)?.body?.chatRoomList || [];
+    return Array.isArray(list) ? list : [];
+  }, [chatRoomsData]);
+
+  const emergencyRoom = useMemo(() => rooms.find((r: any) => r.type === 'EMERGENCY'), [rooms]);
+
+  const [emergencyCount, setEmergencyCount] = useState(0);
+  const [isEmergencyLoading, setIsEmergencyLoading] = useState(false);
+
+  useEffect(() => {
+    const db = database;
+    if (!emergencyRoom?.chatRoomId || !db) {
+      setEmergencyCount(0);
+      return;
+    }
+
+    const fetchEmergencyCount = async () => {
+      setIsEmergencyLoading(true);
+      try {
+        const start = dayjs(dateRange.startDate).startOf('day').valueOf().toString();
+        const end = dayjs(dateRange.endDate).endOf('day').valueOf().toString();
+
+        const messagesRef = ref(db, `chatRooms/${emergencyRoom.chatRoomId}/messages`);
+        const messagesQuery = query(
+          messagesRef,
+          orderByChild('timestamp'),
+          startAt(start),
+          endAt(end)
+        );
+
+        const snapshot = await get(messagesQuery);
+        let count = 0;
+        snapshot.forEach((child) => {
+          const val = child.val();
+          if (val.messageType === 'EMERGENCY') {
+            count += 1;
+          }
+        });
+        setEmergencyCount(count);
+      } catch (error) {
+        console.error('Failed to fetch emergency count for dashboard:', error);
+      } finally {
+        setIsEmergencyLoading(false);
+      }
+    };
+
+    fetchEmergencyCount();
+  }, [emergencyRoom?.chatRoomId, dateRange.startDate, dateRange.endDate]);
+
+  const { data: myInfoData } = useMyInfo(); // isSuperAdmin 정보 가져오기
   const {
     data: educationData,
     isLoading: educationLoading,
@@ -115,11 +173,10 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
   } = useEducationCompletionRate({ role: user?.role });
 
   // 에러 처리
-  if (pendingError || sharedError || riskStatsError || profileError || educationError) {
+  if (pendingError || sharedError || profileError || educationError) {
     console.error('❌ Dashboard API Errors:', {
       pendingError,
       sharedError,
-      riskStatsError,
       profileError,
       educationError,
     });
@@ -178,16 +235,24 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
     return pendingSignatures.slice(start, start + pendingPageSize);
   }, [pendingSignatures, pendingPage]);
 
-  // 사고·위험 보고 현황 통계 (에러 처리 포함)
-  // totalCount를 사고 발생 건수로 사용
-  const accidentCount =
-    riskStatsData?.header?.isSuccess && riskStatsData?.statistics?.totalCount
-      ? riskStatsData.statistics.totalCount
-      : 0;
-  const riskCount =
-    riskStatsData?.header?.isSuccess && riskStatsData?.statistics?.riskCount
-      ? riskStatsData.statistics.riskCount
-      : 0;
+  // 사고·위험 보고 현황 통계 계산 (클라이언트 사이드 필터링)
+  const { accidentCount, riskCount } = useMemo(() => {
+    const { startDate, endDate } = dateRange;
+    const start = dayjs(startDate).startOf('day');
+    const end = dayjs(endDate).endOf('day');
+
+    // 위험 보고 건수: 해당 기간 내 등록된 전체 위험 보고서 (createAt 기준)
+    const filteredReports = allReports.filter((report: RiskReport) => {
+      if (!report.registeredAt) return false;
+      const regDate = dayjs(report.registeredAt);
+      return regDate.isSameOrAfter(start) && regDate.isSameOrBefore(end);
+    });
+
+    return {
+      accidentCount: emergencyCount,
+      riskCount: filteredReports.length,
+    };
+  }, [allReports, dateRange, emergencyCount]);
 
   // 프로필 정보 (에러 처리 포함)
   const profileName =
@@ -203,6 +268,9 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
       ? profileData.member.memberThumbnail
       : undefined;
   const profileRoles = ['작업 현장 위험요인 파악 및 보고', '사고 발생 시 보고·조사·후속조치']; // TODO: API에서 가져오기
+
+  // 슈퍼 어드민 여부 (myInfoData에서 가져옴 - /member/my-info API)
+  const profileIsSuperAdmin = !!(myInfoData as any)?.isSuperAdmin;
 
   // 교육 이수율 (응답 구조: educationCompletion.completionRate)
   const educationRate =
@@ -268,14 +336,10 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
 
   const handlePeriodTypeChange = (type: 'year' | 'month' | 'week') => {
     setPeriodType(type);
-    // 기간 변경 시 통계 데이터 새로고침
-    queryClient.invalidateQueries({ queryKey: ['riskReportStatistics'] });
   };
 
   const handlePeriodValueChange = (value: string) => {
     setPeriodValue(value);
-    // 기간 값 변경 시 통계 데이터 새로고침
-    queryClient.invalidateQueries({ queryKey: ['riskReportStatistics'] });
   };
 
   const handlePendingPageChange = (page: number) => {
@@ -285,7 +349,12 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
 
   // 로딩 상태
   const isLoading =
-    pendingLoading || sharedLoading || riskStatsLoading || profileLoading || educationLoading;
+    pendingLoading ||
+    sharedLoading ||
+    reportsLoading ||
+    profileLoading ||
+    educationLoading ||
+    isEmergencyLoading;
 
   return (
     <DashboardContent maxWidth="xl" sx={{ width: '100%', height: '100%' }}>
@@ -332,7 +401,7 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
               educationRate={educationRate}
               memberThumbnail={profileThumbnail}
               onViewDetail={handleViewDetail}
-              isSuperAdmin={profileData?.member?.isSuperAdmin}
+              isSuperAdmin={profileIsSuperAdmin}
             />
           </Box>
           <Box sx={{ flex: 1, minWidth: 0, display: 'flex' }}>
