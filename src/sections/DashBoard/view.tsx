@@ -434,7 +434,13 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
             />
           </Box>
           <Box sx={{ flex: 1, minWidth: 0, display: 'flex' }}>
-            <SharedDocumentsCard rows={publicSharedDocuments} onViewAll={handleViewAll} />
+            <SharedDocumentsCard
+              rows={publicSharedDocuments}
+              onViewAll={handleViewAll}
+              onDocumentClick={(doc) => {
+                setSelectedSharedDocumentIdx(doc.sharedDocumentIdx);
+              }}
+            />
           </Box>
         </Stack>
       </Stack>

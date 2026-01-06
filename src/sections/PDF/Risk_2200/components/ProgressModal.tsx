@@ -108,6 +108,14 @@ export default function ProgressModal({
     const detailAny = documentDetail as any;
     const docData = detailAny?.document || detailAny?.body?.document || detailAny?.data?.document;
 
+    // 디버깅: API 응답 구조 확인
+    if (import.meta.env.DEV) {
+      console.log('📄 [ProgressModal] documentDetail:', documentDetail);
+      console.log('📄 [ProgressModal] docData:', docData);
+      console.log('📄 [ProgressModal] docData?.workerSignatureList:', docData?.workerSignatureList);
+      console.log('📄 [ProgressModal] props workerSignatureList:', workerSignatureList);
+    }
+
     // API에서 가져온 서명 목록이 있으면 사용 (없으면 props)
     const effectiveSignatureList: DocumentSignatureInfo[] = docData?.signatureList || signatureList;
     const effectiveWorkerList: WorkerSignatureStatusInfo[] =
@@ -148,8 +156,12 @@ export default function ProgressModal({
         label = '시청중';
       }
 
+      // 두 가지 속성명 모두 지원 (documentWorkerSignatureIdx 또는 workerSignatureIdx)
+      const signatureId =
+        sig.documentWorkerSignatureIdx ?? sig.workerSignatureIdx ?? sig.targetMemberIdx;
+
       return {
-        id: `worker-${sig.workerSignatureIdx}`,
+        id: `worker-${signatureId}`,
         targetMemberIdx: sig.targetMemberIdx,
         name: sig.memberName,
         position: sig.position || '',
@@ -174,6 +186,36 @@ export default function ProgressModal({
   }, [signatureTargets, page]);
 
   const totalPages = Math.ceil(signatureTargets.length / ROWS_PER_PAGE);
+
+  // 진행률 계산 (결재자 > 근로자 서명 우선순위)
+  const { progress, progressLabel, progressColor } = useMemo(() => {
+    const approvalTargets = signatureTargets.filter((t) => t.type === 'approval');
+    const workerTargets = signatureTargets.filter((t) => t.type === 'worker');
+
+    // 결재자가 있으면 결재 기준
+    if (approvalTargets.length > 0) {
+      const completedCount = approvalTargets.filter((t) => t.status === 'completed').length;
+      const progressValue = Math.round((completedCount / approvalTargets.length) * 100);
+      return {
+        progress: progressValue,
+        progressLabel: `결재 진행률: ${completedCount}/${approvalTargets.length}`,
+        progressColor: progressValue === 100 ? 'success' : 'warning',
+      };
+    }
+
+    // 근로자 서명만 있으면 서명 기준
+    if (workerTargets.length > 0) {
+      const signedCount = workerTargets.filter((t) => t.status === 'completed').length;
+      const progressValue = Math.round((signedCount / workerTargets.length) * 100);
+      return {
+        progress: progressValue,
+        progressLabel: `서명 진행률: ${signedCount}/${workerTargets.length}`,
+        progressColor: progressValue === 100 ? 'success' : 'info',
+      };
+    }
+
+    return { progress: 0, progressLabel: '대상자 없음', progressColor: 'default' };
+  }, [signatureTargets]);
 
   const selectedTargets = useMemo(
     () => signatureTargets.filter((target) => selectedIds.includes(target.id)),
@@ -338,6 +380,44 @@ export default function ProgressModal({
                   {approvalDeadline || '2025-10-23'}
                 </Typography>
               </Box>
+            </Box>
+          </Box>
+
+          {/* 진행률 표시 */}
+          <Box sx={{ px: 3, pb: 2 }}>
+            <Box
+              sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}
+            >
+              <Typography variant="subtitle2" sx={{ color: 'text.primary' }}>
+                {progressLabel}
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+                {progress}%
+              </Typography>
+            </Box>
+            <Box
+              sx={{
+                width: '100%',
+                height: 8,
+                bgcolor: 'grey.200',
+                borderRadius: 1,
+                overflow: 'hidden',
+              }}
+            >
+              <Box
+                sx={{
+                  width: `${progress}%`,
+                  height: '100%',
+                  bgcolor:
+                    progressColor === 'success'
+                      ? 'success.main'
+                      : progressColor === 'warning'
+                        ? 'warning.main'
+                        : 'info.main',
+                  borderRadius: 1,
+                  transition: 'width 0.3s ease-in-out',
+                }}
+              />
             </Box>
           </Box>
 

@@ -20,13 +20,25 @@ import { useQueryClient } from '@tanstack/react-query';
 export type FirebaseMessage = {
   id: string;
   chatRoomId: string;
-  senderMemberIdx: number;
+  senderMemberIdx: number | string; // 문자열로 올 수도 있음
+  senderId?: string;
+  senderName?: string;
   message: string;
+  text?: string; // 앱에서 보낸 메시지는 text 필드 사용
   messageType: 'TEXT' | 'IMAGE' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
   signalType?: 'RISK' | 'RESCUE' | 'EVACUATION' | null;
   attachments?: string[] | null;
   sharedDocumentIdx?: number; // FILE 타입 메시지의 공유 문서 인덱스
+  metadata?: {
+    type?: 'rescue_request' | 'evacuation' | 'risk_report' | string;
+    location?: {
+      latitude: number;
+      longitude: number;
+      address?: string;
+    };
+  };
   timestamp: string;
+  createdAt?: number;
   isRead: boolean;
 };
 
@@ -173,11 +185,25 @@ export function useChatRoomFirebase({
         throw new Error('현재 사용자 식별자를 확인할 수 없습니다.');
       }
 
+      // 이미지 메시지인 경우 앱과 동일한 형식으로 메시지 구성
+      // 형식: [이미지]|URL 또는 텍스트와 함께 사용 시 "텍스트 [이미지]|URL"
+      let messageContent = content;
+      if (messageType === 'IMAGE' && attachments && attachments.length > 0) {
+        const imageUrl = attachments[0];
+        if (content.trim()) {
+          // 텍스트가 있으면 함께 보내기
+          messageContent = `${content.trim()} [이미지]|${imageUrl}`;
+        } else {
+          // 이미지만 보내기
+          messageContent = `[이미지]|${imageUrl}`;
+        }
+      }
+
       const messageData: FirebaseMessage = {
         id: messageId,
         chatRoomId,
         senderMemberIdx,
-        message: content,
+        message: messageContent,
         messageType,
         signalType: signalType || null,
         attachments: attachments || null,
@@ -204,7 +230,7 @@ export function useChatRoomFirebase({
           await backupMessage({
             id: messageData.id,
             chatRoomId: messageData.chatRoomId,
-            senderMemberIdx: messageData.senderMemberIdx,
+            senderMemberIdx: Number(messageData.senderMemberIdx),
             message: messageData.message,
             messageType: messageData.messageType,
             signalType: messageData.signalType,

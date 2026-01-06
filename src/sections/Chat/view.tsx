@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { ref, get, query, orderByChild, startAt, endAt } from 'firebase/database';
 import { database } from 'src/config/firebase';
+import { CONFIG } from 'src/global-config';
 
 import type { SxProps, Theme } from '@mui/material/styles';
 
@@ -227,10 +228,13 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
 
     // 일반 채팅방이면 Firebase 메시지 반환
     return firebaseMessages.map((msg) => {
-      const senderInfo = participantLookup.get(msg.senderMemberIdx);
-      const senderName = senderInfo?.name || `사용자 ${msg.senderMemberIdx}`;
+      // senderMemberIdx가 string일 수 있으므로 number로 변환
+      const senderMemberIdxNum = Number(msg.senderMemberIdx);
+      const senderInfo = participantLookup.get(senderMemberIdxNum);
+      // senderName 우선순위: msg.senderName > participantLookup > 기본값
+      const senderName = msg.senderName || senderInfo?.name || `사용자 ${msg.senderMemberIdx}`;
       const avatarUrl = senderInfo?.avatarUrl;
-      const dateValue = parseTimestamp(msg.timestamp);
+      const dateValue = parseTimestamp(msg.timestamp || msg.createdAt?.toString() || '');
       const dateLabel = dateValue ? fDate(dateValue, 'YYYY년 M월 D일') : undefined;
       const timeLabel = dateValue ? fTime(dateValue, 'HH:mm') : msg.timestamp;
 
@@ -238,12 +242,16 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
         id: msg.id,
         sender: senderName,
         avatarUrl,
-        message: msg.message,
+        // message 또는 text 필드 사용
+        message: msg.message || msg.text || '',
         timestamp: timeLabel,
         dateLabel,
-        isOwn: currentMemberIdx === msg.senderMemberIdx,
+        isOwn: currentMemberIdx === senderMemberIdxNum,
         messageType: msg.messageType,
         sharedDocumentIdx: msg.sharedDocumentIdx,
+        attachments: msg.attachments,
+        // metadata 전달 (위치 정보 등)
+        metadata: msg.metadata,
       };
     });
   }, [firebaseMessages, chatbotMessages, isChatbotRoom, participantLookup, currentMemberIdx]);
@@ -308,19 +316,44 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
         setMessageInput('');
 
         // 챗봇 API 호출
-        await sendChatbotMessage({
+        const response = await sendChatbotMessage({
           memberIndexes: [currentMemberIdx],
           message: messageInput.trim(),
         });
 
-        // 챗봇 응답 메시지 (일단 임시로 추가, 나중에 API 응답으로 교체)
-        // TODO: API 응답에서 실제 챗봇 응답을 받아서 추가
+        // API 응답에서 챗봇 응답 메시지 추출
+        const responseData = response as any;
+
+        // 디버깅: 응답 구조 확인
+        if (import.meta.env.DEV) {
+          console.log('🤖 Chatbot API Response:', responseData);
+        }
+
+        let botResponseMessage = '응답을 받지 못했습니다.';
+
+        // 응답 구조에 맞게 메시지 추출
+        // axios 인터셉터가 response.data를 반환하므로 { result: { body: { message } } } 구조
+        if (responseData?.result?.body?.message) {
+          botResponseMessage = responseData.result.body.message;
+        } else if (responseData?.data?.result?.body?.message) {
+          botResponseMessage = responseData.data.result.body.message;
+        } else if (responseData?.body?.message) {
+          botResponseMessage = responseData.body.message;
+        } else if (responseData?.message) {
+          botResponseMessage = responseData.message;
+        }
+
+        if (import.meta.env.DEV) {
+          console.log('🤖 Extracted message:', botResponseMessage);
+        }
+
         const botMessage: ChatbotMessage = {
           id: `chatbot-${Date.now()}-bot`,
           sender: '챗봇',
-          message: '메시지를 전송했습니다. 챗봇 응답은 백엔드에서 처리됩니다.',
+          message: botResponseMessage,
           timestamp: fTime(new Date(), 'HH:mm'),
           dateLabel: fDate(new Date(), 'YYYY년 M월 D일'),
+          avatarUrl: `${CONFIG.assetsDir}/bot.png`,
           isOwn: false,
         };
 
@@ -329,6 +362,18 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
         }, 500);
       } catch (error) {
         console.error('Failed to send chatbot message:', error);
+
+        // 에러 시 에러 메시지 표시
+        const errorMessage: ChatbotMessage = {
+          id: `chatbot-${Date.now()}-error`,
+          sender: '챗봇',
+          message: '메시지 전송 중 오류가 발생했습니다. 다시 시도해주세요.',
+          timestamp: fTime(new Date(), 'HH:mm'),
+          dateLabel: fDate(new Date(), 'YYYY년 M월 D일'),
+          avatarUrl: `${CONFIG.assetsDir}/bot.png`,
+          isOwn: false,
+        };
+        setChatbotMessages((prev) => [...prev, errorMessage]);
       }
       return;
     }
@@ -583,12 +628,11 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
   // 첨부파일 조회
   const { data: attachmentsData } = useGetAttachments(selectedRoom?.chatRoomIdx || 0);
   const attachments: ChatAttachmentDto[] = useMemo(() => {
-    if (!attachmentsData) return [];
-
+    // API에서 가져온 첨부파일
     const rawAttachments =
       (attachmentsData as any)?.attachments || (attachmentsData as any)?.body?.attachments || [];
 
-    return rawAttachments.map(
+    const apiAttachments = rawAttachments.map(
       (att: any): ChatAttachmentDto => ({
         id: att.id || '',
         name: att.name || '',
@@ -597,7 +641,69 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
         createdAt: att.createdAt || '',
       })
     );
-  }, [attachmentsData]);
+
+    // 메시지에서 이미지와 문서 파일 추출
+    const messageAttachments: ChatAttachmentDto[] = [];
+
+    firebaseMessages.forEach((msg) => {
+      // 이미지 메시지 ([이미지]|URL 형식)
+      const imageMatch = msg.message?.match(/\[이미지\]\|(.+)$/);
+      if (imageMatch) {
+        const imageUrl = imageMatch[1].trim();
+        const fileName = imageUrl.split('/').pop() || '이미지';
+        messageAttachments.push({
+          id: `img-${msg.id}`,
+          name: fileName,
+          type: 'image',
+          url: imageUrl,
+          createdAt: msg.timestamp,
+        });
+      }
+
+      // attachments 배열에서 이미지 추출
+      if (msg.attachments && msg.attachments.length > 0) {
+        msg.attachments.forEach((url, idx) => {
+          const fileName = url.split('/').pop() || '첨부파일';
+          const ext = fileName.split('.').pop()?.toLowerCase() || '';
+          const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext);
+
+          messageAttachments.push({
+            id: `att-${msg.id}-${idx}`,
+            name: fileName,
+            type: isImage ? 'image' : ext === 'pdf' ? 'pdf' : 'document',
+            url,
+            createdAt: msg.timestamp,
+          });
+        });
+      }
+
+      // 문서 공유 메시지 (FILE 타입)
+      if (msg.messageType === 'FILE' && msg.sharedDocumentIdx) {
+        messageAttachments.push({
+          id: `doc-${msg.id}`,
+          name: msg.message || `문서 ${msg.sharedDocumentIdx}`,
+          type: 'pdf',
+          url: '', // 공유 문서는 별도 모달로 열람
+          createdAt: msg.timestamp,
+        });
+      }
+    });
+
+    // API 첨부파일 + 메시지에서 추출한 첨부파일 합치기 (최신순 정렬)
+    const allAttachments = [...apiAttachments, ...messageAttachments];
+
+    // 중복 제거 (URL 기준)
+    const uniqueAttachments = allAttachments.filter(
+      (att, idx, arr) => arr.findIndex((a) => a.url === att.url || a.id === att.id) === idx
+    );
+
+    // 최신순 정렬
+    return uniqueAttachments.sort((a, b) => {
+      const dateA = new Date(a.createdAt || 0).getTime();
+      const dateB = new Date(b.createdAt || 0).getTime();
+      return dateB - dateA;
+    });
+  }, [attachmentsData, firebaseMessages]);
 
   const renderContent = () => (
     <Box
@@ -731,6 +837,24 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
                   onInvite={handleInviteParticipant}
                   onRemove={handleRemoveParticipants}
                   attachments={attachments}
+                  onFileClick={(attachment) => {
+                    // 문서 파일인 경우 (doc- 접두사가 있거나 pdf 타입인 경우)
+                    if (attachment.id.startsWith('doc-') && attachment.type === 'pdf') {
+                      // sharedDocumentIdx 추출
+                      const docIdMatch = attachment.id.match(/^doc-(.+)$/);
+                      const msgId = docIdMatch?.[1];
+                      if (msgId) {
+                        // 메시지에서 sharedDocumentIdx 찾기
+                        const msg = firebaseMessages.find((m) => m.id === msgId);
+                        if (msg?.sharedDocumentIdx) {
+                          handleFileMessageClick(msg.sharedDocumentIdx);
+                        }
+                      }
+                    } else if (attachment.url) {
+                      // URL이 있는 경우 새 탭에서 열기
+                      window.open(attachment.url, '_blank');
+                    }
+                  }}
                 />
               )}
             </Box>

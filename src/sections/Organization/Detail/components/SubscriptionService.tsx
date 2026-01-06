@@ -36,6 +36,14 @@ export default function SubscriptionService({ organizationId }: Props) {
   const [paymentHistoryPage, setPaymentHistoryPage] = useState(0);
   const [paymentHistoryRowsPerPage, setPaymentHistoryRowsPerPage] = useState(5);
 
+  // 등록된 카드 정보
+  const [registeredCard, setRegisteredCard] = useState<{
+    cardName: string;
+    cardNo: string;
+    billingKey: string;
+    registeredAt: Date;
+  } | null>(null);
+
   // API 호출
   // 서비스 목록 조회 (구독할 서비스들)
   const {
@@ -48,15 +56,15 @@ export default function SubscriptionService({ organizationId }: Props) {
     status: 'ACTIVE', // 활성화된 서비스만
   });
 
-  // 결제 내역 조회
+  // 결제 내역 조회 (모든 데이터를 한 번에 불러온 후 클라이언트에서 페이지네이션)
   const {
     data: paymentHistoryData,
     isLoading: isLoadingPaymentHistory,
     isError: isErrorPaymentHistory,
   } = usePaymentHistory({
     searchingDateKey: 'paymentRequestDate',
-    page: paymentHistoryPage + 1, // API는 1부터 시작
-    pageSize: paymentHistoryRowsPerPage,
+    page: 1,
+    pageSize: 1000, // 모든 데이터 불러오기
   });
 
   // API 응답 데이터 추출 (axios interceptor가 평탄화하므로 직접 접근)
@@ -195,6 +203,14 @@ export default function SubscriptionService({ organizationId }: Props) {
           });
         }
 
+        // 등록된 카드 정보 저장
+        setRegisteredCard({
+          cardName,
+          cardNo,
+          billingKey,
+          registeredAt: new Date(),
+        });
+
         // 구독 성공 후 선택 해제
         setSelectedServiceSettingIdx(null);
       } catch (error: any) {
@@ -235,13 +251,53 @@ export default function SubscriptionService({ organizationId }: Props) {
   // 결제 내역 데이터 변환
   const paymentHistory: PaymentHistoryItem[] = useMemo(() => {
     const paymentHistoryInfo = paymentHistoryData as any;
-    // 새로운 API 응답 구조: data 배열에 직접 결제 내역이 있음
-    const paymentList = Array.isArray(paymentHistoryInfo?.data)
-      ? paymentHistoryInfo.data
-      : paymentHistoryInfo?.paymentList || [];
+
+    // 디버깅: 원본 데이터 확인
+    if (import.meta.env.DEV) {
+      console.log('🔍 [SubscriptionService] 결제 내역 원본 데이터', {
+        paymentHistoryData,
+        paymentHistoryInfo,
+        dataArray: paymentHistoryInfo?.data,
+        paymentList: paymentHistoryInfo?.paymentList,
+      });
+    }
+
+    // 결제 내역 데이터 추출
+    // axios 인터셉터가 응답을 평탄화하면서 배열이 {0: {...}, 1: {...}, header: {...}} 형태로 올 수 있음
+    let paymentList: any[] = [];
+
+    if (Array.isArray(paymentHistoryInfo?.data)) {
+      // 형태 1: { data: [...] }
+      paymentList = paymentHistoryInfo.data;
+    } else if (Array.isArray(paymentHistoryInfo?.paymentList)) {
+      // 형태 2: { paymentList: [...] }
+      paymentList = paymentHistoryInfo.paymentList;
+    } else if (Array.isArray(paymentHistoryInfo)) {
+      // 형태 3: 직접 배열
+      paymentList = paymentHistoryInfo;
+    } else if (paymentHistoryInfo && typeof paymentHistoryInfo === 'object') {
+      // 형태 4: 숫자 키로 된 객체 (0, 1, 2, ... + header)
+      // header 등 메타 필드를 제외하고 숫자 키만 추출
+      const numericKeys = Object.keys(paymentHistoryInfo)
+        .filter((key) => !isNaN(Number(key)))
+        .sort((a, b) => Number(a) - Number(b));
+
+      if (numericKeys.length > 0) {
+        paymentList = numericKeys.map((key) => paymentHistoryInfo[key]);
+      }
+    }
+
     const totalCount = paymentHistoryInfo?.totalCount || paymentList.length;
 
-    return paymentList.map((payment: any, index: number) => {
+    if (import.meta.env.DEV) {
+      console.log('🔍 [SubscriptionService] 결제 내역 변환 전', {
+        paymentList,
+        totalCount,
+        paymentListLength: paymentList.length,
+      });
+    }
+
+    const result: PaymentHistoryItem[] = paymentList.map((payment: any, index: number) => {
       // 상태 매핑: 한글 문자열로 오는 paymentStatus 처리
       let status: PaymentHistoryItem['status'] = 'PENDING';
       const paymentStatus = payment.paymentStatus || '';
@@ -334,9 +390,7 @@ export default function SubscriptionService({ organizationId }: Props) {
 
       return {
         id: payment.paymentIdx,
-        order: totalCount
-          ? totalCount - (paymentHistoryPage * paymentHistoryRowsPerPage + index)
-          : index + 1,
+        order: index + 1,
         paymentDate: finalPaymentDate,
         paymentNumber: finalPaymentNumber,
         serviceName,
@@ -346,7 +400,26 @@ export default function SubscriptionService({ organizationId }: Props) {
         receiptUrl,
       };
     });
-  }, [paymentHistoryData, paymentHistoryPage, paymentHistoryRowsPerPage]);
+
+    // 최신순으로 정렬 (paymentDate 기준 내림차순)
+    return result
+      .sort((a, b) => {
+        const dateA = new Date(a.paymentDate || 0).getTime();
+        const dateB = new Date(b.paymentDate || 0).getTime();
+        return dateB - dateA; // 최신이 앞에 오도록
+      })
+      .map((item, idx) => ({
+        ...item,
+        order: idx + 1, // 정렬 후 순번 재할당
+      }));
+  }, [paymentHistoryData]);
+
+  // 클라이언트 측 페이지네이션 적용
+  const paginatedPaymentHistory = useMemo(() => {
+    const startIndex = paymentHistoryPage * paymentHistoryRowsPerPage;
+    const endIndex = startIndex + paymentHistoryRowsPerPage;
+    return paymentHistory.slice(startIndex, endIndex);
+  }, [paymentHistory, paymentHistoryPage, paymentHistoryRowsPerPage]);
 
   const handleViewReceipt = useCallback((row: PaymentHistoryItem) => {
     if (row.receiptUrl) {
@@ -460,13 +533,86 @@ export default function SubscriptionService({ organizationId }: Props) {
             startIcon={<Iconify icon="solar:add-circle-bold" width={20} />}
             disabled={!selectedServiceSettingIdx}
           >
-            카드 추가
+            {registeredCard ? '카드 변경' : '카드 추가'}
           </Button>
         </Stack>
-        {!selectedServiceSettingIdx && (
+
+        {/* 등록된 카드 표시 */}
+        {registeredCard ? (
+          <Box
+            sx={{
+              p: 2.5,
+              borderRadius: 2,
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              maxWidth: 360,
+              boxShadow: '0 8px 24px rgba(102, 126, 234, 0.35)',
+            }}
+          >
+            {/* 카드 상단 - 아이콘과 등록일 */}
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="center"
+              sx={{ mb: 3 }}
+            >
+              <Iconify icon={'ic:baseline-credit-card' as any} width={40} />
+              <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                등록일: {registeredCard.registeredAt.toLocaleDateString('ko-KR')}
+              </Typography>
+            </Stack>
+
+            {/* 카드 번호 */}
+            <Typography
+              variant="h5"
+              sx={{
+                fontFamily: 'monospace',
+                letterSpacing: 2,
+                mb: 2,
+                fontWeight: 500,
+              }}
+            >
+              {registeredCard.cardNo}
+            </Typography>
+
+            {/* 카드사 */}
+            <Stack direction="row" justifyContent="space-between" alignItems="center">
+              <Box>
+                <Typography variant="caption" sx={{ opacity: 0.7, display: 'block' }}>
+                  CARD TYPE
+                </Typography>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                  {registeredCard.cardName}
+                </Typography>
+              </Box>
+              {/* 카드사 로고 (간단한 표시) */}
+              <Box
+                sx={{
+                  width: 50,
+                  height: 30,
+                  bgcolor: 'rgba(255,255,255,0.2)',
+                  borderRadius: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Typography variant="caption" sx={{ fontWeight: 700 }}>
+                  {registeredCard.cardName.slice(0, 2)}
+                </Typography>
+              </Box>
+            </Stack>
+          </Box>
+        ) : !selectedServiceSettingIdx ? (
           <Box sx={{ py: 2, textAlign: 'center' }}>
             <Typography variant="body2" color="text.secondary">
               먼저 구독할 서비스를 선택해주세요.
+            </Typography>
+          </Box>
+        ) : (
+          <Box sx={{ py: 2, textAlign: 'center' }}>
+            <Typography variant="body2" color="text.secondary">
+              등록된 카드가 없습니다. 카드를 추가해주세요.
             </Typography>
           </Box>
         )}
@@ -476,14 +622,10 @@ export default function SubscriptionService({ organizationId }: Props) {
 
       {/* 결제 내역 */}
       <Box sx={{ p: 3 }}>
-        <PaymentHistoryTable rows={paymentHistory} onViewReceipt={handleViewReceipt} />
+        <PaymentHistoryTable rows={paginatedPaymentHistory} onViewReceipt={handleViewReceipt} />
         {paymentHistory.length > 0 && (
           <PaymentHistoryPagination
-            count={
-              (paymentHistoryData as any)?.totalCount ||
-              (paymentHistoryData as any)?.data?.length ||
-              paymentHistory.length
-            }
+            count={paymentHistory.length}
             page={paymentHistoryPage}
             rowsPerPage={paymentHistoryRowsPerPage}
             onChangePage={setPaymentHistoryPage}

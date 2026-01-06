@@ -132,6 +132,7 @@ export default function PublishModal({
       // 관련 쿼리 무효화
       queryClient.invalidateQueries({ queryKey: ['safety-system-item'] });
       queryClient.invalidateQueries({ queryKey: ['priority-settings'] });
+      queryClient.invalidateQueries({ queryKey: ['sharedDocuments'] }); // 공유 문서함 새로고침
       onConfirm?.();
       handleClose();
     },

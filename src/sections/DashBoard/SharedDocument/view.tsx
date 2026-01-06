@@ -32,6 +32,7 @@ import {
 import type { PrioritySetting } from 'src/services/dashboard/dashboard.types';
 import { useQueryClient } from '@tanstack/react-query';
 import { uploadFile } from 'src/services/system/system.service';
+import SharedDocumentDetailModal from 'src/sections/Chat/components/SharedDocumentDetailModal';
 
 // ----------------------------------------------------------------------
 
@@ -105,6 +106,8 @@ export function SharedDocumentView({ title = '공유 문서함', description, sx
   const [shareToChatModalOpen, setShareToChatModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [documentDetailModalOpen, setDocumentDetailModalOpen] = useState(false);
+  const [selectedDocumentIdx, setSelectedDocumentIdx] = useState<number | null>(null);
   const [selectedDocumentForShare, setSelectedDocumentForShare] = useState<SharedDocument | null>(
     null
   );
@@ -114,6 +117,16 @@ export function SharedDocumentView({ title = '공유 문서함', description, sx
   const [selectedDocumentForDelete, setSelectedDocumentForDelete] = useState<SharedDocument | null>(
     null
   );
+
+  const handleDocumentClick = (row: SharedDocument) => {
+    setSelectedDocumentIdx(row.sharedDocumentIdx);
+    setDocumentDetailModalOpen(true);
+  };
+
+  const handleCloseDocumentDetailModal = () => {
+    setDocumentDetailModalOpen(false);
+    setSelectedDocumentIdx(null);
+  };
 
   const handlePrioritySettings = () => {
     setPrioritySettingsModalOpen(true);
@@ -465,6 +478,7 @@ export function SharedDocumentView({ title = '공유 문서함', description, sx
             onShareToChat={handleShareToChat}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            onRowClick={handleDocumentClick}
           />
 
           <SharedDocumentPagination
@@ -559,6 +573,15 @@ export function SharedDocumentView({ title = '공유 문서함', description, sx
           }}
           onConfirm={handleConfirmDelete}
           document={selectedDocumentForDelete}
+        />
+      )}
+
+      {/* 문서 상세 모달 */}
+      {selectedDocumentIdx && (
+        <SharedDocumentDetailModal
+          open={documentDetailModalOpen}
+          onClose={handleCloseDocumentDetailModal}
+          sharedDocumentIdx={selectedDocumentIdx}
         />
       )}
     </DashboardContent>

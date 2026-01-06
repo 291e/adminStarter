@@ -36,6 +36,7 @@ type Props = {
   onShareToChat?: (row: SharedDocument) => void;
   onEdit?: (row: SharedDocument) => void;
   onDelete?: (row: SharedDocument) => void;
+  onRowClick?: (row: SharedDocument) => void;
 };
 
 export default function SharedDocumentTable({
@@ -46,6 +47,7 @@ export default function SharedDocumentTable({
   onShareToChat,
   onEdit,
   onDelete,
+  onRowClick,
 }: Props) {
   const [menuAnchorEl, setMenuAnchorEl] = useState<{ [key: string]: HTMLElement | null }>({});
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -139,7 +141,19 @@ export default function SharedDocumentTable({
             const rowNumber = (page - 1) * rowsPerPage + index + 1;
 
             return (
-              <TableRow key={rowId} hover>
+              <TableRow
+                key={rowId}
+                hover
+                onClick={(e) => {
+                  // 메뉴가 열려있으면 행 클릭 무시
+                  if (openMenuId) return;
+                  // 이벤트가 IconButton이나 Menu에서 발생했으면 무시
+                  const target = e.target as HTMLElement;
+                  if (target.closest('button') || target.closest('[role="menu"]')) return;
+                  onRowClick?.(row);
+                }}
+                sx={{ cursor: onRowClick && !openMenuId ? 'pointer' : 'default' }}
+              >
                 <TableCell>
                   <Typography variant="body2" sx={{ fontSize: 14, textAlign: 'center' }}>
                     {rowNumber}

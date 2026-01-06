@@ -111,8 +111,9 @@ export async function sendMessage(params: SendMessageDto): Promise<void> {
  * 챗봇 메시지 전송
  * POST /member/chatbot-message
  */
-export async function sendChatbotMessage(params: SendChatbotMessageDto): Promise<void> {
-  await axiosInstance.post(endpoints.member.chatbotMessage, params);
+export async function sendChatbotMessage(params: SendChatbotMessageDto): Promise<any> {
+  const response = await axiosInstance.post(endpoints.member.chatbotMessage, params);
+  return response.data;
 }
 
 /**

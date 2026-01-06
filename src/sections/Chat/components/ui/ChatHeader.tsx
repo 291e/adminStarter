@@ -12,6 +12,7 @@ import ListItemText from '@mui/material/ListItemText';
 
 import { Iconify } from 'src/components/iconify';
 import { CustomPopover } from 'src/components/custom-popover';
+import { CONFIG } from 'src/global-config';
 import RenameChatRoomModal from './RenameChatRoomModal';
 import LeaveChatRoomModal from './LeaveChatRoomModal';
 import type { ChatRoomDto, ChatParticipantDto } from 'src/services/chat/chat.types';
@@ -70,6 +71,15 @@ export default function ChatHeader({
 
   // Avatar 표시 로직
   const renderAvatar = () => {
+    // 챗봇인 경우
+    if (room.type === 'CHATBOT') {
+      return (
+        <Avatar sx={{ width: 40, height: 40 }} src={`${CONFIG.assetsDir}/bot.png`} alt="챗봇">
+          <Iconify icon="solar:user-rounded-bold" width={24} />
+        </Avatar>
+      );
+    }
+
     if (room.type === 'EMERGENCY') {
       return (
         <Avatar

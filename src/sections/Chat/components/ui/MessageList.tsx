@@ -16,8 +16,17 @@ type ChatMessage = {
   dateLabel?: string;
   avatarUrl?: string;
   isOwn?: boolean;
-  messageType?: 'TEXT' | 'IMAGE' | 'FILE' | 'SYSTEM';
+  messageType?: 'TEXT' | 'IMAGE' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
   sharedDocumentIdx?: number;
+  attachments?: string[] | null;
+  metadata?: {
+    type?: string;
+    location?: {
+      latitude: number;
+      longitude: number;
+      address?: string;
+    };
+  };
 };
 
 type Props = {
@@ -229,6 +238,8 @@ export default function MessageList({
               isOwn={message.isOwn || false}
               messageType={message.messageType}
               sharedDocumentIdx={message.sharedDocumentIdx}
+              attachments={message.attachments}
+              metadata={message.metadata}
               onFileClick={onFileMessageClick}
             />
           </Box>

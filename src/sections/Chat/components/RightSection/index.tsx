@@ -14,6 +14,7 @@ type Props = {
   attachments: ChatAttachmentDto[];
   onInvite?: () => void;
   onRemove?: (participantIds: string[]) => void;
+  onFileClick?: (attachment: ChatAttachmentDto) => void;
 };
 
 export default function RightSection({
@@ -22,6 +23,7 @@ export default function RightSection({
   attachments,
   onInvite,
   onRemove,
+  onFileClick,
 }: Props) {
   return (
     <Box
@@ -43,7 +45,7 @@ export default function RightSection({
         onInvite={onInvite}
         onRemove={onRemove}
       />
-      <AttachmentList attachments={attachments} />
+      <AttachmentList attachments={attachments} onFileClick={onFileClick} />
     </Box>
   );
 }

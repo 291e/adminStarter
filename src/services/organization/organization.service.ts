@@ -184,7 +184,6 @@ export async function updateBranch(
   return response.data;
 }
 
-
 /**
  * 서비스 업그레이드
  * POST /companies/{companyIdx}/upgrade
@@ -326,3 +325,15 @@ export async function getCurrentSubscription(
   return response.data;
 }
 
+/**
+ * 등록된 카드 목록 조회
+ * GET /companies/{companyIdx}/cards
+ */
+export async function getRegisteredCards(
+  companyIdx: number
+): Promise<import('./organization.types').GetRegisteredCardsResponse> {
+  const response = await axiosInstance.get<
+    import('./organization.types').GetRegisteredCardsResponse
+  >(`${endpoints.company.cards}/${companyIdx}/cards`);
+  return response.data;
+}

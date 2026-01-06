@@ -450,7 +450,7 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom, onCre
               <ListItemAvatar>
                 <Avatar
                   sx={{ width: 40, height: 40 }}
-                  src={CONFIG.assetsDir ? `${CONFIG.assetsDir}/bot.svg` : '/bot.svg'}
+                  src={CONFIG.assetsDir ? `${CONFIG.assetsDir}/bot.png` : '/bot.png'}
                   alt="챗봇"
                 >
                   <Iconify icon="solar:user-rounded-bold" width={24} />

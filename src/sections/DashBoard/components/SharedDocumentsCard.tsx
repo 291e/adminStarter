@@ -20,6 +20,7 @@ type Props = {
   totalPages?: number;
   onPageChange?: (page: number) => void;
   onViewAll?: () => void;
+  onDocumentClick?: (document: SharedDocument) => void;
 };
 
 const PRIORITY_CONFIG: Record<
@@ -62,6 +63,7 @@ export default function SharedDocumentsCard({
   totalPages: propTotalPages,
   onPageChange: propOnPageChange,
   onViewAll,
+  onDocumentClick,
 }: Props) {
   const navigate = useNavigate();
   const [sortField, setSortField] = useState<SortField>('createAt');
@@ -347,10 +349,17 @@ export default function SharedDocumentsCard({
             return (
               <Box
                 key={row.sharedDocumentIdx}
+                onClick={() => onDocumentClick?.(row)}
                 sx={{
                   display: 'flex',
                   borderBottom: '1px dashed',
                   borderColor: 'divider',
+                  cursor: onDocumentClick ? 'pointer' : 'default',
+                  '&:hover': onDocumentClick
+                    ? {
+                        bgcolor: 'action.hover',
+                      }
+                    : {},
                   '&:last-child': {
                     borderBottom: 'none',
                   },

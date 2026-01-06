@@ -93,13 +93,20 @@ export type SafetySystemDocument = {
   approvalStep?: number | null; // 결재 단계 (0: 없음, 1: 승인만, 2: 작성+승인, 3: 작성+검토+승인)
   isPublished: number; // 0: 미게시, 1: 게시
   publishedAt: Date | string | null;
-  status: 'COMPLETED' | 'DRAFT' | 'IN_PROGRESS' | 'PENDING'; // 문서 상태
+  status:
+    | 'COMPLETED'
+    | 'DRAFT'
+    | 'IN_PROGRESS'
+    | 'PENDING'
+    | 'SIGNATURE_IN_PROGRESS'
+    | 'SIGNATURE_COMPLETED'; // 문서 상태
   guide?: string | null;
   sample?: string | null;
   tableData?: string | any; // JSON string 또는 파싱된 객체
   createAt: Date | string;
   updateAt: Date | string;
   signatureList?: DocumentSignatureInfo[]; // 결재 서명 목록
+  workerSignatureList?: WorkerSignatureStatusInfo[]; // 근로자 서명 목록
   approvalList?: DocumentApprovalInfo[]; // 결재 등록 목록 (DocumentApprovalEntity 응답)
 };
 
@@ -199,7 +206,8 @@ export type DocumentSignatureInfo = {
 
 // 근로자 서명 현황 정보 (추가된 타입)
 export type WorkerSignatureStatusInfo = {
-  workerSignatureIdx: number;
+  workerSignatureIdx?: number; // 구버전 호환
+  documentWorkerSignatureIdx?: number; // 새 API 응답
   targetMemberIdx: number;
   memberName: string;
   memberEmail?: string;
@@ -210,7 +218,9 @@ export type WorkerSignatureStatusInfo = {
   status: 'SIGNED' | 'PENDING' | 'WATCHED' | 'WATCHING'; // 서명 상태
   signatureData?: string; // Base64 서명 데이터
   signedAt?: string; // 서명일 (ISO 문자열)
-  createAt: string; // 생성일 (ISO 문자열)
+  watchProgress?: number; // 시청 진행률
+  watchedAt?: string; // 시청 완료일
+  createAt?: string; // 생성일 (ISO 문자열) - 선택적으로 변경
 };
 
 // ----------------------------------------------------------------------

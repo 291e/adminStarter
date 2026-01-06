@@ -112,43 +112,86 @@ export default function Risk_2200Table({
     }
   };
 
-  const getStatusLabel = (status: SafetySystemDocument['status']) => {
-    switch (status) {
-      case 'COMPLETED':
-        return '완료';
+  // 상태 라벨 매핑 (백엔드 status 값 그대로 사용)
+  // DRAFT=임시저장, PENDING=결재대기, IN_PROGRESS=결재진행중, COMPLETED=결재완료
+  // SIGNATURE_IN_PROGRESS=서명진행중, SIGNATURE_COMPLETED=서명완료
+  const getStatusLabel = (row: Risk_2200Row): string => {
+    switch (row.status) {
       case 'DRAFT':
-        return '결재 진행중';
-      case 'IN_PROGRESS':
-        return '결재 대기중';
+        return '임시저장';
       case 'PENDING':
-        return '임시 저장';
+        return '결재대기';
+      case 'IN_PROGRESS':
+        return '결재진행중';
+      case 'COMPLETED':
+        return '결재완료';
+      case 'SIGNATURE_IN_PROGRESS':
+        return '서명진행중';
+      case 'SIGNATURE_COMPLETED':
+        return '서명완료';
       default:
-        return status || '';
+        return row.status || '';
     }
   };
 
+  // 상태 배지 스타일 매핑
   const getStatusVariant = (
-    status: SafetySystemDocument['status']
+    row: Risk_2200Row
   ): 'default' | 'info' | 'warning' | 'error' | 'success' => {
-    switch (status) {
-      case 'COMPLETED':
-        return 'success';
+    switch (row.status) {
       case 'DRAFT':
-        return 'warning';
-      case 'IN_PROGRESS':
-        return 'info';
+        return 'default'; // 임시저장 - 회색
       case 'PENDING':
-        return 'default';
+        return 'info'; // 결재대기 - 파랑
+      case 'IN_PROGRESS':
+        return 'warning'; // 결재진행중 - 주황
+      case 'COMPLETED':
+        return 'success'; // 결재완료 - 초록
+      case 'SIGNATURE_IN_PROGRESS':
+        return 'warning'; // 서명진행중 - 주황
+      case 'SIGNATURE_COMPLETED':
+        return 'success'; // 서명완료 - 초록
       default:
         return 'default';
     }
   };
+
+  // 진행률 계산 (결재자 > 근로자 서명 우선순위)
+  // 백엔드에서 workerSignatureProgress도 제공하면 그것 활용
+  const getProgress = (row: Risk_2200Row): number => {
+    const hasApproval = (row.signatureList?.length ?? 0) > 0;
+
+    // 결재자가 있으면 결재 진행률 사용 (백엔드에서 계산된 값)
+    if (hasApproval) {
+      return row.approvalProgress ?? 0;
+    }
+
+    // 백엔드에서 workerSignatureProgress를 제공하면 사용
+
+    const workerProgress = (row as any).workerSignatureProgress;
+    if (typeof workerProgress === 'number') {
+      return workerProgress;
+    }
+
+    // 프론트에서 계산 (fallback)
+    const workerList = row.workerSignatureList ?? [];
+    if (workerList.length > 0) {
+      const signedCount = workerList.filter((w) => w.status === 'SIGNED').length;
+      return Math.round((signedCount / workerList.length) * 100);
+    }
+
+    return 0;
+  };
+
+  // 완료 상태 판별 헬퍼
+  const isCompletedStatus = (status: string) =>
+    status === 'COMPLETED' || status === 'SIGNATURE_COMPLETED';
 
   // 완료되지 않은 문서만 필터링하여 전체 선택 상태 계산
-  const nonCompletedRows = rows.filter((row) => row.status !== 'COMPLETED');
+  const nonCompletedRows = rows.filter((row) => !isCompletedStatus(row.status));
   const selectedNonCompletedIds = selectedIds.filter((id) => {
     const row = rows.find((r) => r.id === id);
-    return row && row.status !== 'COMPLETED';
+    return row && !isCompletedStatus(row.status);
   });
   const isAllSelected =
     nonCompletedRows.length > 0 && selectedNonCompletedIds.length === nonCompletedRows.length;
@@ -377,7 +420,7 @@ export default function Risk_2200Table({
                   <Checkbox
                     checked={selectedIds.includes(row.id)}
                     onChange={() => onSelectRow(row.id)}
-                    disabled={row.status === 'COMPLETED'}
+                    disabled={isCompletedStatus(row.status)}
                     size="small"
                   />
                 </TableCell>
@@ -466,12 +509,12 @@ export default function Risk_2200Table({
                       variant="caption"
                       sx={{ color: 'text.secondary', textAlign: 'right', display: 'block' }}
                     >
-                      {row.approvalProgress ? `${row.approvalProgress}%` : '0%'}
+                      {`${getProgress(row)}%`}
                     </Typography>
                     <LinearProgress
                       variant="determinate"
-                      value={typeof row.approvalProgress === 'number' ? row.approvalProgress : 0}
-                      color={row.approvalProgress === 100 ? 'success' : 'warning'}
+                      value={getProgress(row)}
+                      color={getProgress(row) === 100 ? 'success' : 'warning'}
                       sx={{
                         height: 6,
                         borderRadius: 1,
@@ -486,15 +529,12 @@ export default function Risk_2200Table({
                       variant="caption"
                       sx={{ color: 'text.secondary', mt: 0.5, display: 'block' }}
                     >
-                      {typeof row.approvalProgress === 'number' ? row.approvalProgress : 0} / 100
+                      {getProgress(row)} / 100
                     </Typography>
                   </Box>
                 </TableCell>
                 <TableCell sx={{ width: 100, minWidth: 100, p: 2, textAlign: 'center' }}>
-                  <Badge
-                    label={getStatusLabel(row.status)}
-                    variant={getStatusVariant(row.status)}
-                  />
+                  <Badge label={getStatusLabel(row)} variant={getStatusVariant(row)} />
                 </TableCell>
                 <TableCell sx={{ width: 80, minWidth: 80, p: 1, textAlign: 'center' }}>
                   <Tooltip title="PDF 다운로드">
@@ -563,7 +603,7 @@ export default function Risk_2200Table({
                     {onEdit && (
                       <MenuItem
                         onClick={() => handleMenuItemClick('edit', row.id)}
-                        disabled={row.status === 'COMPLETED'}
+                        disabled={isCompletedStatus(row.status)}
                         sx={{ px: 2 }}
                       >
                         수정
@@ -572,7 +612,7 @@ export default function Risk_2200Table({
                     {onDelete && (
                       <MenuItem
                         onClick={() => handleMenuItemClick('delete', row.id)}
-                        disabled={row.status === 'COMPLETED'}
+                        disabled={isCompletedStatus(row.status)}
                         sx={{ color: 'error.main', px: 2 }}
                       >
                         삭제
@@ -595,6 +635,7 @@ export default function Risk_2200Table({
           approvalDeadline={selectedProgressRow.approvalDeadline}
           documentId={selectedProgressRow.id}
           signatureList={selectedProgressRow.signatureList}
+          workerSignatureList={selectedProgressRow.workerSignatureList}
         />
       )}
 
