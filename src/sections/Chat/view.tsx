@@ -33,6 +33,7 @@ import {
   useUpdateLastReadAt,
 } from './hooks/use-chat-api';
 import { useChatRoomFirebase } from './hooks/use-chat-room-firebase';
+import { useChatRoomsEvent } from './hooks/use-chat-rooms-event';
 import { useMyInfo } from './hooks/use-my-info';
 import { fDate, fTime } from 'src/utils/format-time';
 import type {
@@ -73,6 +74,9 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
   });
   const [documentDetailModalOpen, setDocumentDetailModalOpen] = useState(false);
   const [selectedDocumentIdx, setSelectedDocumentIdx] = useState<number | null>(null);
+
+  // Firebase 사용자 노드 변경 감지 및 채팅방 목록 갱신
+  useChatRoomsEvent();
 
   // 백엔드 API에서 채팅방 목록 조회
   const { data: chatRoomsData, isLoading: isRoomsLoading } = useGetChatRooms();

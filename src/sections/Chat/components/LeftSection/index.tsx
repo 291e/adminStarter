@@ -20,6 +20,7 @@ import { useAuthContext } from 'src/auth/hooks/use-auth-context';
 import { useMyInfo } from 'src/sections/Chat/hooks/use-my-info';
 import { CONFIG } from 'src/global-config';
 import CreateChatRoomModal from './CreateChatRoomModal';
+import ChatRoomItem from './ChatRoomItem';
 import type { ChatRoomDto, ChatParticipantDto } from 'src/services/chat/chat.types';
 
 type Props = {
@@ -53,15 +54,42 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom, onCre
 
   const filteredRooms = rooms
     .map((room) => {
-      const lastMessageTime = room.lastMessageAt
-        ? new Date(room.lastMessageAt).toLocaleTimeString('ko-KR', {
-            hour: '2-digit',
-            minute: '2-digit',
-          })
-        : '';
+      let displayTime = '';
+
+      // 1. room.lastMessage 객체 내부의 lastMessageAt 확인
+      let rawTime = room.lastMessageAt || (room as any).lastMessageTime;
+
+      if (typeof room.lastMessage === 'object' && room.lastMessage !== null) {
+        const msg = room.lastMessage as any;
+        // lastMessage 객체 안에 lastMessageAt이 있고 유효한 값이면 우선 사용
+        if (msg.lastMessageAt) {
+          rawTime = msg.lastMessageAt;
+        }
+      }
+
+      if (rawTime) {
+        const timestamp = Number(rawTime);
+        if (!Number.isNaN(timestamp) && timestamp > 10000000000) {
+          const date = new Date(timestamp);
+          if (!Number.isNaN(date.getTime())) {
+            displayTime = date.toLocaleTimeString('ko-KR', {
+              hour: '2-digit',
+              minute: '2-digit',
+            });
+          }
+        } else if (typeof rawTime === 'string') {
+          const date = new Date(rawTime);
+          if (!Number.isNaN(date.getTime()) && date.getTime() > 0) {
+            displayTime = date.toLocaleTimeString('ko-KR', {
+              hour: '2-digit',
+              minute: '2-digit',
+            });
+          }
+        }
+      }
       return {
         ...room,
-        lastMessageTime,
+        displayTime,
       };
     })
     .filter((room) => room.name.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -468,58 +496,15 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom, onCre
 
           {/* 응급 채팅 */}
           {emergencyRoom && (
-            <ListItem disablePadding>
-              <ListItemButton
-                selected={selectedRoomId === 'emergency'}
-                onClick={() => onSelectRoom(emergencyRoom)}
-                sx={{
-                  px: 2.5,
-                  py: 1.5,
-                  bgcolor: 'warning.lighter',
-                  borderTop: '1px solid',
-                  borderBottom: '1px solid',
-                  borderColor: 'grey.300',
-                  '&.Mui-selected': {
-                    bgcolor: 'warning.lighter',
-                  },
-                }}
-              >
-                <ListItemAvatar>
-                  <Avatar
-                    sx={{
-                      width: 40,
-                      height: 40,
-                      bgcolor: 'rgba(255, 86, 48, 0.24)',
-                      color: 'error.main',
-                    }}
-                  >
-                    <Iconify icon={'mingcute:warning-fill' as any} width={24} />
-                  </Avatar>
-                </ListItemAvatar>
-                <ListItemText
-                  primary={
-                    <Typography variant="subtitle2" sx={{ color: 'error.main', fontWeight: 600 }}>
-                      사고 발생 현황
-                    </Typography>
-                  }
-                  secondary="응급신고"
-                  secondaryTypographyProps={{
-                    fontSize: 14,
-                  }}
-                />
-                <Stack direction="column" alignItems="flex-end" spacing={0.5} sx={{ minWidth: 68 }}>
-                  {emergencyRoom.lastMessageTime ? (
-                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                      {emergencyRoom.lastMessageTime}
-                    </Typography>
-                  ) : null}
-                  {typeof emergencyRoom.unreadCount === 'number' &&
-                    emergencyRoom.unreadCount > 0 && (
-                      <UnreadBadge count={emergencyRoom.unreadCount} />
-                    )}
-                </Stack>
-              </ListItemButton>
-            </ListItem>
+            <ChatRoomItem
+              room={emergencyRoom}
+              selected={
+                selectedRoomId === 'emergency' || selectedRoomId === emergencyRoom.chatRoomId
+              }
+              onSelect={onSelectRoom}
+              currentMemberIdx={Number(currentUserMemberIdx)}
+              isGroup
+            />
           )}
 
           {/* 일반 채팅 목록 */}
@@ -563,58 +548,16 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom, onCre
               </Box>
               {normalChatExpanded.value && (
                 <List disablePadding>
-                  {normalRooms.map((room) => {
-                    // 일반 채팅: 상대방 1명의 정보 가져오기 (아바타용)
-                    const otherParticipants = getFilteredParticipants(room.participants);
-                    const otherParticipant = otherParticipants[0];
-
-                    return (
-                      <ListItem key={room.chatRoomId || room.name} disablePadding>
-                        <ListItemButton
-                          selected={selectedRoomId === room.chatRoomId}
-                          onClick={() => onSelectRoom(room)}
-                          sx={{ px: 2.5, py: 1.5 }}
-                        >
-                          <ListItemAvatar>
-                            {otherParticipant ? (
-                              renderAvatar(otherParticipant, 40)
-                            ) : (
-                              <Avatar sx={{ width: 40, height: 40 }}>
-                                <Iconify icon="solar:user-rounded-bold" width={24} />
-                              </Avatar>
-                            )}
-                          </ListItemAvatar>
-                          <ListItemText
-                            primary={room.name}
-                            secondary={getLastMessageText(room.lastMessage)}
-                            primaryTypographyProps={{
-                              fontSize: 14,
-                              fontWeight: 600,
-                            }}
-                            secondaryTypographyProps={{
-                              fontSize: 12,
-                              color: 'text.secondary',
-                            }}
-                          />
-                          <Stack
-                            direction="column"
-                            alignItems="flex-end"
-                            spacing={0.5}
-                            sx={{ minWidth: 68, ml: 1.5 }}
-                          >
-                            {room.lastMessageTime ? (
-                              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                                {room.lastMessageTime}
-                              </Typography>
-                            ) : null}
-                            {typeof room.unreadCount === 'number' && room.unreadCount > 0 && (
-                              <UnreadBadge count={room.unreadCount} />
-                            )}
-                          </Stack>
-                        </ListItemButton>
-                      </ListItem>
-                    );
-                  })}
+                  {normalRooms.map((room) => (
+                    <ChatRoomItem
+                      key={room.chatRoomId || room.name}
+                      room={room}
+                      selected={selectedRoomId === room.chatRoomId}
+                      onSelect={onSelectRoom}
+                      currentMemberIdx={Number(currentUserMemberIdx)}
+                      isGroup={false}
+                    />
+                  ))}
                 </List>
               )}
             </>
@@ -662,42 +605,14 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom, onCre
               {groupChatExpanded.value && (
                 <List disablePadding>
                   {groupRooms.map((room) => (
-                    <ListItem key={room.chatRoomId || room.name} disablePadding>
-                      <ListItemButton
-                        selected={selectedRoomId === room.chatRoomId}
-                        onClick={() => onSelectRoom(room)}
-                        sx={{ px: 2.5, py: 1.5 }}
-                      >
-                        <ListItemAvatar>{renderGroupAvatar(room.participants)}</ListItemAvatar>
-                        <ListItemText
-                          primary={
-                            <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: 14 }}>
-                              {room.name}
-                            </Typography>
-                          }
-                          secondary={getLastMessageText(room.lastMessage)}
-                          secondaryTypographyProps={{
-                            fontSize: 12,
-                            color: 'text.secondary',
-                          }}
-                        />
-                        <Stack
-                          direction="column"
-                          alignItems="flex-end"
-                          spacing={0.5}
-                          sx={{ minWidth: 68, ml: 1.5 }}
-                        >
-                          {room.lastMessageTime ? (
-                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                              {room.lastMessageTime}
-                            </Typography>
-                          ) : null}
-                          {typeof room.unreadCount === 'number' && room.unreadCount > 0 && (
-                            <UnreadBadge count={room.unreadCount} />
-                          )}
-                        </Stack>
-                      </ListItemButton>
-                    </ListItem>
+                    <ChatRoomItem
+                      key={room.chatRoomId || room.name}
+                      room={room}
+                      selected={selectedRoomId === room.chatRoomId}
+                      onSelect={onSelectRoom}
+                      currentMemberIdx={Number(currentUserMemberIdx)}
+                      isGroup
+                    />
                   ))}
                 </List>
               )}

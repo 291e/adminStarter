@@ -1,15 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import {
-  ref,
-  push,
-  set,
-  onChildAdded,
-  query,
-  orderByChild,
-  limitToLast,
-  get,
-  off,
-} from 'firebase/database';
+import { ref, push, set, onChildAdded, query, orderByChild, limitToLast } from 'firebase/database';
 import { database } from 'src/config/firebase';
 import { useAuthContext } from 'src/auth/hooks';
 import { backupMessage } from 'src/services/chat/chat.service';
@@ -40,6 +30,8 @@ export type FirebaseMessage = {
   timestamp: string;
   createdAt?: number;
   isRead: boolean;
+  // 앱 호환성을 위해 추가될 수 있는 필드들
+  [key: string]: any;
 };
 
 type UseChatRoomFirebaseProps = {
@@ -58,70 +50,65 @@ export function useChatRoomFirebase({
   const [messages, setMessages] = useState<FirebaseMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // 메시지 목록 초기 로드
+  // 실시간 메시지 수신 (일원화된 로직)
   useEffect(() => {
-    if (!chatRoomId || !database) return;
+    if (!chatRoomId || !database) {
+      setMessages([]);
+      return undefined;
+    }
 
-    const loadInitialMessages = async () => {
-      if (!database) return; // 타입 가드
-      setIsLoading(true);
-      try {
-        const messagesRef = ref(database, `chatRooms/${chatRoomId}/messages`);
-        const messagesQuery = query(messagesRef, orderByChild('timestamp'), limitToLast(50));
+    // 방이 변경되면 기존 메시지 초기화 및 로딩 시작
+    setMessages([]);
+    setIsLoading(true);
 
-        const snapshot = await get(messagesQuery);
-        const loadedMessages: FirebaseMessage[] = [];
-
-        snapshot.forEach((child) => {
-          loadedMessages.push(child.val());
-        });
-
-        setMessages(loadedMessages);
-      } catch (error) {
-        console.error('Failed to load messages:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadInitialMessages();
-  }, [chatRoomId]);
-
-  // 실시간 메시지 수신
-  useEffect(() => {
-    if (!chatRoomId || !database) return undefined;
-
-    // 타입 가드: database가 undefined가 아님을 보장
     const db = database;
-    if (!db) return undefined;
-
     const messagesRef = ref(db, `chatRooms/${chatRoomId}/messages`);
+    // 타임스탬프 기준 정렬 및 마지막 100개 가져오기
+    const messagesQuery = query(messagesRef, orderByChild('timestamp'), limitToLast(100));
 
-    // 새 메시지가 추가될 때마다 호출
-    // 주의: 초기 로드된 메시지 이후에 추가된 것만 처리하거나,
-    // 이미 로드된 것과 중복되지 않게 처리해야 함.
-    // onChildAdded는 기존 데이터에 대해서도 호출될 수 있으므로 limitToLast를 쿼리에 적용하거나
-    // timestamp 기준으로 필터링하는 것이 좋음.
-    // 여기서는 간단히 마지막 메시지 시간 이후의 것만 받거나,
-    // state 업데이트 시 중복 체크를 함.
-
-    const unsubscribe = onChildAdded(messagesRef, (snapshot) => {
+    const handleNewMessage = (snapshot: any) => {
       const newMessage = snapshot.val() as FirebaseMessage;
 
+      // 현재 보고 있는 방의 메시지가 아니면 무시 (이전 리스너 잔재 등 방지)
+      if (newMessage.chatRoomId && newMessage.chatRoomId !== chatRoomId) {
+        return;
+      }
+
       setMessages((prev) => {
-        // 이미 존재하는 메시지면 무시
+        // 이미 존재하는 메시지면 업데이트하지 않음
         if (prev.some((msg) => msg.id === newMessage.id)) {
           return prev;
         }
-        return [...prev, newMessage];
+
+        // 새 메시지 추가 후 타임스탬프로 정렬
+        const updated = [...prev, newMessage];
+        return updated.sort((a, b) => {
+          const timeA = Number(a.timestamp) || 0;
+          const timeB = Number(b.timestamp) || 0;
+          return timeA - timeB;
+        });
       });
-    });
+
+      // 데이터가 들어오면 로딩 해제
+      setIsLoading(false);
+    };
+
+    // onChildAdded는 unsubscribe 함수를 반환함
+    const unsubscribe = onChildAdded(messagesQuery, handleNewMessage);
+
+    // 데이터가 없는 경우를 대비해 타임아웃으로 로딩 해제
+    const loadingTimeout = setTimeout(() => {
+      setIsLoading(false);
+    }, 2000);
 
     return () => {
-      off(messagesRef, 'child_added', unsubscribe);
+      clearTimeout(loadingTimeout);
+      // 반환된 unsubscribe 함수 호출이 더 안전함 (off 대신)
+      unsubscribe();
     };
   }, [chatRoomId]);
 
+  // 구형 memberIdx 해결 로직은 유지
   const resolveMemberIdx = (
     overrideIdx: number | null | undefined,
     authUser: ReturnType<typeof useAuthContext>['user']
@@ -216,16 +203,6 @@ export function useChatRoomFirebase({
         await set(newMessageRef, messageData);
 
         // 2. 백엔드 백업 API 호출 (chatRoomIdx가 필요)
-        // 백업 실패해도 RTDB에는 저장됨. 에러 처리는 필요에 따라 추가.
-        // chatRoomIdx가 없는 경우(예: 아직 생성되지 않은 방?)는 호출 불가하지만
-        // 여기서는 이미 방이 있다고 가정.
-        // 백엔드 API가 UUID(chatRoomId)를 받을 수도 있고 Idx를 받을 수도 있는데,
-        // chat.service.ts의 backupMessage는 chatRoomId(UUID)를 받도록 정의했음.
-        // swagger.json을 보면 `POST /safeyoui/api/chat/messages/backup` Body에 `chatRoomId`가 있음.
-        // 이 `chatRoomId`가 UUID인지 Idx인지 확인 필요.
-        // 보통 Firebase 연동이면 UUID일 가능성이 높음.
-        // 하지만 chat.types.ts에서 BackupMessageParams에 chatRoomId: string으로 정의함.
-
         if (chatRoomId) {
           await backupMessage({
             id: messageData.id,

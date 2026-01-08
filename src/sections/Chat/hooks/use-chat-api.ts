@@ -21,6 +21,7 @@ export function useGetChatRooms(params?: GetChatRoomsParams) {
   return useQuery({
     queryKey: ['chatRooms', params],
     queryFn: () => chatService.getChatRooms(params),
+    refetchInterval: 3000,
   });
 }
 
@@ -47,7 +48,9 @@ export function useCreateChatRoom() {
     },
     onError: (error: any) => {
       const resultMessage =
-        error?.response?.data?.header?.resultMessage || error?.message || '채팅방 생성에 실패했습니다.';
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '채팅방 생성에 실패했습니다.';
       toast.error(resultMessage);
     },
   });
@@ -71,7 +74,9 @@ export function useUpdateChatRoom() {
     },
     onError: (error: any) => {
       const resultMessage =
-        error?.response?.data?.header?.resultMessage || error?.message || '채팅방 수정에 실패했습니다.';
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '채팅방 수정에 실패했습니다.';
       toast.error(resultMessage);
     },
   });
@@ -100,7 +105,9 @@ export function useInviteParticipants() {
     },
     onError: (error: any) => {
       const resultMessage =
-        error?.response?.data?.header?.resultMessage || error?.message || '참가자 초대에 실패했습니다.';
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '참가자 초대에 실패했습니다.';
       toast.error(resultMessage);
     },
   });
@@ -121,7 +128,9 @@ export function useRemoveParticipants() {
     },
     onError: (error: any) => {
       const resultMessage =
-        error?.response?.data?.header?.resultMessage || error?.message || '참가자 제거에 실패했습니다.';
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '참가자 제거에 실패했습니다.';
       toast.error(resultMessage);
     },
   });
@@ -142,7 +151,9 @@ export function useLeaveChatRoom() {
     },
     onError: (error: any) => {
       const resultMessage =
-        error?.response?.data?.header?.resultMessage || error?.message || '채팅방 나가기에 실패했습니다.';
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '채팅방 나가기에 실패했습니다.';
       toast.error(resultMessage);
     },
   });
@@ -209,7 +220,9 @@ export function useCreateOrJoinEmergencyRoom() {
     },
     onError: (error: any) => {
       const resultMessage =
-        error?.response?.data?.header?.resultMessage || error?.message || '비상 채팅방 참가에 실패했습니다.';
+        error?.response?.data?.header?.resultMessage ||
+        error?.message ||
+        '비상 채팅방 참가에 실패했습니다.';
       toast.error(resultMessage);
     },
   });
