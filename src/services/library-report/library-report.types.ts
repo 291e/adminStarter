@@ -31,6 +31,7 @@ export type LibraryReport = {
   status?: LibraryReportStatus;
   fileUrl?: string;
   thumbnailUrl?: string;
+  thumbnailPath?: string;
   description?: string | null;
   memo?: string | null;
   isActive?: number | boolean;

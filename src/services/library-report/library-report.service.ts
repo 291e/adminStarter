@@ -84,6 +84,8 @@ const normalizeLibraryReport = (item: any, index: number): LibraryReport => {
     visibilityType: item?.visibilityType,
     status,
     fileUrl: item?.fileUrl,
+    thumbnailUrl: item?.thumbnailUrl,
+    thumbnailPath: item?.thumbnailPath,
     description: item?.description,
     memo: item?.memo,
     isActive: typeof item?.isActive === 'number' ? item.isActive : status === 'active' ? 1 : 0,

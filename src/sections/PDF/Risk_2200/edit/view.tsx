@@ -5,13 +5,14 @@ import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import dayjs, { type Dayjs } from 'dayjs';
 
+import { CONFIG } from 'src/global-config';
+
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 
 import { DashboardContent } from 'src/layouts/dashboard';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import { CONFIG } from 'src/global-config';
 import type { SafetySystem } from 'src/_mock/_safety-system';
 import type { SafetySystemItem } from 'src/services/safety-system/safety-system.types';
 import { getTableDataByDocument, FIXED_MINIMUM_EDUCATION_ROWS } from 'src/_mock/_safety-system';
@@ -1624,7 +1625,6 @@ export function Risk_2200EditView({
       `width=${width},height=${height},left=${left},top=${top},menubar=no,status=no,toolbar=no,scrollbars=yes`
     );
   }, []);
-
   const handleSampleView = useCallback(() => {
     // 활성화된 아이템 정보(itemDetail) 또는 전달받은 상태(state.item)에서 샘플 URL 확인
     const sampleUrl =

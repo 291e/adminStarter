@@ -94,8 +94,8 @@ export default function EditContentModal({
   };
 
   const normalizedThumbnailUrl = useMemo(
-    () => getFullFileUrl(initialData?.thumbnailUrl),
-    [initialData?.thumbnailUrl]
+    () => getFullFileUrl(initialData?.thumbnailPath || initialData?.thumbnailUrl),
+    [initialData?.thumbnailPath, initialData?.thumbnailUrl]
   );
 
   useEffect(() => {

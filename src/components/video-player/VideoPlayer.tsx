@@ -1,9 +1,6 @@
 import { useState, useMemo, useRef } from 'react';
 
 import Box from '@mui/material/Box';
-import FormControl from '@mui/material/FormControl';
-import Select from '@mui/material/Select';
-import MenuItem from '@mui/material/MenuItem';
 import Typography from '@mui/material/Typography';
 
 import { CONFIG } from 'src/global-config';
@@ -18,6 +15,7 @@ type Props = {
   defaultLanguage?: string; // 사용자 언어 (memberLang)에 따른 자동 자막 선택
   onEnded?: () => void;
   serverUrl?: string;
+  disableControls?: boolean;
 };
 
 const LANGUAGE_LABELS: Record<string, string> = {
@@ -42,6 +40,7 @@ export default function VideoPlayer({
   defaultLanguage,
   onEnded,
   serverUrl,
+  disableControls = false,
 }: Props) {
   // 🐛 디버깅: VideoPlayer props 확인
   console.log('🎥 [VideoPlayer] Props 수신:', {
@@ -51,8 +50,8 @@ export default function VideoPlayer({
     vttMap,
     defaultLanguage,
     serverUrl,
+    disableControls,
   });
-
   // 자막 언어 초기값 결정: defaultLanguage → 'ko' → 첫 번째 가용 언어
   const getInitialLanguage = () => {
     if (defaultLanguage && availableLanguages.includes(defaultLanguage)) {
@@ -108,9 +107,12 @@ export default function VideoPlayer({
       ({
         file: {
           attributes: {
-            controls: true,
+            controls: !disableControls,
             playsInline: true,
             crossOrigin: 'anonymous', // [필수] 자막 CORS 문제 해결
+            onContextMenu: (e: any) => {
+              if (disableControls) e.preventDefault();
+            },
           },
           tracks,
         },
@@ -120,7 +122,7 @@ export default function VideoPlayer({
          * 'as any'를 붙여서 TS 검사를 통과시킵니다. (런타임에서는 완벽하게 동작함)
          */
       }) as any,
-    [tracks]
+    [tracks, disableControls]
   );
 
   // 3. 언어 변경 핸들러 (네이티브 HTMLVideoElement 사용)
@@ -159,29 +161,6 @@ export default function VideoPlayer({
         </Box>
       ) : (
         <>
-          {/* 자막 언어 선택 UI */}
-          {availableLanguages.length > 0 && (
-            <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                자막 언어:
-              </Typography>
-              <FormControl size="small" sx={{ minWidth: 150 }}>
-                <Select
-                  value={selectedLanguage}
-                  onChange={(e) => handleLanguageChange(e.target.value)}
-                  displayEmpty
-                >
-                  <MenuItem value="">자막 끄기</MenuItem>
-                  {availableLanguages.map((lang) => (
-                    <MenuItem key={lang} value={lang}>
-                      {LANGUAGE_LABELS[lang] || lang}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Box>
-          )}
-
           {/* 플레이어 영역 - 네이티브 video 태그로 테스트 */}
           <Box
             sx={{
@@ -192,10 +171,21 @@ export default function VideoPlayer({
               overflow: 'hidden',
             }}
           >
-            {/* 디버깅용: 네이티브 HTML5 video 태그 사용 */}
             <video
               ref={playerRef}
-              controls
+              autoPlay
+              controls={!disableControls}
+              onClick={(e) => {
+                const videoEl = e.target as HTMLVideoElement;
+                if (videoEl.paused) {
+                  videoEl.play();
+                } else {
+                  videoEl.pause();
+                }
+              }}
+              onContextMenu={(e) => {
+                if (disableControls) e.preventDefault();
+              }}
               crossOrigin="anonymous"
               style={{ width: '100%', maxHeight: '500px' }}
               onLoadedData={(e) => {
@@ -247,4 +237,3 @@ export default function VideoPlayer({
     </Box>
   );
 }
-

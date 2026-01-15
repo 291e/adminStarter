@@ -11,9 +11,12 @@ import CircularProgress from '@mui/material/CircularProgress';
 
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useNavigate } from 'react-router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { CONFIG } from 'src/global-config';
-import { getSafetySystemItem } from 'src/services/safety-system/safety-system.service';
+import {
+  getSafetySystemItem,
+  deleteSafetySystemDocument,
+} from 'src/services/safety-system/safety-system.service';
 import { getSafetySystemDocumentDetail } from 'src/services/dashboard/dashboard.service';
 import type {
   SafetySystem,
@@ -28,6 +31,7 @@ import RiskAssessmentSettingModal, {
   type RiskAssessmentData,
 } from './components/RiskAssessmentSettingModal';
 import PDFDownloadModal from './components/PDFDownloadModal';
+import DeleteDocumentModal from './components/DeleteDocumentModal';
 import { useRisk_2200 } from './hooks/use-risk-2200';
 import { getTableDataByDocument } from 'src/_mock/_safety-system';
 import { downloadDocumentPDF } from './utils/download-pdf';
@@ -51,6 +55,9 @@ export function Risk_2200View({ safetyId, title = 'Blank', description, sx }: Pr
   const [riskAssessmentModalOpen, setRiskAssessmentModalOpen] = useState(false);
   const [pdfDownloadModalOpen, setPdfDownloadModalOpen] = useState(false);
   const [sampleViewModalOpen, setSampleViewModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [selectedDeleteRow, setSelectedDeleteRow] = useState<Risk_2200Row | null>(null);
+  const queryClient = useQueryClient();
 
   // 아이템 상세 정보 조회 (문서 목록 포함)
   const { data: itemDetailResponse, isLoading: isItemLoading } = useQuery({
@@ -188,16 +195,58 @@ export function Risk_2200View({ safetyId, title = 'Blank', description, sx }: Pr
     }
   };
 
+  // 문서 삭제 mutation
+  const deleteDocumentMutation = useMutation({
+    mutationFn: async (safetySystemDocumentIdx: number) => {
+      await deleteSafetySystemDocument(safetySystemDocumentIdx);
+    },
+    onSuccess: () => {
+      // 삭제 성공 시 목록 새로고침
+      queryClient.invalidateQueries({
+        queryKey: ['safety-system-item', state?.item?.safetySystemItemIdx],
+      });
+      toast.success('문서가 삭제되었습니다.');
+      setDeleteModalOpen(false);
+      setSelectedDeleteRow(null);
+    },
+    onError: (error: any) => {
+      console.error('문서 삭제 실패:', error);
+      toast.error(
+        error?.response?.data?.header?.resultMessage || '문서 삭제에 실패했습니다.'
+      );
+    },
+  });
+
   const handleDelete = (id: string) => {
-    // TODO: TanStack Query Hook(useMutation)으로 문서 삭제
-    // const mutation = useMutation({
-    //   mutationFn: (documentId: string) => deleteRisk2200Document(documentId),
-    //   onSuccess: () => {
-    //     queryClient.invalidateQueries({ queryKey: ['risk2200Documents'] });
-    //   },
-    // });
-    // mutation.mutate(id);
-    console.log('삭제:', id);
+    // id는 safetySystemDocumentIdx를 문자열로 변환한 값
+    const safetySystemDocumentIdx = Number(id);
+    if (!safetySystemDocumentIdx || isNaN(safetySystemDocumentIdx)) {
+      toast.error('문서 ID가 유효하지 않습니다.');
+      return;
+    }
+
+    // 삭제할 문서 찾기
+    const rowToDelete = rows.find((row) => row.id === id);
+    if (!rowToDelete) {
+      toast.error('삭제할 문서를 찾을 수 없습니다.');
+      return;
+    }
+
+    // 삭제 확인 모달 열기
+    setSelectedDeleteRow(rowToDelete);
+    setDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!selectedDeleteRow) return;
+
+    const safetySystemDocumentIdx = Number(selectedDeleteRow.id);
+    if (!safetySystemDocumentIdx || isNaN(safetySystemDocumentIdx)) {
+      toast.error('문서 ID가 유효하지 않습니다.');
+      return;
+    }
+
+    deleteDocumentMutation.mutate(safetySystemDocumentIdx);
   };
 
   const handleDownloadPDF = async (id: string, safetySystemItemIdx?: number) => {
@@ -489,6 +538,18 @@ export function Risk_2200View({ safetyId, title = 'Blank', description, sx }: Pr
         open={sampleViewModalOpen}
         onClose={() => setSampleViewModalOpen(false)}
         samples={sampleList}
+      />
+
+      {/* 삭제 확인 모달 */}
+      <DeleteDocumentModal
+        open={deleteModalOpen}
+        onClose={() => {
+          setDeleteModalOpen(false);
+          setSelectedDeleteRow(null);
+        }}
+        onConfirm={handleConfirmDelete}
+        document={selectedDeleteRow}
+        isDeleting={deleteDocumentMutation.isPending}
       />
     </DashboardContent>
   );

@@ -33,13 +33,9 @@ export default function RiskTable_2_4_2400_TBM({ data = defaultData }: Props) {
     (row) => row.inspectionContent?.trim() || row.result?.trim()
   );
 
-  // 교육영상 빈 행 필터링
+  // 교육영상 빈 행 필터링 (참여자가 있거나 영상이 있는 경우)
   const filteredEducationVideoRows = data.educationVideoRows.filter(
-    (row) =>
-      row.participant?.name?.trim() ||
-      row.participant?.department?.trim() ||
-      row.educationVideo?.trim() ||
-      row.signature?.trim()
+    (row) => row.educationVideo?.trim() || row.participant
   );
 
   const tableStyle = {
@@ -76,7 +72,7 @@ export default function RiskTable_2_4_2400_TBM({ data = defaultData }: Props) {
             </tr>
           </thead>
           <tbody>
-            {data.inspectionRows.map((row, index) => (
+            {filteredInspectionRows.map((row, index) => (
               <tr key={index} style={{ height: 48 }}>
                 <td>
                   <Typography sx={{ fontSize: 14, fontWeight: 400 }}>
@@ -149,8 +145,8 @@ export default function RiskTable_2_4_2400_TBM({ data = defaultData }: Props) {
           <thead>
             <tr style={{ height: 60 }}>
               <th style={{ width: '30%' }}>대상자</th>
-              <th style={{ width: '35%' }}>교육영상</th>
-              <th style={{ width: '25%' }}>서명</th>
+              <th style={{ width: '40%' }}>교육영상</th>
+              <th style={{ width: '30%' }}>서명</th>
             </tr>
           </thead>
           <tbody>

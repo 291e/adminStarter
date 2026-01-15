@@ -4,6 +4,25 @@ import html2canvas from 'html2canvas';
 // ----------------------------------------------------------------------
 
 /**
+ * 요소 내의 모든 이미지가 로드될 때까지 대기
+ */
+async function waitForImages(element: HTMLElement): Promise<void> {
+  const images = Array.from(element.querySelectorAll('img'));
+  const promises = images.map((img) => {
+    if (img.complete) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      img.onload = () => resolve();
+      img.onerror = () => resolve(); // 에러 발생 시에도 진행
+    });
+  });
+
+  // 최대 5초 대기
+  const timeoutPromise = new Promise<void>((resolve) => setTimeout(resolve, 5000));
+
+  await Promise.race([Promise.all(promises), timeoutPromise]);
+}
+
+/**
  * PDF 생성 함수
  * @param element - PDF로 변환할 HTML 요소
  * @param filename - 저장할 파일명
@@ -28,12 +47,15 @@ export async function generatePDF(
       }
     });
 
+    // 모든 이미지가 로드될 때까지 대기
+    await waitForImages(element);
+
     // 해상도 및 품질 조정 (scale: 2로 낮춤, 충분한 품질 유지)
     const canvas = await html2canvas(element, {
       scale, // 해상도 (기본값: 2, 3에서 낮춤)
       useCORS: true,
       logging: false,
-      allowTaint: true,
+      allowTaint: false,
       backgroundColor: '#ffffff',
       removeContainer: false,
       width: element.scrollWidth,

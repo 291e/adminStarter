@@ -4,6 +4,8 @@ import { useNavigate, useLocation } from 'react-router';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import dayjs, { type Dayjs } from 'dayjs';
 
+import { CONFIG } from 'src/global-config';
+
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 
@@ -11,7 +13,6 @@ import { DashboardContent } from 'src/layouts/dashboard';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import type { SafetySystem } from 'src/_mock/_safety-system';
-import { CONFIG } from 'src/global-config';
 import type { SafetySystemItem } from 'src/services/safety-system/safety-system.types';
 import type { OriginalDocument } from 'src/services/dashboard/dashboard.types';
 import { getTableDataByDocument, FIXED_MINIMUM_EDUCATION_ROWS } from 'src/_mock/_safety-system';
@@ -847,7 +848,6 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
       ],
     }));
   }, []);
-
   // 2400번대 (연간 교육 계획) 핸들러
   const handleTable2400EducationRowChange = useCallback(
     (
@@ -1464,7 +1464,6 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
       `width=${width},height=${height},left=${left},top=${top},menubar=no,status=no,toolbar=no,scrollbars=yes`
     );
   }, []);
-
   // 샘플 보기 모달 상태
   const [sampleViewModalOpen, setSampleViewModalOpen] = useState(false);
 

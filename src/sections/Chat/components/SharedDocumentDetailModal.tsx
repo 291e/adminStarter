@@ -47,6 +47,102 @@ import type { WorkerSignatureStatusInfo } from 'src/services/safety-system/safet
 
 // ----------------------------------------------------------------------
 
+// Video.js 플레이어 래퍼 컴포넌트 (자막 지원)
+const VideoPlayerWithSubtitle = ({
+  vodIdx,
+  videoTitle,
+  memberLang,
+  onEnded,
+}: {
+  vodIdx: number;
+  videoTitle: string;
+  memberLang: string;
+  onEnded: () => void;
+}) => {
+  // VOD 상세 정보 조회 (자막 언어 목록 가져오기)
+  const { data: vodDetailData, isLoading: isLoadingVodDetail } = useVodDetail(vodIdx, true);
+
+  // vttMap 추출
+  const vttMap = useMemo(() => {
+    if (!vodDetailData) return undefined;
+    const vodDetail = vodDetailData as any;
+    return vodDetail.vttMap || vodDetail.body?.vttMap || vodDetail.data?.vttMap || {};
+  }, [vodDetailData]);
+
+  // 사용 가능한 자막 언어 목록 추출
+  const availableLanguages = useMemo(() => {
+    if (!vttMap) return [];
+    return Object.keys(vttMap).filter((lang) => vttMap[lang]);
+  }, [vttMap]);
+
+  // 비디오 URL 생성 (이미지 불러오기와 동일한 방식: CONFIG.serverUrl + videoPath)
+  const videoUrl = useMemo(() => {
+    if (!vodDetailData) return null;
+    const vodDetail = vodDetailData as any;
+    // vodDetailData에서 videoPath 직접 추출
+    const videoPath = vodDetail.videoPath || vodDetail.body?.videoPath || vodDetail.data?.videoPath;
+
+    if (!videoPath) return null;
+
+    // 이미지 불러오기와 동일한 방식: CONFIG.serverUrl + videoPath
+    const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
+    const path = videoPath.startsWith('/') ? videoPath : `/${videoPath}`;
+    return `${baseUrl}${path}`;
+  }, [vodDetailData]);
+
+  // 로딩 중이거나 비디오 URL이 없으면 로딩 표시
+  if (isLoadingVodDetail || !videoUrl) {
+    return (
+      <Box
+        sx={{
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 1,
+          pt: 2,
+          borderTop: '1px solid',
+          borderColor: 'divider',
+        }}
+      >
+        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+          {videoTitle}
+        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
+          <CircularProgress />
+        </Box>
+      </Box>
+    );
+  }
+
+  return (
+    <Box
+      sx={{
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 1,
+        pt: 2,
+        borderTop: '1px solid',
+        borderColor: 'divider',
+      }}
+    >
+      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+        {videoTitle}
+      </Typography>
+      <VideoPlayer
+        vodIdx={vodIdx}
+        videoUrl={videoUrl}
+        availableLanguages={availableLanguages}
+        vttMap={vttMap}
+        defaultLanguage={memberLang || 'ko'}
+        onEnded={onEnded}
+        serverUrl={CONFIG.serverUrl}
+        disableControls
+      />
+    </Box>
+  );
+};
+
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -559,129 +655,6 @@ export default function SharedDocumentDetailModal({
     });
   };
 
-  // Video.js 플레이어 래퍼 컴포넌트 (자막 지원)
-  const VideoPlayerWithSubtitle = ({
-    vodIdx,
-    videoTitle,
-    onEnded,
-  }: {
-    vodIdx: number;
-    videoTitle: string;
-    onEnded: () => void;
-  }) => {
-    // VOD 상세 정보 조회 (자막 언어 목록 가져오기)
-    const {
-      data: vodDetailData,
-      isLoading: isLoadingVodDetail,
-      error: vodDetailError,
-    } = useVodDetail(vodIdx, true);
-
-    // 🐛 디버깅: VOD 상세 조회 결과 확인
-    console.log('🎬 [VideoPlayerWithSubtitle] vodIdx:', vodIdx);
-    console.log('🎬 [VideoPlayerWithSubtitle] vodDetailData:', vodDetailData);
-    console.log('🎬 [VideoPlayerWithSubtitle] isLoadingVodDetail:', isLoadingVodDetail);
-    console.log('🎬 [VideoPlayerWithSubtitle] vodDetailError:', vodDetailError);
-
-    // vttMap 추출
-    const vttMap = useMemo(() => {
-      if (!vodDetailData) return undefined;
-      const vodDetail = vodDetailData as any;
-      const map = vodDetail.vttMap || vodDetail.body?.vttMap || vodDetail.data?.vttMap || {};
-      console.log('🎬 [VideoPlayerWithSubtitle] vttMap:', map);
-      return map;
-    }, [vodDetailData]);
-
-    // 사용 가능한 자막 언어 목록 추출
-    const availableLanguages = useMemo(() => {
-      if (!vttMap) return [];
-      return Object.keys(vttMap).filter((lang) => vttMap[lang]);
-    }, [vttMap]);
-
-    // 비디오 URL 생성 (이미지 불러오기와 동일한 방식: CONFIG.serverUrl + videoPath)
-    const videoUrl = useMemo(() => {
-      if (!vodDetailData) return null;
-      const vodDetail = vodDetailData as any;
-      // vodDetailData에서 videoPath 직접 추출
-      const videoPath =
-        vodDetail.videoPath || vodDetail.body?.videoPath || vodDetail.data?.videoPath;
-
-      console.log('🎬 [VideoPlayerWithSubtitle] vodDetail에서 추출한 videoPath:', videoPath);
-
-      if (!videoPath) {
-        console.log('🎬 [VideoPlayerWithSubtitle] videoPath가 없음');
-        return null;
-      }
-
-      // 이미지 불러오기와 동일한 방식: CONFIG.serverUrl + videoPath
-      const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
-      const path = videoPath.startsWith('/') ? videoPath : `/${videoPath}`;
-      const fullVideoUrl = `${baseUrl}${path}`;
-
-      console.log('🎬 [VideoPlayerWithSubtitle] baseUrl (CONFIG.serverUrl):', baseUrl);
-      console.log('🎬 [VideoPlayerWithSubtitle] path:', path);
-      console.log('🎬 [VideoPlayerWithSubtitle] fullVideoUrl:', fullVideoUrl);
-
-      return fullVideoUrl;
-    }, [vodDetailData]);
-
-    console.log('🎬 [VideoPlayerWithSubtitle] availableLanguages:', availableLanguages);
-    console.log('🎬 [VideoPlayerWithSubtitle] final videoUrl:', videoUrl);
-
-    // 로딩 중이거나 비디오 URL이 없으면 로딩 표시
-    if (isLoadingVodDetail || !videoUrl) {
-      console.log('🎬 [VideoPlayerWithSubtitle] 로딩 중이거나 videoUrl 없음, 로딩 표시');
-      return (
-        <Box
-          sx={{
-            width: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 1,
-            pt: 2,
-            borderTop: '1px solid',
-            borderColor: 'divider',
-          }}
-        >
-          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-            {videoTitle}
-          </Typography>
-          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
-            <CircularProgress />
-          </Box>
-        </Box>
-      );
-    }
-
-    console.log('🎬 [VideoPlayerWithSubtitle] VideoPlayer 렌더링 시작');
-
-    return (
-      <Box
-        sx={{
-          width: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 1,
-          pt: 2,
-          borderTop: '1px solid',
-          borderColor: 'divider',
-        }}
-      >
-        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-          {videoTitle}
-        </Typography>
-        <VideoPlayer
-          vodIdx={vodIdx}
-          videoUrl={videoUrl}
-          availableLanguages={availableLanguages}
-          vttMap={vttMap}
-          defaultLanguage={(myInfoData as any)?.memberLang || 'ko'}
-          onEnded={onEnded}
-          serverUrl={CONFIG.serverUrl}
-        />
-      </Box>
-    );
-  };
-
   // 2400-tbm 테이블 커스텀 렌더링
   const render2400TBMTable = (data: Table2400TBMData) => {
     const tableStyle = {
@@ -783,22 +756,20 @@ export default function SharedDocumentDetailModal({
                     </Typography>
                   </td>
                   <td>
-                    {row.vodIdx ? (
+                    {/* vodIdx가 있고, 현재 로그인한 사용자와 대상자가 일치하는 경우에만 재생 버튼 표시 */}
+                    {row.vodIdx && (myInfoData as any)?.memberIdx === row.participant?.memberIdx ? (
                       <Button
-                        variant="text"
+                        variant={playingVideoRow?.rowIndex === index ? 'outlined' : 'contained'}
+                        startIcon={<Iconify icon="solar:play-circle-bold" width={20} />}
                         onClick={() => handleEducationVideoClick(row, index)}
                         sx={{
+                          minHeight: 36,
                           fontSize: 14,
-                          fontWeight: 400,
-                          color: 'primary.main',
-                          textDecoration: 'underline',
-                          textTransform: 'none',
-                          '&:hover': {
-                            textDecoration: 'underline',
-                          },
+                          fontWeight: 600,
                         }}
                       >
-                        {row.educationVideo || ''}
+                        {row.participant?.name || '대상자'} - {row.educationVideo || '교육영상'}{' '}
+                        재생
                       </Button>
                     ) : (
                       <Typography sx={{ fontSize: 14, fontWeight: 400 }}>
@@ -832,46 +803,6 @@ export default function SharedDocumentDetailModal({
               ))}
             </tbody>
           </Box>
-
-          {/* 교육영상 재생 버튼 및 플레이어 (vodIdx가 있는 경우) */}
-          {data.educationVideoRows.some((row) => row.vodIdx) && (
-            <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'center' }}>
-                {data.educationVideoRows.map((row, index) => {
-                  if (!row.vodIdx) return null;
-                  const isPlaying =
-                    playingVideoRow?.vodIdx === row.vodIdx && playingVideoRow?.rowIndex === index;
-                  return (
-                    <Button
-                      key={index}
-                      variant={isPlaying ? 'outlined' : 'contained'}
-                      startIcon={<Iconify icon="solar:play-circle-bold" width={20} />}
-                      onClick={() => handleEducationVideoClick(row, index)}
-                      sx={{
-                        minHeight: 36,
-                        fontSize: 14,
-                        fontWeight: 600,
-                      }}
-                    >
-                      {row.participant?.name || '대상자'} - {row.educationVideo || '교육영상'} 재생
-                    </Button>
-                  );
-                })}
-              </Box>
-
-              {/* 비디오 플레이어 */}
-              {playingVideoRow && (
-                <VideoPlayerWithSubtitle
-                  key={`video-${playingVideoRow.vodIdx}-${playingVideoRow.rowIndex}`}
-                  vodIdx={playingVideoRow.vodIdx}
-                  videoTitle={
-                    data.educationVideoRows[playingVideoRow.rowIndex]?.educationVideo || '교육영상'
-                  }
-                  onEnded={handleVideoEnded}
-                />
-              )}
-            </Box>
-          )}
         </Box>
       </Box>
     );
@@ -1204,7 +1135,8 @@ export default function SharedDocumentDetailModal({
             <VideoPlayerWithSubtitle
               key={`video-modal-${playingVideoRow.vodIdx}`}
               vodIdx={playingVideoRow.vodIdx}
-              videoTitle=""
+              videoTitle={playingVideoRow.videoTitle || '교육영상'}
+              memberLang={(myInfoData as any)?.memberLang || 'ko'}
               onEnded={handleVideoEnded}
             />
           )}

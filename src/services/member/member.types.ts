@@ -151,6 +151,8 @@ export type UpdateMemberDto = {
   companyBranchIdx?: number;
   standardHours?: number; // 개별 이수 시간 (분, null이면 EducationStandard 기준 사용)
   joinedAt?: string; // 입사일 (YYYY-MM-DD 형식)
+  workType?: string; // 직종
+  memberLang?: string; // 국적(언어)
 };
 
 // 회원 수정 응답

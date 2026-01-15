@@ -84,11 +84,13 @@ const getJobType = (member: Member): string => {
 // 국적 매핑 함수
 const getNationality = (member: Member): string => {
   const nationalityMap: { [key: string]: string } = {
-    ko: '대한민국',
-    zh: '중국',
-    vi: '베트남',
-    en: '영어',
+    ko: '한국',
+    en: '미국',
     ne: '네팔',
+    vn: '베트남',
+    vi: '베트남',
+    zh: '중국',
+    uz: '우즈베키스탄',
   };
   return nationalityMap[member.memberLang] || member.memberLang || '-';
 };

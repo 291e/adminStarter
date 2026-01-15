@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -22,7 +22,6 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 
 import { Iconify } from 'src/components/iconify';
 import { useCreateOrganization, useInviteMember } from '../hooks/use-organization-api';
-import { useServices } from 'src/sections/ServiceSetting/hooks/use-service-setting-api';
 
 // 다음 주소 API 타입 정의
 declare global {
@@ -60,7 +59,6 @@ export type OrganizationFormData = {
   businessItem: string;
   address: string;
   detailAddress: string;
-  subscriptionService: string;
   sendInvitationEmail: boolean;
 };
 
@@ -101,7 +99,6 @@ const DEFAULT_FORM_DATA: OrganizationFormData = {
   businessItem: '',
   address: '',
   detailAddress: '',
-  subscriptionService: '',
   sendInvitationEmail: false,
 };
 
@@ -111,6 +108,11 @@ const REQUIRED_FIELDS: Array<keyof OrganizationFormData> = [
   'representativeName',
   'representativePhone',
   'representativeEmail',
+  'businessNumber',
+  'businessCategory',
+  'businessItem',
+  'address',
+  'detailAddress',
 ];
 
 export default function CreateOrganizationModal({ open, onClose }: Props) {
@@ -119,23 +121,21 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
   const [businessNumberError, setBusinessNumberError] = useState<string | null>(null);
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
+
   const createOrganizationMutation = useCreateOrganization();
   const inviteMemberMutation = useInviteMember();
 
   const addressInputRef = useRef<HTMLInputElement>(null);
-
-  const {
-    data: servicesData,
-    isLoading: isLoadingServices,
-    isError: isErrorServices,
-  } = useServices({ page: 1, pageSize: 100, status: 'ACTIVE' });
-
-  const serviceOptions = useMemo(() => {
-    const list = (servicesData as any)?.serviceSettingList;
-    return Array.isArray(list) ? list : [];
-  }, [servicesData]);
+  const errorAlertRef = useRef<HTMLDivElement>(null); // 에러 메시지 스크롤용 ref
 
   const isSubmitting = createOrganizationMutation.isPending || inviteMemberMutation.isPending;
+
+  // 에러 메시지가 나타나면 자동으로 스크롤
+  useEffect(() => {
+    if (errorMessage && errorAlertRef.current) {
+      errorAlertRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [errorMessage]);
 
   const formatBusinessNumber = (value: string) => {
     const digits = value.replace(/\D/g, '').slice(0, 10);
@@ -297,7 +297,7 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
     }
 
     if (missingFields.length > 0) {
-      setErrorMessage('필수 항목을 모두 입력해주세요.');
+      setErrorMessage('모든 필수 항목을 입력해주세요.');
       return;
     }
 
@@ -317,9 +317,7 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
         address:
           [formData.address, formData.detailAddress].filter(Boolean).join(' ').trim() || undefined,
         companyType: formData.companyType,
-        serviceSettingIdxes: formData.subscriptionService
-          ? [Number(formData.subscriptionService)]
-          : undefined,
+        serviceSettingIdxes: undefined, // 구독 서비스 제거됨
       };
 
       if (import.meta.env.DEV) {
@@ -336,9 +334,6 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
         (result as any)?.data?.companyIdx ??
         (result as any)?.body?.companyIdx ??
         null;
-
-      // 참고: 구독은 빌링키 등록 시 자동으로 처리됩니다.
-      // 조직 생성 시 serviceSettingIdxes를 전달하면, 나중에 빌링키를 등록할 때 해당 서비스로 구독이 생성됩니다.
 
       if (newCompanyIdx && formData.sendInvitationEmail) {
         try {
@@ -402,12 +397,19 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
       <DialogContent>
         <Box sx={{ py: 1 }}>
           <Stack spacing={3}>
+            {/* 에러 메시지 (상단 이동) */}
+            {errorMessage && (
+              <Alert severity="error" ref={errorAlertRef} sx={{ mb: 2 }}>
+                {errorMessage}
+              </Alert>
+            )}
+
             {/* 첫 번째 행: 구분, 조직명 */}
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <FormControl fullWidth>
                 <InputLabel id="company-type-label">
                   구분
-                  <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
+                  <Typography component="span" sx={{ color: 'error.main', ml: 0.5 }}>
                     *
                   </Typography>
                 </InputLabel>
@@ -433,7 +435,7 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
                 label={
                   <>
                     조직명
-                    <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
+                    <Typography component="span" sx={{ color: 'error.main', ml: 0.5 }}>
                       *
                     </Typography>
                   </>
@@ -447,10 +449,15 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
             {/* 사업자 유형, 사업자 번호 */}
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <FormControl fullWidth>
-                <InputLabel id="business-type-label">사업자 유형</InputLabel>
+                <InputLabel id="business-type-label">
+                  사업자 유형
+                  <Typography component="span" sx={{ color: 'error.main', ml: 0.5 }}>
+                    *
+                  </Typography>
+                </InputLabel>
                 <Select
                   labelId="business-type-label"
-                  label="사업자 유형"
+                  label="사업자 유형 *"
                   value={formData.businessType}
                   onChange={(e) => handleChange('businessType', e.target.value)}
                 >
@@ -463,7 +470,14 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
               </FormControl>
               <TextField
                 fullWidth
-                label="사업자 번호"
+                label={
+                  <>
+                    사업자 번호
+                    <Typography component="span" sx={{ color: 'error.main', ml: 0.5 }}>
+                      *
+                    </Typography>
+                  </>
+                }
                 placeholder="123-45-67890"
                 value={formData.businessNumber}
                 onChange={(e) => handleBusinessNumberChange(e.target.value)}
@@ -480,7 +494,7 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
               label={
                 <>
                   대표자명
-                  <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
+                  <Typography component="span" sx={{ color: 'error.main', ml: 0.5 }}>
                     *
                   </Typography>
                 </>
@@ -496,7 +510,7 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
               label={
                 <>
                   대표 전화번호
-                  <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
+                  <Typography component="span" sx={{ color: 'error.main', ml: 0.5 }}>
                     *
                   </Typography>
                 </>
@@ -516,7 +530,7 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
               label={
                 <>
                   대표 이메일
-                  <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
+                  <Typography component="span" sx={{ color: 'error.main', ml: 0.5 }}>
                     *
                   </Typography>
                 </>
@@ -533,14 +547,28 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <TextField
                 fullWidth
-                label="업태"
+                label={
+                  <>
+                    업태
+                    <Typography component="span" sx={{ color: 'error.main', ml: 0.5 }}>
+                      *
+                    </Typography>
+                  </>
+                }
                 placeholder="업태"
                 value={formData.businessCategory}
                 onChange={(e) => handleChange('businessCategory', e.target.value)}
               />
               <TextField
                 fullWidth
-                label="종목"
+                label={
+                  <>
+                    종목
+                    <Typography component="span" sx={{ color: 'error.main', ml: 0.5 }}>
+                      *
+                    </Typography>
+                  </>
+                }
                 placeholder="종목"
                 value={formData.businessItem}
                 onChange={(e) => handleChange('businessItem', e.target.value)}
@@ -552,7 +580,14 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
               <TextField
                 inputRef={addressInputRef}
                 fullWidth
-                label="사업장 주소"
+                label={
+                  <>
+                    사업장 주소
+                    <Typography component="span" sx={{ color: 'error.main', ml: 0.5 }}>
+                      *
+                    </Typography>
+                  </>
+                }
                 placeholder="서울시 강남구 ..."
                 value={formData.address}
                 onClick={handleAddressFieldClick}
@@ -585,35 +620,18 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
             {/* 상세주소 */}
             <TextField
               fullWidth
-              label="상세주소"
+              label={
+                <>
+                  상세주소
+                  <Typography component="span" sx={{ color: 'error.main', ml: 0.5 }}>
+                    *
+                  </Typography>
+                </>
+              }
               placeholder="상세주소"
               value={formData.detailAddress}
               onChange={(e) => handleChange('detailAddress', e.target.value)}
             />
-
-            {/* 구독 서비스 */}
-            <FormControl fullWidth>
-              <InputLabel id="subscription-service-label">구독 서비스</InputLabel>
-              <Select
-                labelId="subscription-service-label"
-                label="구독 서비스"
-                value={formData.subscriptionService}
-                onChange={(e) => handleChange('subscriptionService', e.target.value)}
-                disabled={isLoadingServices || serviceOptions.length === 0}
-              >
-                <MenuItem value="">선택 안 함</MenuItem>
-                {isErrorServices && (
-                  <MenuItem value="error" disabled>
-                    서비스 불러오기 실패
-                  </MenuItem>
-                )}
-                {serviceOptions.map((service: any) => (
-                  <MenuItem key={service.id} value={service.id}>
-                    {service.serviceName}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
 
             {/* 초대 이메일 */}
             <FormControlLabel
@@ -625,12 +643,6 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
               }
               label="초대 이메일을 발송합니다."
             />
-
-            {errorMessage && (
-              <Alert severity="error" sx={{ mt: 1 }}>
-                {errorMessage}
-              </Alert>
-            )}
 
             <Divider sx={{ borderStyle: 'dashed' }} />
           </Stack>

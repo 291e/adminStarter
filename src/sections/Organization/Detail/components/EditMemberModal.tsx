@@ -94,8 +94,10 @@ const WORK_TYPES = [
 
 const NATIONALITIES = [
   { value: 'ko', label: '한국' },
-  { value: 'vn', label: '베트남' },
   { value: 'en', label: '미국' },
+  { value: 'ne', label: '네팔' },
+  { value: 'vn', label: '베트남' },
+  { value: 'zh', label: '중국' },
   { value: 'uz', label: '우즈베키스탄' },
 ];
 
@@ -444,6 +446,8 @@ export default function EditMemberModal({
       ...(formData.companyBranchIdx && { companyBranchIdx: Number(formData.companyBranchIdx) }),
       ...(standardHoursToSend !== undefined && { standardHours: standardHoursToSend }),
       ...(formData.joinedAt && { joinedAt: formData.joinedAt.format('YYYY-MM-DD') }),
+      workType: formData.workType || undefined,
+      memberLang: formData.memberLang || undefined,
     };
 
     updateMemberMutation.mutate({

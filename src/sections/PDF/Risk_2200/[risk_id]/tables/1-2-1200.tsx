@@ -1,6 +1,10 @@
+import { useState, useEffect } from 'react';
+
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
+
+import { CONFIG } from 'src/global-config';
 
 import type { Table1200NearMissRow } from '../../types/table-data';
 
@@ -97,6 +101,56 @@ export default function RiskTable_1_2_1200({ row = defaultRow }: Props) {
     </Box>
   );
 
+  // 이미지 Base64 상태 관리
+  const [base64Images, setBase64Images] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const loadImages = async () => {
+      if (!row.siteImages || row.siteImages.length === 0) return;
+
+      const newBase64Images: Record<string, string> = {};
+
+      await Promise.all(
+        row.siteImages.map(async (imgUrl) => {
+          try {
+            // 이미 변환된 경우 건너뜀
+            if (base64Images[imgUrl]) return;
+
+            const fullUrl = imgUrl.startsWith('http')
+              ? imgUrl
+              : `${CONFIG.serverUrl}${imgUrl.startsWith('/') ? '' : '/'}${imgUrl}`;
+
+            const response = await fetch(fullUrl, {
+              mode: 'cors',
+              headers: {
+                'Cache-Control': 'no-cache',
+              },
+            });
+
+            if (!response.ok) throw new Error('Network response was not ok');
+
+            const blob = await response.blob();
+            const base64 = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.readAsDataURL(blob);
+            });
+
+            newBase64Images[imgUrl] = base64;
+          } catch (error) {
+            console.error('이미지 로드 실패:', imgUrl, error);
+            // 실패 시 원본 URL 사용 (CORS 에러 가능성 있음)
+            newBase64Images[imgUrl] = imgUrl;
+          }
+        })
+      );
+
+      setBase64Images((prev) => ({ ...prev, ...newBase64Images }));
+    };
+
+    loadImages();
+  }, [row.siteImages]);
+
   const renderSiteImages = () => {
     if (!row.siteImages || row.siteImages.length === 0) {
       return (
@@ -108,24 +162,22 @@ export default function RiskTable_1_2_1200({ row = defaultRow }: Props) {
 
     return (
       <Stack direction="row" spacing={1} flexWrap="wrap">
-        {row.siteImages.map((_, index) => (
+        {row.siteImages.map((imgUrl, index) => (
           <Box
             key={index}
+            component="img"
+            src={base64Images[imgUrl] || imgUrl}
+            alt={`현장 사진 ${index + 1}`}
+            crossOrigin="anonymous"
             sx={{
-              width: 96,
-              height: 96,
+              width: 200,
+              height: 150,
+              objectFit: 'cover',
               borderRadius: 1,
-              border: '1px dashed',
+              border: '1px solid',
               borderColor: 'divider',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 12,
-              color: 'text.secondary',
             }}
-          >
-            이미지 {index + 1}
-          </Box>
+          />
         ))}
       </Stack>
     );
