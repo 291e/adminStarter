@@ -308,6 +308,7 @@ export default function EducationDetailModal({ open, onClose, educationReportIdx
     0
   );
   const totalTime = mandatoryTotal + regularTotal;
+  const remainingTime = Math.max(0, (report?.standardEducation || 0) - totalTime);
 
   if (!educationReportIdx && !isLoading) {
     return null;
@@ -747,23 +748,56 @@ export default function EducationDetailModal({ open, onClose, educationReportIdx
               }}
             >
               <Stack spacing={3} sx={{ minWidth: 300 }}>
-                <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-                  <TextField
-                    label="총 이수시간"
-                    value={totalTime}
-                    disabled
-                    size="small"
-                    sx={{
-                      flex: 1,
-                      '& .MuiInputBase-input': {
-                        fontSize: 15,
-                        fontWeight: 400,
-                      },
-                    }}
-                  />
-                  <Typography variant="subtitle2" sx={{ fontSize: 14, fontWeight: 600, mb: 0.5 }}>
-                    분
-                  </Typography>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 3,
+                  }}
+                >
+                  <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flex: 1 }}>
+                    <TextField
+                      label="총 이수시간"
+                      value={totalTime}
+                      disabled
+                      size="small"
+                      sx={{
+                        flex: 1,
+                        '& .MuiInputBase-input': {
+                          fontSize: 15,
+                          fontWeight: 400,
+                        },
+                      }}
+                    />
+                    <Typography
+                      variant="subtitle2"
+                      sx={{ fontSize: 14, fontWeight: 600, mb: 0.5 }}
+                    >
+                      분
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flex: 1 }}>
+                    <TextField
+                      label="잔여 시간"
+                      value={remainingTime}
+                      disabled
+                      size="small"
+                      sx={{
+                        flex: 1,
+                        '& .MuiInputBase-input': {
+                          fontSize: 15,
+                          fontWeight: 400,
+                        },
+                      }}
+                    />
+                    <Typography
+                      variant="subtitle2"
+                      sx={{ fontSize: 14, fontWeight: 600, mb: 0.5 }}
+                    >
+                      분
+                    </Typography>
+                  </Box>
                 </Box>
                 <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
                   <TextField

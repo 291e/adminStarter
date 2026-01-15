@@ -24,6 +24,8 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
+import { useAuthContext } from 'src/auth/hooks/use-auth-context';
+import { useMyInfo } from 'src/sections/Chat/hooks/use-my-info';
 
 // ----------------------------------------------------------------------
 
@@ -46,6 +48,21 @@ export default function ShareToChatModal({
   const [selectedRoomIndices, setSelectedRoomIndices] = useState<number[]>([]);
   const [isNormalExpanded, setIsNormalExpanded] = useState(true);
   const [isGroupExpanded, setIsGroupExpanded] = useState(true);
+  const { user } = useAuthContext();
+  const { data: myInfoData } = useMyInfo();
+
+  const currentMemberIdx =
+    (myInfoData as any)?.memberIdx ||
+    (myInfoData as any)?.memberIndex ||
+    (myInfoData as any)?.member?.memberIdx ||
+    (myInfoData as any)?.member?.memberIndex ||
+    user?.memberIdx ||
+    user?.memberIndex ||
+    user?.member?.memberIdx ||
+    user?.member?.memberIndex ||
+    user?.companyMember?.memberIdx ||
+    user?.companyMember?.memberIndex ||
+    null;
 
   useEffect(() => {
     if (open) {
@@ -77,21 +94,55 @@ export default function ShareToChatModal({
     normalRooms: ChatRoomDto[];
     groupRooms: ChatRoomDto[];
   }>(() => {
-    let filtered = rooms;
+    const hasCurrentMemberIdx =
+      currentMemberIdx !== null &&
+      currentMemberIdx !== undefined &&
+      !Number.isNaN(Number(currentMemberIdx));
 
-    if (searchQuery.trim()) {
-      filtered = rooms.filter((room) =>
-        room.name?.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+    const getOtherParticipants = (participants?: ChatRoomDto['participants']) => {
+      if (!participants || !Array.isArray(participants)) return [];
+      if (!hasCurrentMemberIdx) return participants;
+
+      const currentIdx = Number(currentMemberIdx);
+      if (Number.isNaN(currentIdx)) return participants;
+
+      return participants.filter((p) => {
+        const participantIdx = Number(p.memberIdx ?? (p as any)?.memberIndex);
+        return !Number.isNaN(participantIdx) && participantIdx !== currentIdx;
+      });
+    };
+
+    let filtered = rooms;
+    const searchValue = searchQuery.trim().toLowerCase();
+
+    if (searchValue) {
+      filtered = rooms.filter((room) => {
+        const roomName = room.name?.toLowerCase() || '';
+        if (!hasCurrentMemberIdx) {
+          return roomName.includes(searchValue);
+        }
+        const otherParticipants = getOtherParticipants(room.participants);
+        const participantNames = otherParticipants.map((p) => p.name).join(' ').toLowerCase();
+        return roomName.includes(searchValue) || participantNames.includes(searchValue);
+      });
     }
 
-    const normal = filtered.filter(
-      (room) => !room.isGroup && room.type !== 'CHATBOT' && room.type !== 'EMERGENCY'
-    );
-    const group = filtered.filter((room) => room.isGroup);
+    const normal = filtered.filter((room) => {
+      if (room.type === 'CHATBOT' || room.type === 'EMERGENCY') return false;
+      if (!hasCurrentMemberIdx) return !room.isGroup;
+      const otherParticipants = getOtherParticipants(room.participants);
+      return otherParticipants.length === 1;
+    });
+
+    const group = filtered.filter((room) => {
+      if (room.type === 'CHATBOT' || room.type === 'EMERGENCY') return false;
+      if (!hasCurrentMemberIdx) return !!room.isGroup;
+      const otherParticipants = getOtherParticipants(room.participants);
+      return otherParticipants.length >= 2;
+    });
 
     return { normalRooms: normal, groupRooms: group };
-  }, [rooms, searchQuery]);
+  }, [rooms, searchQuery, currentMemberIdx]);
 
   // lastMessage가 객체일 경우 text를 추출하는 헬퍼 함수
   const getLastMessageText = (

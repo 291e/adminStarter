@@ -478,9 +478,12 @@ export default function SubscriptionService({ organizationId }: Props) {
       <Box sx={{ p: 3 }}>
         <Stack
           direction="row"
-          justifyContent="space-between"
-          spacing={2}
-          sx={{ flexWrap: 'wrap', gap: 2 }}
+          justifyContent="flex-start"
+          sx={{
+            flexWrap: 'wrap',
+            columnGap: 1.5,
+            rowGap: 2,
+          }}
         >
           {plans.map((plan) => {
             const isSelected = selectedServiceSettingIdx === plan.serviceSettingIdx;
