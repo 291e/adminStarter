@@ -135,8 +135,20 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom, onCre
       | { text: string; senderId?: string; translations?: Record<string, string> }
   ): string => {
     if (!lastMessage) return '';
-    if (typeof lastMessage === 'string') return lastMessage;
-    return lastMessage.text || '';
+    
+    let text = '';
+    if (typeof lastMessage === 'string') {
+      text = lastMessage;
+    } else {
+      text = lastMessage.text || '';
+    }
+    
+    // [이미지]|url 형식을 [이미지]로 변환
+    if (text.includes('[이미지]|')) {
+      text = text.split('|')[0]; // | 기준으로 분리하여 첫 번째 부분만 사용
+    }
+    
+    return text;
   };
 
   // 챗봇방은 항상 표시 (API 응답에 없어도)

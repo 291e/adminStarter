@@ -747,7 +747,7 @@ export default function EducationDetailModal({ open, onClose, educationReportIdx
                 pb: 2,
               }}
             >
-              <Stack spacing={3} sx={{ minWidth: 300 }}>
+              <Stack spacing={3} sx={{ minWidth: 300, width: '100%' }}>
                 <Box
                   sx={{
                     display: 'flex',
@@ -770,10 +770,7 @@ export default function EducationDetailModal({ open, onClose, educationReportIdx
                         },
                       }}
                     />
-                    <Typography
-                      variant="subtitle2"
-                      sx={{ fontSize: 14, fontWeight: 600, mb: 0.5 }}
-                    >
+                    <Typography variant="subtitle2" sx={{ fontSize: 14, fontWeight: 600, mb: 0.5 }}>
                       분
                     </Typography>
                   </Box>
@@ -791,10 +788,7 @@ export default function EducationDetailModal({ open, onClose, educationReportIdx
                         },
                       }}
                     />
-                    <Typography
-                      variant="subtitle2"
-                      sx={{ fontSize: 14, fontWeight: 600, mb: 0.5 }}
-                    >
+                    <Typography variant="subtitle2" sx={{ fontSize: 14, fontWeight: 600, mb: 0.5 }}>
                       분
                     </Typography>
                   </Box>

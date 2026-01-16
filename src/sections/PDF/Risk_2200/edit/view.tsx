@@ -1274,7 +1274,7 @@ export function Risk_2200EditView({
   const updateDocumentMutation = useMutation({
     mutationFn: ({ docIdx, params }: { docIdx: number; params: any }) =>
       updateSafetySystemDocument(docIdx, params),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       // 아이템 상세 정보 쿼리 무효화하여 문서 목록 갱신
       if (item?.safetySystemItemIdx) {
         queryClient.invalidateQueries({
@@ -1288,6 +1288,8 @@ export function Risk_2200EditView({
       // 공유 문서 상세 모달 쿼리 무효화
       queryClient.invalidateQueries({ queryKey: ['sharedDocumentDetail'] });
       queryClient.invalidateQueries({ queryKey: ['safetySystemDocumentDetail'] });
+      // 문서 상세 정보 쿼리 무효화 (진행률 모달에서 사용)
+      queryClient.invalidateQueries({ queryKey: ['safetySystemDocument', variables.docIdx] });
       // 리스트 페이지로 이동
       if (safetyId) {
         navigate(`/dashboard/safety-system/${safetyId}/risk-2200`, {
@@ -2037,6 +2039,7 @@ export function Risk_2200EditView({
                   onEducationVideoRowDelete={handleTable2400TBMEducationVideoRowDelete}
                   onEducationVideoRowMove={handleTable2400TBMEducationVideoRowMove}
                   onEducationVideoAddRow={handleTable2400TBMEducationVideoAddRow}
+                  safetySystemDocumentIdx={safetySystemDocumentIdx || undefined}
                 />
               ) : is2400Education ? (
                 <Table2400EducationForm

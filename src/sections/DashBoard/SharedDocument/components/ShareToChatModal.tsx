@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useGetChatRooms } from 'src/sections/Chat/hooks/use-chat-api';
-import type { ChatRoomDto } from 'src/services/chat/chat.types';
+import type { ChatRoomDto, ChatParticipantDto } from 'src/services/chat/chat.types';
 
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -26,6 +26,7 @@ import { Scrollbar } from 'src/components/scrollbar';
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
 import { useAuthContext } from 'src/auth/hooks/use-auth-context';
 import { useMyInfo } from 'src/sections/Chat/hooks/use-my-info';
+import { CONFIG } from 'src/global-config';
 
 // ----------------------------------------------------------------------
 
@@ -79,6 +80,68 @@ export default function ShareToChatModal({
     }
   }, [open]);
 
+  // participants를 배열로 정규화 (객체 형태일 수도 있음)
+  const normalizeParticipants = (participants?: ChatRoomDto['participants']): ChatParticipantDto[] => {
+    if (!participants) return [];
+    // 이미 배열이면 그대로 반환
+    if (Array.isArray(participants)) return participants;
+    // 객체 형태면 값들을 배열로 변환
+    if (typeof participants === 'object') {
+      return Object.values(participants).filter(
+        (p): p is ChatParticipantDto => p !== null && typeof p === 'object'
+      );
+    }
+    return [];
+  };
+
+  // 파일 URL을 전체 URL로 변환하는 헬퍼 함수
+  const getFullFileUrl = (url: string | null | undefined): string | null => {
+    if (!url) return null;
+    // 잘못된 형식: data:image/png;base64,data/admin/... 같은 경우 처리
+    if (
+      url.startsWith('data:image/png;base64,data/admin/') ||
+      url.startsWith('data:image/png;base64,/data/admin/')
+    ) {
+      // base64 접두사를 제거하고 URL로 처리
+      const cleanUrl = url.replace(/^data:image\/png;base64,/, '');
+      const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
+      const path = cleanUrl.startsWith('/') ? cleanUrl : `/${cleanUrl}`;
+      return `${baseUrl}${path}`;
+    }
+    // 이미 전체 URL인 경우 (http:// 또는 https://로 시작)
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    // base64 데이터 URL인 경우 그대로 반환 (실제 base64 데이터인 경우)
+    if (url.startsWith('data:image/') && !url.includes('data/admin/')) {
+      return url;
+    }
+    // 상대 경로인 경우 CONFIG.serverUrl과 결합
+    // data/admin/로 시작하는 경우도 처리
+    const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
+    const path = url.startsWith('/') ? url : `/${url}`;
+    return `${baseUrl}${path}`;
+  };
+
+  // 현재 사용자를 제외한 참가자 목록 반환
+  const getOtherParticipants = (participants?: ChatRoomDto['participants']) => {
+    const normalizedParticipants = normalizeParticipants(participants);
+    const hasCurrentMemberIdx =
+      currentMemberIdx !== null &&
+      currentMemberIdx !== undefined &&
+      !Number.isNaN(Number(currentMemberIdx));
+    
+    if (!hasCurrentMemberIdx) return normalizedParticipants;
+
+    const currentIdx = Number(currentMemberIdx);
+    if (Number.isNaN(currentIdx)) return normalizedParticipants;
+
+    return normalizedParticipants.filter((p) => {
+      const participantIdx = Number(p.memberIdx ?? (p as any)?.memberIndex);
+      return !Number.isNaN(participantIdx) && participantIdx !== currentIdx;
+    });
+  };
+
   // 검색 필터링 및 일반/그룹 채팅 분리
   const { data: chatRoomsData, isLoading } = useGetChatRooms();
   const rooms = useMemo<ChatRoomDto[]>(() => {
@@ -99,30 +162,61 @@ export default function ShareToChatModal({
       currentMemberIdx !== undefined &&
       !Number.isNaN(Number(currentMemberIdx));
 
-    const getOtherParticipants = (participants?: ChatRoomDto['participants']) => {
-      if (!participants || !Array.isArray(participants)) return [];
-      if (!hasCurrentMemberIdx) return participants;
+    // 현재 사용자가 참가자 목록에 포함되어 있는지 확인 (나간 채팅방 필터링)
+    const isCurrentUserParticipant = (participants?: ChatRoomDto['participants']): boolean => {
+      const normalizedParticipants = normalizeParticipants(participants);
+      
+      // participants가 비어있으면 필터링하지 않음 (API가 이미 처리했을 수도 있음)
+      if (normalizedParticipants.length === 0) return true;
+      
+      if (!hasCurrentMemberIdx) return true; // memberIdx가 없으면 필터링하지 않음
 
       const currentIdx = Number(currentMemberIdx);
-      if (Number.isNaN(currentIdx)) return participants;
+      if (Number.isNaN(currentIdx)) return true;
 
-      return participants.filter((p) => {
+      // 현재 사용자가 participants 배열에 포함되어 있는지 확인
+      const currentParticipant = normalizedParticipants.find((p) => {
         const participantIdx = Number(p.memberIdx ?? (p as any)?.memberIndex);
-        return !Number.isNaN(participantIdx) && participantIdx !== currentIdx;
+        return !Number.isNaN(participantIdx) && participantIdx === currentIdx;
       });
+
+      // 현재 사용자가 참가자 목록에 없으면 나간 채팅방으로 간주
+      if (!currentParticipant) return false;
+
+      // leftAt 필드가 있으면 null인지 확인 (null이면 아직 참가 중)
+      const leftAt = (currentParticipant as any)?.leftAt;
+      if (leftAt !== undefined && leftAt !== null) {
+        return false; // leftAt이 있으면 나간 채팅방
+      }
+
+      return true; // 참가 중인 채팅방
     };
 
+
+    // 나간 채팅방 필터링: participants 배열에 현재 사용자가 포함되어 있는 채팅방만 표시
     let filtered = rooms;
+    if (hasCurrentMemberIdx) {
+      filtered = rooms.filter((room) => {
+        // CHATBOT, EMERGENCY 타입은 항상 표시
+        if (room.type === 'CHATBOT' || room.type === 'EMERGENCY') return true;
+        // 현재 사용자가 참가 중인 채팅방만 표시
+        return isCurrentUserParticipant(room.participants);
+      });
+    }
+
     const searchValue = searchQuery.trim().toLowerCase();
 
     if (searchValue) {
-      filtered = rooms.filter((room) => {
+      filtered = filtered.filter((room) => {
         const roomName = room.name?.toLowerCase() || '';
         if (!hasCurrentMemberIdx) {
           return roomName.includes(searchValue);
         }
         const otherParticipants = getOtherParticipants(room.participants);
-        const participantNames = otherParticipants.map((p) => p.name).join(' ').toLowerCase();
+        const participantNames = otherParticipants
+          .map((p) => p.name)
+          .join(' ')
+          .toLowerCase();
         return roomName.includes(searchValue) || participantNames.includes(searchValue);
       });
     }
@@ -151,8 +245,20 @@ export default function ShareToChatModal({
       | { text: string; senderId?: string; translations?: Record<string, string> }
   ): string => {
     if (!lastMessage) return '';
-    if (typeof lastMessage === 'string') return lastMessage;
-    return lastMessage.text || '';
+    
+    let text = '';
+    if (typeof lastMessage === 'string') {
+      text = lastMessage;
+    } else {
+      text = lastMessage.text || '';
+    }
+    
+    // [이미지]|url 형식을 [이미지]로 변환
+    if (text.includes('[이미지]|')) {
+      text = text.split('|')[0]; // | 기준으로 분리하여 첫 번째 부분만 사용
+    }
+    
+    return text;
   };
 
   const handleToggleRoom = (chatRoomIdx: number) => {
@@ -305,6 +411,20 @@ export default function ShareToChatModal({
                                   minute: '2-digit',
                                 })
                               : '';
+                            
+                            // 상대방 참가자 찾기
+                            const otherParticipants = getOtherParticipants(room.participants);
+                            const otherParticipant = otherParticipants[0];
+                            const profileImageUrl = otherParticipant
+                              ? getFullFileUrl(
+                                  otherParticipant.profileImage ||
+                                    (otherParticipant as any)?.avatar ||
+                                    (otherParticipant as any)?.memberThumbnail
+                                )
+                              : null;
+                            const displayName = otherParticipant?.name || room.name || '';
+                            const firstChar = displayName?.[0] || '?';
+
                             return (
                               <ListItem
                                 key={room.chatRoomIdx}
@@ -359,8 +479,18 @@ export default function ShareToChatModal({
                                     />
                                   </Box>
                                   <ListItemAvatar sx={{ minWidth: 40, py: 2 }}>
-                                    <Avatar sx={{ width: 40, height: 40, bgcolor: 'grey.500' }}>
-                                      {room.name[0]}
+                                    <Avatar
+                                      sx={{ width: 40, height: 40, bgcolor: 'grey.500' }}
+                                      src={profileImageUrl || undefined}
+                                      alt={displayName}
+                                    >
+                                      {!profileImageUrl && (
+                                        firstChar ? (
+                                          firstChar
+                                        ) : (
+                                          <Iconify icon="solar:user-rounded-bold" width={24} />
+                                        )
+                                      )}
                                     </Avatar>
                                   </ListItemAvatar>
                                   <ListItemText
@@ -499,8 +629,18 @@ export default function ShareToChatModal({
                                   minute: '2-digit',
                                 })
                               : '';
+                            const otherParticipants = getOtherParticipants(room.participants);
                             const memberNames =
-                              room.participants?.map((p) => p.name).filter((name) => name) || [];
+                              otherParticipants.map((p) => p.name).filter((name) => name) || [];
+                            
+                            // 각 참가자의 프로필 이미지 URL 가져오기
+                            const getParticipantAvatarUrl = (participant: ChatParticipantDto) =>
+                              getFullFileUrl(
+                                participant.profileImage ||
+                                  (participant as any)?.avatar ||
+                                  (participant as any)?.memberThumbnail
+                              );
+                            
                             return (
                               <ListItem
                                 key={room.chatRoomIdx}
@@ -564,172 +704,332 @@ export default function ShareToChatModal({
                                         }}
                                       >
                                         {memberNames.length === 1 ? (
-                                          <Avatar
-                                            sx={{
-                                              width: 40,
-                                              height: 40,
-                                              bgcolor: 'primary.main',
-                                              fontSize: 16,
-                                            }}
-                                          >
-                                            {memberNames[0][0]}
-                                          </Avatar>
+                                          (() => {
+                                            const participant = otherParticipants[0];
+                                            const avatarUrl = participant ? getParticipantAvatarUrl(participant) : null;
+                                            const name = participant?.name || memberNames[0] || '';
+                                            const firstChar = name?.[0] || '?';
+                                            return (
+                                              <Avatar
+                                                sx={{
+                                                  width: 40,
+                                                  height: 40,
+                                                  bgcolor: 'primary.main',
+                                                  fontSize: 16,
+                                                }}
+                                                src={avatarUrl || undefined}
+                                                alt={name}
+                                              >
+                                                {!avatarUrl && (
+                                                  firstChar ? (
+                                                    firstChar
+                                                  ) : (
+                                                    <Iconify icon="solar:user-rounded-bold" width={24} />
+                                                  )
+                                                )}
+                                              </Avatar>
+                                            );
+                                          })()
                                         ) : memberNames.length === 2 ? (
                                           <>
-                                            <Avatar
-                                              sx={{
-                                                position: 'absolute',
-                                                left: 0,
-                                                top: 0,
-                                                width: 28,
-                                                height: 28,
-                                                border: '1px solid',
-                                                borderColor: 'background.paper',
-                                                bgcolor: 'primary.main',
-                                                fontSize: 14,
-                                                zIndex: 2,
-                                              }}
-                                            >
-                                              {memberNames[0][0]}
-                                            </Avatar>
-                                            <Avatar
-                                              sx={{
-                                                position: 'absolute',
-                                                right: 0,
-                                                bottom: 0,
-                                                width: 28,
-                                                height: 28,
-                                                border: '1px solid',
-                                                borderColor: 'background.paper',
-                                                bgcolor: 'primary.main',
-                                                fontSize: 14,
-                                                zIndex: 1,
-                                              }}
-                                            >
-                                              {memberNames[1][0]}
-                                            </Avatar>
+                                            {(() => {
+                                              const participant = otherParticipants[0];
+                                              const avatarUrl = participant ? getParticipantAvatarUrl(participant) : null;
+                                              const name = participant?.name || memberNames[0] || '';
+                                              const firstChar = name?.[0] || '?';
+                                              return (
+                                                <Avatar
+                                                  sx={{
+                                                    position: 'absolute',
+                                                    left: 0,
+                                                    top: 0,
+                                                    width: 28,
+                                                    height: 28,
+                                                    border: '1px solid',
+                                                    borderColor: 'background.paper',
+                                                    bgcolor: 'primary.main',
+                                                    fontSize: 14,
+                                                    zIndex: 2,
+                                                  }}
+                                                  src={avatarUrl || undefined}
+                                                  alt={name}
+                                                >
+                                                  {!avatarUrl && (
+                                                    firstChar ? (
+                                                      firstChar
+                                                    ) : (
+                                                      <Iconify icon="solar:user-rounded-bold" width={16} />
+                                                    )
+                                                  )}
+                                                </Avatar>
+                                              );
+                                            })()}
+                                            {(() => {
+                                              const participant = otherParticipants[1];
+                                              const avatarUrl = participant ? getParticipantAvatarUrl(participant) : null;
+                                              const name = participant?.name || memberNames[1] || '';
+                                              const firstChar = name?.[0] || '?';
+                                              return (
+                                                <Avatar
+                                                  sx={{
+                                                    position: 'absolute',
+                                                    right: 0,
+                                                    bottom: 0,
+                                                    width: 28,
+                                                    height: 28,
+                                                    border: '1px solid',
+                                                    borderColor: 'background.paper',
+                                                    bgcolor: 'primary.main',
+                                                    fontSize: 14,
+                                                    zIndex: 1,
+                                                  }}
+                                                  src={avatarUrl || undefined}
+                                                  alt={name}
+                                                >
+                                                  {!avatarUrl && (
+                                                    firstChar ? (
+                                                      firstChar
+                                                    ) : (
+                                                      <Iconify icon="solar:user-rounded-bold" width={16} />
+                                                    )
+                                                  )}
+                                                </Avatar>
+                                              );
+                                            })()}
                                           </>
                                         ) : memberNames.length === 3 ? (
                                           <>
-                                            <Avatar
-                                              sx={{
-                                                position: 'absolute',
-                                                left: 0,
-                                                bottom: '20%',
-                                                top: '20%',
-                                                width: 24,
-                                                height: 24,
-                                                border: '1px solid',
-                                                borderColor: 'background.paper',
-                                                bgcolor: 'primary.main',
-                                                fontSize: 12,
-                                                zIndex: 3,
-                                              }}
-                                            >
-                                              {memberNames[0][0]}
-                                            </Avatar>
-                                            <Avatar
-                                              sx={{
-                                                position: 'absolute',
-                                                left: '50%',
-                                                bottom: '20%',
-                                                top: '20%',
-                                                transform: 'translateX(-50%)',
-                                                width: 24,
-                                                height: 24,
-                                                border: '1px solid',
-                                                borderColor: 'background.paper',
-                                                bgcolor: 'primary.main',
-                                                fontSize: 12,
-                                                zIndex: 2,
-                                              }}
-                                            >
-                                              {memberNames[1][0]}
-                                            </Avatar>
-                                            <Avatar
-                                              sx={{
-                                                position: 'absolute',
-                                                right: 0,
-                                                bottom: '20%',
-                                                top: '20%',
-                                                width: 24,
-                                                height: 24,
-                                                border: '1px solid',
-                                                borderColor: 'background.paper',
-                                                bgcolor: 'primary.main',
-                                                fontSize: 12,
-                                                zIndex: 1,
-                                              }}
-                                            >
-                                              {memberNames[2][0]}
-                                            </Avatar>
+                                            {(() => {
+                                              const participant = otherParticipants[0];
+                                              const avatarUrl = participant ? getParticipantAvatarUrl(participant) : null;
+                                              const name = participant?.name || memberNames[0] || '';
+                                              const firstChar = name?.[0] || '?';
+                                              return (
+                                                <Avatar
+                                                  sx={{
+                                                    position: 'absolute',
+                                                    left: 0,
+                                                    bottom: '20%',
+                                                    top: '20%',
+                                                    width: 24,
+                                                    height: 24,
+                                                    border: '1px solid',
+                                                    borderColor: 'background.paper',
+                                                    bgcolor: 'primary.main',
+                                                    fontSize: 12,
+                                                    zIndex: 3,
+                                                  }}
+                                                  src={avatarUrl || undefined}
+                                                  alt={name}
+                                                >
+                                                  {!avatarUrl && (
+                                                    firstChar ? (
+                                                      firstChar
+                                                    ) : (
+                                                      <Iconify icon="solar:user-rounded-bold" width={14} />
+                                                    )
+                                                  )}
+                                                </Avatar>
+                                              );
+                                            })()}
+                                            {(() => {
+                                              const participant = otherParticipants[1];
+                                              const avatarUrl = participant ? getParticipantAvatarUrl(participant) : null;
+                                              const name = participant?.name || memberNames[1] || '';
+                                              const firstChar = name?.[0] || '?';
+                                              return (
+                                                <Avatar
+                                                  sx={{
+                                                    position: 'absolute',
+                                                    left: '50%',
+                                                    bottom: '20%',
+                                                    top: '20%',
+                                                    transform: 'translateX(-50%)',
+                                                    width: 24,
+                                                    height: 24,
+                                                    border: '1px solid',
+                                                    borderColor: 'background.paper',
+                                                    bgcolor: 'primary.main',
+                                                    fontSize: 12,
+                                                    zIndex: 2,
+                                                  }}
+                                                  src={avatarUrl || undefined}
+                                                  alt={name}
+                                                >
+                                                  {!avatarUrl && (
+                                                    firstChar ? (
+                                                      firstChar
+                                                    ) : (
+                                                      <Iconify icon="solar:user-rounded-bold" width={14} />
+                                                    )
+                                                  )}
+                                                </Avatar>
+                                              );
+                                            })()}
+                                            {(() => {
+                                              const participant = otherParticipants[2];
+                                              const avatarUrl = participant ? getParticipantAvatarUrl(participant) : null;
+                                              const name = participant?.name || memberNames[2] || '';
+                                              const firstChar = name?.[0] || '?';
+                                              return (
+                                                <Avatar
+                                                  sx={{
+                                                    position: 'absolute',
+                                                    right: 0,
+                                                    bottom: '20%',
+                                                    top: '20%',
+                                                    width: 24,
+                                                    height: 24,
+                                                    border: '1px solid',
+                                                    borderColor: 'background.paper',
+                                                    bgcolor: 'primary.main',
+                                                    fontSize: 12,
+                                                    zIndex: 1,
+                                                  }}
+                                                  src={avatarUrl || undefined}
+                                                  alt={name}
+                                                >
+                                                  {!avatarUrl && (
+                                                    firstChar ? (
+                                                      firstChar
+                                                    ) : (
+                                                      <Iconify icon="solar:user-rounded-bold" width={14} />
+                                                    )
+                                                  )}
+                                                </Avatar>
+                                              );
+                                            })()}
                                           </>
                                         ) : (
                                           <>
-                                            <Avatar
-                                              sx={{
-                                                position: 'absolute',
-                                                left: 0,
-                                                top: 0,
-                                                width: 20,
-                                                height: 20,
-                                                border: '1px solid',
-                                                borderColor: 'background.paper',
-                                                bgcolor: 'primary.main',
-                                                fontSize: 10,
-                                                zIndex: 4,
-                                              }}
-                                            >
-                                              {memberNames[0]?.[0] || 'G'}
-                                            </Avatar>
-                                            <Avatar
-                                              sx={{
-                                                position: 'absolute',
-                                                right: 0,
-                                                top: 0,
-                                                width: 20,
-                                                height: 20,
-                                                border: '1px solid',
-                                                borderColor: 'background.paper',
-                                                bgcolor: 'primary.main',
-                                                fontSize: 10,
-                                                zIndex: 3,
-                                              }}
-                                            >
-                                              {memberNames[1]?.[0] || 'G'}
-                                            </Avatar>
-                                            <Avatar
-                                              sx={{
-                                                position: 'absolute',
-                                                left: 0,
-                                                bottom: 0,
-                                                width: 20,
-                                                height: 20,
-                                                border: '1px solid',
-                                                borderColor: 'background.paper',
-                                                bgcolor: 'primary.main',
-                                                fontSize: 10,
-                                                zIndex: 2,
-                                              }}
-                                            >
-                                              {memberNames[2]?.[0] || 'G'}
-                                            </Avatar>
-                                            <Avatar
-                                              sx={{
-                                                position: 'absolute',
-                                                right: 0,
-                                                bottom: 0,
-                                                width: 20,
-                                                height: 20,
-                                                border: '1px solid',
-                                                borderColor: 'background.paper',
-                                                bgcolor: 'primary.main',
-                                                fontSize: 10,
-                                                zIndex: 1,
-                                              }}
-                                            >
-                                              {memberNames[3]?.[0] || 'G'}
-                                            </Avatar>
+                                            {(() => {
+                                              const participant = otherParticipants[0];
+                                              const avatarUrl = participant ? getParticipantAvatarUrl(participant) : null;
+                                              const name = participant?.name || memberNames[0] || '';
+                                              const firstChar = name?.[0] || 'G';
+                                              return (
+                                                <Avatar
+                                                  sx={{
+                                                    position: 'absolute',
+                                                    left: 0,
+                                                    top: 0,
+                                                    width: 20,
+                                                    height: 20,
+                                                    border: '1px solid',
+                                                    borderColor: 'background.paper',
+                                                    bgcolor: 'primary.main',
+                                                    fontSize: 10,
+                                                    zIndex: 4,
+                                                  }}
+                                                  src={avatarUrl || undefined}
+                                                  alt={name}
+                                                >
+                                                  {!avatarUrl && (
+                                                    firstChar ? (
+                                                      firstChar
+                                                    ) : (
+                                                      <Iconify icon="solar:user-rounded-bold" width={12} />
+                                                    )
+                                                  )}
+                                                </Avatar>
+                                              );
+                                            })()}
+                                            {(() => {
+                                              const participant = otherParticipants[1];
+                                              const avatarUrl = participant ? getParticipantAvatarUrl(participant) : null;
+                                              const name = participant?.name || memberNames[1] || '';
+                                              const firstChar = name?.[0] || 'G';
+                                              return (
+                                                <Avatar
+                                                  sx={{
+                                                    position: 'absolute',
+                                                    right: 0,
+                                                    top: 0,
+                                                    width: 20,
+                                                    height: 20,
+                                                    border: '1px solid',
+                                                    borderColor: 'background.paper',
+                                                    bgcolor: 'primary.main',
+                                                    fontSize: 10,
+                                                    zIndex: 3,
+                                                  }}
+                                                  src={avatarUrl || undefined}
+                                                  alt={name}
+                                                >
+                                                  {!avatarUrl && (
+                                                    firstChar ? (
+                                                      firstChar
+                                                    ) : (
+                                                      <Iconify icon="solar:user-rounded-bold" width={12} />
+                                                    )
+                                                  )}
+                                                </Avatar>
+                                              );
+                                            })()}
+                                            {(() => {
+                                              const participant = otherParticipants[2];
+                                              const avatarUrl = participant ? getParticipantAvatarUrl(participant) : null;
+                                              const name = participant?.name || memberNames[2] || '';
+                                              const firstChar = name?.[0] || 'G';
+                                              return (
+                                                <Avatar
+                                                  sx={{
+                                                    position: 'absolute',
+                                                    left: 0,
+                                                    bottom: 0,
+                                                    width: 20,
+                                                    height: 20,
+                                                    border: '1px solid',
+                                                    borderColor: 'background.paper',
+                                                    bgcolor: 'primary.main',
+                                                    fontSize: 10,
+                                                    zIndex: 2,
+                                                  }}
+                                                  src={avatarUrl || undefined}
+                                                  alt={name}
+                                                >
+                                                  {!avatarUrl && (
+                                                    firstChar ? (
+                                                      firstChar
+                                                    ) : (
+                                                      <Iconify icon="solar:user-rounded-bold" width={12} />
+                                                    )
+                                                  )}
+                                                </Avatar>
+                                              );
+                                            })()}
+                                            {(() => {
+                                              const participant = otherParticipants[3];
+                                              const avatarUrl = participant ? getParticipantAvatarUrl(participant) : null;
+                                              const name = participant?.name || memberNames[3] || '';
+                                              const firstChar = name?.[0] || 'G';
+                                              return (
+                                                <Avatar
+                                                  sx={{
+                                                    position: 'absolute',
+                                                    right: 0,
+                                                    bottom: 0,
+                                                    width: 20,
+                                                    height: 20,
+                                                    border: '1px solid',
+                                                    borderColor: 'background.paper',
+                                                    bgcolor: 'primary.main',
+                                                    fontSize: 10,
+                                                    zIndex: 1,
+                                                  }}
+                                                  src={avatarUrl || undefined}
+                                                  alt={name}
+                                                >
+                                                  {!avatarUrl && (
+                                                    firstChar ? (
+                                                      firstChar
+                                                    ) : (
+                                                      <Iconify icon="solar:user-rounded-bold" width={12} />
+                                                    )
+                                                  )}
+                                                </Avatar>
+                                              );
+                                            })()}
                                           </>
                                         )}
                                       </Box>
@@ -737,7 +1037,7 @@ export default function ShareToChatModal({
                                       <Avatar
                                         sx={{ width: 40, height: 40, bgcolor: 'primary.main' }}
                                       >
-                                        G
+                                        <Iconify icon="solar:user-rounded-bold" width={24} />
                                       </Avatar>
                                     )}
                                   </ListItemAvatar>

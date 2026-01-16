@@ -64,7 +64,8 @@ export default function ProgressModal({
   const { data: documentDetail } = useQuery({
     queryKey: ['safetySystemDocument', Number(documentId)],
     queryFn: () => getSafetySystemDocument(Number(documentId)),
-    enabled: !!documentId,
+    enabled: !!documentId && open, // 모달이 열렸을 때만 조회
+    refetchOnMount: true, // 마운트 시 항상 최신 데이터 조회
   });
 
   // approvalStep에 따라 유형 결정 (결재 유형)

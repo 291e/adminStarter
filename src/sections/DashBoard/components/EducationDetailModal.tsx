@@ -728,7 +728,7 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
                   pb: 2,
                 }}
               >
-                <Stack spacing={3} sx={{ minWidth: 300 }}>
+                <Stack spacing={3} sx={{ minWidth: 300, width: '100%' }}>
                   <Box
                     sx={{
                       display: 'flex',

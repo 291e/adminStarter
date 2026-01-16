@@ -47,6 +47,11 @@ export default function ChatRoomItem({
       messageText = (rawMsg as any).text || '';
     }
   }
+  
+  // [이미지]|url 형식을 [이미지]로 변환
+  if (messageText.includes('[이미지]|')) {
+    messageText = messageText.split('|')[0]; // | 기준으로 분리하여 첫 번째 부분만 사용
+  }
 
   // 2. 시간 결정
   let displayTime = '';
