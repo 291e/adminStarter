@@ -1,5 +1,5 @@
 import type { Theme, SxProps } from '@mui/material/styles';
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -649,9 +649,25 @@ export function Risk_2200EditView({
     }
   }, [currentDocument]);
 
+  // 초기 로드 여부 추적 (사용자 수정 상태 보호)
+  const isInitialLoadRef = useRef(true);
+
   // 기존 문서 데이터 로드
   useEffect(() => {
     if (!currentDocument) return;
+    
+    // 초기 로드가 아니고 사용자가 수정한 상태가 있으면 덮어쓰지 않음
+    if (!isInitialLoadRef.current) {
+      const hasUserChanges = table2400TBMData.educationVideoRows.some(
+        (row) => row.participant?.memberIdx || row.educationVideo
+      );
+      if (hasUserChanges) {
+        console.log('🔍 [edit/view] 사용자 수정 상태 보호 - useEffect 스킵');
+        return;
+      }
+    }
+    
+    isInitialLoadRef.current = false;
 
     // documentWrittenAt 설정 (documentWrittenAt 우선, 없으면 createAt 사용)
     const documentWrittenAtDate =
@@ -728,7 +744,22 @@ export function Risk_2200EditView({
       } else if (tableType === '1200-near-miss' && parsedTableData.row) {
         setTable1200NearMissRow(parsedTableData.row as Table1200NearMissRow);
       } else if (tableType === '2400-tbm' && parsedTableData.data) {
-        setTable2400TBMData(parsedTableData.data as Table2400TBMData);
+        // 사용자가 이미 수정한 상태가 있으면 덮어쓰지 않음
+        // (근로자 서명 등록 후 쿼리 무효화로 인한 재로드 방지)
+        setTable2400TBMData((prev) => {
+          // prev가 초기값이 아니고, educationVideoRows가 있으면 유지
+          const hasUserChanges = prev.educationVideoRows.some(
+            (row) => row.participant?.memberIdx || row.educationVideo
+          );
+          if (hasUserChanges) {
+            console.log('🔍 [edit/view] 사용자 수정 상태 유지:', {
+              prev,
+              parsedData: parsedTableData.data,
+            });
+            return prev;
+          }
+          return parsedTableData.data as Table2400TBMData;
+        });
       } else if (tableType === '2400-education') {
         if (parsedTableData.rows) {
           setTable2400EducationRows(parsedTableData.rows as Table2400EducationRow[]);
@@ -786,7 +817,20 @@ export function Risk_2200EditView({
         } else if (tableData.type === '1200-near-miss') {
           setTable1200NearMissRow(tableData.row as Table1200NearMissRow);
         } else if (tableData.type === '2400-tbm') {
-          setTable2400TBMData(tableData.data as Table2400TBMData);
+          // 사용자가 이미 수정한 상태가 있으면 덮어쓰지 않음
+          setTable2400TBMData((prev) => {
+            const hasUserChanges = prev.educationVideoRows.some(
+              (row) => row.participant?.memberIdx || row.educationVideo
+            );
+            if (hasUserChanges) {
+              console.log('🔍 [edit/view] 사용자 수정 상태 유지 (fallback):', {
+                prev,
+                tableData: tableData.data,
+              });
+              return prev;
+            }
+            return tableData.data as Table2400TBMData;
+          });
         } else if (tableData.type === '2400-education') {
           setTable2400EducationRows(tableData.rows as Table2400EducationRow[]);
           if (tableData.minimumEducationRows) {
@@ -901,9 +945,54 @@ export function Risk_2200EditView({
     ]);
   }, []);
 
-  const handleTable2400TBMDataChange = useCallback((data: Table2400TBMData) => {
-    setTable2400TBMData(data);
-  }, []);
+  const handleTable2400TBMDataChange = useCallback(
+    (data: Table2400TBMData | ((prev: Table2400TBMData) => Table2400TBMData)) => {
+      console.log('🔍 [edit/view] handleTable2400TBMDataChange 호출:', {
+        isFunction: typeof data === 'function',
+        data: typeof data === 'function' ? 'function' : data,
+        educationVideoRows: typeof data === 'function' ? 'function' : data.educationVideoRows?.map((row, idx) => ({
+          index: idx,
+          participant: row.participant,
+          participantMemberIdx: row.participant?.memberIdx,
+          participantName: row.participant?.name,
+          vodIdx: row.vodIdx,
+          educationVideo: row.educationVideo,
+        })),
+      });
+      
+      if (typeof data === 'function') {
+        setTable2400TBMData((prev) => {
+          const result = data(prev);
+          console.log('✅ [edit/view] 함수형 업데이트 결과:', {
+            result,
+            educationVideoRows: result.educationVideoRows?.map((row, idx) => ({
+              index: idx,
+              participant: row.participant,
+              participantMemberIdx: row.participant?.memberIdx,
+              participantName: row.participant?.name,
+              vodIdx: row.vodIdx,
+              educationVideo: row.educationVideo,
+            })),
+          });
+          return result;
+        });
+      } else {
+        console.log('✅ [edit/view] 직접 업데이트:', {
+          data,
+          educationVideoRows: data.educationVideoRows?.map((row, idx) => ({
+            index: idx,
+            participant: row.participant,
+            participantMemberIdx: row.participant?.memberIdx,
+            participantName: row.participant?.name,
+            vodIdx: row.vodIdx,
+            educationVideo: row.educationVideo,
+          })),
+        });
+        setTable2400TBMData(data);
+      }
+    },
+    []
+  );
 
   const handleTable2400TBMInspectionRowChange = useCallback(
     (index: number, field: 'inspectionContent' | 'result', value: string) => {
@@ -1272,9 +1361,21 @@ export function Risk_2200EditView({
 
   // 문서 수정 Mutation
   const updateDocumentMutation = useMutation({
-    mutationFn: ({ docIdx, params }: { docIdx: number; params: any }) =>
-      updateSafetySystemDocument(docIdx, params),
-    onSuccess: (_, variables) => {
+    mutationFn: ({ docIdx, params }: { docIdx: number; params: any }) => {
+      console.log('🔍 [문서 수정 API] 요청 시작:', {
+        docIdx,
+        params,
+        hasWorkerList: !!params.workerList,
+        workerList: params.workerList,
+      });
+      return updateSafetySystemDocument(docIdx, params);
+    },
+    onSuccess: (response, variables) => {
+      console.log('✅ [문서 수정 API] 성공:', {
+        docIdx: variables.docIdx,
+        response,
+        workerList: variables.params.workerList,
+      });
       // 아이템 상세 정보 쿼리 무효화하여 문서 목록 갱신
       if (item?.safetySystemItemIdx) {
         queryClient.invalidateQueries({
@@ -1442,11 +1543,59 @@ export function Risk_2200EditView({
     }
 
     // API 요청 데이터 구성
-    const requestData = {
+    const requestData: any = {
       approvalDeadline: approvalDeadline ? approvalDeadline.format('YYYY-MM-DD') : undefined,
       tableData: JSON.stringify(tableData),
       approvalStep, // approvalStep 포함
     };
+
+    // 2400 TBM 문서인 경우 workerList 추가
+    if (is2400TBM && table2400TBMData) {
+      console.log('🔍 [문서 수정] 2400 TBM 데이터 확인:', {
+        educationVideoRows: table2400TBMData.educationVideoRows,
+        educationVideoRowsCount: table2400TBMData.educationVideoRows.length,
+      });
+
+      const workerList = table2400TBMData.educationVideoRows
+        .filter((row) => row.participant?.memberIdx && row.vodIdx)
+        .map((row) => ({
+          targetMemberIdx: row.participant!.memberIdx!,
+          vodIdx: row.vodIdx!,
+        }));
+
+      console.log('🔍 [문서 수정] 생성된 workerList:', {
+        workerList,
+        workerListCount: workerList.length,
+        details: workerList.map((w) => ({
+          targetMemberIdx: w.targetMemberIdx,
+          vodIdx: w.vodIdx,
+          participantName: table2400TBMData.educationVideoRows.find(
+            (r) => r.participant?.memberIdx === w.targetMemberIdx && r.vodIdx === w.vodIdx
+          )?.participant?.name,
+        })),
+      });
+
+      if (workerList.length > 0) {
+        requestData.workerList = workerList;
+      } else {
+        console.warn('⚠️ [문서 수정] workerList가 비어있습니다. educationVideoRows 확인:', {
+          educationVideoRows: table2400TBMData.educationVideoRows.map((row, idx) => ({
+            index: idx,
+            participant: row.participant,
+            participantMemberIdx: row.participant?.memberIdx,
+            vodIdx: row.vodIdx,
+            educationVideo: row.educationVideo,
+          })),
+        });
+      }
+    }
+
+    console.log('🔍 [문서 수정] 최종 API 요청 데이터:', {
+      docIdx: safetySystemDocumentIdx,
+      requestData,
+      hasWorkerList: !!requestData.workerList,
+      workerListCount: requestData.workerList?.length || 0,
+    });
 
     updateDocumentMutation.mutate({
       docIdx: safetySystemDocumentIdx,

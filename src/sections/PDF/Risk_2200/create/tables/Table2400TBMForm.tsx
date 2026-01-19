@@ -8,6 +8,8 @@ import IconButton from '@mui/material/IconButton';
 import Button from '@mui/material/Button';
 
 import { Iconify } from 'src/components/iconify';
+import axiosInstance from 'src/lib/axios';
+import { endpoints } from 'src/lib/axios';
 
 import type {
   Table2400TBMData,
@@ -18,7 +20,6 @@ import InvestigationTeamSelectModal from './modal/InvestigationTeamSelectModal';
 import EducationVideoSelectModal from './modal/EducationVideoSelectModal';
 import SignatureModal from '../../edit/components/SignatureModal';
 import {
-  createWorkerSignature,
   addWorkerSignature,
 } from 'src/services/safety-system/safety-system.service';
 
@@ -26,7 +27,7 @@ import {
 
 type Props = {
   data: Table2400TBMData;
-  onDataChange: (data: Table2400TBMData) => void;
+  onDataChange: (data: Table2400TBMData | ((prev: Table2400TBMData) => Table2400TBMData)) => void;
   onInspectionRowChange: (
     index: number,
     field: 'inspectionContent' | 'result',
@@ -96,12 +97,46 @@ export default function Table2400TBMForm({
       workerList: Array<{ targetMemberIdx: number; vodIdx?: number }>;
       rowIndex: number;
     }) => {
+      console.log('🔍 [근로자 서명 등록 API] 요청 시작:', {
+        documentIdx,
+        workerList,
+        workerListCount: workerList.length,
+        rowIndex,
+        workerListDetails: workerList.map((w) => ({
+          targetMemberIdx: w.targetMemberIdx,
+          vodIdx: w.vodIdx,
+        })),
+      });
+
       // 여러 명을 한 번에 등록할 수 있도록 API 호출
-      const response = await createWorkerSignature(documentIdx, { workerList });
-      return { response, rowIndex, documentIdx, workerList };
+      // createWorkerSignature는 workerSignatureIdx만 반환하므로, 전체 응답을 받기 위해 직접 호출
+      const url = `${endpoints.safetySystem.documents}/${documentIdx}/worker-signatures`;
+      const axiosResponse = await axiosInstance.post(url, { workerList });
+      
+      // axios 인터셉터가 평탄화하므로 response.data에 직접 접근
+      const responseData = axiosResponse.data as any;
+      
+      console.log('✅ [근로자 서명 등록 API] 전체 응답:', {
+        documentIdx,
+        axiosResponse,
+        responseData,
+        workerSignatureList: responseData?.workerSignatureList,
+        workerList,
+      });
+
+      return { response: responseData, rowIndex, documentIdx, workerList };
     },
     onSuccess: (result) => {
       const count = result.workerList.length;
+      console.log('✅ [근로자 서명 등록 API] 성공:', {
+        count,
+        workerList: result.workerList,
+        response: result.response,
+        workerListDetails: result.workerList.map((w) => ({
+          targetMemberIdx: w.targetMemberIdx,
+          vodIdx: w.vodIdx,
+        })),
+      });
       toast.success(`${count}명의 근로자 대상자가 등록되었습니다.`);
 
       // 응답에서 workerSignatureIdx 추출
@@ -109,49 +144,214 @@ export default function Table2400TBMForm({
       const responseAny = result.response as any;
       let workerSignatureIndices: number[] = [];
       
+      console.log('🔍 [근로자 서명 등록 API] 응답 파싱:', {
+        responseAny,
+        hasWorkerSignatureList: Array.isArray(responseAny?.workerSignatureList),
+        hasWorkerSignatureIdx: !!responseAny?.workerSignatureIdx,
+        workerSignatureIdxType: typeof responseAny?.workerSignatureIdx,
+        workerSignatureList: responseAny?.workerSignatureList,
+      });
+      
       if (Array.isArray(responseAny?.workerSignatureList)) {
-        // 배열인 경우
+        // 배열인 경우 - documentWorkerSignatureIdx 또는 workerSignatureIdx 사용
         workerSignatureIndices = responseAny.workerSignatureList
-          .map((item: any) => item.workerSignatureIdx || item.documentWorkerSignatureIdx)
+          .map((item: any) => item.documentWorkerSignatureIdx || item.workerSignatureIdx)
           .filter((idx: any) => idx !== undefined && idx !== null);
+        console.log('✅ [근로자 서명 등록 API] 배열 응답 파싱:', {
+          workerSignatureIndices,
+          count: workerSignatureIndices.length,
+          workerSignatureListDetails: responseAny.workerSignatureList.map((item: any) => ({
+            documentWorkerSignatureIdx: item.documentWorkerSignatureIdx,
+            workerSignatureIdx: item.workerSignatureIdx,
+            targetMemberIdx: item.targetMemberIdx,
+            memberName: item.memberName,
+          })),
+        });
       } else if (responseAny?.workerSignatureIdx) {
         // 단일인 경우
         workerSignatureIndices = [responseAny.workerSignatureIdx];
+        console.log('✅ [근로자 서명 등록 API] 단일 응답 파싱:', {
+          workerSignatureIndices,
+        });
       } else if (Array.isArray(responseAny?.workerSignatureIdx)) {
         // workerSignatureIdx가 배열인 경우
         workerSignatureIndices = responseAny.workerSignatureIdx;
+        console.log('✅ [근로자 서명 등록 API] workerSignatureIdx 배열 파싱:', {
+          workerSignatureIndices,
+        });
+      } else {
+        console.warn('⚠️ [근로자 서명 등록 API] 응답에서 workerSignatureIdx를 찾을 수 없음:', {
+          responseAny,
+          responseKeys: Object.keys(responseAny || {}),
+        });
       }
 
       if (workerSignatureIndices.length > 0) {
-        const newRows = [...data.educationVideoRows];
-        const currentRow = newRows[result.rowIndex];
-        const vodIdx = currentRow.vodIdx;
+        // 최신 상태를 가져오기 위해 함수형 업데이트 사용
+        // onDataChange가 함수를 받을 수 있도록 수정하거나, 
+        // 여기서는 직접 최신 data를 사용하도록 수정
+        // 하지만 data는 클로저이므로, onDataChange를 통해 최신 상태를 받아야 함
+        // 일단 현재 data를 사용하되, onDataChange 호출 시 최신 상태가 반영되도록 함
+        
+        // 현재 data의 최신 상태를 가져오기 위해 onDataChange에 함수를 전달할 수 없으므로,
+        // 대신 queryClient를 통해 최신 상태를 가져오거나,
+        // 또는 onDataChange를 수정하여 함수를 받을 수 있도록 해야 함
+        // 임시 해결책: data를 직접 사용하되, onDataChange 호출 후에도 상태가 유지되도록 함
+        
+        const currentData = data; // 클로저의 data 사용
+        const newRows = [...currentData.educationVideoRows];
+        const workerList = result.workerList;
 
-        // 같은 영상(vodIdx)을 가진 행들 중에서 대상자가 있고 workerSignatureIdx가 없는 행들 찾기
-        let workerIndex = 0;
-        for (let i = result.rowIndex; i < newRows.length && workerIndex < workerSignatureIndices.length; i++) {
-          const row = newRows[i];
-          if (
-            row.vodIdx === vodIdx &&
-            row.participant?.memberIdx &&
-            !row.workerSignatureIdx
-          ) {
-            newRows[i] = {
-              ...row,
-              workerSignatureIdx: workerSignatureIndices[workerIndex],
+        console.log('🔍 [근로자 서명 등록 API] 행 업데이트 시작:', {
+          rowIndex: result.rowIndex,
+          workerSignatureIndices,
+          workerList,
+          currentRows: newRows.map((row, idx) => ({
+            index: idx,
+            participant: row.participant,
+            participantMemberIdx: row.participant?.memberIdx,
+            participantName: row.participant?.name,
+            vodIdx: row.vodIdx,
+            workerSignatureIdx: row.workerSignatureIdx,
+          })),
+        });
+
+        // workerList와 workerSignatureIndices를 매칭하여 각 행에 올바른 workerSignatureIdx 할당
+        // workerList의 순서와 workerSignatureList의 순서가 일치한다고 가정
+        for (let i = 0; i < workerList.length && i < workerSignatureIndices.length; i++) {
+          const worker = workerList[i];
+          const workerSignatureIdx = workerSignatureIndices[i];
+          
+          // 해당 targetMemberIdx와 vodIdx를 가진 행 찾기
+          const targetRowIndex = newRows.findIndex(
+            (row) =>
+              row.vodIdx === worker.vodIdx &&
+              row.participant?.memberIdx === worker.targetMemberIdx &&
+              !row.workerSignatureIdx
+          );
+          
+          if (targetRowIndex !== -1) {
+            console.log('✅ [근로자 서명 등록 API] 행 업데이트:', {
+              targetRowIndex,
+              participantMemberIdx: newRows[targetRowIndex].participant?.memberIdx,
+              participantName: newRows[targetRowIndex].participant?.name,
+              vodIdx: newRows[targetRowIndex].vodIdx,
+              workerSignatureIdx,
+              workerTargetMemberIdx: worker.targetMemberIdx,
+            });
+            newRows[targetRowIndex] = {
+              ...newRows[targetRowIndex],
+              workerSignatureIdx,
             };
-            workerIndex++;
+          } else {
+            console.warn('⚠️ [근로자 서명 등록 API] 매칭되는 행을 찾을 수 없음:', {
+              worker,
+              workerSignatureIdx,
+              availableRows: newRows.map((row, idx) => ({
+                index: idx,
+                participantMemberIdx: row.participant?.memberIdx,
+                participantName: row.participant?.name,
+                vodIdx: row.vodIdx,
+                workerSignatureIdx: row.workerSignatureIdx,
+              })),
+            });
           }
         }
 
-        onDataChange({ ...data, educationVideoRows: newRows });
+        console.log('✅ [근로자 서명 등록 API] 최종 업데이트된 행:', {
+          updatedRows: newRows.map((row, idx) => ({
+            index: idx,
+            participant: row.participant,
+            participantMemberIdx: row.participant?.memberIdx,
+            participantName: row.participant?.name,
+            vodIdx: row.vodIdx,
+            workerSignatureIdx: row.workerSignatureIdx,
+          })),
+        });
+
+        // 최신 상태로 업데이트 (함수형 업데이트 사용하여 최신 상태 보장)
+        onDataChange((prevData) => {
+          console.log('🔍 [근로자 서명 등록 API] 함수형 업데이트 시작:', {
+            prevData,
+            prevRows: prevData.educationVideoRows.map((row, idx) => ({
+              index: idx,
+              participant: row.participant,
+              participantMemberIdx: row.participant?.memberIdx,
+              participantName: row.participant?.name,
+              vodIdx: row.vodIdx,
+              workerSignatureIdx: row.workerSignatureIdx,
+            })),
+            workerList,
+            workerSignatureIndices,
+          });
+
+          const prevRows = [...prevData.educationVideoRows];
+          const updatedRows = [...prevRows];
+          
+          // workerList와 workerSignatureIndices를 매칭하여 각 행에 올바른 workerSignatureIdx 할당
+          for (let i = 0; i < workerList.length && i < workerSignatureIndices.length; i++) {
+            const worker = workerList[i];
+            const workerSignatureIdx = workerSignatureIndices[i];
+            
+            const targetRowIndex = updatedRows.findIndex(
+              (row) =>
+                row.vodIdx === worker.vodIdx &&
+                row.participant?.memberIdx === worker.targetMemberIdx &&
+                !row.workerSignatureIdx
+            );
+            
+            if (targetRowIndex !== -1) {
+              console.log('✅ [근로자 서명 등록 API] 함수형 업데이트 - 행 업데이트:', {
+                targetRowIndex,
+                participantMemberIdx: updatedRows[targetRowIndex].participant?.memberIdx,
+                participantName: updatedRows[targetRowIndex].participant?.name,
+                vodIdx: updatedRows[targetRowIndex].vodIdx,
+                workerSignatureIdx,
+                workerTargetMemberIdx: worker.targetMemberIdx,
+              });
+              updatedRows[targetRowIndex] = {
+                ...updatedRows[targetRowIndex],
+                workerSignatureIdx,
+              };
+            } else {
+              console.warn('⚠️ [근로자 서명 등록 API] 함수형 업데이트 - 매칭되는 행을 찾을 수 없음:', {
+                worker,
+                workerSignatureIdx,
+                availableRows: updatedRows.map((row, idx) => ({
+                  index: idx,
+                  participantMemberIdx: row.participant?.memberIdx,
+                  participantName: row.participant?.name,
+                  vodIdx: row.vodIdx,
+                  workerSignatureIdx: row.workerSignatureIdx,
+                })),
+              });
+            }
+          }
+          
+          const finalData = { ...prevData, educationVideoRows: updatedRows };
+          console.log('✅ [근로자 서명 등록 API] 함수형 업데이트 완료:', {
+            finalData,
+            finalRows: finalData.educationVideoRows.map((row, idx) => ({
+              index: idx,
+              participant: row.participant,
+              participantMemberIdx: row.participant?.memberIdx,
+              participantName: row.participant?.name,
+              vodIdx: row.vodIdx,
+              workerSignatureIdx: row.workerSignatureIdx,
+            })),
+          });
+          
+          return finalData;
+        });
+      } else {
+        console.warn('⚠️ [근로자 서명 등록 API] workerSignatureIndices가 비어있음');
       }
       
       queryClient.invalidateQueries({ queryKey: ['notificationHistory'] });
       queryClient.invalidateQueries({ queryKey: ['pendingSignatures'] });
       queryClient.invalidateQueries({ queryKey: ['safety-system-item'] });
-      // 문서 상세 정보 쿼리 무효화 (진행률 모달에서 사용)
-      queryClient.invalidateQueries({ queryKey: ['safetySystemDocument', result.documentIdx] });
+      // 문서 상세 정보 쿼리 무효화는 하지 않음 (사용자가 수정한 상태를 덮어쓰지 않도록)
+      // 진행률 모달은 필요시 refetchOnMount를 사용하여 최신 데이터를 가져옴
     },
   });
 
@@ -177,12 +377,24 @@ export default function Table2400TBMForm({
     summary: string;
     vodIdx?: number;
   }) => {
+    console.log('🔍 [교육영상 선택] 시작:', {
+      educationVideoModalRowIndex,
+      video,
+      currentData: data.educationVideoRows,
+    });
+
     if (educationVideoModalRowIndex !== null) {
       const newRows = [...data.educationVideoRows];
       const currentRow = newRows[educationVideoModalRowIndex];
       
       // 영상이 변경되면 기존 대상자들의 서명 정보 초기화
       const isVideoChanged = currentRow.vodIdx !== video.vodIdx;
+      
+      console.log('🔍 [교육영상 선택] 영상 변경 여부:', {
+        isVideoChanged,
+        oldVodIdx: currentRow.vodIdx,
+        newVodIdx: video.vodIdx,
+      });
       
       newRows[educationVideoModalRowIndex] = {
         ...currentRow,
@@ -194,6 +406,12 @@ export default function Table2400TBMForm({
           signature: '',
         }),
       };
+      
+      console.log('🔍 [교육영상 선택] 업데이트된 행:', {
+        rowIndex: educationVideoModalRowIndex,
+        updatedRow: newRows[educationVideoModalRowIndex],
+      });
+
       onEducationContentChange(video.summary);
       onDataChange({ ...data, educationVideoRows: newRows });
       setEducationVideoModalRowIndex(null);
@@ -202,15 +420,33 @@ export default function Table2400TBMForm({
 
   // 대상자(참여자) 선택 완료 - 여러 명 선택 가능
   const handleParticipantConfirm = (members: InvestigationTeamMember[]) => {
+    console.log('🔍 [대상자 선택] 시작:', {
+      participantModalRowIndex,
+      members,
+      membersCount: members.length,
+      currentData: data.educationVideoRows,
+    });
+
     if (participantModalRowIndex === null || members.length === 0) {
+      console.log('⚠️ [대상자 선택] 조건 불만족:', {
+        participantModalRowIndex,
+        membersLength: members.length,
+      });
       setParticipantModalRowIndex(null);
       return;
     }
 
     const currentRow = data.educationVideoRows[participantModalRowIndex];
+    console.log('🔍 [대상자 선택] 현재 행 정보:', {
+      rowIndex: participantModalRowIndex,
+      currentRow,
+      vodIdx: currentRow.vodIdx,
+      educationVideo: currentRow.educationVideo,
+    });
     
     // 교육영상이 선택되지 않았으면 경고
     if (!currentRow.vodIdx || !currentRow.educationVideo) {
+      console.warn('⚠️ [대상자 선택] 교육영상이 선택되지 않음');
       toast.error('먼저 교육영상을 선택해주세요.');
       setParticipantModalRowIndex(null);
       return;
@@ -223,12 +459,30 @@ export default function Table2400TBMForm({
         .map((row) => row.participant!.memberIdx)
     );
 
+    console.log('🔍 [대상자 선택] 기존 대상자 확인:', {
+      existingMemberIndices: Array.from(existingMemberIndices),
+      sameVodRows: data.educationVideoRows.filter(
+        (row) => row.vodIdx === currentRow.vodIdx && row.participant?.memberIdx
+      ),
+    });
+
     // 새로 추가할 대상자들 필터링 (중복 제거)
     const newMembers = members.filter(
       (member) => member.memberIdx && !existingMemberIndices.has(member.memberIdx)
     );
 
+    console.log('🔍 [대상자 선택] 새로 추가할 대상자:', {
+      newMembers,
+      newMembersCount: newMembers.length,
+      newMembersDetails: newMembers.map((m) => ({
+        memberIdx: m.memberIdx,
+        name: m.name,
+        department: m.department,
+      })),
+    });
+
     if (newMembers.length === 0) {
+      console.warn('⚠️ [대상자 선택] 이미 추가된 대상자');
       toast.warning('이미 추가된 대상자입니다.');
       setParticipantModalRowIndex(null);
       return;
@@ -259,6 +513,20 @@ export default function Table2400TBMForm({
     }));
 
     const finalRows = [...updatedRows, ...additionalRows];
+    
+    console.log('🔍 [대상자 선택] 최종 행 데이터:', {
+      finalRows,
+      finalRowsCount: finalRows.length,
+      finalRowsDetails: finalRows.map((row, idx) => ({
+        index: idx,
+        participant: row.participant,
+        participantMemberIdx: row.participant?.memberIdx,
+        participantName: row.participant?.name,
+        vodIdx: row.vodIdx,
+        educationVideo: row.educationVideo,
+      })),
+    });
+
     onDataChange({ ...data, educationVideoRows: finalRows });
 
     // 문서가 이미 있고 영상 정보(vodIdx)가 있다면 대상자 등록 API 호출
@@ -271,6 +539,17 @@ export default function Table2400TBMForm({
           vodIdx: currentRow.vodIdx!,
         }));
 
+      console.log('🔍 [대상자 선택] API 호출 준비:', {
+        safetySystemDocumentIdx,
+        workerList,
+        workerListCount: workerList.length,
+        workerListDetails: workerList.map((w) => ({
+          targetMemberIdx: w.targetMemberIdx,
+          vodIdx: w.vodIdx,
+          participantName: newMembers.find((m) => m.memberIdx === w.targetMemberIdx)?.name,
+        })),
+      });
+
       if (workerList.length > 0) {
         // 여러 명을 한 번에 등록 (API가 배열을 받을 수 있음)
         createWorkerSignatureMutation.mutate({
@@ -279,6 +558,11 @@ export default function Table2400TBMForm({
           rowIndex: participantModalRowIndex,
         });
       }
+    } else {
+      console.log('⚠️ [대상자 선택] API 호출 스킵:', {
+        safetySystemDocumentIdx,
+        vodIdx: currentRow.vodIdx,
+      });
     }
 
     setParticipantModalRowIndex(null);

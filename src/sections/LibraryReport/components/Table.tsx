@@ -22,6 +22,9 @@ type Props = {
   onSelectAll: (rows: LibraryReport[], checked: boolean) => void;
   onSelectRow: (id: string, checked: boolean) => void;
   onEdit?: (row: LibraryReport) => void;
+  page?: number;
+  rowsPerPage?: number;
+  totalCount?: number;
 };
 
 export default function LibraryReportTable({
@@ -30,9 +33,15 @@ export default function LibraryReportTable({
   onSelectAll,
   onSelectRow,
   onEdit,
+  page = 0,
+  rowsPerPage = 10,
+  totalCount = 0,
 }: Props) {
   const allSelected = rows.length > 0 && selectedIds.length === rows.length;
   const someSelected = selectedIds.length > 0 && selectedIds.length < rows.length;
+  
+  // 클라이언트에서 순번 계산 (역순: 1페이지가 가장 큰 숫자부터 시작)
+  const getRowNumber = (index: number) => totalCount - (page * rowsPerPage + index);
 
   return (
     <TableContainer
@@ -90,7 +99,7 @@ export default function LibraryReportTable({
                   />
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2">{row.id}</Typography>
+                  <Typography variant="body2">{getRowNumber(index)}</Typography>
                 </TableCell>
                 <TableCell>
                   {hasRegistrationDate ? (

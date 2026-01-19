@@ -756,9 +756,16 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
   }, []);
 
   // 2400번대 (TBM 일지) 핸들러
-  const handleTable2400TBMDataChange = useCallback((data: Table2400TBMData) => {
-    setTable2400TBMData(data);
-  }, []);
+  const handleTable2400TBMDataChange = useCallback(
+    (data: Table2400TBMData | ((prev: Table2400TBMData) => Table2400TBMData)) => {
+      if (typeof data === 'function') {
+        setTable2400TBMData(data);
+      } else {
+        setTable2400TBMData(data);
+      }
+    },
+    []
+  );
 
   // 점검내용 테이블 핸들러
   const handleTable2400TBMInspectionRowChange = useCallback(

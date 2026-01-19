@@ -611,6 +611,9 @@ export function LibraryReportView({ title = '라이브러리', description, sx }
             setSelectedRow(row);
             setEditModalOpen(true);
           }}
+          page={logic.page}
+          rowsPerPage={logic.rowsPerPage}
+          totalCount={totalCount}
         />
 
         <LibraryReportPagination
