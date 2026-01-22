@@ -412,7 +412,19 @@ export default function Table2400TBMForm({
         updatedRow: newRows[educationVideoModalRowIndex],
       });
 
-      onEducationContentChange(video.summary);
+      const summary = (video.summary || '').trim();
+      const autoContent = summary || video.title?.trim();
+      if (autoContent) {
+        const currentContent = data.educationContent?.trim() || '';
+        const nextContent = currentContent.includes(autoContent)
+          ? currentContent
+          : currentContent
+            ? `${currentContent}\n\n${autoContent}`
+            : autoContent;
+        if (nextContent !== currentContent) {
+          onEducationContentChange(nextContent);
+        }
+      }
       onDataChange({ ...data, educationVideoRows: newRows });
       setEducationVideoModalRowIndex(null);
     }

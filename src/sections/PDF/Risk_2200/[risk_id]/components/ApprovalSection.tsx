@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import dayjs from 'dayjs';
 
 import Box from '@mui/material/Box';
@@ -26,35 +26,73 @@ export default function ApprovalSection({
   // 파일 URL을 전체 URL로 변환하는 헬퍼 함수
   const getFullFileUrl = (url: string | null | undefined): string | null => {
     if (!url) return null;
+    const trimmedUrl = url.trim();
     // 잘못된 형식: data:image/png;base64,data/admin/... 같은 경우 처리
     if (
-      url.startsWith('data:image/png;base64,data/admin/') ||
-      url.startsWith('data:image/png;base64,/data/admin/')
+      trimmedUrl.startsWith('data:image/png;base64,data/admin/') ||
+      trimmedUrl.startsWith('data:image/png;base64,/data/admin/')
     ) {
       // base64 접두사를 제거하고 URL로 처리
-      const cleanUrl = url.replace(/^data:image\/png;base64,/, '');
+      const cleanUrl = trimmedUrl.replace(/^data:image\/png;base64,/, '');
       const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
       const path = cleanUrl.startsWith('/') ? cleanUrl : `/${cleanUrl}`;
       return `${baseUrl}${path}`;
     }
     // 이미 전체 URL인 경우 (http:// 또는 https://로 시작)
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      return url;
+    if (trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://')) {
+      return trimmedUrl;
     }
     // base64 데이터 URL인 경우 그대로 반환 (실제 base64 데이터인 경우)
-    if (url.startsWith('data:image/') && !url.includes('data/admin/')) {
-      return url;
+    if (trimmedUrl.startsWith('data:image/') && !trimmedUrl.includes('data/admin/')) {
+      return trimmedUrl;
     }
-    // base64 문자열인 경우 (data: 접두사 없이 base64만 있는 경우, 경로가 없는 경우)
-    if (!url.includes('/') && url.length > 100 && !url.startsWith('data/admin/')) {
-      return `data:image/png;base64,${url}`;
+    // base64 문자열인 경우 (data: 접두사 없이 base64만 있는 경우)
+    const isLikelyBase64 =
+      trimmedUrl.length > 80 &&
+      !trimmedUrl.startsWith('data/admin/') &&
+      !trimmedUrl.startsWith('/data/') &&
+      !trimmedUrl.startsWith('/') &&
+      /^[A-Za-z0-9+/=_-]+$/.test(trimmedUrl);
+    if (isLikelyBase64) {
+      return `data:image/png;base64,${trimmedUrl}`;
     }
     // 상대 경로인 경우 CONFIG.serverUrl과 결합
     // data/admin/로 시작하는 경우도 처리
     const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
-    const path = url.startsWith('/') ? url : `/${url}`;
+    const path = trimmedUrl.startsWith('/') ? trimmedUrl : `/${trimmedUrl}`;
     return `${baseUrl}${path}`;
   };
+
+  const [signatureImages, setSignatureImages] = useState<Record<string, string>>({});
+
+  const loadSignatureImage = useCallback(
+    async (signature: string): Promise<string> => {
+      const normalized = getFullFileUrl(signature);
+      if (!normalized) return signature;
+      if (normalized.startsWith('data:image/')) return normalized;
+
+      try {
+        const response = await fetch(normalized, {
+          mode: 'cors',
+          headers: {
+            'Cache-Control': 'no-cache',
+          },
+        });
+        if (!response.ok) throw new Error('Network response was not ok');
+        const blob = await response.blob();
+        const base64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+        return base64;
+      } catch (error) {
+        console.error('서명 이미지 로드 실패:', normalized, error);
+        return normalized;
+      }
+    },
+    [getFullFileUrl]
+  );
 
   // approvalList에서 결재 정보 추출
   const approvalData = useMemo(() => {
@@ -103,6 +141,46 @@ export default function ApprovalSection({
       approvalStep,
     };
   }, [currentDocument]);
+
+  const signatureValues = useMemo(
+    () =>
+      [approvalData.writer?.signature, approvalData.reviewer?.signature, approvalData.approver?.signature]
+        .filter((value): value is string => !!value),
+    [approvalData]
+  );
+
+  useEffect(() => {
+    if (signatureValues.length === 0) return;
+
+    let cancelled = false;
+
+    const loadImages = async () => {
+      const newImages: Record<string, string> = {};
+
+      await Promise.all(
+        signatureValues.map(async (signature) => {
+          if (signatureImages[signature]) return;
+          const base64 = await loadSignatureImage(signature);
+          newImages[signature] = base64;
+        })
+      );
+
+      if (!cancelled && Object.keys(newImages).length > 0) {
+        setSignatureImages((prev) => ({ ...prev, ...newImages }));
+      }
+    };
+
+    loadImages();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [signatureValues, signatureImages, loadSignatureImage]);
+
+  const getSignatureSrc = (signature?: string | null) => {
+    if (!signature) return null;
+    return signatureImages[signature] || getFullFileUrl(signature);
+  };
 
   // approvalStep에 따라 표시할 컬럼 결정 (Hooks는 조건부 return 전에 호출해야 함)
   const displayColumns = useMemo(() => {
@@ -208,7 +286,7 @@ export default function ApprovalSection({
                     {approvalData[col]?.signature ? (
                       <Box
                         component="img"
-                        src={getFullFileUrl(approvalData[col]?.signature) || ''}
+                        src={getSignatureSrc(approvalData[col]?.signature) || ''}
                         alt={`${columnLabels[col]} 서명`}
                         sx={{
                           maxWidth: 90,
@@ -362,7 +440,7 @@ export default function ApprovalSection({
                   {approvalData.approver?.signature ? (
                     <Box
                       component="img"
-                      src={getFullFileUrl(approvalData.approver.signature) || ''}
+                      src={getSignatureSrc(approvalData.approver.signature) || ''}
                       alt="승인자 서명"
                       sx={{
                         maxWidth: 90,
@@ -502,7 +580,7 @@ export default function ApprovalSection({
                   {approvalData[col]?.signature ? (
                     <Box
                       component="img"
-                      src={getFullFileUrl(approvalData[col]?.signature) || ''}
+                      src={getSignatureSrc(approvalData[col]?.signature) || ''}
                       alt={`${columnLabels[col]} 서명`}
                       sx={{
                         maxWidth: 90,

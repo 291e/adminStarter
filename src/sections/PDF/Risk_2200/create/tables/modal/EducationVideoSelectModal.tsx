@@ -72,7 +72,7 @@ export default function EducationVideoSelectModal({ open, onClose, onConfirm }: 
       title: report.title || '',
       duration: report.playbackTime || '00:00:00',
       hasSubtitle: report.hasSubtitles || false,
-      summary: report.description || '',
+      summary: report.description || report.memo || '',
     }));
   }, [reportsData]);
 

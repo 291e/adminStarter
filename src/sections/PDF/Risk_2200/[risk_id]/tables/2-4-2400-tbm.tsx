@@ -1,5 +1,9 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
+
+import { CONFIG } from 'src/global-config';
 import type { Table2400TBMData } from '../../types/table-data';
 
 // ----------------------------------------------------------------------
@@ -37,6 +41,116 @@ export default function RiskTable_2_4_2400_TBM({ data = defaultData }: Props) {
   const filteredEducationVideoRows = data.educationVideoRows.filter(
     (row) => row.educationVideo?.trim() || row.participant
   );
+
+  const [signatureImages, setSignatureImages] = useState<Record<string, string>>({});
+
+  const getFullFileUrl = useCallback((url: string | null | undefined): string | null => {
+    if (!url) return null;
+    const trimmedUrl = url.trim();
+
+    if (
+      trimmedUrl.startsWith('data:image/png;base64,data/admin/') ||
+      trimmedUrl.startsWith('data:image/png;base64,/data/admin/')
+    ) {
+      const cleanUrl = trimmedUrl.replace(/^data:image\/png;base64,/, '');
+      const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
+      const path = cleanUrl.startsWith('/') ? cleanUrl : `/${cleanUrl}`;
+      return `${baseUrl}${path}`;
+    }
+
+    if (trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://')) {
+      return trimmedUrl;
+    }
+
+    if (trimmedUrl.startsWith('data:image/') && !trimmedUrl.includes('data/admin/')) {
+      return trimmedUrl;
+    }
+
+    const isLikelyBase64 =
+      trimmedUrl.length > 80 &&
+      !trimmedUrl.startsWith('data/admin/') &&
+      !trimmedUrl.startsWith('/data/') &&
+      !trimmedUrl.startsWith('/') &&
+      /^[A-Za-z0-9+/=_-]+$/.test(trimmedUrl);
+
+    if (isLikelyBase64) {
+      return `data:image/png;base64,${trimmedUrl}`;
+    }
+
+    const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
+    const path = trimmedUrl.startsWith('/') ? trimmedUrl : `/${trimmedUrl}`;
+    return `${baseUrl}${path}`;
+  }, []);
+
+  const loadSignatureImage = useCallback(
+    async (signature: string): Promise<string> => {
+      const normalized = getFullFileUrl(signature);
+      if (!normalized) return signature;
+      if (normalized.startsWith('data:image/')) return normalized;
+
+      try {
+        const response = await fetch(normalized, {
+          mode: 'cors',
+          headers: {
+            'Cache-Control': 'no-cache',
+          },
+        });
+        if (!response.ok) throw new Error('Network response was not ok');
+        const blob = await response.blob();
+        const base64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+        return base64;
+      } catch (error) {
+        console.error('서명 이미지 로드 실패:', normalized, error);
+        return normalized;
+      }
+    },
+    [getFullFileUrl]
+  );
+
+  const signatureValues = useMemo(
+    () =>
+      filteredEducationVideoRows
+        .map((row) => row.signature)
+        .filter((value): value is string => !!value && value !== 'SIGNED'),
+    [filteredEducationVideoRows]
+  );
+
+  useEffect(() => {
+    if (signatureValues.length === 0) return;
+
+    let cancelled = false;
+
+    const loadImages = async () => {
+      const newImages: Record<string, string> = {};
+
+      await Promise.all(
+        signatureValues.map(async (signature) => {
+          if (signatureImages[signature]) return;
+          const base64 = await loadSignatureImage(signature);
+          newImages[signature] = base64;
+        })
+      );
+
+      if (!cancelled && Object.keys(newImages).length > 0) {
+        setSignatureImages((prev) => ({ ...prev, ...newImages }));
+      }
+    };
+
+    loadImages();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [signatureValues, signatureImages, loadSignatureImage]);
+
+  const getSignatureSrc = (signature?: string | null) => {
+    if (!signature || signature === 'SIGNED') return null;
+    return signatureImages[signature] || getFullFileUrl(signature);
+  };
 
   const tableStyle = {
     width: '100%',
@@ -163,9 +277,19 @@ export default function RiskTable_2_4_2400_TBM({ data = defaultData }: Props) {
                   </Typography>
                 </td>
                 <td>
-                  <Typography sx={{ fontSize: 14, fontWeight: 400 }}>
-                    {row.signature ? '서명 완료' : ''}
-                  </Typography>
+                  {getSignatureSrc(row.signature) ? (
+                    <Box
+                      component="img"
+                      src={getSignatureSrc(row.signature) || ''}
+                      alt="서명"
+                      crossOrigin="anonymous"
+                      sx={{ maxHeight: 30, maxWidth: 90, objectFit: 'contain' }}
+                    />
+                  ) : (
+                    <Typography sx={{ fontSize: 14, fontWeight: 400 }}>
+                      {row.signature ? '서명 완료' : ''}
+                    </Typography>
+                  )}
                 </td>
               </tr>
             ))}
