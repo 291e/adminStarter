@@ -18,6 +18,7 @@ import {
   getSafetySystemItem,
   addApprovalSignature,
 } from 'src/services/safety-system/safety-system.service';
+import { getSafetySystemDocumentDetail } from 'src/services/dashboard/dashboard.service';
 import { uploadFile } from 'src/services/system/system.service';
 
 import DetailHeader from './components/Header';
@@ -85,8 +86,8 @@ export function Risk_2200View({
   // 문서 상세 정보 조회 (아이템 상세 정보에서 documentList를 가져와서 해당 문서 찾기)
   const {
     data: itemDetailResponse,
-    isLoading: isLoadingDocument,
-    error: documentError,
+    isLoading: isItemLoading,
+    error: itemError,
   } = useQuery({
     queryKey: ['safety-system-item', safetySystemItemIdx],
     queryFn: async () => {
@@ -121,10 +122,54 @@ export function Risk_2200View({
     enabled: !!safetySystemItemIdx,
   });
 
+  const { data: documentDetailResponse, isLoading: isDetailLoading } = useQuery({
+    queryKey: ['safety-system-document-detail', safetySystemDocumentIdx],
+    queryFn: async () => {
+      if (!safetySystemDocumentIdx) {
+        return null;
+      }
+      try {
+        return await getSafetySystemDocumentDetail({ safetySystemDocumentIdx });
+      } catch (error) {
+        console.error('문서 상세 정보 조회 실패:', error);
+        return null;
+      }
+    },
+    enabled: !!safetySystemDocumentIdx,
+  });
+
+  const detailDocument = useMemo(() => {
+    if (!documentDetailResponse) return null;
+    return (
+      (documentDetailResponse as any).originalDocument ||
+      (documentDetailResponse as any).body?.data?.originalDocument ||
+      (documentDetailResponse as any).body?.originalDocument ||
+      null
+    );
+  }, [documentDetailResponse]);
+
   // 현재 문서 찾기
-  const currentDocument = itemDetailResponse?.documentList?.find(
+  const listDocument = itemDetailResponse?.documentList?.find(
     (doc) => doc.safetySystemDocumentIdx === safetySystemDocumentIdx
   ) as SafetySystemDocument | undefined;
+
+  const resolvedDocument = useMemo(() => {
+    if (!detailDocument) return listDocument;
+    if (!listDocument) return detailDocument as SafetySystemDocument;
+
+    return {
+      ...listDocument,
+      ...detailDocument,
+      approvalList: detailDocument.approvalList ?? listDocument.approvalList,
+      signatureList: detailDocument.signatureList ?? listDocument.signatureList,
+      workerSignatureList: detailDocument.workerSignatureList ?? listDocument.workerSignatureList,
+    } as SafetySystemDocument;
+  }, [detailDocument, listDocument]);
+
+  const currentDocument = resolvedDocument;
+
+  const isLoadingDocument = isItemLoading || isDetailLoading;
+  const documentError = itemError;
 
   const handleDownloadPDF = async () => {
     const element = pdfRef.current;
@@ -278,6 +323,49 @@ export function Risk_2200View({
         typeof currentDocument.tableData === 'string'
           ? JSON.parse(currentDocument.tableData)
           : currentDocument.tableData;
+
+      if (
+        parsed?.tableType === '2400-tbm' &&
+        parsed?.data?.educationVideoRows &&
+        currentDocument?.workerSignatureList?.length
+      ) {
+        const signatureMap = new Map<string, { signatureData?: string; status?: string }>();
+
+        currentDocument.workerSignatureList.forEach((worker) => {
+          const vodIdx = (worker as any).vodIdx ?? '';
+          const key = `${worker.targetMemberIdx}:${vodIdx}`;
+          signatureMap.set(key, {
+            signatureData: worker.signatureData,
+            status: worker.status,
+          });
+        });
+
+        const educationVideoRows = parsed.data.educationVideoRows.map((row: any) => {
+          if (row.signature) return row;
+          const memberIdx = row.participant?.memberIdx ?? '';
+          const vodIdx = row.vodIdx ?? '';
+          const directKey = `${memberIdx}:${vodIdx}`;
+          const fallbackKey = `${memberIdx}:`;
+          const match = signatureMap.get(directKey) || signatureMap.get(fallbackKey);
+
+          if (!match) return row;
+          if (match.signatureData) {
+            return { ...row, signature: match.signatureData };
+          }
+          if (match.status === 'SIGNED') {
+            return { ...row, signature: 'SIGNED' };
+          }
+          return row;
+        });
+
+        return {
+          ...parsed,
+          data: {
+            ...parsed.data,
+            educationVideoRows,
+          },
+        };
+      }
       return parsed;
     } catch (error) {
       console.error('tableData 파싱 실패:', error);
@@ -424,14 +512,15 @@ export function Risk_2200View({
           />
 
           {/* Main Card */}
-          <Box
-            ref={pdfRef}
-            component="div"
-            data-pdf-content
-            sx={{
-              bgcolor: 'background.paper',
-              borderRadius: 2,
-              boxShadow: 3,
+        <Box
+          ref={pdfRef}
+          component="div"
+          data-pdf-content
+          data-pdf-ready={!isLoadingDocument && currentDocument ? 'true' : 'false'}
+          sx={{
+            bgcolor: 'background.paper',
+            borderRadius: 2,
+            boxShadow: 3,
               width: '100%',
 
               display: 'flex',

@@ -177,6 +177,32 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
       }
     | undefined;
 
+  const resolvedDocumentType = useMemo(() => {
+    if (state?.documentType) return state.documentType;
+    const rawTableData = state?.documentData?.tableData;
+    if (!rawTableData) return undefined;
+
+    try {
+      const parsed =
+        typeof rawTableData === 'string' ? JSON.parse(rawTableData) : rawTableData;
+      switch (parsed?.tableType) {
+        case '1200-industrial':
+          return 'industrial-accident';
+        case '1200-near-miss':
+          return 'near-miss';
+        case '2400-tbm':
+          return 'tbm';
+        case '2400-education':
+          return 'education';
+        default:
+          return undefined;
+      }
+    } catch (error) {
+      console.error('documentType 추론 실패:', error);
+      return undefined;
+    }
+  }, [state?.documentType, state?.documentData?.tableData]);
+
   // TODO: TanStack Query Hook(useQuery)으로 임시 저장된 문서 불러오기 (수정 모드 또는 임시 저장 불러오기)
   // const { data: temporaryDocument } = useQuery({
   //   queryKey: ['risk2200TemporaryDocument', state?.documentId],
@@ -189,8 +215,8 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
   const itemNumber = state?.item?.itemNumber;
   const is1100Series = safetyIdx === 1 && itemNumber === 1; // 1100번대: 위험요인 파악
   const is1200Series = safetyIdx === 1 && itemNumber === 2; // 1200번대: 산업재해 및 아차사고
-  const is1200IndustrialAccident = is1200Series && state?.documentType === 'industrial-accident'; // 산업재해 작성
-  const is1200NearMiss = is1200Series && state?.documentType === 'near-miss'; // 아차사고 작성
+  const is1200IndustrialAccident = is1200Series && resolvedDocumentType === 'industrial-accident'; // 산업재해 작성
+  const is1200NearMiss = is1200Series && resolvedDocumentType === 'near-miss'; // 아차사고 작성
   const is1300Series = safetyIdx === 1 && itemNumber === 3; // 1300번대: 위험 기계·기구·설비
   const is1400Series = safetyIdx === 1 && itemNumber === 4; // 1400번대: 유해인자
   const is1500Series = safetyIdx === 1 && itemNumber === 5; // 1500번대: 위험장소 및 작업형태별 위험요인
@@ -198,8 +224,8 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
   const is2200Series = safetyIdx === 2 && itemNumber === 2; // 2200번대: 위험요인 제거·대체 및 통제 등록
   const is2300Series = safetyIdx === 2 && itemNumber === 3; // 2300번대: 감소 대책 수립·이행
   const is2400Series = safetyIdx === 2 && itemNumber === 4; // 2400번대: 교육훈련
-  const is2400TBM = is2400Series && state?.documentType === 'tbm'; // TBM 일지 작성
-  const is2400Education = is2400Series && state?.documentType === 'education'; // 연간 교육 계획 작성
+  const is2400TBM = is2400Series && resolvedDocumentType === 'tbm'; // TBM 일지 작성
+  const is2400Education = is2400Series && resolvedDocumentType === 'education'; // 연간 교육 계획 작성
 
   const [documentWrittenAt, setDocumentWrittenAt] = useState<Dayjs | null>(dayjs());
   const [approvalDeadline, setApprovalDeadline] = useState<Dayjs | null>(dayjs().add(1, 'month'));

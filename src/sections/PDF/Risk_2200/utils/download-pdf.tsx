@@ -108,8 +108,9 @@ export async function downloadDocumentPDF(
         
         // 요소가 있고 내용이 있는지 확인 (로딩 중일 수 있음)
         const hasContent = pdfElement && pdfElement.children.length > 0;
+        const isReady = pdfElement?.getAttribute('data-pdf-ready') === 'true';
         
-        if (hasContent) {
+        if (hasContent && isReady) {
           const currentDate = new Date();
           const days = ['일', '월', '화', '수', '목', '금', '토'];
           const formattedDate = `${currentDate.getFullYear()}.${String(
