@@ -69,7 +69,7 @@ export const signInWithPassword = async ({ email, password }: SignInParams): Pro
         'res.data?.accessToken': resAny.data?.accessToken,
         'res.accessToken': resAny.accessToken,
       });
-      throw new Error('Access token not found in response');
+      throw new Error('로그인 에러');
     }
 
     setSession(accessToken);
@@ -130,7 +130,7 @@ export const signUp = async ({
 
     if (!accessToken) {
       console.error('❌ Response structure:', res);
-      throw new Error('Access token not found in response');
+      throw new Error('로그인 에러');
     }
 
     sessionStorage.setItem(JWT_STORAGE_KEY, accessToken);

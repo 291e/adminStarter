@@ -20,7 +20,7 @@ import Divider from '@mui/material/Divider';
 import Switch from '@mui/material/Switch';
 
 import { Iconify } from 'src/components/iconify';
-import { useUpdateOrganization, useDeactivateOrganization } from '../hooks/use-organization-api';
+import { useUpdateOrganization } from '../hooks/use-organization-api';
 import { useServices } from 'src/sections/ServiceSetting/hooks/use-service-setting-api';
 import DeactivateMemberModal from './DeactivateMemberModal';
 
@@ -124,7 +124,6 @@ export default function EditOrganizationModal({ open, organization, onClose, onU
   const addressInputRef = useRef<HTMLInputElement>(null);
 
   const updateOrganizationMutation = useUpdateOrganization();
-  const deactivateOrganizationMutation = useDeactivateOrganization();
 
   const {
     data: servicesData,
@@ -202,8 +201,7 @@ export default function EditOrganizationModal({ open, organization, onClose, onU
     setBusinessNumberError(null);
   }, [open, organization, derivedSubscriptionId]);
 
-  const isSubmitting =
-    updateOrganizationMutation.isPending || deactivateOrganizationMutation.isPending;
+  const isSubmitting = updateOrganizationMutation.isPending;
 
   const handleChange = (field: keyof EditFormState, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -273,7 +271,11 @@ export default function EditOrganizationModal({ open, organization, onClose, onU
   const handleConfirmDeactivate = async () => {
     if (!organization) return;
     try {
-      await deactivateOrganizationMutation.mutateAsync(organization.companyIdx);
+      // deactivateOrganization API 대신 updateOrganization API의 isActive 필드 사용
+      await updateOrganizationMutation.mutateAsync({
+        companyIdx: organization.companyIdx,
+        isActive: 0, // 0: 비활성
+      });
       setIsActive(false);
       onUpdated?.();
       setDeactivateModalOpen(false);
