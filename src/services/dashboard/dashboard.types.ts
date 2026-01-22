@@ -1,17 +1,35 @@
 import type { BaseResponseDto, BaseResponseHeader } from '../common';
 
+// 안전 시스템 문서 정보 (중첩 객체)
+export type SafetySystemDocumentInformation = {
+  safetySystemDocumentIdx: number;
+  documentName?: string;
+  [key: string]: any; // 기타 필드 허용
+};
+
 // 서명 대기 문서 (실제 응답 구조)
 export type DocumentSignature = {
   id?: string;
   documentId?: string;
-  sharedDocumentIdx?: number; // 공유 문서 인덱스
+  sharedDocumentIdx?: number | null; // 공유 문서 인덱스
   documentName?: string; // 문서 이름
   requestedAt: string;
   signatureStatus: 'PENDING' | 'SIGNED' | 'REJECTED';
-  signatureType: 'APPROVAL' | 'REVIEW';
+  signatureType: 'APPROVAL' | 'REVIEW' | 'WORKER_SIGNATURE'; // 근로자 서명 타입 추가
   signedAt: string | null;
   targetMemberIdx: number;
   targetMemberName: string;
+  // 결재 관련 필드 (APPROVAL 타입일 때 사용)
+  documentApprovalIdx?: number | null; // 결재 인덱스
+  approvalOrder?: number | null; // 결재 순서
+  approvalStep?: number | null; // 결재 단계
+  approvalType?: 'SEQUENTIAL' | 'PARALLEL' | null; // 결재 유형
+  // 근로자 서명 관련 필드 (WORKER_SIGNATURE 타입일 때 사용)
+  documentWorkerSignatureIdx?: number | null; // 근로자 서명 인덱스
+  watchProgress?: number; // 시청 진행률 (0-100)
+  watchedAt?: string | null; // 시청 완료일
+  // 문서 정보 (중첩 객체)
+  safetySystemDocumentInformation?: SafetySystemDocumentInformation | null; // 안전 시스템 문서 정보
 };
 
 // axios 인터셉터에서 평탄화되므로 직접 접근 가능

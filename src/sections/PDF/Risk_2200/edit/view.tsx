@@ -364,8 +364,8 @@ export function Risk_2200EditView({
   ]);
   const [table2400TBMData, setTable2400TBMData] = useState<Table2400TBMData>({
     inspectionRows: [
-      { inspectionContent: '기계·가구·설비 이상 유무', result: '' },
-      { inspectionContent: '기계·가구·설비 방호장치', result: '' },
+      { inspectionContent: '기계·기구·설비 이상 유무', result: '' },
+      { inspectionContent: '기계·기구·설비 방호장치', result: '' },
       { inspectionContent: '근로자 건강 상태', result: '' },
       { inspectionContent: '개인보호구 착용 여부', result: '' },
       { inspectionContent: '작업절차 및 방법 숙지', result: '' },
@@ -655,7 +655,7 @@ export function Risk_2200EditView({
   // 기존 문서 데이터 로드
   useEffect(() => {
     if (!currentDocument) return;
-    
+
     // 초기 로드가 아니고 사용자가 수정한 상태가 있으면 덮어쓰지 않음
     if (!isInitialLoadRef.current) {
       const hasUserChanges = table2400TBMData.educationVideoRows.some(
@@ -666,7 +666,7 @@ export function Risk_2200EditView({
         return;
       }
     }
-    
+
     isInitialLoadRef.current = false;
 
     // documentWrittenAt 설정 (documentWrittenAt 우선, 없으면 createAt 사용)
@@ -950,16 +950,19 @@ export function Risk_2200EditView({
       console.log('🔍 [edit/view] handleTable2400TBMDataChange 호출:', {
         isFunction: typeof data === 'function',
         data: typeof data === 'function' ? 'function' : data,
-        educationVideoRows: typeof data === 'function' ? 'function' : data.educationVideoRows?.map((row, idx) => ({
-          index: idx,
-          participant: row.participant,
-          participantMemberIdx: row.participant?.memberIdx,
-          participantName: row.participant?.name,
-          vodIdx: row.vodIdx,
-          educationVideo: row.educationVideo,
-        })),
+        educationVideoRows:
+          typeof data === 'function'
+            ? 'function'
+            : data.educationVideoRows?.map((row, idx) => ({
+                index: idx,
+                participant: row.participant,
+                participantMemberIdx: row.participant?.memberIdx,
+                participantName: row.participant?.name,
+                vodIdx: row.vodIdx,
+                educationVideo: row.educationVideo,
+              })),
       });
-      
+
       if (typeof data === 'function') {
         setTable2400TBMData((prev) => {
           const result = data(prev);

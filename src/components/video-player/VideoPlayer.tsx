@@ -169,12 +169,42 @@ export default function VideoPlayer({
               bgcolor: 'black',
               borderRadius: 1,
               overflow: 'hidden',
+              '& video': {
+                width: '100%',
+                maxHeight: '500px',
+                display: 'block',
+                '&::-webkit-media-controls-panel': {
+                  display: 'flex !important',
+                },
+                '&::-webkit-media-controls-play-button': {
+                  display: 'flex !important',
+                },
+                '&::-webkit-media-controls-timeline': {
+                  display: 'flex !important',
+                },
+                '&::-webkit-media-controls-current-time-display': {
+                  display: 'flex !important',
+                },
+                '&::-webkit-media-controls-time-remaining-display': {
+                  display: 'flex !important',
+                },
+                '&::-webkit-media-controls-mute-button': {
+                  display: 'flex !important',
+                },
+                '&::-webkit-media-controls-volume-slider': {
+                  display: 'flex !important',
+                },
+                '&::-webkit-media-controls-fullscreen-button': {
+                  display: 'flex !important',
+                },
+              },
             }}
           >
             <video
               ref={playerRef}
               autoPlay
               controls={!disableControls}
+              controlsList={disableControls ? 'nodownload nofullscreen noremoteplayback' : undefined}
               onClick={(e) => {
                 const videoEl = e.target as HTMLVideoElement;
                 if (videoEl.paused) {
@@ -187,7 +217,6 @@ export default function VideoPlayer({
                 if (disableControls) e.preventDefault();
               }}
               crossOrigin="anonymous"
-              style={{ width: '100%', maxHeight: '500px' }}
               onLoadedData={(e) => {
                 console.log('🎥 [Native Video] onLoadedData: 데이터 로드 완료');
                 // 자막 자동 활성화

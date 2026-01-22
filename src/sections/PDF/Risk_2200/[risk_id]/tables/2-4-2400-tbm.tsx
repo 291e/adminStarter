@@ -12,8 +12,8 @@ type Props = { data?: Table2400TBMData };
 
 const defaultData: Table2400TBMData = {
   inspectionRows: [
-    { inspectionContent: '기계·가구·설비 이상 유무', result: '정상' },
-    { inspectionContent: '기계·가구·설비 방호장치', result: '정상' },
+    { inspectionContent: '기계·기구·설비 이상 유무', result: '정상' },
+    { inspectionContent: '기계·기구·설비 방호장치', result: '정상' },
     { inspectionContent: '근로자 건강 상태', result: '정상' },
     { inspectionContent: '개인보호구 착용 여부', result: '착용' },
     { inspectionContent: '작업절차 및 방법 숙지', result: '숙지' },
@@ -183,7 +183,7 @@ export default function RiskTable_2_4_2400_TBM({ data = defaultData }: Props) {
         <Box component="table" sx={tableStyle}>
           <thead>
             <tr style={{ height: 60 }}>
-              <th style={{ flex: 1 }}>점검내용</th>
+              <th style={{ flex: 1 }}>점검(작업)내용</th>
               <th style={{ flex: 1 }}>결과</th>
             </tr>
           </thead>

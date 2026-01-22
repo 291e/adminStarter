@@ -19,9 +19,7 @@ import type {
 import InvestigationTeamSelectModal from './modal/InvestigationTeamSelectModal';
 import EducationVideoSelectModal from './modal/EducationVideoSelectModal';
 import SignatureModal from '../../edit/components/SignatureModal';
-import {
-  addWorkerSignature,
-} from 'src/services/safety-system/safety-system.service';
+import { addWorkerSignature } from 'src/services/safety-system/safety-system.service';
 
 // ----------------------------------------------------------------------
 
@@ -112,10 +110,10 @@ export default function Table2400TBMForm({
       // createWorkerSignature는 workerSignatureIdx만 반환하므로, 전체 응답을 받기 위해 직접 호출
       const url = `${endpoints.safetySystem.documents}/${documentIdx}/worker-signatures`;
       const axiosResponse = await axiosInstance.post(url, { workerList });
-      
+
       // axios 인터셉터가 평탄화하므로 response.data에 직접 접근
       const responseData = axiosResponse.data as any;
-      
+
       console.log('✅ [근로자 서명 등록 API] 전체 응답:', {
         documentIdx,
         axiosResponse,
@@ -143,7 +141,7 @@ export default function Table2400TBMForm({
       // API가 여러 명을 한 번에 등록할 때는 workerSignatureList 배열을 반환할 수 있음
       const responseAny = result.response as any;
       let workerSignatureIndices: number[] = [];
-      
+
       console.log('🔍 [근로자 서명 등록 API] 응답 파싱:', {
         responseAny,
         hasWorkerSignatureList: Array.isArray(responseAny?.workerSignatureList),
@@ -151,7 +149,7 @@ export default function Table2400TBMForm({
         workerSignatureIdxType: typeof responseAny?.workerSignatureIdx,
         workerSignatureList: responseAny?.workerSignatureList,
       });
-      
+
       if (Array.isArray(responseAny?.workerSignatureList)) {
         // 배열인 경우 - documentWorkerSignatureIdx 또는 workerSignatureIdx 사용
         workerSignatureIndices = responseAny.workerSignatureList
@@ -188,16 +186,16 @@ export default function Table2400TBMForm({
 
       if (workerSignatureIndices.length > 0) {
         // 최신 상태를 가져오기 위해 함수형 업데이트 사용
-        // onDataChange가 함수를 받을 수 있도록 수정하거나, 
+        // onDataChange가 함수를 받을 수 있도록 수정하거나,
         // 여기서는 직접 최신 data를 사용하도록 수정
         // 하지만 data는 클로저이므로, onDataChange를 통해 최신 상태를 받아야 함
         // 일단 현재 data를 사용하되, onDataChange 호출 시 최신 상태가 반영되도록 함
-        
+
         // 현재 data의 최신 상태를 가져오기 위해 onDataChange에 함수를 전달할 수 없으므로,
         // 대신 queryClient를 통해 최신 상태를 가져오거나,
         // 또는 onDataChange를 수정하여 함수를 받을 수 있도록 해야 함
         // 임시 해결책: data를 직접 사용하되, onDataChange 호출 후에도 상태가 유지되도록 함
-        
+
         const currentData = data; // 클로저의 data 사용
         const newRows = [...currentData.educationVideoRows];
         const workerList = result.workerList;
@@ -221,7 +219,7 @@ export default function Table2400TBMForm({
         for (let i = 0; i < workerList.length && i < workerSignatureIndices.length; i++) {
           const worker = workerList[i];
           const workerSignatureIdx = workerSignatureIndices[i];
-          
+
           // 해당 targetMemberIdx와 vodIdx를 가진 행 찾기
           const targetRowIndex = newRows.findIndex(
             (row) =>
@@ -229,7 +227,7 @@ export default function Table2400TBMForm({
               row.participant?.memberIdx === worker.targetMemberIdx &&
               !row.workerSignatureIdx
           );
-          
+
           if (targetRowIndex !== -1) {
             console.log('✅ [근로자 서명 등록 API] 행 업데이트:', {
               targetRowIndex,
@@ -287,19 +285,19 @@ export default function Table2400TBMForm({
 
           const prevRows = [...prevData.educationVideoRows];
           const updatedRows = [...prevRows];
-          
+
           // workerList와 workerSignatureIndices를 매칭하여 각 행에 올바른 workerSignatureIdx 할당
           for (let i = 0; i < workerList.length && i < workerSignatureIndices.length; i++) {
             const worker = workerList[i];
             const workerSignatureIdx = workerSignatureIndices[i];
-            
+
             const targetRowIndex = updatedRows.findIndex(
               (row) =>
                 row.vodIdx === worker.vodIdx &&
                 row.participant?.memberIdx === worker.targetMemberIdx &&
                 !row.workerSignatureIdx
             );
-            
+
             if (targetRowIndex !== -1) {
               console.log('✅ [근로자 서명 등록 API] 함수형 업데이트 - 행 업데이트:', {
                 targetRowIndex,
@@ -314,20 +312,23 @@ export default function Table2400TBMForm({
                 workerSignatureIdx,
               };
             } else {
-              console.warn('⚠️ [근로자 서명 등록 API] 함수형 업데이트 - 매칭되는 행을 찾을 수 없음:', {
-                worker,
-                workerSignatureIdx,
-                availableRows: updatedRows.map((row, idx) => ({
-                  index: idx,
-                  participantMemberIdx: row.participant?.memberIdx,
-                  participantName: row.participant?.name,
-                  vodIdx: row.vodIdx,
-                  workerSignatureIdx: row.workerSignatureIdx,
-                })),
-              });
+              console.warn(
+                '⚠️ [근로자 서명 등록 API] 함수형 업데이트 - 매칭되는 행을 찾을 수 없음:',
+                {
+                  worker,
+                  workerSignatureIdx,
+                  availableRows: updatedRows.map((row, idx) => ({
+                    index: idx,
+                    participantMemberIdx: row.participant?.memberIdx,
+                    participantName: row.participant?.name,
+                    vodIdx: row.vodIdx,
+                    workerSignatureIdx: row.workerSignatureIdx,
+                  })),
+                }
+              );
             }
           }
-          
+
           const finalData = { ...prevData, educationVideoRows: updatedRows };
           console.log('✅ [근로자 서명 등록 API] 함수형 업데이트 완료:', {
             finalData,
@@ -340,13 +341,13 @@ export default function Table2400TBMForm({
               workerSignatureIdx: row.workerSignatureIdx,
             })),
           });
-          
+
           return finalData;
         });
       } else {
         console.warn('⚠️ [근로자 서명 등록 API] workerSignatureIndices가 비어있음');
       }
-      
+
       queryClient.invalidateQueries({ queryKey: ['notificationHistory'] });
       queryClient.invalidateQueries({ queryKey: ['pendingSignatures'] });
       queryClient.invalidateQueries({ queryKey: ['safety-system-item'] });
@@ -461,7 +462,7 @@ export default function Table2400TBMForm({
       vodIdx: currentRow.vodIdx,
       educationVideo: currentRow.educationVideo,
     });
-    
+
     // 교육영상이 선택되지 않았으면 경고
     if (!currentRow.vodIdx || !currentRow.educationVideo) {
       console.warn('⚠️ [대상자 선택] 교육영상이 선택되지 않음');
@@ -508,8 +509,7 @@ export default function Table2400TBMForm({
 
     // 기존 행 업데이트 (첫 번째 대상자로)
     const updatedRows = [...data.educationVideoRows];
-    const isParticipantChanged =
-      currentRow.participant?.memberIdx !== newMembers[0].memberIdx;
+    const isParticipantChanged = currentRow.participant?.memberIdx !== newMembers[0].memberIdx;
 
     updatedRows[participantModalRowIndex] = {
       ...currentRow,
@@ -531,7 +531,7 @@ export default function Table2400TBMForm({
     }));
 
     const finalRows = [...updatedRows, ...additionalRows];
-    
+
     console.log('🔍 [대상자 선택] 최종 행 데이터:', {
       finalRows,
       finalRowsCount: finalRows.length,
@@ -647,7 +647,7 @@ export default function Table2400TBMForm({
     data.educationVideoRows.forEach((row, index) => {
       // vodIdx가 있으면 사용, 없으면 고유 키 생성
       const vodKey = row.vodIdx ?? `empty-${index}`;
-      
+
       if (!currentGroup || currentGroup.vodKey !== vodKey) {
         // 새로운 그룹 시작
         if (currentGroup) {
@@ -673,9 +673,7 @@ export default function Table2400TBMForm({
 
   // 각 행이 그룹의 첫 번째 행인지 확인하는 함수
   const getRowGroupInfo = (index: number) => {
-    const group = rowGroups.find(
-      (g) => index >= g.startIndex && index < g.startIndex + g.count
-    );
+    const group = rowGroups.find((g) => index >= g.startIndex && index < g.startIndex + g.count);
     return group
       ? {
           isFirstRow: index === group.startIndex,
@@ -710,7 +708,7 @@ export default function Table2400TBMForm({
         <Box component="table" sx={tableStyle}>
           <thead>
             <tr>
-              <th style={{ flex: 1 }}>점검내용</th>
+              <th style={{ flex: 1 }}>점검(작업)내용</th>
               <th style={{ flex: 1 }}>결과</th>
               <th style={{ width: 80 }}>삭제</th>
             </tr>
@@ -849,7 +847,9 @@ export default function Table2400TBMForm({
                       <Button
                         variant="outlined"
                         size="small"
-                        disabled={!safetySystemDocumentIdx || !row.vodIdx || !row.workerSignatureIdx}
+                        disabled={
+                          !safetySystemDocumentIdx || !row.vodIdx || !row.workerSignatureIdx
+                        }
                         onClick={() => setSignatureModalRowIndex(index)}
                       >
                         서명

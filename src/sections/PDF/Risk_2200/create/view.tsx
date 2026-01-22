@@ -183,8 +183,7 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
     if (!rawTableData) return undefined;
 
     try {
-      const parsed =
-        typeof rawTableData === 'string' ? JSON.parse(rawTableData) : rawTableData;
+      const parsed = typeof rawTableData === 'string' ? JSON.parse(rawTableData) : rawTableData;
       switch (parsed?.tableType) {
         case '1200-industrial':
           return 'industrial-accident';
@@ -304,8 +303,8 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
   ]);
   const [table2400TBMData, setTable2400TBMData] = useState<Table2400TBMData>({
     inspectionRows: [
-      { inspectionContent: '기계·가구·설비 이상 유무', result: '' },
-      { inspectionContent: '기계·가구·설비 방호장치', result: '' },
+      { inspectionContent: '기계·기구·설비 이상 유무', result: '' },
+      { inspectionContent: '기계·기구·설비 방호장치', result: '' },
       { inspectionContent: '근로자 건강 상태', result: '' },
       { inspectionContent: '개인보호구 착용 여부', result: '' },
       { inspectionContent: '작업절차 및 방법 숙지', result: '' },

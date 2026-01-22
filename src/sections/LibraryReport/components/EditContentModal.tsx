@@ -388,9 +388,7 @@ export default function EditContentModal({
               onDrop={handleVideoDrop}
               onDragOver={handleVideoDragOver}
               onDragLeave={handleVideoDragLeave}
-              onClick={() =>
-                !videoPreview && !existingFileName && videoFileInputRef.current?.click()
-              }
+              onClick={() => videoFileInputRef.current?.click()}
               sx={{
                 bgcolor: 'grey.50',
                 border: '1px dashed',
@@ -401,14 +399,20 @@ export default function EditContentModal({
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                cursor: videoPreview || existingFileName ? 'default' : 'pointer',
+                cursor: 'pointer',
                 transition: 'all 0.2s',
                 position: 'relative',
                 minHeight: videoPreview ? 300 : existingFileName ? 120 : 'auto',
                 aspectRatio: videoPreview ? '16/9' : 'auto',
                 '&:hover': {
-                  bgcolor: videoPreview || existingFileName ? 'grey.50' : 'grey.100',
-                  borderColor: videoPreview || existingFileName ? 'divider' : 'primary.main',
+                  bgcolor: 'grey.100',
+                  borderColor: 'primary.main',
+                  '& .hover-overlay': {
+                    bgcolor: 'rgba(0, 0, 0, 0.3)',
+                  },
+                  '& .hover-text': {
+                    opacity: 1,
+                  },
                 },
               }}
             >
@@ -433,6 +437,33 @@ export default function EditContentModal({
                         objectFit: 'cover',
                       }}
                     />
+                  </Box>
+                  <Box
+                    className="hover-overlay"
+                    sx={{
+                      position: 'absolute',
+                      inset: 0,
+                      bgcolor: 'rgba(0, 0, 0, 0)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'background-color 0.2s',
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    <Typography
+                      variant="body2"
+                      className="hover-text"
+                      sx={{
+                        color: 'white',
+                        fontWeight: 600,
+                        opacity: 0,
+                        transition: 'opacity 0.2s',
+                        pointerEvents: 'none',
+                      }}
+                    >
+                      클릭하여 파일 변경
+                    </Typography>
                   </Box>
                   <IconButton
                     onClick={(e) => {
@@ -487,6 +518,9 @@ export default function EditContentModal({
                     </Typography>
                     <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
                       등록된 파일
+                    </Typography>
+                    <Typography variant="caption" color="primary.main" sx={{ mt: 1 }}>
+                      클릭하여 파일 변경
                     </Typography>
                   </Box>
                   <IconButton

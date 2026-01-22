@@ -58,12 +58,12 @@ export function JwtSignInView() {
         return saved;
       }
     }
-    return 'member11';
+    return '';
   };
 
   const defaultValues: SignInSchemaType = {
     email: getSavedEmail(),
-    password: 'Safeyou123!',
+    password: '',
   };
 
   const methods = useForm<SignInSchemaType>({
