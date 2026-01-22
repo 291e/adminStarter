@@ -384,48 +384,54 @@ export default function Table2400TBMForm({
     });
 
     if (educationVideoModalRowIndex !== null) {
-      const newRows = [...data.educationVideoRows];
-      const currentRow = newRows[educationVideoModalRowIndex];
-      
-      // 영상이 변경되면 기존 대상자들의 서명 정보 초기화
-      const isVideoChanged = currentRow.vodIdx !== video.vodIdx;
-      
-      console.log('🔍 [교육영상 선택] 영상 변경 여부:', {
-        isVideoChanged,
-        oldVodIdx: currentRow.vodIdx,
-        newVodIdx: video.vodIdx,
-      });
-      
-      newRows[educationVideoModalRowIndex] = {
-        ...currentRow,
-        educationVideo: video.title,
-        vodIdx: video.vodIdx,
-        // 영상이 변경되면 기존 서명 정보 초기화
-        ...(isVideoChanged && {
-          workerSignatureIdx: undefined,
-          signature: '',
-        }),
-      };
-      
-      console.log('🔍 [교육영상 선택] 업데이트된 행:', {
-        rowIndex: educationVideoModalRowIndex,
-        updatedRow: newRows[educationVideoModalRowIndex],
-      });
+      onDataChange((prev) => {
+        const newRows = [...prev.educationVideoRows];
+        const currentRow = newRows[educationVideoModalRowIndex];
 
-      const summary = (video.summary || '').trim();
-      const autoContent = summary || video.title?.trim();
-      if (autoContent) {
-        const currentContent = data.educationContent?.trim() || '';
+        // 영상이 변경되면 기존 대상자들의 서명 정보 초기화
+        const isVideoChanged = currentRow.vodIdx !== video.vodIdx;
+
+        console.log('🔍 [교육영상 선택] 영상 변경 여부:', {
+          isVideoChanged,
+          oldVodIdx: currentRow.vodIdx,
+          newVodIdx: video.vodIdx,
+        });
+
+        newRows[educationVideoModalRowIndex] = {
+          ...currentRow,
+          educationVideo: video.title,
+          vodIdx: video.vodIdx,
+          // 영상이 변경되면 기존 서명 정보 초기화
+          ...(isVideoChanged && {
+            workerSignatureIdx: undefined,
+            signature: '',
+          }),
+        };
+
+        console.log('🔍 [교육영상 선택] 업데이트된 행:', {
+          rowIndex: educationVideoModalRowIndex,
+          updatedRow: newRows[educationVideoModalRowIndex],
+        });
+
+        const summary = (video.summary || '').trim();
+        const autoContent = summary || video.title?.trim();
+        if (!autoContent) {
+          return { ...prev, educationVideoRows: newRows };
+        }
+
+        const currentContent = prev.educationContent?.trim() || '';
         const nextContent = currentContent.includes(autoContent)
           ? currentContent
           : currentContent
             ? `${currentContent}\n\n${autoContent}`
             : autoContent;
-        if (nextContent !== currentContent) {
-          onEducationContentChange(nextContent);
-        }
-      }
-      onDataChange({ ...data, educationVideoRows: newRows });
+
+        return {
+          ...prev,
+          educationVideoRows: newRows,
+          educationContent: nextContent,
+        };
+      });
       setEducationVideoModalRowIndex(null);
     }
   };

@@ -205,6 +205,10 @@ export function Risk_2200View({ safetyId, title = 'Blank', description, sx }: Pr
       queryClient.invalidateQueries({
         queryKey: ['safety-system-item', state?.item?.safetySystemItemIdx],
       });
+      // 대시보드 서명 대기/공유 문서 즉시 반영
+      queryClient.invalidateQueries({ queryKey: ['pendingSignatures'] });
+      queryClient.invalidateQueries({ queryKey: ['sharedDocuments'] });
+      queryClient.invalidateQueries({ queryKey: ['sharedDocumentDetail'] });
       toast.success('문서가 삭제되었습니다.');
       setDeleteModalOpen(false);
       setSelectedDeleteRow(null);

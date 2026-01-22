@@ -121,7 +121,7 @@ export default function RiskTable_2_4_2400_TBM({ data = defaultData }: Props) {
 
   useEffect(() => {
     if (signatureValues.length === 0) {
-      return undefined;
+      return () => {};
     }
 
     let cancelled = false;

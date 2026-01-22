@@ -371,7 +371,7 @@ export function Risk_2200View({
       console.error('tableData 파싱 실패:', error);
       return null;
     }
-  }, [currentDocument?.tableData]);
+  }, [currentDocument?.tableData, currentDocument?.workerSignatureList]);
 
   // safetyIdx와 itemNumber 추출 (item/system이 없으면 riskId에서 추출)
   const safetyIdx = item?.safetyIdx || system?.safetyIdx || extractedInfo?.safetyIdx;

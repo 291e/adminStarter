@@ -150,7 +150,9 @@ export default function ApprovalSection({
   );
 
   useEffect(() => {
-    if (signatureValues.length === 0) return;
+    if (signatureValues.length === 0) {
+      return () => {};
+    }
 
     let cancelled = false;
 
