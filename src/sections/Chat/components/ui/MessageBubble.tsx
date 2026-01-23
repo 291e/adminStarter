@@ -21,9 +21,19 @@ type LocationMetadata = {
 };
 
 type MessageMetadata = {
-  type?: 'rescue_request' | 'evacuation' | 'risk_report' | 'accident_report' | string;
+  type?:
+    | 'rescue_request'
+    | 'evacuation'
+    | 'risk_report'
+    | 'accident_report'
+    | 'video'
+    | 'multi_image'
+    | 'image'
+    | string;
   location?: LocationMetadata;
   imageUrl?: string;
+  imageUrls?: string[];
+  videoUrl?: string;
   address?: string;
 };
 
@@ -63,8 +73,39 @@ function parseImageMessage(message: string): {
 // URL이 이미지인지 확인
 function isImageUrl(url: string): boolean {
   const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'];
-  const lowerUrl = url.toLowerCase();
-  return imageExtensions.some((ext) => lowerUrl.includes(ext));
+  // 쿼리 파라미터 제거하여 확장자 확인
+  const urlPath = url.split('?')[0].toLowerCase();
+  return imageExtensions.some((ext) => urlPath.endsWith(ext) || urlPath.includes(ext));
+}
+
+// URL이 동영상인지 확인
+function isVideoUrl(url: string): boolean {
+  const videoExtensions = ['.mp4', '.mov', '.avi', '.webm', '.mkv', '.m4v', '.3gp'];
+  // 쿼리 파라미터 제거하여 확장자 확인
+  const urlPath = url.split('?')[0].toLowerCase();
+  return videoExtensions.some((ext) => urlPath.endsWith(ext) || urlPath.includes(ext));
+}
+
+// URL이 미디어(이미지 또는 동영상)인지 확인
+function isMediaUrl(url: string): boolean {
+  return isImageUrl(url) || isVideoUrl(url);
+}
+
+// 상대 경로 URL을 절대 경로로 변환 (베이스 도메인 추가)
+const BASE_URL = 'https://safeyou365.com';
+
+function normalizeMediaUrl(url: string | undefined | null): string | null {
+  if (!url) return null;
+  // 이미 절대 URL인 경우
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  // 상대 경로인 경우 (/data/admin/... 형식)
+  if (url.startsWith('/')) {
+    return `${BASE_URL}${url}`;
+  }
+  // 그 외 경우
+  return `${BASE_URL}/${url}`;
 }
 
 // 메타데이터 타입에 따른 레이블 반환
@@ -108,6 +149,8 @@ export default function MessageBubble({
 }: Props) {
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [videoModalOpen, setVideoModalOpen] = useState(false);
+  const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [mapModalOpen, setMapModalOpen] = useState(false);
   const [address, setAddress] = useState<string | null>(metadata?.location?.address || null);
   const [isLoadingAddress, setIsLoadingAddress] = useState(false);
@@ -127,6 +170,16 @@ export default function MessageBubble({
   const handleCloseImageModal = () => {
     setImageModalOpen(false);
     setSelectedImage(null);
+  };
+
+  const handleVideoClick = (videoUrl: string) => {
+    setSelectedVideo(videoUrl);
+    setVideoModalOpen(true);
+  };
+
+  const handleCloseVideoModal = () => {
+    setVideoModalOpen(false);
+    setSelectedVideo(null);
   };
 
   const handleMapClick = () => {
@@ -202,14 +255,59 @@ export default function MessageBubble({
 
   // 이미지 메시지 파싱 (앱에서 보낸 형식)
   const parsedImage = parseImageMessage(message);
-  const isImageMessage =
-    messageType === 'IMAGE' ||
-    parsedImage.isImage ||
-    (attachments && attachments.length > 0 && isImageUrl(attachments[0]));
 
-  // 이미지 URL 결정
-  const imageUrl =
-    parsedImage.imageUrl || (attachments && attachments.length > 0 ? attachments[0] : null);
+  // metadata에서 동영상/이미지 확인 (RTDB 구조)
+  const isVideoFromMetadata = metadata?.type === 'video' && metadata?.videoUrl;
+  const isMultiImageFromMetadata =
+    metadata?.type === 'multi_image' && metadata?.imageUrls && metadata.imageUrls.length > 0;
+  const isSingleImageFromMetadata = metadata?.type === 'image' && metadata?.imageUrl;
+
+  // 첨부파일 URL 정규화 (상대 경로 -> 절대 경로)
+  const normalizedAttachments =
+    attachments
+      ?.map((url) => normalizeMediaUrl(url))
+      .filter((url): url is string => url !== null) || [];
+
+  // 미디어 첨부파일 필터링 (이미지와 동영상)
+  const mediaAttachments = normalizedAttachments.filter((url) => isMediaUrl(url));
+  const imageAttachments = normalizedAttachments.filter((url) => isImageUrl(url));
+  const videoAttachments = normalizedAttachments.filter((url) => isVideoUrl(url));
+
+  // metadata에서 온 이미지들 (multi_image) - 정규화 적용
+  const metadataImageUrls =
+    metadata?.imageUrls
+      ?.map((url) => normalizeMediaUrl(url))
+      .filter((url): url is string => url !== null) || [];
+  // metadata에서 온 동영상 URL - 정규화 적용
+  const metadataVideoUrl = normalizeMediaUrl(metadata?.videoUrl);
+  // metadata에서 온 단일 이미지 URL - 정규화 적용
+  const metadataSingleImageUrl = normalizeMediaUrl(metadata?.imageUrl);
+
+  // 모든 이미지 모으기 (attachments + metadata.imageUrls + metadata.imageUrl)
+  const allImageUrls: string[] = [
+    ...imageAttachments,
+    ...metadataImageUrls,
+    ...(metadataSingleImageUrl ? [metadataSingleImageUrl] : []),
+  ].filter((url, idx, arr) => arr.indexOf(url) === idx); // 중복 제거
+
+  // 모든 동영상 모으기 (attachments + metadata.videoUrl)
+  const allVideoUrls: string[] = [
+    ...videoAttachments,
+    ...(metadataVideoUrl ? [metadataVideoUrl] : []),
+  ].filter((url, idx, arr) => arr.indexOf(url) === idx); // 중복 제거
+
+  // 미디어 메시지 여부 (이미지 또는 동영상)
+  const hasMediaAttachments =
+    allImageUrls.length > 0 ||
+    allVideoUrls.length > 0 ||
+    isVideoFromMetadata ||
+    isMultiImageFromMetadata ||
+    isSingleImageFromMetadata;
+  const isImageMessage = messageType === 'IMAGE' || parsedImage.isImage || hasMediaAttachments;
+
+  // 첫 번째 이미지 URL 결정 (단일 이미지용) - 정규화 적용
+  const parsedImageUrl = parsedImage.imageUrl ? normalizeMediaUrl(parsedImage.imageUrl) : null;
+  const imageUrl = parsedImageUrl || (allImageUrls.length > 0 ? allImageUrls[0] : null);
 
   // 긴급 메시지 (위치 정보 포함)
   const isEmergencyWithLocation = messageType === 'EMERGENCY' && metadata?.location;
@@ -218,9 +316,57 @@ export default function MessageBubble({
   // 이미지와 위치를 함께 가진 메시지 (사고 현장 보고)
   const isImageWithLocation = messageType === 'IMAGE' && metadata?.location;
   const accidentImageUrl =
-    metadata?.imageUrl ||
-    parsedImage.imageUrl ||
-    (attachments && attachments.length > 0 ? attachments[0] : null);
+    normalizeMediaUrl(metadata?.imageUrl) ||
+    parsedImageUrl ||
+    (allImageUrls.length > 0 ? allImageUrls[0] : null);
+
+  // 동영상 렌더링 컴포넌트 (클릭하면 모달에서 재생)
+  const renderVideoContent = (videoUrl: string) => (
+    <Box
+      onClick={() => handleVideoClick(videoUrl)}
+      sx={{
+        position: 'relative',
+        maxWidth: 280,
+        maxHeight: 200,
+        borderRadius: 1,
+        overflow: 'hidden',
+        cursor: 'pointer',
+        bgcolor: 'black',
+        '&:hover': {
+          opacity: 0.9,
+        },
+      }}
+    >
+      <Box
+        component="video"
+        src={videoUrl}
+        preload="metadata"
+        sx={{
+          maxWidth: 280,
+          maxHeight: 200,
+          objectFit: 'contain',
+        }}
+      />
+      {/* 재생 버튼 오버레이 */}
+      <Box
+        sx={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: 48,
+          height: 48,
+          borderRadius: '50%',
+          bgcolor: 'rgba(0,0,0,0.6)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Iconify icon={'mdi:play' as any} width={32} sx={{ color: 'white', ml: 0.5 }} />
+      </Box>
+    </Box>
+  );
 
   // 이미지 메시지 렌더링 컴포넌트
   const renderImageContent = (imgUrl: string, label?: string) => (
@@ -248,6 +394,44 @@ export default function MessageBubble({
       />
     </Stack>
   );
+
+  // 다중 첨부파일 (이미지/동영상) 렌더링 컴포넌트
+  const renderMultipleAttachments = () => {
+    if (allImageUrls.length === 0 && allVideoUrls.length === 0) return null;
+
+    return (
+      <Stack spacing={1}>
+        {/* 이미지들 */}
+        {allImageUrls.length > 0 && (
+          <Stack direction="row" flexWrap="wrap" gap={0.5}>
+            {allImageUrls.map((imgUrl, idx) => (
+              <Box
+                key={`img-${idx}`}
+                component="img"
+                src={imgUrl}
+                alt={`첨부 이미지 ${idx + 1}`}
+                onClick={() => handleImageClick(imgUrl)}
+                sx={{
+                  width: allImageUrls.length === 1 ? 200 : 100,
+                  height: allImageUrls.length === 1 ? 200 : 100,
+                  borderRadius: 1,
+                  objectFit: 'cover',
+                  cursor: 'pointer',
+                  '&:hover': {
+                    opacity: 0.9,
+                  },
+                }}
+              />
+            ))}
+          </Stack>
+        )}
+        {/* 동영상들 */}
+        {allVideoUrls.map((videoUrl, idx) => (
+          <Box key={`video-${idx}`}>{renderVideoContent(videoUrl)}</Box>
+        ))}
+      </Stack>
+    );
+  };
 
   // 긴급 메시지 (지도 포함) 렌더링 컴포넌트
   const renderEmergencyContent = (location: LocationMetadata) => (
@@ -593,6 +777,9 @@ export default function MessageBubble({
               renderAccidentReportContent(accidentImageUrl, metadata.location)
             ) : isEmergencyWithLocation ? (
               renderEmergencyContent(metadata!.location!)
+            ) : hasMediaAttachments ? (
+              // 다중 미디어 첨부파일 (이미지/동영상)
+              renderMultipleAttachments()
             ) : isImageMessage && imageUrl ? (
               renderImageContent(imageUrl, parsedImage.label)
             ) : (
@@ -647,6 +834,53 @@ export default function MessageBubble({
           </Box>
         </Dialog>
 
+        {/* 동영상 모달 */}
+        <Dialog
+          open={videoModalOpen}
+          onClose={handleCloseVideoModal}
+          maxWidth="lg"
+          PaperProps={{
+            sx: {
+              bgcolor: 'black',
+              boxShadow: 'none',
+              maxHeight: '90vh',
+              maxWidth: '90vw',
+            },
+          }}
+        >
+          <Box sx={{ position: 'relative' }}>
+            <IconButton
+              onClick={handleCloseVideoModal}
+              sx={{
+                position: 'absolute',
+                top: 8,
+                right: 8,
+                zIndex: 1,
+                bgcolor: 'rgba(0,0,0,0.5)',
+                color: 'white',
+                '&:hover': {
+                  bgcolor: 'rgba(0,0,0,0.7)',
+                },
+              }}
+            >
+              <Iconify icon="mingcute:close-line" width={24} />
+            </IconButton>
+            {selectedVideo && (
+              <Box
+                component="video"
+                src={selectedVideo}
+                controls
+                autoPlay
+                sx={{
+                  maxWidth: '90vw',
+                  maxHeight: '90vh',
+                  objectFit: 'contain',
+                }}
+              />
+            )}
+          </Box>
+        </Dialog>
+
         {/* 지도 모달 */}
         {renderMapModal()}
       </>
@@ -686,6 +920,9 @@ export default function MessageBubble({
                 renderAccidentReportContent(accidentImageUrl, metadata.location)
               ) : isEmergencyWithLocation ? (
                 renderEmergencyContent(metadata!.location!)
+              ) : hasMediaAttachments ? (
+                // 다중 미디어 첨부파일 (이미지/동영상)
+                renderMultipleAttachments()
               ) : isImageMessage && imageUrl ? (
                 renderImageContent(imageUrl, parsedImage.label)
               ) : (
@@ -742,6 +979,53 @@ export default function MessageBubble({
               component="img"
               src={selectedImage}
               alt="이미지 확대"
+              sx={{
+                maxWidth: '90vw',
+                maxHeight: '90vh',
+                objectFit: 'contain',
+              }}
+            />
+          )}
+        </Box>
+      </Dialog>
+
+      {/* 동영상 모달 */}
+      <Dialog
+        open={videoModalOpen}
+        onClose={handleCloseVideoModal}
+        maxWidth="lg"
+        PaperProps={{
+          sx: {
+            bgcolor: 'black',
+            boxShadow: 'none',
+            maxHeight: '90vh',
+            maxWidth: '90vw',
+          },
+        }}
+      >
+        <Box sx={{ position: 'relative' }}>
+          <IconButton
+            onClick={handleCloseVideoModal}
+            sx={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              zIndex: 1,
+              bgcolor: 'rgba(0,0,0,0.5)',
+              color: 'white',
+              '&:hover': {
+                bgcolor: 'rgba(0,0,0,0.7)',
+              },
+            }}
+          >
+            <Iconify icon="mingcute:close-line" width={24} />
+          </IconButton>
+          {selectedVideo && (
+            <Box
+              component="video"
+              src={selectedVideo}
+              controls
+              autoPlay
               sx={{
                 maxWidth: '90vw',
                 maxHeight: '90vh',

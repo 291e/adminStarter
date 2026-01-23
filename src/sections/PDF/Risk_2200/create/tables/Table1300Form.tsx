@@ -157,7 +157,7 @@ export default function Table1300Form({
           <thead>
             <tr>
               <th style={{ width: 48 }}>순번</th>
-              <th style={{ width: 160 }}>기계.기구. 설비명</th>
+              <th style={{ width: 160 }}>기계·기구·설비명</th>
               <th style={{ width: 96 }}>관리번호</th>
               <th style={{ width: 88 }}>용량</th>
               <th style={{ width: 96 }}>

@@ -21,15 +21,18 @@ type Props = {
 export default function AttachmentList({ attachments, onFileClick }: Props) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
 
   const getFileIcon = (type: string) => {
     if (type === 'image') return 'solar:gallery-bold' as any;
+    if (type === 'video') return 'solar:videocamera-bold' as any;
     if (type === 'pdf') return 'solar:file-text-bold' as any;
     return 'solar:document-text-bold' as any;
   };
 
   const getFileColor = (type: string) => {
     if (type === 'image') return '#22C55E';
+    if (type === 'video') return '#8B5CF6';
     if (type === 'pdf') return '#EF4444';
     return '#3B82F6';
   };
@@ -37,6 +40,8 @@ export default function AttachmentList({ attachments, onFileClick }: Props) {
   const handleItemClick = (file: ChatAttachmentDto) => {
     if (file.type === 'image' && file.url) {
       setSelectedImage(file.url);
+    } else if (file.type === 'video' && file.url) {
+      setSelectedVideo(file.url);
     } else if (file.url) {
       window.open(file.url, '_blank');
     } else if (onFileClick) {
@@ -44,9 +49,10 @@ export default function AttachmentList({ attachments, onFileClick }: Props) {
     }
   };
 
-  // 이미지와 문서 분류
+  // 이미지, 동영상, 문서 분류
   const imageFiles = attachments.filter((att) => att.type === 'image');
-  const documentFiles = attachments.filter((att) => att.type !== 'image');
+  const videoFiles = attachments.filter((att) => att.type === 'video');
+  const documentFiles = attachments.filter((att) => att.type !== 'image' && att.type !== 'video');
 
   return (
     <>
@@ -136,6 +142,81 @@ export default function AttachmentList({ attachments, onFileClick }: Props) {
                             <Iconify icon={getFileIcon('image')} width={24} color="grey.500" />
                           </Box>
                         )}
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+              )}
+
+              {/* 동영상 파일 섹션 */}
+              {videoFiles.length > 0 && (
+                <Box sx={{ mb: 2 }}>
+                  <Typography
+                    variant="caption"
+                    sx={{ fontWeight: 600, color: 'text.secondary', mb: 1, display: 'block' }}
+                  >
+                    동영상 ({videoFiles.length})
+                  </Typography>
+                  <Box
+                    sx={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(3, 1fr)',
+                      gap: 1,
+                    }}
+                  >
+                    {videoFiles.map((file) => (
+                      <Box
+                        key={file.id}
+                        onClick={() => handleItemClick(file)}
+                        sx={{
+                          aspectRatio: '1',
+                          borderRadius: 1,
+                          overflow: 'hidden',
+                          cursor: 'pointer',
+                          bgcolor: 'grey.800',
+                          position: 'relative',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          '&:hover': {
+                            opacity: 0.8,
+                          },
+                        }}
+                      >
+                        {file.url && (
+                          <Box
+                            component="video"
+                            src={file.url}
+                            preload="metadata"
+                            sx={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                            }}
+                          />
+                        )}
+                        {/* 재생 버튼 오버레이 */}
+                        <Box
+                          sx={{
+                            position: 'absolute',
+                            top: '50%',
+                            left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            width: 32,
+                            height: 32,
+                            borderRadius: '50%',
+                            bgcolor: 'rgba(0,0,0,0.6)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <Iconify
+                            icon={'mdi:play' as any}
+                            width={20}
+                            sx={{ color: 'white', ml: 0.3 }}
+                          />
+                        </Box>
                       </Box>
                     ))}
                   </Box>
@@ -265,6 +346,53 @@ export default function AttachmentList({ attachments, onFileClick }: Props) {
               component="img"
               src={selectedImage}
               alt="이미지 확대"
+              sx={{
+                maxWidth: '90vw',
+                maxHeight: '90vh',
+                objectFit: 'contain',
+              }}
+            />
+          )}
+        </Box>
+      </Dialog>
+
+      {/* 동영상 모달 */}
+      <Dialog
+        open={!!selectedVideo}
+        onClose={() => setSelectedVideo(null)}
+        maxWidth="lg"
+        PaperProps={{
+          sx: {
+            bgcolor: 'black',
+            boxShadow: 'none',
+            maxHeight: '90vh',
+            maxWidth: '90vw',
+          },
+        }}
+      >
+        <Box sx={{ position: 'relative' }}>
+          <IconButton
+            onClick={() => setSelectedVideo(null)}
+            sx={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              zIndex: 1,
+              bgcolor: 'rgba(0,0,0,0.5)',
+              color: 'white',
+              '&:hover': {
+                bgcolor: 'rgba(0,0,0,0.7)',
+              },
+            }}
+          >
+            <Iconify icon="mingcute:close-line" width={24} />
+          </IconButton>
+          {selectedVideo && (
+            <Box
+              component="video"
+              src={selectedVideo}
+              controls
+              autoPlay
               sx={{
                 maxWidth: '90vw',
                 maxHeight: '90vh',

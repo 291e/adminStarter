@@ -766,11 +766,63 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     // 메시지에서 이미지와 문서 파일 추출
     const messageAttachments: ChatAttachmentDto[] = [];
 
+    // URL 정규화 함수 (상대 경로 -> 절대 경로)
+    const normalizeUrl = (url: string): string => {
+      if (!url) return '';
+      if (url.startsWith('http://') || url.startsWith('https://')) return url;
+      if (url.startsWith('/')) return `https://safeyou365.com${url}`;
+      return `https://safeyou365.com/${url}`;
+    };
+
     firebaseMessages.forEach((msg) => {
+      // metadata.videoUrl에서 동영상 추출
+      const videoUrl = (msg.metadata as any)?.videoUrl;
+      if (videoUrl) {
+        const normalizedVideoUrl = normalizeUrl(videoUrl);
+        const fileName = normalizedVideoUrl.split('/').pop() || '동영상';
+        messageAttachments.push({
+          id: `video-${msg.id}`,
+          name: fileName,
+          type: 'video',
+          url: normalizedVideoUrl,
+          createdAt: msg.timestamp,
+        });
+      }
+
+      // metadata.imageUrls에서 이미지들 추출 (multi_image)
+      const imageUrls = (msg.metadata as any)?.imageUrls;
+      if (imageUrls && Array.isArray(imageUrls)) {
+        imageUrls.forEach((imgUrl: string, idx: number) => {
+          const normalizedImgUrl = normalizeUrl(imgUrl);
+          const fileName = normalizedImgUrl.split('/').pop() || `이미지${idx + 1}`;
+          messageAttachments.push({
+            id: `meta-img-${msg.id}-${idx}`,
+            name: fileName,
+            type: 'image',
+            url: normalizedImgUrl,
+            createdAt: msg.timestamp,
+          });
+        });
+      }
+
+      // metadata.imageUrl에서 단일 이미지 추출
+      const singleImageUrl = (msg.metadata as any)?.imageUrl;
+      if (singleImageUrl && !imageUrls) {
+        const normalizedSingleImageUrl = normalizeUrl(singleImageUrl);
+        const fileName = normalizedSingleImageUrl.split('/').pop() || '이미지';
+        messageAttachments.push({
+          id: `meta-single-img-${msg.id}`,
+          name: fileName,
+          type: 'image',
+          url: normalizedSingleImageUrl,
+          createdAt: msg.timestamp,
+        });
+      }
+
       // 이미지 메시지 ([이미지]|URL 형식)
       const imageMatch = msg.message?.match(/\[이미지\]\|(.+)$/);
       if (imageMatch) {
-        const imageUrl = imageMatch[1].trim();
+        const imageUrl = normalizeUrl(imageMatch[1].trim());
         const fileName = imageUrl.split('/').pop() || '이미지';
         messageAttachments.push({
           id: `img-${msg.id}`,
@@ -781,18 +833,20 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
         });
       }
 
-      // attachments 배열에서 이미지 추출
+      // attachments 배열에서 이미지/동영상 추출
       if (msg.attachments && msg.attachments.length > 0) {
         msg.attachments.forEach((url, idx) => {
-          const fileName = url.split('/').pop() || '첨부파일';
+          const normalizedUrl = normalizeUrl(url);
+          const fileName = normalizedUrl.split('/').pop() || '첨부파일';
           const ext = fileName.split('.').pop()?.toLowerCase() || '';
           const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext);
+          const isVideo = ['mp4', 'mov', 'avi', 'webm', 'mkv', 'm4v', '3gp'].includes(ext);
 
           messageAttachments.push({
             id: `att-${msg.id}-${idx}`,
             name: fileName,
-            type: isImage ? 'image' : ext === 'pdf' ? 'pdf' : 'document',
-            url,
+            type: isImage ? 'image' : isVideo ? 'video' : ext === 'pdf' ? 'pdf' : 'document',
+            url: normalizedUrl,
             createdAt: msg.timestamp,
           });
         });

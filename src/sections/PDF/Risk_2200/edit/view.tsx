@@ -758,7 +758,48 @@ export function Risk_2200EditView({
             });
             return prev;
           }
-          return parsedTableData.data as Table2400TBMData;
+
+          // workerSignatureList에서 서명 데이터 매핑
+          const workerSignatureList = (currentDocument as any)?.workerSignatureList || [];
+          let processedData = parsedTableData.data as Table2400TBMData;
+
+          if (workerSignatureList.length > 0 && processedData.educationVideoRows) {
+            const signatureMap = new Map<string, { signatureData?: string; status?: string }>();
+
+            workerSignatureList.forEach((worker: any) => {
+              const vodIdx = worker.vodIdx ?? '';
+              const key = `${worker.targetMemberIdx}:${vodIdx}`;
+              signatureMap.set(key, {
+                signatureData: worker.signatureData,
+                status: worker.status,
+              });
+            });
+
+            const updatedRows = processedData.educationVideoRows.map((row: any) => {
+              if (row.signature) return row;
+              const memberIdx = row.participant?.memberIdx ?? '';
+              const vodIdx = row.vodIdx ?? '';
+              const directKey = `${memberIdx}:${vodIdx}`;
+              const fallbackKey = `${memberIdx}:`;
+              const match = signatureMap.get(directKey) || signatureMap.get(fallbackKey);
+
+              if (!match) return row;
+              if (match.signatureData) {
+                return { ...row, signature: match.signatureData };
+              }
+              if (match.status === 'SIGNED') {
+                return { ...row, signature: 'SIGNED' };
+              }
+              return row;
+            });
+
+            processedData = {
+              ...processedData,
+              educationVideoRows: updatedRows,
+            };
+          }
+
+          return processedData;
         });
       } else if (tableType === '2400-education') {
         if (parsedTableData.rows) {
