@@ -11,8 +11,17 @@ type ChatMessage = {
   dateLabel?: string;
   avatarUrl?: string;
   isOwn?: boolean;
-  messageType?: 'TEXT' | 'IMAGE' | 'FILE' | 'SYSTEM';
+  messageType?: 'TEXT' | 'IMAGE' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
   sharedDocumentIdx?: number;
+  attachments?: string[] | null;
+  metadata?: {
+    type?: string;
+    location?: {
+      latitude: number;
+      longitude: number;
+      address?: string;
+    };
+  };
 };
 
 type Props = {
@@ -23,6 +32,9 @@ type Props = {
   onSendMessage?: () => void;
   roomId?: string | number;
   onFileMessageClick?: (sharedDocumentIdx: number) => void;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  onLoadMore?: () => void;
 };
 
 export default function NormalChatView({
@@ -33,6 +45,9 @@ export default function NormalChatView({
   onSendMessage,
   roomId,
   onFileMessageClick,
+  hasMore,
+  isLoadingMore,
+  onLoadMore,
 }: Props) {
   return (
     <Box
@@ -51,6 +66,9 @@ export default function NormalChatView({
         conversationDate={conversationDate}
         roomId={roomId}
         onFileMessageClick={onFileMessageClick}
+        hasMore={hasMore}
+        isLoadingMore={isLoadingMore}
+        onLoadMore={onLoadMore}
       />
       <ChatInput
         value={messageInput}

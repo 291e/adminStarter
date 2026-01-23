@@ -11,6 +11,7 @@ import Checkbox from '@mui/material/Checkbox';
 import Button from '@mui/material/Button';
 
 import { Iconify } from 'src/components/iconify';
+import { getChatAvatarUrl } from 'src/sections/Chat/utils/avatar';
 import { Scrollbar } from 'src/components/scrollbar';
 import RemoveParticipantModal from './RemoveParticipantModal';
 import InviteParticipantModal from './InviteParticipantModal';
@@ -237,12 +238,11 @@ export default function ParticipantList({ room, participants, onInvite, onRemove
               }}
             >
               <Avatar
-                src={
-                  filteredParticipants[0].profileImage &&
-                  filteredParticipants[0].profileImage.trim() !== ''
-                    ? filteredParticipants[0].profileImage
-                    : undefined
-                }
+                src={getChatAvatarUrl(
+                  filteredParticipants[0].profileImage ||
+                    (filteredParticipants[0] as any).memberThumbnail ||
+                    (filteredParticipants[0] as any).avatar
+                )}
                 alt={filteredParticipants[0].name}
                 sx={{
                   width: 64,
@@ -251,17 +251,7 @@ export default function ParticipantList({ room, participants, onInvite, onRemove
                   mb: 0.5,
                 }}
               >
-                {(!filteredParticipants[0].profileImage ||
-                  filteredParticipants[0].profileImage.trim() === '') &&
-                  (() => {
-                    const name = filteredParticipants[0].name || '';
-                    const isValidName = name.trim() !== '' && !/^\d+$/.test(name.trim());
-                    return isValidName && name[0] ? (
-                      name[0]
-                    ) : (
-                      <Iconify icon="solar:user-rounded-bold" width={32} />
-                    );
-                  })()}
+                <Iconify icon="solar:user-rounded-bold" width={32} />
               </Avatar>
               <Stack spacing={0.5} alignItems="center">
                 <Typography
@@ -332,24 +322,15 @@ export default function ParticipantList({ room, participants, onInvite, onRemove
                       </Box>
                     )}
                     <Avatar
-                      src={
-                        participant.profileImage && participant.profileImage.trim() !== ''
-                          ? participant.profileImage
-                          : undefined
-                      }
+                      src={getChatAvatarUrl(
+                        participant.profileImage ||
+                          (participant as any).memberThumbnail ||
+                          (participant as any).avatar
+                      )}
                       alt={participant.name}
                       sx={{ width: 40, height: 40, bgcolor: 'grey.300' }}
                     >
-                      {(!participant.profileImage || participant.profileImage.trim() === '') &&
-                        (() => {
-                          const name = participant.name || '';
-                          const isValidName = name.trim() !== '' && !/^\d+$/.test(name.trim());
-                          return isValidName && name[0] ? (
-                            name[0]
-                          ) : (
-                            <Iconify icon="solar:user-rounded-bold" width={24} />
-                          );
-                        })()}
+                      <Iconify icon="solar:user-rounded-bold" width={24} />
                     </Avatar>
                     <Stack spacing={0.5} sx={{ flex: 1, minWidth: 0 }}>
                       <Typography

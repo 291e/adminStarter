@@ -1,5 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ref, push, set, onChildAdded, query, orderByChild, limitToLast } from 'firebase/database';
+import {
+  ref,
+  push,
+  update,
+  onChildAdded,
+  query,
+  orderByChild,
+  limitToLast,
+  startAt,
+  endAt,
+  get,
+} from 'firebase/database';
 import { database } from 'src/config/firebase';
 import { useAuthContext } from 'src/auth/hooks';
 import { backupMessage } from 'src/services/chat/chat.service';
@@ -10,7 +21,7 @@ import { useQueryClient } from '@tanstack/react-query';
 export type FirebaseMessage = {
   id: string;
   chatRoomId: string;
-  senderMemberIdx: number | string; // 문자열로 올 수도 있음
+  senderMemberIdx: string; // Firebase auth.uid 기준 문자열
   senderId?: string;
   senderName?: string;
   message: string;
@@ -19,6 +30,7 @@ export type FirebaseMessage = {
   signalType?: 'RISK' | 'RESCUE' | 'EVACUATION' | null;
   attachments?: string[] | null;
   sharedDocumentIdx?: number; // FILE 타입 메시지의 공유 문서 인덱스
+  translations?: Record<string, string>;
   metadata?: {
     type?: 'rescue_request' | 'evacuation' | 'risk_report' | string;
     location?: {
@@ -34,10 +46,49 @@ export type FirebaseMessage = {
   [key: string]: any;
 };
 
+const getMessageTimestamp = (message: FirebaseMessage) => {
+  const rawTimestamp = message.timestamp || message.createdAt?.toString() || '0';
+  const numeric = Number(rawTimestamp);
+  if (!Number.isNaN(numeric)) return numeric;
+  const parsed = new Date(rawTimestamp).getTime();
+  return Number.isNaN(parsed) ? 0 : parsed;
+};
+
+const removeUndefinedFields = <T extends Record<string, any>>(obj: T): T => {
+  const entries = Object.entries(obj).filter(([, value]) => value !== undefined);
+  return Object.fromEntries(entries) as T;
+};
+
 type UseChatRoomFirebaseProps = {
   chatRoomId?: string; // Firebase UUID
   chatRoomIdx?: number; // Backend ID (for backup)
   memberIdx?: number | null; // 명시적으로 전달받은 사용자 memberIdx
+};
+
+const resolveMemberIdx = (
+  overrideIdx: number | null | undefined,
+  authUser: ReturnType<typeof useAuthContext>['user']
+) => {
+  const candidates = [
+    overrideIdx,
+    authUser?.memberIdx,
+    authUser?.memberIndex,
+    authUser?.member?.memberIdx,
+    authUser?.member?.memberIndex,
+    authUser?.companyMember?.memberIdx,
+    authUser?.companyMember?.memberIndex,
+    authUser?.member?.id,
+    authUser?.id,
+  ];
+
+  for (const candidate of candidates) {
+    const parsed = Number(candidate);
+    if (!Number.isNaN(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+
+  return null;
 };
 
 export function useChatRoomFirebase({
@@ -49,8 +100,11 @@ export function useChatRoomFirebase({
   const queryClient = useQueryClient();
   const [messages, setMessages] = useState<FirebaseMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [oldestTimestamp, setOldestTimestamp] = useState<number | null>(null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-  // 실시간 메시지 수신 (일원화된 로직)
+  // 실시간 메시지 수신 (초기 로딩 + 신규 구독)
   useEffect(() => {
     if (!chatRoomId || !database) {
       setMessages([]);
@@ -60,80 +114,148 @@ export function useChatRoomFirebase({
     // 방이 변경되면 기존 메시지 초기화 및 로딩 시작
     setMessages([]);
     setIsLoading(true);
+    setHasMore(false);
+    setOldestTimestamp(null);
+    setIsLoadingMore(false);
 
     const db = database;
     const messagesRef = ref(db, `chatRooms/${chatRoomId}/messages`);
-    // 타임스탬프 기준 정렬 및 마지막 100개 가져오기
-    const messagesQuery = query(messagesRef, orderByChild('timestamp'), limitToLast(100));
+    const initialQuery = query(messagesRef, orderByChild('timestamp'), limitToLast(50));
 
-    const handleNewMessage = (snapshot: any) => {
-      const newMessage = snapshot.val() as FirebaseMessage;
+    let unsubscribe: (() => void) | null = null;
+    let cancelled = false;
 
-      // 현재 보고 있는 방의 메시지가 아니면 무시 (이전 리스너 잔재 등 방지)
-      if (newMessage.chatRoomId && newMessage.chatRoomId !== chatRoomId) {
-        return;
-      }
-
-      setMessages((prev) => {
-        // 이미 존재하는 메시지면 업데이트하지 않음
-        if (prev.some((msg) => msg.id === newMessage.id)) {
-          return prev;
-        }
-
-        // 새 메시지 추가 후 타임스탬프로 정렬
-        const updated = [...prev, newMessage];
-        return updated.sort((a, b) => {
-          const timeA = Number(a.timestamp) || 0;
-          const timeB = Number(b.timestamp) || 0;
-          return timeA - timeB;
+    const loadInitial = async () => {
+      try {
+        const snapshot = await get(initialQuery);
+        const loaded: FirebaseMessage[] = [];
+        snapshot.forEach((child) => {
+          loaded.push(child.val() as FirebaseMessage);
         });
-      });
 
-      // 데이터가 들어오면 로딩 해제
-      setIsLoading(false);
+        loaded.sort((a, b) => getMessageTimestamp(a) - getMessageTimestamp(b));
+
+        if (cancelled) return;
+
+        setMessages(loaded);
+        setIsLoading(false);
+
+        if (loaded.length > 0) {
+          setOldestTimestamp(getMessageTimestamp(loaded[0]));
+        }
+        setHasMore(loaded.length >= 50);
+
+        const lastTimestamp = loaded.length
+          ? getMessageTimestamp(loaded[loaded.length - 1])
+          : 0;
+        const liveQuery = query(
+          messagesRef,
+          orderByChild('timestamp'),
+          startAt((lastTimestamp + 1).toString())
+        );
+
+        unsubscribe = onChildAdded(liveQuery, (snap) => {
+          const newMessage = snap.val() as FirebaseMessage;
+          if (newMessage.chatRoomId && newMessage.chatRoomId !== chatRoomId) {
+            return;
+          }
+
+          setMessages((prev) => {
+            if (prev.some((msg) => msg.id === newMessage.id)) {
+              return prev;
+            }
+            return [...prev, newMessage].sort(
+              (a, b) => getMessageTimestamp(a) - getMessageTimestamp(b)
+            );
+          });
+        });
+      } catch (error) {
+        console.error('Failed to load messages:', error);
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
     };
 
-    // onChildAdded는 unsubscribe 함수를 반환함
-    const unsubscribe = onChildAdded(messagesQuery, handleNewMessage);
-
-    // 데이터가 없는 경우를 대비해 타임아웃으로 로딩 해제
-    const loadingTimeout = setTimeout(() => {
-      setIsLoading(false);
-    }, 2000);
+    loadInitial();
 
     return () => {
-      clearTimeout(loadingTimeout);
-      // 반환된 unsubscribe 함수 호출이 더 안전함 (off 대신)
-      unsubscribe();
+      cancelled = true;
+      if (unsubscribe) unsubscribe();
     };
-  }, [chatRoomId]);
+  }, [chatRoomId, database]);
 
   // 구형 memberIdx 해결 로직은 유지
-  const resolveMemberIdx = (
-    overrideIdx: number | null | undefined,
-    authUser: ReturnType<typeof useAuthContext>['user']
-  ) => {
-    const candidates = [
-      overrideIdx,
-      authUser?.memberIdx,
-      authUser?.memberIndex,
-      authUser?.member?.memberIdx,
-      authUser?.member?.memberIndex,
-      authUser?.companyMember?.memberIdx,
-      authUser?.companyMember?.memberIndex,
-      authUser?.member?.id,
-      authUser?.id,
-    ];
 
-    for (const candidate of candidates) {
-      const parsed = Number(candidate);
-      if (!Number.isNaN(parsed) && parsed > 0) {
-        return parsed;
+  const markRoomSeen = useCallback(async () => {
+    if (!chatRoomId || !database) return;
+    const resolvedMemberIdx = resolveMemberIdx(memberIdx, user);
+    if (!resolvedMemberIdx) return;
+
+    const db = database;
+    const now = Date.now();
+    await update(ref(db), {
+      [`chatRooms/${chatRoomId}/participants/${String(resolvedMemberIdx)}/lastSeen`]: now,
+      [`chatRooms/${chatRoomId}/participants/${String(resolvedMemberIdx)}/unreadCount`]: 0,
+    });
+  }, [chatRoomId, database, memberIdx, user]);
+
+  useEffect(() => {
+    if (!chatRoomId || !database) return undefined;
+    const resolvedMemberIdx = resolveMemberIdx(memberIdx, user);
+    if (!resolvedMemberIdx) return undefined;
+
+    const db = database;
+    const now = Date.now();
+    update(ref(db), {
+      [`chatRooms/${chatRoomId}/participants/${String(resolvedMemberIdx)}/online`]: 1,
+      [`chatRooms/${chatRoomId}/participants/${String(resolvedMemberIdx)}/lastSeen`]: now,
+    });
+
+    return () => {
+      update(ref(db), {
+        [`chatRooms/${chatRoomId}/participants/${String(resolvedMemberIdx)}/online`]: 0,
+      });
+    };
+  }, [chatRoomId, database, memberIdx, user]);
+
+  useEffect(() => {
+    if (!chatRoomId || !database || messages.length === 0) return;
+    markRoomSeen();
+  }, [chatRoomId, database, messages.length, markRoomSeen]);
+
+  const loadMore = useCallback(async () => {
+    if (!chatRoomId || !database || oldestTimestamp === null) return;
+
+    if (isLoadingMore) return;
+    setIsLoadingMore(true);
+
+    const messagesRef = ref(database, `chatRooms/${chatRoomId}/messages`);
+    const moreQuery = query(
+      messagesRef,
+      orderByChild('timestamp'),
+      endAt((oldestTimestamp - 1).toString()),
+      limitToLast(20)
+    );
+
+    try {
+      const snapshot = await get(moreQuery);
+      const older: FirebaseMessage[] = [];
+      snapshot.forEach((child) => {
+        older.push(child.val() as FirebaseMessage);
+      });
+      older.sort((a, b) => getMessageTimestamp(a) - getMessageTimestamp(b));
+
+      if (older.length > 0) {
+        setMessages((prev) => [...older, ...prev]);
+        setOldestTimestamp(getMessageTimestamp(older[0]));
       }
-    }
 
-    return null;
-  };
+      setHasMore(older.length >= 20);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [chatRoomId, database, oldestTimestamp, isLoadingMore]);
 
   // 메시지 전송
   const sendMessage = useCallback(
@@ -141,7 +263,8 @@ export function useChatRoomFirebase({
       content: string,
       messageType: FirebaseMessage['messageType'] = 'TEXT',
       attachments?: string[],
-      signalType?: FirebaseMessage['signalType']
+      signalType?: FirebaseMessage['signalType'],
+      sharedDocumentIdx?: number
     ) => {
       if (!chatRoomId) {
         throw new Error('채팅방이 선택되지 않았습니다.');
@@ -165,7 +288,8 @@ export function useChatRoomFirebase({
 
       if (!messageId) return;
 
-      const timestamp = Date.now().toString();
+      const createdAt = Date.now();
+      const timestamp = createdAt.toString();
       const senderMemberIdx = resolveMemberIdx(memberIdx, user);
 
       if (!senderMemberIdx) {
@@ -186,28 +310,66 @@ export function useChatRoomFirebase({
         }
       }
 
-      const messageData: FirebaseMessage = {
+      const senderId = String(senderMemberIdx);
+      const messageData: FirebaseMessage = removeUndefinedFields({
         id: messageId,
         chatRoomId,
-        senderMemberIdx,
+        senderMemberIdx: senderId,
+        senderId,
         message: messageContent,
+        text: messageContent,
         messageType,
         signalType: signalType || null,
         attachments: attachments || null,
+        sharedDocumentIdx,
         timestamp,
+        createdAt,
         isRead: false,
-      };
+      }) as FirebaseMessage;
 
       try {
-        // 1. Firebase RTDB 저장
-        await set(newMessageRef, messageData);
+        // 1. Firebase RTDB 멀티 업데이트
+        const participantsSnap = await get(ref(db, `chatRooms/${chatRoomId}/participants`));
+        const participants = participantsSnap.val() || {};
+
+        const lastMessage = removeUndefinedFields({
+          message: messageContent,
+          text: messageContent,
+          timestamp,
+          createdAt,
+          senderMemberIdx: senderId,
+          senderId,
+          senderName: messageData.senderName,
+          messageType,
+          signalType: signalType || null,
+          sharedDocumentIdx: messageData.sharedDocumentIdx,
+        });
+
+        const updates: Record<string, any> = {};
+        updates[`chatRooms/${chatRoomId}/messages/${messageId}`] = messageData;
+        updates[`chatRooms/${chatRoomId}/lastMessage`] = lastMessage;
+        updates[`chatRooms/${chatRoomId}/lastMessageAt`] = timestamp;
+        updates[`chatRooms/${chatRoomId}/updatedAt`] = createdAt;
+
+        Object.entries(participants).forEach(([pid, p]: [string, any]) => {
+          if (pid === senderId || pid === 'chatbot') return;
+          const unread = (p?.unreadCount ?? 0) + 1;
+          updates[`chatRooms/${chatRoomId}/participants/${pid}/unreadCount`] = unread;
+          updates[`chatRooms/${chatRoomId}/participants/${pid}/lastSeen`] =
+            p?.lastSeen ?? createdAt;
+        });
+
+        updates[`chatRooms/${chatRoomId}/participants/${senderId}/unreadCount`] = 0;
+        updates[`chatRooms/${chatRoomId}/participants/${senderId}/lastSeen`] = createdAt;
+
+        await update(ref(db), updates);
 
         // 2. 백엔드 백업 API 호출 (chatRoomIdx가 필요)
         if (chatRoomId) {
           await backupMessage({
             id: messageData.id,
             chatRoomId: messageData.chatRoomId,
-            senderMemberIdx: Number(messageData.senderMemberIdx),
+            senderMemberIdx: Number(senderMemberIdx),
             message: messageData.message,
             messageType: messageData.messageType,
             signalType: messageData.signalType,
@@ -227,12 +389,15 @@ export function useChatRoomFirebase({
         throw error;
       }
     },
-    [chatRoomId, user, memberIdx, queryClient]
+    [chatRoomId, user, memberIdx, queryClient, database]
   );
 
   return {
     messages,
     sendMessage,
     isLoading,
+    hasMore,
+    loadMore,
+    isLoadingMore,
   };
 }

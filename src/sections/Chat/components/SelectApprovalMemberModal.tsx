@@ -23,6 +23,7 @@ import InputAdornment from '@mui/material/InputAdornment';
 
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
 import { Iconify } from 'src/components/iconify';
+import { getChatAvatarUrl } from 'src/sections/Chat/utils/avatar';
 import { useAuthContext } from 'src/auth/hooks/use-auth-context';
 import { useMyInfo } from 'src/sections/Chat/hooks/use-my-info';
 import {
@@ -351,8 +352,11 @@ export default function SelectApprovalMemberModal({
                           </TableCell>
                           <TableCell>
                             <Stack direction="row" spacing={1.5} alignItems="center">
-                              <Avatar src={member.avatar} sx={{ width: 40, height: 40 }}>
-                                {member.name[0]}
+                              <Avatar
+                                src={getChatAvatarUrl(member.avatar)}
+                                sx={{ width: 40, height: 40 }}
+                              >
+                                <Iconify icon="solar:user-rounded-bold" width={24} />
                               </Avatar>
                               <Typography variant="body2" sx={{ fontWeight: 600 }}>
                                 {member.name}

@@ -16,6 +16,7 @@ type Props = {
   onEnded?: () => void;
   serverUrl?: string;
   disableControls?: boolean;
+  disableControlInteraction?: boolean;
 };
 
 const LANGUAGE_LABELS: Record<string, string> = {
@@ -41,6 +42,7 @@ export default function VideoPlayer({
   onEnded,
   serverUrl,
   disableControls = false,
+  disableControlInteraction = false,
 }: Props) {
   // 🐛 디버깅: VideoPlayer props 확인
   console.log('🎥 [VideoPlayer] Props 수신:', {
@@ -51,7 +53,19 @@ export default function VideoPlayer({
     defaultLanguage,
     serverUrl,
     disableControls,
+    disableControlInteraction,
   });
+
+  const controlsListValue = useMemo(() => {
+    const list: string[] = [];
+    if (disableControls) {
+      list.push('nodownload', 'nofullscreen', 'noremoteplayback');
+    }
+    if (disableControlInteraction) {
+      list.push('noplaybackrate');
+    }
+    return list.length > 0 ? list.join(' ') : undefined;
+  }, [disableControls, disableControlInteraction]);
   // 자막 언어 초기값 결정: defaultLanguage → 'ko' → 첫 번째 가용 언어
   const getInitialLanguage = () => {
     if (defaultLanguage && availableLanguages.includes(defaultLanguage)) {
@@ -204,13 +218,20 @@ export default function VideoPlayer({
               ref={playerRef}
               autoPlay
               controls={!disableControls}
-              controlsList={disableControls ? 'nodownload nofullscreen noremoteplayback' : undefined}
+              controlsList={controlsListValue}
               onClick={(e) => {
                 const videoEl = e.target as HTMLVideoElement;
                 if (videoEl.paused) {
                   videoEl.play();
                 } else {
                   videoEl.pause();
+                }
+              }}
+              onRateChange={(e) => {
+                if (!disableControlInteraction) return;
+                const videoEl = e.currentTarget as HTMLVideoElement;
+                if (videoEl.playbackRate !== 1) {
+                  videoEl.playbackRate = 1;
                 }
               }}
               onContextMenu={(e) => {
@@ -260,6 +281,22 @@ export default function VideoPlayer({
               })}
               브라우저가 비디오를 지원하지 않습니다.
             </video>
+            {disableControlInteraction && !disableControls && (
+              <Box
+                aria-hidden
+                sx={{
+                  position: 'absolute',
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  height: 48,
+                  zIndex: 2,
+                  pointerEvents: 'auto',
+                }}
+                onClick={(e) => e.preventDefault()}
+                onPointerDown={(e) => e.preventDefault()}
+              />
+            )}
           </Box>
         </>
       )}

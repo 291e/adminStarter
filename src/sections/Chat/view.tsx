@@ -42,6 +42,7 @@ import type {
   ChatAttachmentDto,
 } from 'src/services/chat/chat.types';
 import { sendChatbotMessage } from 'src/services/member/member.service';
+import { getChatAvatarUrl } from 'src/sections/Chat/utils/avatar';
 
 // ----------------------------------------------------------------------
 
@@ -51,7 +52,7 @@ type Props = {
   sx?: SxProps<Theme>;
 };
 
-type ChatbotMessage = {
+type ChatMessageItem = {
   id: string;
   sender: string;
   message: string;
@@ -59,6 +60,17 @@ type ChatbotMessage = {
   dateLabel?: string;
   avatarUrl?: string;
   isOwn: boolean;
+  messageType?: 'TEXT' | 'IMAGE' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
+  sharedDocumentIdx?: number;
+  attachments?: string[] | null;
+  metadata?: {
+    type?: string;
+    location?: {
+      latitude: number;
+      longitude: number;
+      address?: string;
+    };
+  };
 };
 
 export function ChatView({ title = '채팅', description, sx }: Props) {
@@ -67,7 +79,7 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
   const [selectedRoom, setSelectedRoom] = useState<ChatRoomDto | null>(null);
   const [messageInput, setMessageInput] = useState('');
   const [isChatbotRoom, setIsChatbotRoom] = useState(false);
-  const [chatbotMessages, setChatbotMessages] = useState<ChatbotMessage[]>([]);
+  const [chatbotMessages, setChatbotMessages] = useState<ChatMessageItem[]>([]);
   const [errorSnackbar, setErrorSnackbar] = useState<{ open: boolean; message: string }>({
     open: false,
     message: '',
@@ -118,7 +130,13 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
   const updateLastReadAtMutation = useUpdateLastReadAt();
 
   // 선택된 채팅방의 Firebase 메시지 수신 (챗봇방이 아닐 때만)
-  const { messages: firebaseMessages, sendMessage } = useChatRoomFirebase({
+  const {
+    messages: firebaseMessages,
+    sendMessage,
+    hasMore,
+    loadMore,
+    isLoadingMore,
+  } = useChatRoomFirebase({
     chatRoomId: !isChatbotRoom ? selectedRoom?.chatRoomId : undefined,
     chatRoomIdx: !isChatbotRoom ? selectedRoom?.chatRoomIdx : undefined,
     memberIdx: currentMemberIdx ?? undefined,
@@ -133,7 +151,7 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
 
     if (Array.isArray(participants)) {
       return participants.map((p) => {
-        const avatar = (p as any).avatar;
+        const avatar = (p as any).avatar || (p as any).memberThumbnail || (p as any).thumbnail;
         return {
           ...p,
           profileImage: p.profileImage || avatar || undefined,
@@ -142,7 +160,8 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     }
 
     return Object.entries(participants).map(([key, value]) => {
-      const avatar = (value as any).avatar;
+      const avatar =
+        (value as any).avatar || (value as any).memberThumbnail || (value as any).thumbnail;
       return {
         ...(value as ChatParticipantDto),
         memberIdx: (value as any)?.memberIdx ?? (value as any)?.memberIndex ?? Number(key),
@@ -150,6 +169,14 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
       };
     });
   };
+
+  const getRoomParticipants = (room?: ChatRoomDto | null) =>
+    normalizeParticipants(
+      (room as any)?.participants ||
+        (room as any)?.participantList ||
+        (room as any)?.participantInfos ||
+        (room as any)?.memberList
+    );
 
   // 참가자 목록 API 조회 (챗봇방이 아닐 때만)
   const { data: participantsData } = useGetParticipants(
@@ -171,7 +198,7 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
 
     // API 응답 구조를 ChatParticipantDto로 매핑 (memberRole도 함께 저장)
     return rawParticipants.map((p: any): ChatParticipantDto & { memberRole?: string } => {
-      const avatar = p.avatar || p.memberThumbnail || p.profileImage;
+      const avatar = p.avatar || p.memberThumbnail || p.profileImage || p.thumbnail;
       return {
         memberIdx: p.memberIdx,
         name: p.memberName || p.name || `사용자 ${p.memberIdx}`,
@@ -204,7 +231,9 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
       if (!Number.isNaN(idx)) {
         map.set(idx, {
           name: participant.name || (participant as any)?.memberName || `사용자 ${idx}`,
-          avatarUrl: participant.profileImage || (participant as any)?.memberThumbnail,
+          avatarUrl: getChatAvatarUrl(
+            participant.profileImage || (participant as any)?.memberThumbnail
+          ),
         });
       }
     });
@@ -224,7 +253,85 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     return null;
   };
 
-  const chatMessages = useMemo(() => {
+  const preferredLang = useMemo(() => {
+    const raw =
+      (myInfoData as any)?.memberLang ||
+      (myInfoData as any)?.language ||
+      (myInfoData as any)?.lang ||
+      (myInfoData as any)?.locale;
+    if (raw) return String(raw).split('-')[0];
+    if (typeof navigator !== 'undefined' && navigator.language) {
+      return navigator.language.split('-')[0];
+    }
+    return 'ko';
+  }, [myInfoData]);
+
+  const pickTranslation = (
+    translations?: Record<string, string>,
+    lang?: string
+  ): string | undefined => {
+    if (!translations) return undefined;
+    const preferred = lang || 'ko';
+    if (translations[preferred]) return translations[preferred];
+
+    const aliasMap: Record<string, string[]> = {
+      ko: ['ko', 'kr'],
+      en: ['en'],
+      vi: ['vi', 'vn'],
+      vn: ['vn', 'vi'],
+      zh: ['zh', 'cn'],
+      ja: ['ja', 'jp'],
+      th: ['th'],
+      id: ['id'],
+      my: ['my'],
+      ne: ['ne'],
+      ru: ['ru'],
+      uz: ['uz'],
+    };
+
+    const aliases = aliasMap[preferred] || [];
+    for (const key of aliases) {
+      if (translations[key]) return translations[key];
+    }
+
+    if (translations.ko) return translations.ko;
+    if (translations.en) return translations.en;
+    return undefined;
+  };
+
+  const formatMessageText = (msg: any, translatedText?: string) => {
+    const base = translatedText || msg.message || msg.text || '';
+    const type = msg.messageType as string | undefined;
+
+    if (type === 'IMAGE') {
+      if (base.includes('[이미지]|')) {
+        const label = base.split('[이미지]|')[0]?.trim();
+        return label ? `${label} [이미지]` : '[이미지]';
+      }
+      return base || '[이미지]';
+    }
+
+    if (type === 'FILE') {
+      return base || '공유 문서';
+    }
+
+    if (type === 'SYSTEM') {
+      return base || '시스템 메시지';
+    }
+
+    if (type === 'EMERGENCY') {
+      return base || '긴급 메시지';
+    }
+
+    if (base.includes('[이미지]|')) {
+      const label = base.split('[이미지]|')[0]?.trim();
+      return label ? `${label} [이미지]` : '[이미지]';
+    }
+
+    return base;
+  };
+
+  const chatMessages = useMemo<ChatMessageItem[]>(() => {
     // 챗봇방이면 챗봇 메시지 반환
     if (isChatbotRoom) {
       return chatbotMessages;
@@ -242,12 +349,15 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
       const dateLabel = dateValue ? fDate(dateValue, 'YYYY년 M월 D일') : undefined;
       const timeLabel = dateValue ? fTime(dateValue, 'HH:mm') : msg.timestamp;
 
+      const translated = pickTranslation(msg.translations, preferredLang);
+      const messageText = formatMessageText(msg, translated);
+
       return {
         id: msg.id,
         sender: senderName,
         avatarUrl,
         // message 또는 text 필드 사용
-        message: msg.message || msg.text || '',
+        message: messageText,
         timestamp: timeLabel,
         dateLabel,
         isOwn: currentMemberIdx === senderMemberIdxNum,
@@ -258,7 +368,14 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
         metadata: msg.metadata,
       };
     });
-  }, [firebaseMessages, chatbotMessages, isChatbotRoom, participantLookup, currentMemberIdx]);
+  }, [
+    firebaseMessages,
+    chatbotMessages,
+    isChatbotRoom,
+    participantLookup,
+    currentMemberIdx,
+    preferredLang,
+  ]);
 
   const conversationDateLabel = chatMessages[0]?.dateLabel;
 
@@ -306,7 +423,7 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
       }
 
       try {
-        const userMessage: ChatbotMessage = {
+        const userMessage: ChatMessageItem = {
           id: `chatbot-${Date.now()}-user`,
           sender: '나',
           message: messageInput.trim(),
@@ -351,7 +468,7 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
           console.log('🤖 Extracted message:', botResponseMessage);
         }
 
-        const botMessage: ChatbotMessage = {
+        const botMessage: ChatMessageItem = {
           id: `chatbot-${Date.now()}-bot`,
           sender: '챗봇',
           message: botResponseMessage,
@@ -368,7 +485,7 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
         console.error('Failed to send chatbot message:', error);
 
         // 에러 시 에러 메시지 표시
-        const errorMessage: ChatbotMessage = {
+        const errorMessage: ChatMessageItem = {
           id: `chatbot-${Date.now()}-error`,
           sender: '챗봇',
           message: '메시지 전송 중 오류가 발생했습니다. 다시 시도해주세요.',
@@ -545,7 +662,7 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
 
   // LeftSection용 ChatRoomDto 배열 (customRoomName 우선 사용)
   const leftSectionRooms: ChatRoomDto[] = rooms.map((room: ChatRoomDto) => {
-    const participants = normalizeParticipants(room.participants);
+    const participants = getRoomParticipants(room);
     const currentParticipant = participants.find(
       (participant) =>
         Number(participant.memberIdx ?? (participant as any)?.memberIndex) === currentMemberIdx
@@ -830,6 +947,9 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
                     selectedRoom?.type === 'EMERGENCY' ? currentEmergencyStats : undefined
                   }
                   onFileMessageClick={handleFileMessageClick}
+                  hasMore={hasMore}
+                  isLoadingMore={isLoadingMore}
+                  onLoadMore={loadMore}
                 />
               </Box>
 

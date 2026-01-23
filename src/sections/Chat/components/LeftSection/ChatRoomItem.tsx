@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from 'react';
+import type { RefObject } from 'react';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
@@ -8,10 +10,10 @@ import ListItemAvatar from '@mui/material/ListItemAvatar';
 import ListItemText from '@mui/material/ListItemText';
 
 import { Iconify } from 'src/components/iconify';
-import { CONFIG } from 'src/global-config';
 import type { ChatRoomDto, ChatParticipantDto } from 'src/services/chat/chat.types';
 
 import { useChatRoomLastMessage } from 'src/sections/Chat/hooks/use-chat-room-last-message';
+import { getChatAvatarUrl } from 'src/sections/Chat/utils/avatar';
 
 // ----------------------------------------------------------------------
 
@@ -21,6 +23,7 @@ type Props = {
   onSelect: (room: ChatRoomDto) => void;
   currentMemberIdx: number | null;
   isGroup?: boolean;
+  scrollContainerRef?: RefObject<HTMLDivElement | null>;
 };
 
 export default function ChatRoomItem({
@@ -29,33 +32,127 @@ export default function ChatRoomItem({
   onSelect,
   currentMemberIdx,
   isGroup,
+  scrollContainerRef,
 }: Props) {
+  const itemRef = useRef<HTMLLIElement | null>(null);
+  const [isVisible, setIsVisible] = useState(true);
+
+  useEffect(() => {
+    const rootElement = scrollContainerRef?.current ?? null;
+    const target = itemRef.current;
+
+    if (!target || !rootElement || typeof IntersectionObserver === 'undefined') {
+      setIsVisible(true);
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        setIsVisible(Boolean(entry?.isIntersecting));
+      },
+      {
+        root: rootElement,
+        rootMargin: '120px',
+        threshold: 0.1,
+      }
+    );
+
+    observer.observe(target);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [scrollContainerRef]);
+
   // Firebase RTDB에서 최신 메시지 구독
-  const firebaseMsg = useChatRoomLastMessage(room.chatRoomId);
+  const shouldSubscribe = selected || isVisible;
+  const realtime = useChatRoomLastMessage(room.chatRoomId, currentMemberIdx, shouldSubscribe);
+  const firebaseMsg = realtime.lastMessage;
 
   // 1. 메시지 텍스트 결정
   let messageText = '';
+  let messageType: string | undefined;
+  const preferredLang =
+    typeof navigator !== 'undefined' && navigator.language
+      ? navigator.language.split('-')[0]
+      : 'ko';
+
+  const pickTranslation = (translations?: Record<string, string>) => {
+    if (!translations) return undefined;
+    if (translations[preferredLang]) return translations[preferredLang];
+
+    const aliasMap: Record<string, string[]> = {
+      ko: ['ko', 'kr'],
+      en: ['en'],
+      vi: ['vi', 'vn'],
+      vn: ['vn', 'vi'],
+      zh: ['zh', 'cn'],
+      ja: ['ja', 'jp'],
+      th: ['th'],
+      id: ['id'],
+      my: ['my'],
+      ne: ['ne'],
+      ru: ['ru'],
+      uz: ['uz'],
+    };
+
+    const aliases = aliasMap[preferredLang] || [];
+    for (const key of aliases) {
+      if (translations[key]) return translations[key];
+    }
+    if (translations.ko) return translations.ko;
+    if (translations.en) return translations.en;
+    return undefined;
+  };
 
   if (firebaseMsg) {
-    messageText = firebaseMsg.message || firebaseMsg.text || '';
+    messageType = firebaseMsg.messageType;
+    messageText =
+      pickTranslation(firebaseMsg.translations) || firebaseMsg.message || firebaseMsg.text || '';
   } else {
     // API 데이터 사용
     const rawMsg = room.lastMessage;
     if (typeof rawMsg === 'string') {
       messageText = rawMsg;
     } else if (rawMsg && typeof rawMsg === 'object') {
-      messageText = (rawMsg as any).text || '';
+      messageType = (rawMsg as any).messageType;
+      messageText =
+        pickTranslation((rawMsg as any).translations) || (rawMsg as any).text || '';
     }
   }
-  
-  // [이미지]|url 형식을 [이미지]로 변환
-  if (messageText.includes('[이미지]|')) {
-    messageText = messageText.split('|')[0]; // | 기준으로 분리하여 첫 번째 부분만 사용
-  }
+
+  const normalizePreview = (text: string, type?: string) => {
+    const trimmed = text?.trim() || '';
+    if (type === 'IMAGE') {
+      if (trimmed.includes('[이미지]|')) {
+        const label = trimmed.split('[이미지]|')[0]?.trim();
+        return label ? `${label} [이미지]` : '[이미지]';
+      }
+      return trimmed || '[이미지]';
+    }
+    if (type === 'FILE') {
+      return trimmed || '공유 문서';
+    }
+    if (type === 'SYSTEM') {
+      return trimmed || '시스템 메시지';
+    }
+    if (type === 'EMERGENCY') {
+      return trimmed || '긴급 메시지';
+    }
+    if (trimmed.includes('[이미지]|')) {
+      const label = trimmed.split('[이미지]|')[0]?.trim();
+      return label ? `${label} [이미지]` : '[이미지]';
+    }
+    return trimmed;
+  };
+
+  messageText = normalizePreview(messageText, messageType);
 
   // 2. 시간 결정
   let displayTime = '';
-  let rawTime: string | number | undefined = room.lastMessageAt || (room as any).lastMessageTime;
+  let rawTime: string | number | undefined =
+    realtime.lastMessageAt || room.lastMessageAt || (room as any).lastMessageTime;
 
   // Firebase 메시지가 있으면 최우선 사용
   if (firebaseMsg && firebaseMsg.timestamp) {
@@ -103,39 +200,13 @@ export default function ChatRoomItem({
 
   const otherParticipants = getOtherParticipants(room.participants);
 
-  const getFullFileUrl = (url: string | null | undefined): string | null => {
-    if (!url) return null;
-    if (
-      url.startsWith('data:image/png;base64,data/admin/') ||
-      url.startsWith('data:image/png;base64,/data/admin/')
-    ) {
-      const cleanUrl = url.replace(/^data:image\/png;base64,/, '');
-      const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
-      const path = cleanUrl.startsWith('/') ? cleanUrl : `/${cleanUrl}`;
-      return `${baseUrl}${path}`;
-    }
-    if (url.startsWith('http://') || url.startsWith('https://')) return url;
-    if (url.startsWith('data:image/') && !url.includes('data/admin/')) return url;
-
-    const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
-    const path = url.startsWith('/') ? url : `/${url}`;
-    return `${baseUrl}${path}`;
-  };
-
   const renderSingleAvatar = (participant: ChatParticipantDto, size: number = 40) => {
-    const profileImageUrl = getFullFileUrl(
+    const profileImageUrl = getChatAvatarUrl(
       participant.profileImage || (participant as any).memberThumbnail
     );
 
-    if (profileImageUrl) {
-      return (
-        <Avatar sx={{ width: size, height: size }} src={profileImageUrl} alt={participant.name}>
-          {participant.name?.[0] || '?'}
-        </Avatar>
-      );
-    }
     return (
-      <Avatar sx={{ width: size, height: size }}>
+      <Avatar sx={{ width: size, height: size }} src={profileImageUrl} alt={participant.name}>
         <Iconify icon="solar:user-rounded-bold" width={size * 0.6} />
       </Avatar>
     );
@@ -219,10 +290,10 @@ export default function ChatRoomItem({
   const displayName = isGroup ? room.name : otherParticipants[0]?.name || room.name;
 
   // 안 읽은 메시지 수
-  const unreadCount = room.unreadCount;
+  const unreadCount = realtime.unreadCount ?? room.unreadCount;
 
   return (
-    <ListItem disablePadding>
+      <ListItem disablePadding ref={itemRef}>
       <ListItemButton
         selected={selected}
         onClick={() => onSelect(room)}

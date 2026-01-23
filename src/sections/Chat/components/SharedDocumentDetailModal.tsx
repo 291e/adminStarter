@@ -137,7 +137,7 @@ const VideoPlayerWithSubtitle = ({
         defaultLanguage={memberLang || 'ko'}
         onEnded={onEnded}
         serverUrl={CONFIG.serverUrl}
-        disableControls
+        disableControlInteraction
       />
     </Box>
   );

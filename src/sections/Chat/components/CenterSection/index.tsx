@@ -11,8 +11,17 @@ type ChatMessage = {
   dateLabel?: string;
   avatarUrl?: string;
   isOwn?: boolean;
-  messageType?: 'TEXT' | 'IMAGE' | 'FILE' | 'SYSTEM';
+  messageType?: 'TEXT' | 'IMAGE' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
   sharedDocumentIdx?: number;
+  attachments?: string[] | null;
+  metadata?: {
+    type?: string;
+    location?: {
+      latitude: number;
+      longitude: number;
+      address?: string;
+    };
+  };
 };
 
 type Props = {
@@ -24,6 +33,9 @@ type Props = {
   onSendMessage?: () => void;
   emergencyStats?: { month: number; count: number };
   onFileMessageClick?: (sharedDocumentIdx: number) => void;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  onLoadMore?: () => void;
 };
 
 export default function CenterSection({
@@ -35,6 +47,9 @@ export default function CenterSection({
   onSendMessage,
   emergencyStats,
   onFileMessageClick,
+  hasMore,
+  isLoadingMore,
+  onLoadMore,
 }: Props) {
   if (!room) {
     return null;
@@ -63,6 +78,9 @@ export default function CenterSection({
           onMessageInputChange={onMessageInputChange}
           onSendMessage={onSendMessage}
           roomId={room.chatRoomId || room.chatRoomIdx}
+          hasMore={hasMore}
+          isLoadingMore={isLoadingMore}
+          onLoadMore={onLoadMore}
         />
       );
     case 'NORMAL':
@@ -77,6 +95,9 @@ export default function CenterSection({
           onSendMessage={onSendMessage}
           roomId={room.chatRoomId || room.chatRoomIdx}
           onFileMessageClick={onFileMessageClick}
+          hasMore={hasMore}
+          isLoadingMore={isLoadingMore}
+          onLoadMore={onLoadMore}
         />
       );
   }

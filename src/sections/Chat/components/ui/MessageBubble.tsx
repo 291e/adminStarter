@@ -9,6 +9,10 @@ import DialogContent from '@mui/material/DialogContent';
 import IconButton from '@mui/material/IconButton';
 import CircularProgress from '@mui/material/CircularProgress';
 import { Iconify } from 'src/components/iconify';
+import { getChatAvatarUrl } from 'src/sections/Chat/utils/avatar';
+
+const reverseGeocodeCache = new Map<string, string>();
+let reverseGeocodeDisabled = false;
 
 type LocationMetadata = {
   latitude: number;
@@ -107,6 +111,7 @@ export default function MessageBubble({
   const [mapModalOpen, setMapModalOpen] = useState(false);
   const [address, setAddress] = useState<string | null>(metadata?.location?.address || null);
   const [isLoadingAddress, setIsLoadingAddress] = useState(false);
+  const normalizedAvatarUrl = getChatAvatarUrl(avatarUrl);
 
   const handleFileClick = () => {
     if (messageType === 'FILE' && sharedDocumentIdx && onFileClick) {
@@ -136,23 +141,55 @@ export default function MessageBubble({
   useEffect(() => {
     const fetchAddress = async () => {
       if (!metadata?.location || address) return;
+      if (metadata?.address) {
+        setAddress(metadata.address);
+        return;
+      }
+      if (reverseGeocodeDisabled) {
+        const { latitude, longitude } = metadata.location;
+        setAddress(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+        return;
+      }
 
       const { latitude, longitude } = metadata.location;
       setIsLoadingAddress(true);
 
       try {
-        // Kakao Local API 또는 다른 역지오코딩 서비스 사용
-        // 여기서는 Nominatim (OpenStreetMap) 무료 API 사용
+        const cacheKey = `${latitude.toFixed(5)},${longitude.toFixed(5)}`;
+        const cached = reverseGeocodeCache.get(cacheKey);
+        if (cached) {
+          setAddress(cached);
+          return;
+        }
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 4000);
+
+        // Nominatim (OpenStreetMap) 무료 API 사용
         const response = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=ko`
+          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&accept-language=ko`,
+          { signal: controller.signal }
         );
+        clearTimeout(timeout);
+
+        if (!response.ok) {
+          throw new Error('Reverse geocoding failed');
+        }
+
         const data = await response.json();
 
         if (data.display_name) {
+          reverseGeocodeCache.set(cacheKey, data.display_name);
           setAddress(data.display_name);
+        } else {
+          setAddress(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
         }
       } catch (error) {
-        console.error('역지오코딩 실패:', error);
+        if (import.meta.env.DEV) {
+          console.warn('역지오코딩 실패:', error);
+        }
+        reverseGeocodeDisabled = true;
+        setAddress(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
       } finally {
         setIsLoadingAddress(false);
       }
@@ -620,8 +657,8 @@ export default function MessageBubble({
   return (
     <>
       <Stack direction="row" spacing={0.5} sx={{ alignItems: 'flex-start' }}>
-        <Avatar src={avatarUrl} sx={{ width: 40, height: 40 }}>
-          {sender?.[0] ?? '?'}
+        <Avatar src={normalizedAvatarUrl} sx={{ width: 40, height: 40 }}>
+          <Iconify icon="solar:user-rounded-bold" width={24} />
         </Avatar>
         <Stack spacing={0.5} sx={{ flex: 1, minWidth: 0 }}>
           <Typography variant="caption" sx={{ fontSize: 12, fontWeight: 400 }}>

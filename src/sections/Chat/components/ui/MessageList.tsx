@@ -4,6 +4,7 @@ import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Divider from '@mui/material/Divider';
+import Button from '@mui/material/Button';
 
 import { Scrollbar } from 'src/components/scrollbar';
 import MessageBubble from './MessageBubble';
@@ -34,6 +35,9 @@ type Props = {
   conversationDate?: string;
   roomId?: string | number; // 채팅방 변경 감지용
   onFileMessageClick?: (sharedDocumentIdx: number) => void;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  onLoadMore?: () => void;
 };
 
 export default function MessageList({
@@ -41,6 +45,9 @@ export default function MessageList({
   conversationDate,
   roomId,
   onFileMessageClick,
+  hasMore,
+  isLoadingMore,
+  onLoadMore,
 }: Props) {
   const scrollbarRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -219,6 +226,18 @@ export default function MessageList({
   return (
     <Scrollbar ref={scrollbarRef} sx={{ flex: 1, p: { xs: 2, lg: 2.5 } }}>
       <Stack spacing={2}>
+        {hasMore && onLoadMore && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', pt: 1 }}>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={onLoadMore}
+              disabled={isLoadingMore}
+            >
+              {isLoadingMore ? '불러오는 중...' : '이전 메시지 더보기'}
+            </Button>
+          </Box>
+        )}
         {/* 날짜 구분선 */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Divider sx={{ flex: 1 }} />

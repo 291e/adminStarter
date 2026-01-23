@@ -1,36 +1,81 @@
 import { useState, useEffect } from 'react';
-import { ref, query, orderByChild, limitToLast, onValue } from 'firebase/database';
+import { ref, onValue } from 'firebase/database';
 import { database } from 'src/config/firebase';
 import type { FirebaseMessage } from './use-chat-room-firebase';
 
-export function useChatRoomLastMessage(chatRoomId?: string) {
-  const [lastMessage, setLastMessage] = useState<FirebaseMessage | null>(null);
+type ChatRoomRealtime = {
+  lastMessage: FirebaseMessage | null;
+  lastMessageAt?: string;
+  unreadCount?: number;
+};
+
+export function useChatRoomLastMessage(
+  chatRoomId?: string,
+  memberIdx?: number | null,
+  enabled: boolean = true
+) {
+  const [state, setState] = useState<ChatRoomRealtime>({
+    lastMessage: null,
+  });
 
   useEffect(() => {
-    if (!chatRoomId || !database) return undefined;
+    if (!enabled || !chatRoomId || !database) return undefined;
 
-    const messagesRef = ref(database, `chatRooms/${chatRoomId}/messages`);
-    const q = query(messagesRef, orderByChild('timestamp'), limitToLast(1));
+    const roomRef = ref(database, `chatRooms/${chatRoomId}`);
 
-    const unsubscribe = onValue(q, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        // data는 객체 형태 { messageId: content, ... } 이므로 값만 추출
-        const messages = Object.values(data) as FirebaseMessage[];
-        if (messages.length > 0) {
-          setLastMessage(messages[0]);
-        } else {
-          setLastMessage(null);
-        }
-      } else {
-        setLastMessage(null);
+    const unsubscribe = onValue(roomRef, (snapshot) => {
+      if (!snapshot.exists()) {
+        setState({ lastMessage: null });
+        return;
       }
+
+      const data = snapshot.val() as any;
+      const rawLastMessage = data?.lastMessage;
+      const lastMessageAt = data?.lastMessageAt;
+      const memberKey = memberIdx ? String(memberIdx) : null;
+      const unreadCount = memberKey ? data?.participants?.[memberKey]?.unreadCount : undefined;
+
+      let lastMessage: FirebaseMessage | null = null;
+      if (rawLastMessage) {
+        const messageText =
+          typeof rawLastMessage === 'string'
+            ? rawLastMessage
+            : rawLastMessage.message || rawLastMessage.text || '';
+        const timestamp =
+          rawLastMessage.timestamp ||
+          rawLastMessage.createdAt?.toString() ||
+          lastMessageAt ||
+          '';
+
+        lastMessage = {
+          id: rawLastMessage.id || `last-${chatRoomId}`,
+          chatRoomId,
+          senderMemberIdx: String(rawLastMessage.senderMemberIdx || rawLastMessage.senderId || ''),
+          senderId: rawLastMessage.senderId,
+          senderName: rawLastMessage.senderName,
+          message: messageText,
+          text: rawLastMessage.text || rawLastMessage.message || messageText,
+          messageType: rawLastMessage.messageType || 'TEXT',
+          timestamp,
+          createdAt: rawLastMessage.createdAt,
+          isRead: false,
+          translations: rawLastMessage.translations,
+          sharedDocumentIdx: rawLastMessage.sharedDocumentIdx,
+          metadata: rawLastMessage.metadata,
+        };
+      }
+
+      setState({
+        lastMessage,
+        lastMessageAt,
+        unreadCount,
+      });
     });
 
     return () => {
       unsubscribe();
     };
-  }, [chatRoomId]);
+  }, [chatRoomId, memberIdx, database, enabled]);
 
-  return lastMessage;
+  return state;
 }

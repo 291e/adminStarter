@@ -12,6 +12,17 @@ type ChatMessage = {
   dateLabel?: string;
   avatarUrl?: string;
   isOwn?: boolean;
+  messageType?: 'TEXT' | 'IMAGE' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
+  sharedDocumentIdx?: number;
+  attachments?: string[] | null;
+  metadata?: {
+    type?: string;
+    location?: {
+      latitude: number;
+      longitude: number;
+      address?: string;
+    };
+  };
 };
 
 type Props = {
@@ -22,6 +33,9 @@ type Props = {
   onMessageInputChange?: (value: string) => void;
   onSendMessage?: () => void;
   roomId?: string | number;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  onLoadMore?: () => void;
 };
 
 export default function EmergencyChatView({
@@ -32,6 +46,9 @@ export default function EmergencyChatView({
   onMessageInputChange,
   onSendMessage,
   roomId,
+  hasMore,
+  isLoadingMore,
+  onLoadMore,
 }: Props) {
   return (
     <Box
@@ -48,7 +65,14 @@ export default function EmergencyChatView({
       {emergencyStats && (
         <EmergencyStatsHeader month={emergencyStats.month} count={emergencyStats.count} />
       )}
-      <MessageList messages={messages} conversationDate={conversationDate} roomId={roomId} />
+      <MessageList
+        messages={messages}
+        conversationDate={conversationDate}
+        roomId={roomId}
+        hasMore={hasMore}
+        isLoadingMore={isLoadingMore}
+        onLoadMore={onLoadMore}
+      />
       <ChatInput
         isEmergency
         value={messageInput}

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useBoolean } from 'minimal-shared/hooks';
 
 import Box from '@mui/material/Box';
@@ -19,6 +19,7 @@ import { Scrollbar } from 'src/components/scrollbar';
 import { useAuthContext } from 'src/auth/hooks/use-auth-context';
 import { useMyInfo } from 'src/sections/Chat/hooks/use-my-info';
 import { CONFIG } from 'src/global-config';
+import { getChatAvatarUrl } from 'src/sections/Chat/utils/avatar';
 import CreateChatRoomModal from './CreateChatRoomModal';
 import ChatRoomItem from './ChatRoomItem';
 import type { ChatRoomDto, ChatParticipantDto } from 'src/services/chat/chat.types';
@@ -37,6 +38,7 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom, onCre
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const normalChatExpanded = useBoolean(true);
   const groupChatExpanded = useBoolean(true);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   // 현재 사용자 memberIdx 추출 (여러 후보 필드에서 시도)
   const currentUserMemberIdx =
@@ -184,47 +186,13 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom, onCre
     [myInfoData, user]
   );
 
-  // 파일 URL을 전체 URL로 변환하는 헬퍼 함수 (ProfileCard.tsx와 동일한 로직)
-  const getFullFileUrl = (url: string | null | undefined): string | null => {
-    if (!url) return null;
-    // 잘못된 형식: data:image/png;base64,data/admin/... 같은 경우 처리
-    if (
-      url.startsWith('data:image/png;base64,data/admin/') ||
-      url.startsWith('data:image/png;base64,/data/admin/')
-    ) {
-      // base64 접두사를 제거하고 URL로 처리
-      const cleanUrl = url.replace(/^data:image\/png;base64,/, '');
-      const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
-      const path = cleanUrl.startsWith('/') ? cleanUrl : `/${cleanUrl}`;
-      return `${baseUrl}${path}`;
-    }
-    // 이미 전체 URL인 경우 (http:// 또는 https://로 시작)
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      return url;
-    }
-    // base64 데이터 URL인 경우 그대로 반환 (실제 base64 데이터인 경우)
-    if (url.startsWith('data:image/') && !url.includes('data/admin/')) {
-      return url;
-    }
-    // 상대 경로인 경우 CONFIG.serverUrl과 결합
-    // data/admin/로 시작하는 경우도 처리
-    const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
-    const path = url.startsWith('/') ? url : `/${url}`;
-    return `${baseUrl}${path}`;
-  };
-
   // Avatar 렌더링 헬퍼 함수 (프로필 이미지가 있으면 사용, 없으면 아이콘)
   const renderAvatar = (participant: ChatParticipantDto, size: number = 40) => {
-    const profileImageUrl = getFullFileUrl(participant.profileImage);
-    if (profileImageUrl) {
-      return (
-        <Avatar sx={{ width: size, height: size }} src={profileImageUrl} alt={participant.name}>
-          {participant.name?.[0] || '?'}
-        </Avatar>
-      );
-    }
+    const profileImageUrl = getChatAvatarUrl(
+      participant.profileImage || (participant as any).memberThumbnail || (participant as any).avatar
+    );
     return (
-      <Avatar sx={{ width: size, height: size }}>
+      <Avatar sx={{ width: size, height: size }} src={profileImageUrl} alt={participant.name}>
         <Iconify icon="solar:user-rounded-bold" width={size * 0.6} />
       </Avatar>
     );
@@ -450,10 +418,10 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom, onCre
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ p: 2.5 }}>
         <Avatar
           sx={{ width: 48, height: 48 }}
-          src={getFullFileUrl(myProfileImage) || undefined}
+          src={getChatAvatarUrl(myProfileImage)}
           alt={myName}
         >
-          {myName?.[0] || <Iconify icon="solar:user-rounded-bold" width={24} />}
+          <Iconify icon="solar:user-rounded-bold" width={24} />
         </Avatar>
         <Tooltip title="채팅방 만들기" arrow>
           <IconButton size="small" onClick={() => setCreateModalOpen(true)}>
@@ -478,7 +446,7 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom, onCre
         />
       </Box>
 
-      <Scrollbar sx={{ flex: 1 }}>
+      <Scrollbar ref={scrollContainerRef} sx={{ flex: 1 }}>
         <Box sx={{ pb: 1 }}>
           {/* 챗봇 - 항상 표시 */}
           <ListItem disablePadding>
@@ -516,6 +484,7 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom, onCre
               onSelect={onSelectRoom}
               currentMemberIdx={Number(currentUserMemberIdx)}
               isGroup
+              scrollContainerRef={scrollContainerRef}
             />
           )}
 
@@ -568,6 +537,7 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom, onCre
                       onSelect={onSelectRoom}
                       currentMemberIdx={Number(currentUserMemberIdx)}
                       isGroup={false}
+                      scrollContainerRef={scrollContainerRef}
                     />
                   ))}
                 </List>
@@ -624,6 +594,7 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom, onCre
                       onSelect={onSelectRoom}
                       currentMemberIdx={Number(currentUserMemberIdx)}
                       isGroup
+                      scrollContainerRef={scrollContainerRef}
                     />
                   ))}
                 </List>

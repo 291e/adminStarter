@@ -16,6 +16,7 @@ import { CONFIG } from 'src/global-config';
 import RenameChatRoomModal from './RenameChatRoomModal';
 import LeaveChatRoomModal from './LeaveChatRoomModal';
 import type { ChatRoomDto, ChatParticipantDto } from 'src/services/chat/chat.types';
+import { getChatAvatarUrl } from 'src/sections/Chat/utils/avatar';
 
 type Props = {
   room: ChatRoomDto;
@@ -98,13 +99,10 @@ export default function ChatHeader({
     // 1명일 때: 단일 Avatar
     if (participants.length <= 1) {
       const participant = participants[0];
-      const displayName = participant?.name || room.name || '';
-      // 이름이 숫자 문자열이거나 유효하지 않으면 아이콘만 표시
-      const isValidName =
-        displayName && displayName.trim() !== '' && !/^\d+$/.test(displayName.trim());
-      const firstChar = isValidName ? displayName[0] : null;
-      const profileImage = participant?.profileImage;
-      const hasProfileImage = profileImage && profileImage.trim() !== '';
+      const profileImage = getChatAvatarUrl(
+        participant?.profileImage || (participant as any)?.memberThumbnail || (participant as any)?.avatar
+      );
+      const hasProfileImage = !!profileImage;
 
       return (
         <Avatar
@@ -112,7 +110,7 @@ export default function ChatHeader({
           src={hasProfileImage ? profileImage : undefined}
           alt={participant?.name || room.name}
         >
-          {!hasProfileImage && (firstChar || <Iconify icon="solar:user-rounded-bold" width={24} />)}
+          <Iconify icon="solar:user-rounded-bold" width={24} />
         </Avatar>
       );
     }
@@ -149,14 +147,10 @@ export default function ChatHeader({
           }}
         >
           {displayParticipants.map((participant, index) => {
-            // 이름이 숫자 문자열이거나 유효하지 않으면 아이콘만 표시
-            const isValidName =
-              participant.name &&
-              participant.name.trim() !== '' &&
-              !/^\d+$/.test(participant.name.trim());
-            const firstChar = isValidName ? participant.name[0] : null;
-            const profileImage = participant.profileImage;
-            const hasProfileImage = profileImage && profileImage.trim() !== '';
+            const profileImage = getChatAvatarUrl(
+              participant.profileImage || (participant as any)?.memberThumbnail || (participant as any)?.avatar
+            );
+            const hasProfileImage = !!profileImage;
             return (
               <Avatar
                 key={participant.name || index}
@@ -173,8 +167,7 @@ export default function ChatHeader({
                   flexShrink: 0,
                 }}
               >
-                {!hasProfileImage &&
-                  (firstChar || <Iconify icon="solar:user-rounded-bold" width={20} />)}
+                <Iconify icon="solar:user-rounded-bold" width={20} />
               </Avatar>
             );
           })}

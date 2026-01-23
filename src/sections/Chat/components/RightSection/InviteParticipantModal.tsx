@@ -21,6 +21,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
 import { Iconify } from 'src/components/iconify';
+import { getChatAvatarUrl } from 'src/sections/Chat/utils/avatar';
 import { useAuthContext } from 'src/auth/hooks/use-auth-context';
 import { useInviteParticipants, useGetParticipants } from 'src/sections/Chat/hooks/use-chat-api';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
@@ -403,20 +404,11 @@ export default function InviteParticipantModal({ open, onClose, onConfirm, room 
                         <TableCell sx={{ px: 2, py: 1.75 }}>
                           <Stack direction="row" spacing={2} alignItems="center">
                             <Avatar
-                              src={
-                                invitableUser.avatar && invitableUser.avatar.trim() !== ''
-                                  ? invitableUser.avatar
-                                  : undefined
-                              }
+                              src={getChatAvatarUrl(invitableUser.avatar)}
                               alt={invitableUser.name}
                               sx={{ width: 40, height: 40, bgcolor: 'grey.300' }}
                             >
-                              {(!invitableUser.avatar || invitableUser.avatar.trim() === '') &&
-                                (invitableUser.name?.[0] ? (
-                                  invitableUser.name[0]
-                                ) : (
-                                  <Iconify icon="solar:user-rounded-bold" width={24} />
-                                ))}
+                              <Iconify icon="solar:user-rounded-bold" width={24} />
                             </Avatar>
                             <Stack spacing={0.5}>
                               <Typography

@@ -22,6 +22,7 @@ import TextField from '@mui/material/TextField';
 
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
 import { Iconify } from 'src/components/iconify';
+import { getChatAvatarUrl } from 'src/sections/Chat/utils/avatar';
 import { useMyInfo } from 'src/sections/Chat/hooks/use-my-info';
 import { useAuthContext } from 'src/auth/hooks/use-auth-context';
 import { useQuery } from '@tanstack/react-query';
@@ -365,20 +366,11 @@ export default function CreateChatRoomModal({ open, onClose, onConfirm }: Props)
                         <TableCell sx={{ px: 2, py: 1.75 }}>
                           <Stack direction="row" spacing={2} alignItems="center">
                             <Avatar
-                              src={
-                                invitableUser.avatar && invitableUser.avatar.trim() !== ''
-                                  ? invitableUser.avatar
-                                  : undefined
-                              }
+                              src={getChatAvatarUrl(invitableUser.avatar)}
                               alt={invitableUser.name}
                               sx={{ width: 40, height: 40, bgcolor: 'grey.300' }}
                             >
-                              {(!invitableUser.avatar || invitableUser.avatar.trim() === '') &&
-                                (invitableUser.name?.[0] ? (
-                                  invitableUser.name[0]
-                                ) : (
-                                  <Iconify icon="solar:user-rounded-bold" width={24} />
-                                ))}
+                              <Iconify icon="solar:user-rounded-bold" width={24} />
                             </Avatar>
                             <Stack spacing={0.5}>
                               <Typography
