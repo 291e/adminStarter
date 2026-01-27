@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 import type { Theme, SxProps } from '@mui/material/styles';
 
@@ -17,6 +18,9 @@ import LibraryReportPagination from './components/Pagination';
 import CategorySettingsModal, { type CategoryItem } from './components/CategorySettingsModal';
 import VODUploadModal, { type VODUploadFormData } from './components/VODUploadModal';
 import EditContentModal, { type EditContentFormData } from './components/EditContentModal';
+import DeleteContentModal from './components/DeleteContentModal';
+import MoveContentModal from './components/MoveContentModal';
+import PDFDownloadModal from 'src/sections/PDF/Risk_2200/components/PDFDownloadModal';
 import { useLibraryReport } from './hooks/use-library-report';
 import dayjs from 'dayjs';
 import type {
@@ -24,6 +28,7 @@ import type {
   SaveLibraryCategoryListParams,
   CreateLibraryReportParams,
   UpdateLibraryReportParams,
+  GetLibraryReportsResult,
 } from 'src/services/library-report/library-report.types';
 import {
   useLibraryReports,
@@ -36,6 +41,8 @@ import {
 import { uploadFile } from 'src/services/system/system.service';
 import {
   getVodDetail,
+  getVodStatus,
+  uploadVod,
   getVodDownloadUrl,
   getVodBatchDownloadUrl,
 } from 'src/services/vod/vod.service';
@@ -50,10 +57,19 @@ type Props = {
 };
 
 export function LibraryReportView({ title = '라이브러리', description, sx }: Props) {
+  const queryClient = useQueryClient();
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [vodUploadModalOpen, setVodUploadModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [moveModalOpen, setMoveModalOpen] = useState(false);
+  const [editUploadStep, setEditUploadStep] = useState<
+    'idle' | 'uploading' | 'processing' | 'completed' | 'error'
+  >('idle');
+  const [editUploadProgress, setEditUploadProgress] = useState<number | null>(null);
+  const [editUploadMessage, setEditUploadMessage] = useState<string>('');
+  const [downloadModalOpen, setDownloadModalOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState<LibraryReport | null>(null);
   const saveCategoriesMutation = useSaveCategories();
   const uploadVodMutation = useUploadVOD();
@@ -191,14 +207,11 @@ export function LibraryReportView({ title = '라이브러리', description, sx }
           console.log('📤 [LibraryReportView] 비디오 파일 업로드 시작:', data.videoFile.name);
         }
         const uploadResponse = await uploadFile({ files: [data.videoFile] });
-
-        // axios interceptor가 body를 flatten하므로 uploadResponse는 { fileUrls: string[], header: ... } 형태
-        const fileUrls = (uploadResponse as unknown as { fileUrls: string[] }).fileUrls;
-        if (!fileUrls || fileUrls.length === 0) {
-          throw new Error('파일 업로드 실패: fileUrls가 없습니다.');
+        const fileUrl =
+          (uploadResponse as any)?.fileUrls?.[0] ?? (uploadResponse as any)?.files?.[0]?.fileUrl;
+        if (!fileUrl) {
+          throw new Error('파일 업로드 실패: fileUrl이 없습니다.');
         }
-
-        const fileUrl = fileUrls[0];
         if (import.meta.env.DEV) {
           console.log('✅ [LibraryReportView] 파일 업로드 완료:', fileUrl);
         }
@@ -216,10 +229,11 @@ export function LibraryReportView({ title = '라이브러리', description, sx }
               console.log('📤 [LibraryReportView] 썸네일 업로드 시작');
             }
             const thumbnailUploadResponse = await uploadFile({ files: [thumbnailFile] });
-            const thumbnailFileUrls = (thumbnailUploadResponse as unknown as { fileUrls: string[] })
-              .fileUrls;
-            if (thumbnailFileUrls && thumbnailFileUrls.length > 0) {
-              thumbnailUrl = thumbnailFileUrls[0];
+            const nextThumbnailUrl =
+              (thumbnailUploadResponse as any)?.fileUrls?.[0] ??
+              (thumbnailUploadResponse as any)?.files?.[0]?.fileUrl;
+            if (nextThumbnailUrl) {
+              thumbnailUrl = nextThumbnailUrl;
               if (import.meta.env.DEV) {
                 console.log('✅ [LibraryReportView] 썸네일 업로드 완료:', thumbnailUrl);
               }
@@ -261,22 +275,76 @@ export function LibraryReportView({ title = '라이브러리', description, sx }
         return;
       }
 
+      let hasUploadError = false;
       try {
         let fileUrl = selectedRow.fileUrl;
         let thumbnailUrl = selectedRow.thumbnailUrl;
+        let playbackTime = selectedRow.playbackTime;
+        let hasSubtitles = selectedRow.hasSubtitles ?? false;
+        let vodIdx = selectedRow.vodIdx;
 
         // 새 비디오 파일이 있으면 업로드
         if (form.videoFile) {
           if (import.meta.env.DEV) {
             console.log('📤 [LibraryReportView] 비디오 파일 업로드 시작:', form.videoFile.name);
           }
-          const uploadResponse = await uploadFile({ files: [form.videoFile] });
-          const fileUrls = (uploadResponse as unknown as { fileUrls: string[] }).fileUrls;
-          if (fileUrls && fileUrls.length > 0) {
-            fileUrl = fileUrls[0];
-            if (import.meta.env.DEV) {
-              console.log('✅ [LibraryReportView] 파일 업로드 완료:', fileUrl);
+          setEditUploadStep('uploading');
+          setEditUploadProgress(0);
+          setEditUploadMessage('비디오 업로드 중입니다. 이 페이지를 벗어나지 마시오.');
+
+          const uploadResponse = await uploadVod({ video: form.videoFile });
+          const vodIdxValue = (uploadResponse as any)?.vodIdx;
+          if (!vodIdxValue) {
+            throw new Error('VOD 업로드 응답에 vodIdx가 없습니다.');
+          }
+          vodIdx = vodIdxValue;
+
+          const maxAttempts = 60;
+          let isCompleted = false;
+          for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+            const statusResponse = await getVodStatus(vodIdxValue);
+            const statusData = statusResponse as any;
+            const status = statusData?.status;
+            const progress = statusData?.progress ?? 0;
+            setEditUploadStep('processing');
+            setEditUploadProgress(progress);
+            setEditUploadMessage('비디오 처리 중입니다. 이 페이지를 벗어나지 마시오.');
+            if (status === 'FAILED') {
+              throw new Error(statusData?.errorMessage || 'VOD 처리 중 오류가 발생했습니다.');
             }
+            if (status === 'COMPLETED' || progress >= 100) {
+              isCompleted = true;
+              break;
+            }
+            await new Promise((resolve) => {
+              setTimeout(resolve, 3000);
+            });
+          }
+          if (!isCompleted) {
+            throw new Error('VOD 처리 시간이 초과되었습니다.');
+          }
+
+          const vodDetail = await getVodDetail(vodIdxValue);
+          const vodData = vodDetail as any;
+          const videoPath = vodData?.videoPath;
+          if (!videoPath) {
+            throw new Error('VOD 상세 정보에 비디오 경로가 없습니다.');
+          }
+          fileUrl = videoPath;
+
+          if (typeof vodData?.durationSec === 'number') {
+            const hours = Math.floor(vodData.durationSec / 3600);
+            const minutes = Math.floor((vodData.durationSec % 3600) / 60);
+            const seconds = Math.floor(vodData.durationSec % 60);
+            playbackTime = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(
+              2,
+              '0'
+            )}:${String(seconds).padStart(2, '0')}`;
+          }
+          hasSubtitles = Object.keys(vodData?.vttMap || {}).length > 0;
+
+          if (import.meta.env.DEV) {
+            console.log('✅ [LibraryReportView] 파일 업로드 완료:', fileUrl);
           }
         }
 
@@ -291,10 +359,11 @@ export function LibraryReportView({ title = '라이브러리', description, sx }
               console.log('📤 [LibraryReportView] 썸네일 업로드 시작');
             }
             const thumbnailUploadResponse = await uploadFile({ files: [thumbnailFile] });
-            const thumbnailFileUrls = (thumbnailUploadResponse as unknown as { fileUrls: string[] })
-              .fileUrls;
-            if (thumbnailFileUrls && thumbnailFileUrls.length > 0) {
-              thumbnailUrl = thumbnailFileUrls[0];
+            const nextThumbnailUrl =
+              (thumbnailUploadResponse as any)?.fileUrls?.[0] ??
+              (thumbnailUploadResponse as any)?.files?.[0]?.fileUrl;
+            if (nextThumbnailUrl) {
+              thumbnailUrl = nextThumbnailUrl;
               if (import.meta.env.DEV) {
                 console.log('✅ [LibraryReportView] 썸네일 업로드 완료:', thumbnailUrl);
               }
@@ -314,24 +383,69 @@ export function LibraryReportView({ title = '라이브러리', description, sx }
           description: form.description || undefined,
           isActive: form.isActive ? 1 : 0,
           organizationName: selectedRow.organizationName || undefined,
-          playbackTime: selectedRow.playbackTime || undefined,
-          hasSubtitles: selectedRow.hasSubtitles ? 1 : 0,
+          playbackTime: playbackTime || undefined,
+          hasSubtitles: hasSubtitles ? 1 : 0,
           visibilityType: (selectedRow.visibilityType as any) || undefined,
           fileUrl,
+          vodIdx: vodIdx || undefined,
           thumbnailUrl,
           memo: selectedRow.memo || undefined,
         };
 
-        await updateContentMutation.mutateAsync(payload);
+        const response = await updateContentMutation.mutateAsync(payload);
         if (import.meta.env.DEV) {
           console.log('✏️ [LibraryReportView] 컨텐츠 수정 성공', payload);
         }
+        const updatedData = response as any;
+        const updatedRow: LibraryReport = {
+          ...selectedRow,
+          ...updatedData,
+          ...payload,
+          fileUrl,
+          thumbnailUrl,
+          playbackTime,
+          hasSubtitles,
+          vodIdx,
+        };
+        setSelectedRow(updatedRow);
+        queryClient.setQueryData<GetLibraryReportsResult>(['libraryReports'], (prev) => {
+          if (!prev) {
+            return prev;
+          }
+          return {
+            ...prev,
+            libraryReports: prev.libraryReports.map((row) => {
+              const rowId = row.libraryReportIdx ?? Number(row.id);
+              const updatedId = updatedRow.libraryReportIdx ?? Number(updatedRow.id);
+              return rowId === updatedId ? { ...row, ...updatedRow } : row;
+            }),
+          };
+        });
+        if (form.videoFile) {
+          setEditUploadStep('completed');
+          setEditUploadProgress(100);
+        }
       } catch (error) {
         console.error('❌ [LibraryReportView] 컨텐츠 수정 실패', error);
+        if (form.videoFile) {
+          const message =
+            error instanceof Error ? error.message : 'VOD 처리 중 오류가 발생했습니다.';
+          setEditUploadStep('error');
+          setEditUploadMessage(message);
+          hasUploadError = true;
+        }
         throw error;
+      } finally {
+        if (form.videoFile && !hasUploadError) {
+          setTimeout(() => {
+            setEditUploadStep('idle');
+            setEditUploadProgress(null);
+            setEditUploadMessage('');
+          }, 300);
+        }
       }
     },
-    [categories, selectedRow, updateContentMutation]
+    [categories, selectedRow, updateContentMutation, queryClient]
   );
 
   const handleDeleteContent = useCallback(async () => {
@@ -351,6 +465,76 @@ export function LibraryReportView({ title = '라이브러리', description, sx }
     }
   }, [deleteContentMutation, selectedRow]);
 
+  const selectedRows = useMemo(() => {
+    if (logic.selectedIds.length === 0) {
+      return [];
+    }
+    return allRows.filter((row) => {
+      const rowId = row.id ?? String(row.libraryReportIdx ?? '');
+      return logic.selectedIds.includes(rowId);
+    });
+  }, [allRows, logic.selectedIds]);
+
+  const handleDeleteSelected = useCallback(() => {
+    if (logic.selectedIds.length === 0) {
+      toast.warning('삭제할 항목을 선택해주세요.');
+      return;
+    }
+    setDeleteConfirmOpen(true);
+  }, [logic.selectedIds.length]);
+
+  const handleDeleteSelectedConfirm = useCallback(async () => {
+    if (selectedRows.length === 0) {
+      setDeleteConfirmOpen(false);
+      return;
+    }
+    try {
+      await Promise.all(
+        selectedRows.map((row) =>
+          deleteContentMutation.mutateAsync({
+            libraryReportIdx: row.libraryReportIdx ?? Number(row.id),
+          })
+        )
+      );
+      logic.resetSelection();
+      setDeleteConfirmOpen(false);
+    } catch (error) {
+      console.error('❌ [LibraryReportView] 선택 삭제 실패', error);
+    }
+  }, [deleteContentMutation, logic, selectedRows]);
+
+  const handleMoveSelected = useCallback(() => {
+    if (logic.selectedIds.length === 0) {
+      toast.warning('이동할 항목을 선택해주세요.');
+      return;
+    }
+    setMoveModalOpen(true);
+  }, [logic.selectedIds.length]);
+
+  const handleMoveSelectedConfirm = useCallback(
+    async (category: CategoryItem) => {
+      if (selectedRows.length === 0) {
+        setMoveModalOpen(false);
+        return;
+      }
+      try {
+        await Promise.all(
+          selectedRows.map((row) =>
+            updateContentMutation.mutateAsync({
+              libraryReportIdx: row.libraryReportIdx ?? Number(row.id),
+              libraryCategoryIdx: category.libraryCategoryIdx ?? undefined,
+            })
+          )
+        );
+        logic.resetSelection();
+        setMoveModalOpen(false);
+      } catch (error) {
+        console.error('❌ [LibraryReportView] 선택 이동 실패', error);
+      }
+    },
+    [selectedRows, updateContentMutation, logic]
+  );
+
   const handleDownloadSelected = useCallback(async () => {
     if (logic.selectedIds.length === 0) {
       toast.warning('다운로드할 파일을 선택해주세요.');
@@ -358,14 +542,16 @@ export function LibraryReportView({ title = '라이브러리', description, sx }
     }
 
     try {
+      setDownloadModalOpen(true);
       // 선택된 항목들의 데이터 가져오기
-      const selectedRows = allRows.filter((row) => {
+      const downloadRows = allRows.filter((row) => {
         const rowId = row.id ?? String(row.libraryReportIdx ?? '');
         return logic.selectedIds.includes(rowId);
       });
 
-      if (selectedRows.length === 0) {
+      if (downloadRows.length === 0) {
         toast.error('선택된 항목을 찾을 수 없습니다.');
+        setDownloadModalOpen(false);
         return;
       }
 
@@ -373,7 +559,7 @@ export function LibraryReportView({ title = '라이브러리', description, sx }
       const vodIdxes: number[] = [];
       const invalidRows: LibraryReport[] = [];
 
-      for (const row of selectedRows) {
+      for (const row of downloadRows) {
         const vodIdx = row.vodIdx;
         if (vodIdx) {
           vodIdxes.push(vodIdx);
@@ -384,6 +570,19 @@ export function LibraryReportView({ title = '라이브러리', description, sx }
           console.warn('⚠️ [LibraryReportView] vodIdx나 fileUrl이 없어서 다운로드 건너뜀:', row);
         }
       }
+
+      const sanitizeFileName = (value: string) =>
+        value.replace(/[^a-zA-Z0-9가-힣\s]/g, '_').trim();
+
+      const buildBatchFileName = (titles: string[]) => {
+        const safeTitles = titles.filter(Boolean);
+        if (safeTitles.length === 0) {
+          return `videos_${new Date().getTime()}.zip`;
+        }
+        const [first, ...rest] = safeTitles;
+        const suffix = rest.length > 0 ? `_외${rest.length}개` : '';
+        return `${sanitizeFileName(first)}${suffix}.zip`;
+      };
 
       // 여러 개 선택된 경우 배치 다운로드 사용
       if (vodIdxes.length > 1) {
@@ -428,6 +627,9 @@ export function LibraryReportView({ title = '라이브러리', description, sx }
               console.error('❌ [LibraryReportView] 작은 blob 응답:', text);
             }
             try {
+              if (!text) {
+                throw new Error('배치 다운로드에 실패했습니다. 파일이 비어있습니다.');
+              }
               const errorData = JSON.parse(text);
               const errorMessage =
                 errorData?.header?.resultMessage ||
@@ -446,7 +648,9 @@ export function LibraryReportView({ title = '라이브러리', description, sx }
             }
           }
 
-          const fileName = `videos_${new Date().getTime()}.zip`;
+          const vodRows = downloadRows.filter((row) => row.vodIdx);
+          const vodTitles = vodRows.map((row) => row.title || `video_${row.vodIdx}`);
+          const fileName = buildBatchFileName(vodTitles);
 
           // ZIP 다운로드
           const url = window.URL.createObjectURL(blob);
@@ -508,6 +712,9 @@ export function LibraryReportView({ title = '라이브러리', description, sx }
               console.error('❌ [LibraryReportView] 작은 blob 응답:', text);
             }
             try {
+              if (!text) {
+                throw new Error('다운로드에 실패했습니다. 파일이 비어있습니다.');
+              }
               const errorData = JSON.parse(text);
               const errorMessage =
                 errorData?.header?.resultMessage ||
@@ -526,11 +733,8 @@ export function LibraryReportView({ title = '라이브러리', description, sx }
             }
           }
 
-          const row = selectedRows.find((r) => r.vodIdx === vodIdxes[0]);
-          const fileName = (row?.title || `video_${vodIdxes[0]}`).replace(
-            /[^a-zA-Z0-9가-힣\s]/g,
-            '_'
-          );
+          const row = downloadRows.find((r) => r.vodIdx === vodIdxes[0]);
+          const fileName = sanitizeFileName(row?.title || `video_${vodIdxes[0]}`);
 
           // 다운로드
           const url = window.URL.createObjectURL(blob);
@@ -553,7 +757,7 @@ export function LibraryReportView({ title = '라이브러리', description, sx }
       // fileUrl이 있는 항목들은 개별 처리 (기존 방식)
       for (const row of invalidRows) {
         try {
-          const fileName = row.title || `video_${row.id}`;
+          const fileName = sanitizeFileName(row.title || `video_${row.id}`);
           const a = document.createElement('a');
           a.href = row.fileUrl!;
           a.download = `${fileName}.mp4`;
@@ -569,6 +773,8 @@ export function LibraryReportView({ title = '라이브러리', description, sx }
     } catch (error) {
       console.error('❌ [LibraryReportView] 다운로드 실패', error);
       toast.error('다운로드 중 오류가 발생했습니다.');
+    } finally {
+      setDownloadModalOpen(false);
     }
   }, [logic.selectedIds, allRows]);
 
@@ -623,6 +829,8 @@ export function LibraryReportView({ title = '라이브러리', description, sx }
           onChangePage={logic.onChangePage}
           onChangeRowsPerPage={logic.onChangeRowsPerPage}
           onDownload={handleDownloadSelected}
+          onMoveSelected={handleMoveSelected}
+          onDeleteSelected={handleDeleteSelected}
           selectedCount={logic.selectedIds.length}
         />
       </>
@@ -723,11 +931,43 @@ export function LibraryReportView({ title = '라이브러리', description, sx }
         onClose={() => {
           setEditModalOpen(false);
           setSelectedRow(null);
+          setEditUploadStep('idle');
+          setEditUploadProgress(null);
+          setEditUploadMessage('');
         }}
         onSave={handleUpdateContent}
         onDelete={handleDeleteContent}
         categories={categories}
         initialData={selectedRow}
+        uploadStep={editUploadStep}
+        uploadProgress={editUploadProgress}
+        uploadMessage={editUploadMessage}
+        disableClose={editUploadStep === 'uploading' || editUploadStep === 'processing'}
+      />
+
+      <PDFDownloadModal
+        open={downloadModalOpen}
+        title="영상 다운로드"
+        message="영상 파일을 내려받는 중입니다..."
+      />
+
+      <DeleteContentModal
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        onConfirm={handleDeleteSelectedConfirm}
+        label={
+          selectedRows.length > 1
+            ? `선택한 ${selectedRows.length}개 영상`
+            : selectedRows[0]?.title || '영상'
+        }
+      />
+
+      <MoveContentModal
+        open={moveModalOpen}
+        categories={categories}
+        selectedCount={logic.selectedIds.length}
+        onClose={() => setMoveModalOpen(false)}
+        onConfirm={handleMoveSelectedConfirm}
       />
     </DashboardContent>
   );

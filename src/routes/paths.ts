@@ -53,6 +53,10 @@ export const paths = {
   // DASHBOARD
   dashboard: {
     root: ROOTS.DASHBOARD,
+    notice: `${ROOTS.DASHBOARD}/notice`,
+    sales: `${ROOTS.DASHBOARD}/sales`,
+    inquiries: `${ROOTS.DASHBOARD}/inquiries`,
+    inquiriesOneToOne: `${ROOTS.DASHBOARD}/inquiries/one-to-one`,
     sharedDocument: {
       root: `${ROOTS.DASHBOARD}/shared-document`,
     },

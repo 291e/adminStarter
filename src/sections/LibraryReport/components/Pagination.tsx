@@ -16,6 +16,8 @@ type Props = {
   onChangePage: (page: number) => void;
   onChangeRowsPerPage: (rows: number) => void;
   onDownload?: () => void;
+  onMoveSelected?: () => void;
+  onDeleteSelected?: () => void;
   selectedCount?: number;
 };
 
@@ -26,6 +28,8 @@ export default function LibraryReportPagination({
   onChangePage,
   onChangeRowsPerPage,
   onDownload,
+  onMoveSelected,
+  onDeleteSelected,
   selectedCount = 0,
 }: Props) {
   const start = page * rowsPerPage + 1;
@@ -55,17 +59,43 @@ export default function LibraryReportPagination({
         px: 2,
       }}
     >
-      {onDownload && (
-        <Button
-          variant="contained"
-          startIcon={<Iconify icon="solar:download-bold" />}
-          onClick={onDownload}
-          disabled={selectedCount === 0}
-          size="small"
-          sx={{ mr: 'auto' }}
-        >
-          다운로드 ({selectedCount})
-        </Button>
+      {(onDownload || onMoveSelected || onDeleteSelected) && (
+        <Stack direction="row" spacing={1} sx={{ mr: 'auto' }}>
+          {onDownload && (
+            <Button
+              variant="contained"
+              startIcon={<Iconify icon="solar:download-bold" />}
+              onClick={onDownload}
+              disabled={selectedCount === 0}
+              size="small"
+            >
+              다운로드 ({selectedCount})
+            </Button>
+          )}
+          {onMoveSelected && (
+            <Button
+              variant="outlined"
+              startIcon={<Iconify icon="solar:copy-bold" />}
+              onClick={onMoveSelected}
+              disabled={selectedCount === 0}
+              size="small"
+            >
+              이동 ({selectedCount})
+            </Button>
+          )}
+          {onDeleteSelected && (
+            <Button
+              variant="outlined"
+              color="error"
+              startIcon={<Iconify icon="solar:trash-bin-trash-bold" />}
+              onClick={onDeleteSelected}
+              disabled={selectedCount === 0}
+              size="small"
+            >
+              삭제 ({selectedCount})
+            </Button>
+          )}
+        </Stack>
       )}
 
       <Typography variant="body2">표시행 수</Typography>

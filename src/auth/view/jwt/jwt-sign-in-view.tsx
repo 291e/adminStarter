@@ -1,5 +1,5 @@
 import { z as zod } from 'zod';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { useBoolean } from 'minimal-shared/hooks';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -24,23 +24,29 @@ import { useAuthContext } from '../../hooks';
 import { getErrorMessage } from '../../utils';
 import { FormHead } from '../../components/form-head';
 import { signInWithPassword } from '../../context/jwt';
+import { useAuthI18n } from '../../i18n/auth-i18n';
 
 // ----------------------------------------------------------------------
 
-export type SignInSchemaType = zod.infer<typeof SignInSchema>;
+export type SignInSchemaType = {
+  email: string;
+  password: string;
+};
 
-export const SignInSchema = zod.object({
-  email: zod.string().min(1, { message: '아이디를 입력해주세요.' }),
-  password: zod
-    .string()
-    .min(1, { message: '비밀번호를 입력해주세요.' })
-    .min(6, { message: '비밀번호는 최소 6자 이상이어야 합니다.' }),
-});
+const createSignInSchema = (t: (key: string) => string) =>
+  zod.object({
+    email: zod.string().min(1, { message: t('signIn.validation.idRequired') }),
+    password: zod
+      .string()
+      .min(1, { message: t('signIn.validation.passwordRequired') })
+      .min(6, { message: t('signIn.validation.passwordMin') }),
+  });
 
 // ----------------------------------------------------------------------
 
 export function JwtSignInView() {
   const router = useRouter();
+  const { t, locale } = useAuthI18n();
 
   const showPassword = useBoolean();
   const saveId = useBoolean();
@@ -66,8 +72,10 @@ export function JwtSignInView() {
     password: '',
   };
 
+  const signInSchema = useMemo(() => createSignInSchema(t), [t]);
+
   const methods = useForm<SignInSchemaType>({
-    resolver: zodResolver(SignInSchema),
+    resolver: zodResolver(signInSchema),
     defaultValues,
   });
 
@@ -82,6 +90,16 @@ export function JwtSignInView() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const hasMountedRef = useRef(false);
+
+  useEffect(() => {
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      return;
+    }
+    methods.trigger();
+  }, [locale, methods]);
 
   const {
     handleSubmit,
@@ -112,7 +130,7 @@ export function JwtSignInView() {
     <Box sx={{ gap: 3, display: 'flex', flexDirection: 'column' }}>
       <Field.Text
         name="email"
-        label="아이디"
+        label={t('signIn.emailLabel')}
         slotProps={{
           inputLabel: { shrink: true, required: true },
         }}
@@ -121,8 +139,8 @@ export function JwtSignInView() {
       <Box sx={{ gap: 1.5, display: 'flex', flexDirection: 'column' }}>
         <Field.Text
           name="password"
-          label="비밀번호"
-          placeholder="6자 이상"
+          label={t('signIn.passwordLabel')}
+          placeholder={t('signIn.passwordPlaceholder')}
           type={showPassword.value ? 'text' : 'password'}
           slotProps={{
             inputLabel: { shrink: true, required: true },
@@ -157,7 +175,7 @@ export function JwtSignInView() {
                 sx={{ p: 1 }}
               />
             }
-            label="아이디 저장"
+            label={t('signIn.saveId')}
             sx={{
               m: 0,
               '& .MuiFormControlLabel-label': {
@@ -182,7 +200,7 @@ export function JwtSignInView() {
                 },
               }}
             >
-              아이디 찾기
+              {t('signIn.findId')}
             </Link>
             <Link
               component={RouterLink}
@@ -198,7 +216,7 @@ export function JwtSignInView() {
                 },
               }}
             >
-              비밀번호 재설정
+              {t('signIn.resetPassword')}
             </Link>
           </Box>
         </Box>
@@ -211,16 +229,16 @@ export function JwtSignInView() {
         type="submit"
         variant="contained"
         loading={isSubmitting}
-        loadingIndicator="로그인 중..."
+        loadingIndicator={t('signIn.loading')}
       >
-        로그인
+        {t('signIn.submit')}
       </Button>
     </Box>
   );
 
   return (
     <>
-      <FormHead title="로그인" sx={{ textAlign: { xs: 'center', md: 'left' } }} />
+      <FormHead title={t('signIn.title')} sx={{ textAlign: { xs: 'center', md: 'left' } }} />
 
       {!!errorMessage && (
         <Alert severity="error" sx={{ mb: 3 }}>

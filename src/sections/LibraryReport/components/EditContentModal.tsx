@@ -20,11 +20,13 @@ import Switch from '@mui/material/Switch';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Alert from '@mui/material/Alert';
 import LoadingButton from '@mui/lab/LoadingButton';
+import LinearProgress from '@mui/material/LinearProgress';
 
 import { Iconify } from 'src/components/iconify';
 import type { CategoryItem } from './CategorySettingsModal';
 import type { LibraryReport } from 'src/services/library-report/library-report.types';
 import { fDateTime } from 'src/utils/format-time';
+import DeleteContentModal from './DeleteContentModal';
 
 // ----------------------------------------------------------------------
 
@@ -44,6 +46,10 @@ type Props = {
   onDelete?: () => Promise<void> | void;
   categories: CategoryItem[];
   initialData?: LibraryReport | null;
+  uploadStep?: 'idle' | 'uploading' | 'processing' | 'completed' | 'error';
+  uploadProgress?: number | null;
+  uploadMessage?: string;
+  disableClose?: boolean;
 };
 
 export default function EditContentModal({
@@ -53,6 +59,10 @@ export default function EditContentModal({
   onDelete,
   categories,
   initialData,
+  uploadStep = 'idle',
+  uploadProgress = null,
+  uploadMessage,
+  disableClose = false,
 }: Props) {
   const [formData, setFormData] = useState<EditContentFormData>({
     category: '',
@@ -68,6 +78,8 @@ export default function EditContentModal({
   const videoFileInputRef = useRef<HTMLInputElement>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [confirmUploadOpen, setConfirmUploadOpen] = useState(false);
 
   // 파일 URL을 전체 URL로 변환하는 헬퍼 함수
   const getFullFileUrl = (url: string | null | undefined): string | null => {
@@ -158,6 +170,7 @@ export default function EditContentModal({
   const handleVideoFileSelect = (file: File) => {
     if (file && file.type.startsWith('video/')) {
       handleChange('videoFile', file);
+      setExistingFileName(file.name);
       // 비디오에서 썸네일 추출
       extractVideoThumbnail(file);
     }
@@ -228,9 +241,12 @@ export default function EditContentModal({
     handleChange('thumbnailDataUrl', null);
     setVideoPreview(null);
     setExistingFileName(null);
+    if (videoFileInputRef.current) {
+      videoFileInputRef.current.value = '';
+    }
   };
 
-  const handleSave = async () => {
+  const performSave = async () => {
     if (!formData.category.trim() || !formData.title.trim()) {
       setErrorMessage('카테고리와 제목을 모두 입력해주세요.');
       return;
@@ -254,10 +270,23 @@ export default function EditContentModal({
     }
   };
 
-  const handleDelete = async () => {
+  const handleSave = async () => {
+    if (formData.videoFile) {
+      setConfirmUploadOpen(true);
+      return;
+    }
+    await performSave();
+  };
+
+  const handleDeleteRequest = () => {
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
     if (onDelete) {
       try {
         await onDelete();
+        setDeleteConfirmOpen(false);
         onClose();
       } catch (error) {
         console.error('❌ [EditContentModal] 삭제 실패', error);
@@ -266,6 +295,9 @@ export default function EditContentModal({
   };
 
   const handleClose = () => {
+    if (disableClose) {
+      return;
+    }
     setFormData({
       category: '',
       title: '',
@@ -278,6 +310,8 @@ export default function EditContentModal({
     setExistingFileName(null);
     setErrorMessage('');
     setIsSaving(false);
+    setDeleteConfirmOpen(false);
+    setConfirmUploadOpen(false);
     onClose();
   };
 
@@ -307,6 +341,7 @@ export default function EditContentModal({
         <IconButton
           aria-label="close"
           onClick={handleClose}
+          disabled={disableClose}
           sx={{
             position: 'absolute',
             right: 16,
@@ -351,6 +386,26 @@ export default function EditContentModal({
           {errorMessage && (
             <Alert severity="error" sx={{ mb: 1 }}>
               {errorMessage}
+            </Alert>
+          )}
+          {uploadStep !== 'idle' && (
+            <Alert severity={uploadStep === 'error' ? 'error' : 'warning'}>
+              <Stack spacing={1}>
+                <Typography sx={{ fontWeight: 700 }}>
+                  {uploadMessage || '업로드/처리 중입니다. 이 페이지를 벗어나지 마시오.'}
+                </Typography>
+                {uploadStep !== 'error' && (
+                  <LinearProgress
+                    variant={typeof uploadProgress === 'number' ? 'determinate' : 'indeterminate'}
+                    value={typeof uploadProgress === 'number' ? uploadProgress : undefined}
+                  />
+                )}
+                {typeof uploadProgress === 'number' && uploadStep !== 'error' && (
+                  <Typography variant="caption" color="text.secondary">
+                    {uploadProgress}%
+                  </Typography>
+                )}
+              </Stack>
             </Alert>
           )}
           {/* 카테고리 선택 */}
@@ -617,19 +672,54 @@ export default function EditContentModal({
 
       <DialogActions sx={{ p: 3, justifyContent: 'space-between' }}>
         {onDelete && (
-          <Button onClick={handleDelete} sx={{ color: 'error.main', fontWeight: 700 }}>
+          <Button onClick={handleDeleteRequest} sx={{ color: 'error.main', fontWeight: 700 }}>
             삭제
           </Button>
         )}
         <Stack direction="row" spacing={1.5}>
-          <Button variant="outlined" onClick={handleClose} disabled={isSaving}>
+          <Button variant="outlined" onClick={handleClose} disabled={isSaving || disableClose}>
             취소
           </Button>
-          <LoadingButton variant="contained" onClick={handleSave} loading={isSaving}>
+          <LoadingButton
+            variant="contained"
+            onClick={() => handleSave()}
+            loading={isSaving}
+            disabled={disableClose}
+          >
             저장
           </LoadingButton>
         </Stack>
       </DialogActions>
+
+      <DeleteContentModal
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        onConfirm={handleDeleteConfirm}
+        label={initialData?.title || '영상'}
+      />
+
+      <Dialog open={confirmUploadOpen} onClose={() => setConfirmUploadOpen(false)}>
+        <DialogTitle sx={{ fontWeight: 700 }}>업로드 안내</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            수정 시 업로드가 필요해 시간이 걸릴 수 있습니다. 진행하시겠습니까?
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button variant="outlined" onClick={() => setConfirmUploadOpen(false)}>
+            취소
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              setConfirmUploadOpen(false);
+              void performSave();
+            }}
+          >
+            확인
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Dialog>
   );
 }

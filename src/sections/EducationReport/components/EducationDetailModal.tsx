@@ -793,7 +793,14 @@ export default function EducationDetailModal({ open, onClose, educationReportIdx
                     </Typography>
                   </Box>
                 </Box>
-                <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    gap: 1.5,
+                    alignItems: 'center',
+                    width: 'calc(50% - 12px)',
+                  }}
+                >
                   <TextField
                     label="이수 기준시간"
                     value={report.standardEducation || 0}

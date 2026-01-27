@@ -123,6 +123,7 @@ export type UpdateLibraryReportParams = {
   hasSubtitles?: boolean | number;
   visibilityType?: 'public' | 'organization';
   fileUrl?: string;
+  vodIdx?: number;
   thumbnailUrl?: string;
   memo?: string;
   isActive?: number;

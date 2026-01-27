@@ -24,7 +24,7 @@ import { NavVertical } from './nav-vertical';
 import { NavHorizontal } from './nav-horizontal';
 import { MenuButton } from '../components/menu-button';
 import { SettingsButton } from '../components/settings-button';
-import { navData as dashboardNavData } from '../nav-config-dashboard';
+import { getDashboardNavData, navData as dashboardNavData } from '../nav-config-dashboard';
 import { dashboardLayoutVars, dashboardNavColorVars } from './css-vars';
 import { NotificationsDrawer } from '../components/notifications-drawer';
 import { MainSection, layoutClasses, HeaderSection, LayoutSection } from '../core';
@@ -86,23 +86,16 @@ export function DashboardLayout({
     return undefined;
   }, [myInfo, location.pathname, navigate]);
 
-  // isSuperAdmin이 true인 경우에만 "설정 및 관리" 메뉴 표시
-  const filteredNavData = useMemo(() => {
-    const baseNavData = slotProps?.nav?.data ?? dashboardNavData;
-    const isSuperAdmin = myInfo?.isSuperAdmin === true;
-
-    if (isSuperAdmin) {
+  const navData = useMemo(() => {
+    const baseNavData = slotProps?.nav?.data;
+    if (baseNavData) {
       return baseNavData;
     }
-
-    // "설정 및 관리" 메뉴 필터링
-    return baseNavData.map((section) => ({
-      ...section,
-      items: section.items.filter((item) => item.title !== '설정 및 관리'),
-    }));
-  }, [slotProps?.nav?.data, myInfo?.isSuperAdmin]);
-
-  const navData = filteredNavData;
+    return getDashboardNavData({
+      isSuperAdmin: myInfo?.isSuperAdmin === true,
+      memberRole: (myInfo as any)?.memberRole || (myInfo as any)?.role || '',
+    });
+  }, [slotProps?.nav?.data, myInfo?.isSuperAdmin, myInfo?.memberRole]);
 
   const isNavMini = settings.state.navLayout === 'mini';
   const isNavHorizontal = settings.state.navLayout === 'horizontal';

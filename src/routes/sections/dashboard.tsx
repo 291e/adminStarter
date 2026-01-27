@@ -1,6 +1,6 @@
 import type { RouteObject } from 'react-router';
 
-import { Outlet } from 'react-router';
+import { Outlet, Navigate } from 'react-router';
 import { lazy, Suspense } from 'react';
 
 import { CONFIG } from 'src/global-config';
@@ -9,12 +9,21 @@ import { DashboardLayout } from 'src/layouts/dashboard';
 import { LoadingScreen } from 'src/components/loading-screen';
 
 import { AuthGuard } from 'src/auth/guard';
+import { useMyInfo } from 'src/sections/Chat/hooks/use-my-info';
+import { paths } from 'src/routes/paths';
+import { BlankView } from 'src/sections/blank/view';
 
 import { usePathname } from '../hooks';
 
 // ----------------------------------------------------------------------
 
 const IndexPage = lazy(() => import('src/pages/dashboard/page'));
+const NoticePage = lazy(() => import('src/pages/dashboard/notice/page'));
+const SalesPage = lazy(() => import('src/pages/dashboard/sales/page'));
+const InquiriesPage = lazy(() => import('src/pages/dashboard/inquiries/page'));
+const OneToOneInquiryPage = lazy(
+  () => import('src/pages/dashboard/inquiries/one-to-one/page')
+);
 const SharedDocumentPage = lazy(() => import('src/pages/dashboard/sharedDocument/page'));
 const OrganizationPage = lazy(() => import('src/pages/dashboard/organization/page'));
 const OrganizationDetailPage = lazy(() => import('src/pages/dashboard/organization/detail/page'));
@@ -66,6 +75,42 @@ function SuspenseOutlet() {
   );
 }
 
+type RoleGuardProps = {
+  allowSuperAdmin?: boolean;
+  allowWorker?: boolean;
+  allowNonWorker?: boolean;
+  children: React.ReactNode;
+};
+
+function DashboardRoleGuard({
+  allowSuperAdmin = false,
+  allowWorker = true,
+  allowNonWorker = true,
+  children,
+}: RoleGuardProps) {
+  const { data: myInfo, isLoading } = useMyInfo();
+
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
+
+  const isSuperAdmin = (myInfo as any)?.isSuperAdmin === true;
+  const memberRole = String((myInfo as any)?.memberRole || (myInfo as any)?.role || '').toUpperCase();
+  const isWorker = memberRole === 'WORKER';
+
+  const isAllowed = isSuperAdmin
+    ? allowSuperAdmin
+    : isWorker
+      ? allowWorker
+      : allowNonWorker;
+
+  if (!isAllowed) {
+    return <Navigate to={paths.dashboard.root} replace />;
+  }
+
+  return <>{children}</>;
+}
+
 const dashboardLayout = () => (
   <DashboardLayout>
     <SuspenseOutlet />
@@ -78,6 +123,15 @@ export const dashboardRoutes: RouteObject[] = [
     element: CONFIG.auth.skip ? dashboardLayout() : <AuthGuard>{dashboardLayout()}</AuthGuard>,
     children: [
       { element: <IndexPage />, index: true },
+      { path: 'notice', element: <NoticePage /> },
+      { path: 'sales', element: <SalesPage /> },
+      {
+        path: 'inquiries',
+        children: [
+          { element: <InquiriesPage />, index: true },
+          { path: 'one-to-one', element: <OneToOneInquiryPage /> },
+        ],
+      },
       {
         path: 'shared-document',
         element: <SharedDocumentPage />,
@@ -126,6 +180,11 @@ export const dashboardRoutes: RouteObject[] = [
       },
       {
         path: 'system-setting',
+        element: (
+          <DashboardRoleGuard allowSuperAdmin>
+            <Outlet />
+          </DashboardRoleGuard>
+        ),
         children: [
           { element: <SystemSettingPage />, index: true },
           { path: 'service-setting', element: <ServiceSettingPage /> },
@@ -135,6 +194,8 @@ export const dashboardRoutes: RouteObject[] = [
           { path: 'document-setting', element: <DocumentSettingPage /> },
         ],
       },
+      // Catch-all route for undefined pages
+      { path: '*', element: <BlankView title="페이지를 찾을 수 없습니다" /> },
     ],
   },
 ];

@@ -13,6 +13,8 @@ import { paths } from 'src/routes/paths';
 import { CONFIG } from 'src/global-config';
 
 import { Logo } from 'src/components/logo';
+import { LanguagePopover } from 'src/layouts/components/language-popover';
+import { AuthLocaleProvider, useAuthI18n } from 'src/auth/i18n/auth-i18n';
 
 import { AuthSplitSection } from './section';
 import { AuthSplitContent } from './content';
@@ -32,13 +34,15 @@ export type AuthSplitLayoutProps = LayoutBaseProps & {
   };
 };
 
-export function AuthSplitLayout({
+function AuthSplitLayoutInner({
   sx,
   cssVars,
   children,
   slotProps,
   layoutQuery = 'md',
 }: AuthSplitLayoutProps) {
+  const { locale, setLocale, options } = useAuthI18n();
+
   const renderHeader = () => {
     const headerSlotProps: HeaderSectionProps['slotProps'] = {
       container: { maxWidth: false },
@@ -61,6 +65,7 @@ export function AuthSplitLayout({
           {/** @slot Help link */}
 
           {/** @slot Settings button */}
+          <LanguagePopover data={options} value={locale} onChange={(next) => setLocale(next as any)} />
         </Box>
       ),
     };
@@ -146,5 +151,13 @@ export function AuthSplitLayout({
     >
       {renderMain()}
     </LayoutSection>
+  );
+}
+
+export function AuthSplitLayout(props: AuthSplitLayoutProps) {
+  return (
+    <AuthLocaleProvider>
+      <AuthSplitLayoutInner {...props} />
+    </AuthLocaleProvider>
   );
 }

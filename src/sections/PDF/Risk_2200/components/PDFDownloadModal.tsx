@@ -81,12 +81,14 @@ type Props = {
   open: boolean;
   progress?: number; // 0-100 (선택적, 없으면 indeterminate)
   message?: string;
+  title?: string;
 };
 
 export default function PDFDownloadModal({
   open,
   progress,
   message = 'PDF를 생성하고 있습니다...',
+  title = 'PDF 다운로드',
 }: Props) {
   const [dots, setDots] = useState('');
 
@@ -153,7 +155,7 @@ export default function PDFDownloadModal({
 
         <Box sx={{ textAlign: 'center' }}>
           <Typography variant="subtitle1" sx={{ fontWeight: 600, color: 'text.primary', mb: 0.5 }}>
-            PDF 다운로드
+            {title}
           </Typography>
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>
             {message}

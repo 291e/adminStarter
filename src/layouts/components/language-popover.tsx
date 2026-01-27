@@ -20,21 +20,28 @@ export type LanguagePopoverProps = IconButtonProps & {
     label: string;
     countryCode: string;
   }[];
+  value?: string;
+  onChange?: (next: string) => void;
 };
 
-export function LanguagePopover({ data = [], sx, ...other }: LanguagePopoverProps) {
+export function LanguagePopover({ data = [], value, onChange, sx, ...other }: LanguagePopoverProps) {
   const { open, anchorEl, onClose, onOpen } = usePopover();
 
-  const [locale, setLocale] = useState<string>(data[0].value);
+  const [locale, setLocale] = useState<string>(data[0]?.value);
 
-  const currentLang = data.find((lang) => lang.value === locale);
+  const resolvedLocale = value ?? locale;
+  const currentLang = data.find((lang) => lang.value === resolvedLocale);
 
   const handleChangeLang = useCallback(
     (lang: string) => {
-      setLocale(lang);
+      if (onChange) {
+        onChange(lang);
+      } else {
+        setLocale(lang);
+      }
       onClose();
     },
-    [onClose]
+    [onClose, onChange]
   );
 
   const renderMenuList = () => (

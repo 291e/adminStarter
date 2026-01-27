@@ -1,6 +1,5 @@
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 
 import { Iconify } from 'src/components/iconify';
@@ -25,6 +24,41 @@ export default function PendingSignaturesCard({
   onViewDocument,
 }: Props) {
   const hasRows = rows.length > 0;
+
+  const resolveDocumentTarget = (row: DocumentSignature) => {
+    let documentId: string | null = null;
+    let isSafetySystemDocumentIdx = false;
+
+    const sharedDocumentIdx = (row as any).sharedDocumentIdx;
+    if (sharedDocumentIdx !== null && sharedDocumentIdx !== undefined) {
+      documentId = String(sharedDocumentIdx);
+      isSafetySystemDocumentIdx = false;
+    } else if ((row as any).safetySystemDocumentInformation?.safetySystemDocumentIdx) {
+      const safetySystemDocumentIdx = (row as any).safetySystemDocumentInformation
+        .safetySystemDocumentIdx;
+      documentId = String(safetySystemDocumentIdx);
+      isSafetySystemDocumentIdx = true;
+    } else if (row.id) {
+      documentId = String(row.id);
+      isSafetySystemDocumentIdx = false;
+    }
+
+    return { documentId, isSafetySystemDocumentIdx };
+  };
+
+  const handleViewDocument = (row: DocumentSignature) => {
+    const { documentId, isSafetySystemDocumentIdx } = resolveDocumentTarget(row);
+    if (documentId) {
+      const idx = Number(documentId);
+      if (!Number.isNaN(idx) && idx > 0) {
+        onViewDocument?.(documentId, isSafetySystemDocumentIdx);
+        return;
+      }
+      console.warn('⚠️ Invalid document ID:', documentId, row);
+      return;
+    }
+    console.warn('⚠️ Document ID not found:', row);
+  };
 
   return (
     <Box
@@ -67,6 +101,7 @@ export default function PendingSignaturesCard({
             return (
               <Box
                 key={rowKey}
+                onClick={() => handleViewDocument(row)}
                 sx={{
                   bgcolor: 'background.default',
                   border: '1px solid',
@@ -76,6 +111,12 @@ export default function PendingSignaturesCard({
                   display: 'flex',
                   flexDirection: { xs: 'column', sm: 'row' },
                   alignItems: { xs: 'stretch', sm: 'center' },
+                  cursor: onViewDocument ? 'pointer' : 'default',
+                  '&:hover': onViewDocument
+                    ? {
+                        bgcolor: 'action.hover',
+                      }
+                    : {},
                 }}
               >
                 <Box
@@ -83,7 +124,7 @@ export default function PendingSignaturesCard({
                     flex: 1,
                     display: 'flex',
                     flexDirection: { xs: 'column', sm: 'row' },
-                    gap: { xs: 1, sm: 2 },
+                    gap: 1,
                     alignItems: { xs: 'flex-start', sm: 'center' },
                     justifyContent: 'space-between',
                     minHeight: 56,
@@ -102,13 +143,29 @@ export default function PendingSignaturesCard({
                   >
                     {row.documentName || row.documentId || '문서명 없음'}
                   </Typography>
+                  <IconButton
+                    size="small"
+                    sx={{
+                      width: 20,
+                      height: 20,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      borderRadius: 0.5,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      bgcolor: 'background.paper',
+                    }}
+                  >
+                    <Iconify icon="carbon:chevron-right" width={16} />
+                  </IconButton>
                   <Typography
                     variant="body2"
                     sx={{ maxWidth: '100%', fontSize: { xs: 13, sm: 14 } }}
                   >
                     {row.targetMemberName}
                   </Typography>
-                  <Box sx={{ width: { xs: '100%', sm: 80 } }}>
+                  <Box sx={{ width: { xs: '100%', sm: 100 } }}>
                     <Typography variant="body2" sx={{ fontSize: { xs: 13, sm: 14 } }}>
                       {row.requestedAt
                         ? new Date(row.requestedAt).toLocaleDateString('ko-KR', {
@@ -131,64 +188,6 @@ export default function PendingSignaturesCard({
                         : ''}
                     </Typography>
                   </Box>
-                </Box>
-                <Box sx={{ pl: 2 }}>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={() => {
-                      // sharedDocumentIdx 우선 사용
-                      let documentId: string | null = null;
-                      let isSafetySystemDocumentIdx = false;
-
-                      // 1. sharedDocumentIdx 우선 확인
-                      const sharedDocumentIdx = (row as any).sharedDocumentIdx;
-                      if (sharedDocumentIdx !== null && sharedDocumentIdx !== undefined) {
-                        documentId = String(sharedDocumentIdx);
-                        isSafetySystemDocumentIdx = false;
-                      }
-                      // 2. safetySystemDocumentInformation.safetySystemDocumentIdx 확인
-                      else if (
-                        (row as any).safetySystemDocumentInformation?.safetySystemDocumentIdx
-                      ) {
-                        const safetySystemDocumentIdx = (row as any).safetySystemDocumentInformation
-                          .safetySystemDocumentIdx;
-                        documentId = String(safetySystemDocumentIdx);
-                        isSafetySystemDocumentIdx = true;
-                      }
-                      // 3. row.id 확인
-                      else if (row.id) {
-                        documentId = String(row.id);
-                        isSafetySystemDocumentIdx = false;
-                      }
-
-                      if (documentId) {
-                        const idx = Number(documentId);
-                        if (!Number.isNaN(idx) && idx > 0) {
-                          onViewDocument?.(documentId, isSafetySystemDocumentIdx);
-                        } else {
-                          console.warn('⚠️ Invalid document ID:', documentId, row);
-                        }
-                      } else {
-                        console.warn('⚠️ Document ID not found:', row);
-                      }
-                    }}
-                    sx={{
-                      minHeight: { xs: 32, sm: 36 },
-                      fontSize: { xs: 12, sm: 14 },
-                      fontWeight: 700,
-
-                      width: { xs: '100%', sm: 'auto' },
-                      borderColor: '#2563E9',
-                      color: '#2563E9',
-                      '&:hover': {
-                        borderColor: '#2563E9',
-                        bgcolor: 'rgba(37, 99, 233, 0.04)',
-                      },
-                    }}
-                  >
-                    문서보기
-                  </Button>
                 </Box>
               </Box>
             );

@@ -786,7 +786,14 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
                       </Typography>
                     </Box>
                   </Box>
-                  <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      gap: 1.5,
+                      alignItems: 'center',
+                      width: 'calc(50% - 12px)',
+                    }}
+                  >
                     <TextField
                       label="이수 기준시간"
                       value={educationDetail.standardTime || 0}
@@ -807,8 +814,6 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
                       분
                     </Typography>
                   </Box>
-                </Stack>
-                {isAccidentFreeWorksite && (
                   <Box
                     sx={{
                       display: 'flex',
@@ -817,25 +822,30 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
                       pb: 2,
                       pt: 3,
                       px: 2.5,
+                      minHeight: isAccidentFreeWorksite ? 'auto' : 48,
                     }}
                   >
-                    <Iconify
-                      icon="solar:info-circle-bold"
-                      width={16}
-                      sx={{ color: 'text.secondary' }}
-                    />
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        fontSize: 12,
-                        color: 'text.secondary',
-                        lineHeight: 1.5,
-                      }}
-                    >
-                      무재해 사업장 감면 혜택이 적용되었습니다.
-                    </Typography>
+                    {isAccidentFreeWorksite && (
+                      <>
+                        <Iconify
+                          icon="solar:info-circle-bold"
+                          width={16}
+                          sx={{ color: 'text.secondary' }}
+                        />
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontSize: 12,
+                            color: 'text.secondary',
+                            lineHeight: 1.5,
+                          }}
+                        >
+                          무재해 사업장 감면 혜택이 적용되었습니다.
+                        </Typography>
+                      </>
+                    )}
                   </Box>
-                )}
+                </Stack>
               </Box>
             </Stack>
           </Stack>

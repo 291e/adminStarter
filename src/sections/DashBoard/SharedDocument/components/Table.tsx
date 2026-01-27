@@ -173,17 +173,35 @@ export default function SharedDocumentTable({
                   />
                 </TableCell>
                 <TableCell>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      fontSize: 14,
-                    }}
-                  >
-                    {row.documentName}
-                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        fontSize: 14,
+                      }}
+                    >
+                      {row.documentName}
+                    </Typography>
+                    <IconButton
+                      size="small"
+                      sx={{
+                        width: 20,
+                        height: 20,
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        borderRadius: 0.5,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        bgcolor: 'background.paper',
+                      }}
+                    >
+                      <Iconify icon="carbon:chevron-right" width={16} />
+                    </IconButton>
+                  </Box>
                 </TableCell>
                 <TableCell>
                   <Box>

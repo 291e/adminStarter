@@ -314,6 +314,16 @@ export default function SharedDocumentsCard({
               />
             )}
           </Box>
+          <Box
+            sx={{
+              width: 52,
+              minWidth: 52,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              p: { xs: 1.5, sm: 2 },
+            }}
+          />
         </Box>
 
         {/* 테이블 바디 */}
@@ -397,6 +407,7 @@ export default function SharedDocumentsCard({
                     alignItems: 'center',
                     minHeight: { xs: 48, sm: 56 },
                     p: { xs: 1.5, sm: 2 },
+                    gap: 1.5,
                   }}
                 >
                   <Typography
@@ -410,6 +421,22 @@ export default function SharedDocumentsCard({
                   >
                     {row.documentName}
                   </Typography>
+                  <IconButton
+                    size="small"
+                    sx={{
+                      width: 20,
+                      height: 20,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      borderRadius: 0.5,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      bgcolor: 'background.paper',
+                    }}
+                  >
+                    <Iconify icon="carbon:chevron-right" width={16} />
+                  </IconButton>
                 </Box>
                 <Box
                   sx={{

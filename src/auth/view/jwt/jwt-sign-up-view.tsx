@@ -1,5 +1,5 @@
 import { z as zod } from 'zod';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { useBoolean } from 'minimal-shared/hooks';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -42,28 +42,29 @@ import {
 } from 'src/services/organization/organization.service';
 import type { AcceptInvitationParams } from 'src/services/organization/organization.types';
 import { checkId } from 'src/services/member/member.service';
+import { useAuthI18n } from '../../i18n/auth-i18n';
 
 // ----------------------------------------------------------------------
 
 // 역할 한글 맵핑 함수
-const getRoleLabel = (role: string): string => {
+const getRoleLabel = (role: string, t: (key: string) => string): string => {
   if (!role) return '';
 
   const roleUpper = role.toUpperCase();
   const roleMap: { [key: string]: string } = {
-    OPERATOR_MANAGER: '조직 관리자',
-    MANAGEMENT_SUPERVISOR: '관리 감독자',
-    SAFETY_MANAGER: '안전보건 담당자',
-    WORKER: '근로자',
-    ADMIN: '조직 관리자',
-    MEMBER: '근로자',
+    OPERATOR_MANAGER: t('roles.operatorManager'),
+    MANAGEMENT_SUPERVISOR: t('roles.managementSupervisor'),
+    SAFETY_MANAGER: t('roles.safetyManager'),
+    WORKER: t('roles.worker'),
+    ADMIN: t('roles.operatorManager'),
+    MEMBER: t('roles.worker'),
     // 소문자 키 (하위 호환성)
-    operator_manager: '조직 관리자',
-    management_supervisor: '관리 감독자',
-    safety_manager: '안전보건 담당자',
-    worker: '근로자',
-    admin: '조직 관리자',
-    member: '근로자',
+    operator_manager: t('roles.operatorManager'),
+    management_supervisor: t('roles.managementSupervisor'),
+    safety_manager: t('roles.safetyManager'),
+    worker: t('roles.worker'),
+    admin: t('roles.operatorManager'),
+    member: t('roles.worker'),
   };
 
   return roleMap[roleUpper] || roleMap[role] || role;
@@ -71,37 +72,52 @@ const getRoleLabel = (role: string): string => {
 
 // ----------------------------------------------------------------------
 
-export type SignUpSchemaType = zod.infer<typeof SignUpSchema>;
+export type SignUpSchemaType = {
+  memberId: string;
+  password: string;
+  confirmPassword: string;
+  memberName: string;
+  memberPhone: string;
+  memberLang: string;
+  memberNameOrg?: string;
+  department?: string;
+  joinedAt?: any;
+  agreeToTerms: boolean;
+  agreeToPrivacy: boolean;
+};
 
-export const SignUpSchema = zod
-  .object({
-    memberId: zod.string().min(1, { message: '아이디를 입력해주세요.' }),
-    password: zod
-      .string()
-      .min(1, { message: '비밀번호를 입력해주세요.' })
-      .min(6, { message: '비밀번호는 최소 6자 이상이어야 합니다.' })
-      .max(10, { message: '비밀번호는 10자 이내여야 합니다.' })
-      .regex(/^[a-zA-Z0-9]+$/, {
-        message: '영문 소문자, 대문자, 숫자만 사용 가능합니다.',
+const createSignUpSchema = (t: (key: string) => string) =>
+  zod
+    .object({
+      memberId: zod.string().min(1, { message: t('signUp.validation.idRequired') }),
+      password: zod
+        .string()
+        .min(1, { message: t('signUp.validation.passwordRequired') })
+        .min(6, { message: t('signUp.validation.passwordMin') })
+        .max(10, { message: t('signUp.validation.passwordMax') })
+        .regex(/^[a-zA-Z0-9]+$/, {
+          message: t('signUp.validation.passwordRegex'),
+        }),
+      confirmPassword: zod
+        .string()
+        .min(1, { message: t('signUp.validation.confirmPasswordRequired') }),
+      memberName: zod.string().min(1, { message: t('signUp.validation.nameRequired') }),
+      memberPhone: zod.string().min(1, { message: t('signUp.validation.phoneRequired') }),
+      memberLang: zod.string().min(1, { message: t('signUp.validation.nationalityRequired') }),
+      memberNameOrg: zod.string().optional(),
+      department: zod.string().optional(),
+      joinedAt: zod.any().optional(), // Dayjs 객체
+      agreeToTerms: zod.boolean().refine((val) => val === true, {
+        message: t('signUp.validation.agreeTerms'),
       }),
-    confirmPassword: zod.string().min(1, { message: '비밀번호 확인을 입력해주세요.' }),
-    memberName: zod.string().min(1, { message: '이름을 입력해주세요.' }),
-    memberPhone: zod.string().min(1, { message: '핸드폰 번호를 입력해주세요.' }),
-    memberLang: zod.string().min(1, { message: '국적을 선택해주세요.' }),
-    memberNameOrg: zod.string().optional(),
-    department: zod.string().optional(),
-    joinedAt: zod.any().optional(), // Dayjs 객체
-    agreeToTerms: zod.boolean().refine((val) => val === true, {
-      message: '이용약관에 동의해주세요.',
-    }),
-    agreeToPrivacy: zod.boolean().refine((val) => val === true, {
-      message: '개인정보처리방침에 동의해주세요.',
-    }),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: '비밀번호가 일치하지 않습니다.',
-    path: ['confirmPassword'],
-  });
+      agreeToPrivacy: zod.boolean().refine((val) => val === true, {
+        message: t('signUp.validation.agreePrivacy'),
+      }),
+    })
+    .refine((data) => data.password === data.confirmPassword, {
+      message: t('signUp.validation.passwordMismatch'),
+      path: ['confirmPassword'],
+    });
 
 // ----------------------------------------------------------------------
 
@@ -109,6 +125,7 @@ export function JwtSignUpView() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const invitationCode = searchParams.get('code');
+  const { t, locale } = useAuthI18n();
 
   const showPassword = useBoolean();
   const showConfirmPassword = useBoolean();
@@ -145,12 +162,24 @@ export function JwtSignUpView() {
     agreeToPrivacy: false,
   };
 
+  const signUpSchema = useMemo(() => createSignUpSchema(t), [t]);
+
   const methods = useForm<SignUpSchemaType>({
-    resolver: zodResolver(SignUpSchema),
+    resolver: zodResolver(signUpSchema),
     defaultValues,
   });
 
   const { handleSubmit } = methods;
+
+  const hasMountedRef = useRef(false);
+
+  useEffect(() => {
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      return;
+    }
+    methods.trigger();
+  }, [locale, methods]);
 
   // 폼 검증 실패 시 경고 표시 핸들러
   const onError = (errors: any) => {
@@ -158,36 +187,40 @@ export function JwtSignUpView() {
 
     // 필수 필드 검증
     if (errors.memberId) {
-      errorMessages.push(`• ${errors.memberId.message || '아이디를 입력해주세요.'}`);
+      errorMessages.push(`• ${errors.memberId.message || t('signUp.validation.idRequired')}`);
     }
     if (errors.password) {
-      errorMessages.push(`• ${errors.password.message || '비밀번호를 입력해주세요.'}`);
+      errorMessages.push(`• ${errors.password.message || t('signUp.validation.passwordRequired')}`);
     }
     if (errors.confirmPassword) {
-      errorMessages.push(`• ${errors.confirmPassword.message || '비밀번호 확인을 입력해주세요.'}`);
+      errorMessages.push(
+        `• ${errors.confirmPassword.message || t('signUp.validation.confirmPasswordRequired')}`
+      );
     }
     if (errors.memberName) {
-      errorMessages.push(`• ${errors.memberName.message || '이름을 입력해주세요.'}`);
+      errorMessages.push(`• ${errors.memberName.message || t('signUp.validation.nameRequired')}`);
     }
     if (errors.memberPhone) {
-      errorMessages.push(`• ${errors.memberPhone.message || '핸드폰 번호를 입력해주세요.'}`);
+      errorMessages.push(`• ${errors.memberPhone.message || t('signUp.validation.phoneRequired')}`);
     }
     if (errors.memberLang) {
-      errorMessages.push(`• ${errors.memberLang.message || '국적을 선택해주세요.'}`);
+      errorMessages.push(
+        `• ${errors.memberLang.message || t('signUp.validation.nationalityRequired')}`
+      );
     }
 
     // 체크박스 검증
     if (errors.agreeToTerms) {
-      errorMessages.push(`• ${errors.agreeToTerms.message || '이용약관에 동의해주세요.'}`);
+      errorMessages.push(`• ${errors.agreeToTerms.message || t('signUp.validation.agreeTerms')}`);
     }
     if (errors.agreeToPrivacy) {
       errorMessages.push(
-        `• ${errors.agreeToPrivacy.message || '개인정보처리방침에 동의해주세요.'}`
+        `• ${errors.agreeToPrivacy.message || t('signUp.validation.agreePrivacy')}`
       );
     }
 
     if (errorMessages.length > 0) {
-      setErrorMessage(`다음 항목을 확인해주세요:\n${errorMessages.join('\n')}`);
+      setErrorMessage(`${t('signUp.validation.checkListTitle')}\n${errorMessages.join('\n')}`);
     }
   };
 
@@ -195,7 +228,7 @@ export function JwtSignUpView() {
   const handleCheckId = async () => {
     const memberId = methods.getValues('memberId');
     if (!memberId || memberId.trim() === '') {
-      setIdCheckMessage('아이디를 입력해주세요.');
+      setIdCheckMessage(t('signUp.checkIdMissing'));
       setIsIdAvailable(false);
       return;
     }
@@ -213,7 +246,7 @@ export function JwtSignUpView() {
     } catch (error) {
       console.error('아이디 중복검사 실패:', error);
       setIsIdAvailable(false);
-      setIdCheckMessage('아이디 중복검사에 실패했습니다. 다시 시도해주세요.');
+      setIdCheckMessage(t('signUp.checkIdFail'));
     } finally {
       setIsCheckingId(false);
     }
@@ -289,7 +322,7 @@ export function JwtSignUpView() {
     async (data) => {
       try {
         if (!invitationCode) {
-          setErrorMessage('초대 코드가 필요합니다. 초대 링크를 통해 접근해주세요.');
+          setErrorMessage(`${t('signUp.inviteRequiredTitle')} ${t('signUp.inviteRequiredDesc')}`);
           return;
         }
 
@@ -355,7 +388,9 @@ export function JwtSignUpView() {
     // 직종 한글 변환 함수
     const getWorkTypeLabel = (workType?: string) => {
       if (!workType) return '';
-      return workType === 'PRODUCTION' ? '생산직' : '사무직';
+      return workType === 'PRODUCTION'
+        ? t('signUp.workTypeProduction')
+        : t('signUp.workTypeOffice');
     };
 
     return (
@@ -366,7 +401,7 @@ export function JwtSignUpView() {
             {/* 회사명 + 이메일 */}
             <Stack direction="row" spacing={2}>
               <TextField
-                label="회사명"
+                label={t('signUp.companyName')}
                 value={invitation.companyName || ''}
                 disabled
                 fullWidth
@@ -375,7 +410,7 @@ export function JwtSignUpView() {
                 size="small"
               />
               <TextField
-                label="이메일"
+                label={t('signUp.invitedEmail')}
                 value={invitation.invitedEmail || ''}
                 disabled
                 fullWidth
@@ -388,7 +423,7 @@ export function JwtSignUpView() {
             {/* 소속팀 + 역할 */}
             <Stack direction="row" spacing={2}>
               <TextField
-                label="소속팀"
+                label={t('signUp.department')}
                 value={invitation.department || ''}
                 disabled
                 fullWidth
@@ -397,8 +432,8 @@ export function JwtSignUpView() {
                 size="small"
               />
               <TextField
-                label="역할"
-                value={getRoleLabel(invitation.memberRole || '')}
+                label={t('signUp.role')}
+                value={getRoleLabel(invitation.memberRole || '', t)}
                 disabled
                 fullWidth
                 variant="filled"
@@ -410,7 +445,7 @@ export function JwtSignUpView() {
             {/* 직종 + 입사일 */}
             <Stack direction="row" spacing={2}>
               <TextField
-                label="직종"
+                label={t('signUp.workType')}
                 value={getWorkTypeLabel(invitation.workType)}
                 disabled
                 fullWidth
@@ -420,7 +455,7 @@ export function JwtSignUpView() {
               />
               <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <DatePicker
-                  label="입사일"
+                  label={t('signUp.joinedAt')}
                   value={invitation.joinedAt ? dayjs(invitation.joinedAt) : null}
                   disabled
                   format="YYYY-MM-DD"
@@ -445,7 +480,7 @@ export function JwtSignUpView() {
           variant="subtitle2"
           sx={{ fontWeight: 600, fontSize: 14, color: 'text.primary' }}
         >
-          아래 정보를 입력해 주세요.
+          {t('signUp.guide')}
         </Typography>
 
         {/* 아이디 필드 (중복검사 버튼 포함, 전체 너비) */}
@@ -454,12 +489,12 @@ export function JwtSignUpView() {
             name="memberId"
             control={methods.control}
             render={({ field, fieldState: { error } }) => (
-              <TextField
-                {...field}
-                fullWidth
-                variant="outlined"
-                placeholder="아이디*"
-                error={!!error || isIdAvailable === false}
+                <TextField
+                  {...field}
+                  fullWidth
+                  variant="outlined"
+                  placeholder={t('signUp.memberIdPlaceholder')}
+                  error={!!error || isIdAvailable === false}
                 helperText={
                   error?.message ||
                   (idCheckMessage && (
@@ -492,7 +527,7 @@ export function JwtSignUpView() {
                           disabled={isCheckingId || !memberId || memberId.trim() === ''}
                           sx={{ minHeight: 36, fontSize: 14 }}
                         >
-                          {isCheckingId ? '확인 중...' : '중복검사'}
+                          {isCheckingId ? t('signUp.checkingId') : t('signUp.checkId')}
                         </Button>
                       </InputAdornment>
                     ),
@@ -510,6 +545,10 @@ export function JwtSignUpView() {
               />
             )}
           />
+          <FormHelperText sx={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Iconify icon="solar:info-circle-bold" width={10} sx={{ color: 'text.secondary' }} />
+            {t('signUp.idCheckHelp')}
+          </FormHelperText>
         </Box>
 
         {/* 비밀번호 필드 (2개 한 줄) */}
@@ -523,7 +562,7 @@ export function JwtSignUpView() {
                   {...field}
                   fullWidth
                   variant="outlined"
-                  placeholder="비밀번호*"
+                  placeholder={t('signUp.passwordPlaceholder')}
                   type={showPassword.value ? 'text' : 'password'}
                   error={!!error}
                   slotProps={{
@@ -546,7 +585,7 @@ export function JwtSignUpView() {
             />
             <FormHelperText sx={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 0.5 }}>
               <Iconify icon="solar:info-circle-bold" width={10} sx={{ color: 'text.secondary' }} />
-              10자 이내의 영문 소문자, 대문자, 숫자
+              {t('signUp.passwordHint')}
             </FormHelperText>
           </Box>
           <Box sx={{ flex: 1 }}>
@@ -558,7 +597,7 @@ export function JwtSignUpView() {
                   {...field}
                   fullWidth
                   variant="outlined"
-                  placeholder="비밀번호 확인*"
+                  placeholder={t('signUp.confirmPasswordPlaceholder')}
                   type={showConfirmPassword.value ? 'text' : 'password'}
                   error={!!error}
                   helperText={error?.message}
@@ -597,7 +636,7 @@ export function JwtSignUpView() {
                 {...field}
                 fullWidth
                 variant="outlined"
-                placeholder="한글 이름*"
+                placeholder={t('signUp.memberNamePlaceholder')}
                 error={!!error}
                 helperText={error?.message}
                 slotProps={{
@@ -615,7 +654,7 @@ export function JwtSignUpView() {
                 {...field}
                 fullWidth
                 variant="outlined"
-                placeholder="핸드폰 번호*"
+                placeholder={t('signUp.memberPhonePlaceholder')}
                 error={!!error}
                 helperText={error?.message}
                 slotProps={{
@@ -639,7 +678,7 @@ export function JwtSignUpView() {
         <Stack direction="row" spacing={2}>
           <Field.Select
             name="memberLang"
-            label="국적"
+            label={t('signUp.nationalityLabel')}
             slotProps={{ inputLabel: { shrink: true } }}
             sx={{
               '& .MuiOutlinedInput-root': {
@@ -652,16 +691,19 @@ export function JwtSignUpView() {
               },
             }}
           >
-            <MenuItem value="ko">한국</MenuItem>
-            <MenuItem value="zh">중국</MenuItem>
-            <MenuItem value="vi">베트남</MenuItem>
-            <MenuItem value="en">영어</MenuItem>
-            <MenuItem value="ne">네팔</MenuItem>
+            <MenuItem value="ko">{t('signUp.nationality.ko')}</MenuItem>
+            <MenuItem value="zh">{t('signUp.nationality.zh')}</MenuItem>
+            <MenuItem value="vi">{t('signUp.nationality.vi')}</MenuItem>
+            <MenuItem value="en">{t('signUp.nationality.en')}</MenuItem>
+            <MenuItem value="ne">{t('signUp.nationality.ne')}</MenuItem>
+            <MenuItem value="uz">{t('signUp.nationality.uz')}</MenuItem>
+            <MenuItem value="th">{t('signUp.nationality.th')}</MenuItem>
+            <MenuItem value="km">{t('signUp.nationality.km')}</MenuItem>
           </Field.Select>
           <Field.Text
             name="memberNameOrg"
-            label="원어 이름"
-            placeholder="원어 이름"
+            label={t('signUp.nativeNameLabel')}
+            placeholder={t('signUp.nativeNamePlaceholder')}
             slotProps={{ inputLabel: { shrink: true } }}
             sx={{
               '& .MuiOutlinedInput-root': {
@@ -698,7 +740,7 @@ export function JwtSignUpView() {
                 }}
               />
             }
-            label="이용약관 동의"
+            label={t('signUp.agreeTerms')}
             sx={{
               '& .MuiFormControlLabel-label': {
                 fontSize: 14,
@@ -721,7 +763,7 @@ export function JwtSignUpView() {
                 }}
               />
             }
-            label="개인정보처리방침 동의"
+            label={t('signUp.agreePrivacy')}
             sx={{
               '& .MuiFormControlLabel-label': {
                 fontSize: 14,
@@ -740,7 +782,7 @@ export function JwtSignUpView() {
             disabled={isSubmitting || isLoadingVerify}
             sx={{ minHeight: 36, fontSize: 14 }}
           >
-            {isSubmitting ? '가입 중...' : '가입하기'}
+            {isSubmitting ? t('signUp.submitLoading') : t('signUp.submit')}
           </Button>
         </Box>
       </Box>
@@ -751,16 +793,16 @@ export function JwtSignUpView() {
     return (
       <>
         <FormHead
-          title="초대 코드가 필요합니다"
-          description="초대 링크를 통해 접근해주세요."
+          title={t('signUp.inviteRequiredTitle')}
+          description={t('signUp.inviteRequiredDesc')}
           sx={{ textAlign: { xs: 'center', md: 'left' } }}
         />
         <Alert severity="error" sx={{ mb: 3 }}>
-          초대 코드가 없습니다. 초대 링크를 통해 접근해주세요.
+          {t('signUp.inviteRequiredAlert')}
         </Alert>
         <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
           <Link component={RouterLink} href={paths.auth.jwt.signIn} variant="subtitle2">
-            로그인 페이지로 이동
+            {t('common.goToLogin')}
           </Link>
         </Box>
       </>
@@ -771,8 +813,8 @@ export function JwtSignUpView() {
     return (
       <>
         <FormHead
-          title="초대 정보 확인 중"
-          description="초대 정보를 확인하고 있습니다."
+          title={t('signUp.inviteLoadingTitle')}
+          description={t('signUp.inviteLoadingDesc')}
           sx={{ textAlign: { xs: 'center', md: 'left' } }}
         />
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
@@ -790,16 +832,16 @@ export function JwtSignUpView() {
     return (
       <>
         <FormHead
-          title="초대 링크 오류"
-          description="초대 링크가 유효하지 않거나 만료되었습니다."
+          title={t('signUp.inviteInvalidTitle')}
+          description={t('signUp.inviteInvalidDesc')}
           sx={{ textAlign: { xs: 'center', md: 'left' } }}
         />
         <Alert severity="error" sx={{ mb: 3 }}>
-          초대 링크가 유효하지 않거나 만료되었습니다.
+          {t('signUp.inviteInvalidDesc')}
         </Alert>
         <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
           <Link component={RouterLink} href={paths.auth.jwt.signIn} variant="subtitle2">
-            로그인 페이지로 이동
+            {t('common.goToLogin')}
           </Link>
         </Box>
       </>
@@ -808,7 +850,7 @@ export function JwtSignUpView() {
 
   return (
     <>
-      <FormHead title="회원 가입" sx={{ textAlign: { xs: 'center', md: 'left' } }} />
+      <FormHead title={t('signUp.title')} sx={{ textAlign: { xs: 'center', md: 'left' } }} />
 
       {!!errorMessage && (
         <Alert severity="error" sx={{ mb: 3, whiteSpace: 'pre-line' }}>
