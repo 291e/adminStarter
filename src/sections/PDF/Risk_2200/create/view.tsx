@@ -32,6 +32,7 @@ import type {
   Table2200Row,
   Table2300Row,
   Table2400TBMData,
+  Table2400TBMEducationVideoRow,
   Table2400EducationRow,
   Table2400MinimumEducationRow,
   InvestigationTeamMember,
@@ -311,6 +312,8 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
       { inspectionContent: '작업장 정리/정돈, 통보 확보', result: '' },
       { inspectionContent: '점검결과 조치사항', result: '' },
     ],
+    educationMethod: 'VIDEO',
+    educationType: 'MANDATORY',
     educationContent: '',
     educationVideoRows: [
       {
@@ -836,8 +839,8 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
   const handleTable2400TBMEducationVideoRowChange = useCallback(
     (
       index: number,
-      field: 'participant' | 'educationVideo' | 'signature' | 'vodIdx' | 'workerSignatureIdx',
-      value: InvestigationTeamMember | null | string | number | undefined
+      field: keyof Table2400TBMEducationVideoRow,
+      value: any
     ) => {
       setTable2400TBMData((prev) => {
         const newRows = [...prev.educationVideoRows];
@@ -876,6 +879,8 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
           participant: null,
           educationVideo: '',
           signature: '',
+          evidenceFileName: undefined,
+          evidenceFileUrl: undefined,
         },
       ],
     }));

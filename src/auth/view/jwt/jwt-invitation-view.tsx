@@ -14,6 +14,7 @@ import { useSearchParams } from 'src/routes/hooks';
 import { FormHead } from '../../components/form-head';
 
 import { verifyInvitationCode } from 'src/services/organization/organization.service';
+import { useAuthI18n } from '../../i18n/auth-i18n';
 
 // ----------------------------------------------------------------------
 
@@ -21,6 +22,7 @@ export function JwtInvitationView() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const code = searchParams.get('code');
+  const { t, locale } = useAuthI18n();
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -39,7 +41,7 @@ export function JwtInvitationView() {
 
   useEffect(() => {
     if (!code) {
-      setErrorMessage('초대 코드가 없습니다.');
+      setErrorMessage(t('invitation.noCode'));
       return;
     }
 
@@ -52,7 +54,7 @@ export function JwtInvitationView() {
       const errorMsg =
         (error as any)?.body?.resultMessage ||
         (error as any)?.message ||
-        '초대 링크가 유효하지 않거나 만료되었습니다.';
+        t('invitation.invalidCode');
       setErrorMessage(errorMsg);
       return;
     }
@@ -80,12 +82,12 @@ export function JwtInvitationView() {
       setErrorMessage(null); // 성공 시 에러 메시지 초기화
       router.push(`${paths.auth.jwt.signUp}?code=${encodeURIComponent(code)}`);
     } else if (isValid === false) {
-      setErrorMessage('초대 링크가 유효하지 않거나 만료되었습니다.');
+      setErrorMessage(t('invitation.invalidCode'));
     } else if (verifyData && isValid !== true && !invitation) {
       // isValid가 undefined이거나 false이고 invitation도 없는 경우
-      setErrorMessage('초대 링크가 유효하지 않거나 만료되었습니다.');
+      setErrorMessage(t('invitation.invalidCode'));
     }
-  }, [code, verifyData, isLoading, isError, error, router]);
+  }, [code, verifyData, isLoading, isError, error, router, t]);
 
   const renderContent = () => {
     if (isLoading) {
@@ -93,7 +95,7 @@ export function JwtInvitationView() {
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
           <CircularProgress />
           <Typography variant="body2" color="text.secondary">
-            초대 링크를 검증하는 중...
+            {t('invitation.verifying')}
           </Typography>
         </Box>
       );
@@ -116,7 +118,7 @@ export function JwtInvitationView() {
       return (
         <Stack spacing={2} sx={{ mb: 3 }}>
           <Alert severity="success" sx={{ mb: 2 }}>
-            초대 링크가 유효합니다. 회원가입을 진행해주세요.
+            {t('invitation.valid')}
           </Alert>
           <Box
             sx={{
@@ -128,19 +130,20 @@ export function JwtInvitationView() {
             }}
           >
             <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
-              초대 정보
+              {t('invitation.info.title')}
             </Typography>
             <Typography variant="body2" sx={{ mb: 0.5 }}>
-              회사명: {invitation.companyName}
+              {t('invitation.info.companyName')} {invitation.companyName}
             </Typography>
             <Typography variant="body2" sx={{ mb: 0.5 }}>
-              초대받은 이메일: {invitation.invitedEmail}
+              {t('invitation.info.invitedEmail')} {invitation.invitedEmail}
             </Typography>
             <Typography variant="body2" sx={{ mb: 0.5 }}>
-              역할: {invitation.memberRole}
+              {t('invitation.info.role')} {invitation.memberRole}
             </Typography>
             <Typography variant="body2">
-              만료일: {new Date(invitation.expiresAt).toLocaleDateString('ko-KR')}
+              {t('invitation.info.expiresAt')}{' '}
+              {new Date(invitation.expiresAt).toLocaleDateString(locale)}
             </Typography>
           </Box>
         </Stack>
@@ -151,7 +154,7 @@ export function JwtInvitationView() {
     if (verifyData && !invitation) {
       return (
         <Alert severity="warning" sx={{ mb: 3 }}>
-          초대 정보를 찾을 수 없습니다.
+          {t('invitation.notFound')}
         </Alert>
       );
     }
@@ -162,8 +165,8 @@ export function JwtInvitationView() {
   return (
     <>
       <FormHead
-        title="초대 링크 검증"
-        description="초대 링크를 확인하고 있습니다. 잠시만 기다려주세요."
+        title={t('invitation.title')}
+        description={t('invitation.description')}
         sx={{ textAlign: { xs: 'center', md: 'left' } }}
       />
 

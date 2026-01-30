@@ -292,7 +292,10 @@ export function LibraryReportView({ title = '라이브러리', description, sx }
           setEditUploadProgress(0);
           setEditUploadMessage('비디오 업로드 중입니다. 이 페이지를 벗어나지 마시오.');
 
-          const uploadResponse = await uploadVod({ video: form.videoFile });
+          const uploadResponse = await uploadVod({
+            video: form.videoFile,
+            educationType: 'MANDATORY',
+          });
           const vodIdxValue = (uploadResponse as any)?.vodIdx;
           if (!vodIdxValue) {
             throw new Error('VOD 업로드 응답에 vodIdx가 없습니다.');

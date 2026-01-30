@@ -1,6 +1,6 @@
 import { CONFIG } from 'src/global-config';
 
-import { BlankView } from 'src/sections/blank/view';
+import InquiriesView from 'src/sections/Inquiries/view';
 
 // ----------------------------------------------------------------------
 
@@ -10,7 +10,7 @@ export default function InquiriesPage() {
   return (
     <>
       <title>{metadata.title}</title>
-      <BlankView title="회원사 문의" />
+      <InquiriesView />
     </>
   );
 }

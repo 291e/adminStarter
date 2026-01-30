@@ -266,6 +266,12 @@ export function useChatRoomFirebase({
       signalType?: FirebaseMessage['signalType'],
       sharedDocumentIdx?: number
     ) => {
+      console.debug('[chat] sendMessage called', {
+        chatRoomId,
+        messageType,
+        hasAttachments: Boolean(attachments?.length),
+        contentLength: content.length,
+      });
       if (!chatRoomId) {
         throw new Error('채팅방이 선택되지 않았습니다.');
       }
@@ -328,9 +334,18 @@ export function useChatRoomFirebase({
       }) as FirebaseMessage;
 
       try {
+        console.debug('[chat] sendMessage prepared', {
+          chatRoomId,
+          messageId,
+          senderMemberIdx,
+        });
         // 1. Firebase RTDB 멀티 업데이트
         const participantsSnap = await get(ref(db, `chatRooms/${chatRoomId}/participants`));
         const participants = participantsSnap.val() || {};
+        console.debug('[chat] sendMessage participants', {
+          chatRoomId,
+          participantKeys: Object.keys(participants).length,
+        });
 
         const lastMessage = removeUndefinedFields({
           message: messageContent,
@@ -351,10 +366,25 @@ export function useChatRoomFirebase({
         updates[`chatRooms/${chatRoomId}/lastMessageAt`] = timestamp;
         updates[`chatRooms/${chatRoomId}/updatedAt`] = createdAt;
 
+        const participantMap = new Map<string, { key: string; data: any }>();
         Object.entries(participants).forEach(([pid, p]: [string, any]) => {
+          const normalizedId = Number(p?.memberIdx ?? pid);
+          if (Number.isNaN(normalizedId)) {
+            if (!participantMap.has(pid)) participantMap.set(pid, { key: pid, data: p });
+            return;
+          }
+
+          const normalizedKey = String(normalizedId);
+          const existing = participantMap.get(normalizedKey);
+          const isExactKey = pid === normalizedKey;
+          if (!existing || isExactKey) {
+            participantMap.set(normalizedKey, { key: pid, data: p });
+          }
+        });
+
+        participantMap.forEach(({ key: pid, data: p }) => {
           if (pid === senderId || pid === 'chatbot') return;
-          const unread = (p?.unreadCount ?? 0) + 1;
-          updates[`chatRooms/${chatRoomId}/participants/${pid}/unreadCount`] = unread;
+          // TEMP: disable client-side unread increment to avoid double counting
           updates[`chatRooms/${chatRoomId}/participants/${pid}/lastSeen`] =
             p?.lastSeen ?? createdAt;
         });

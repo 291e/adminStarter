@@ -10,11 +10,13 @@ import { CONFIG } from 'src/global-config';
 
 import { Iconify } from 'src/components/iconify';
 import { FormHead } from '../../components/form-head';
+import { useAuthI18n } from '../../i18n/auth-i18n';
 
 // ----------------------------------------------------------------------
 
 export function JwtFindIdFailView() {
   const router = useRouter();
+  const { t } = useAuthI18n();
 
   const handleRetry = () => {
     router.push(paths.auth.jwt.findId);
@@ -42,13 +44,13 @@ export function JwtFindIdFailView() {
           }}
         >
           <img
-            alt="아이디 찾기 실패"
+            alt={t('findIdFail.title')}
             src={`${CONFIG.assetsDir}/auth/jwt3.svg`}
             style={{ width: '100%', height: '100%', objectFit: 'contain' }}
           />
         </Box>
 
-        <FormHead title="아이디 찾기 실패" sx={{ textAlign: { xs: 'center', md: 'left' } }} />
+        <FormHead title={t('findIdFail.title')} sx={{ textAlign: { xs: 'center', md: 'left' } }} />
 
         <Typography
           variant="body2"
@@ -62,7 +64,7 @@ export function JwtFindIdFailView() {
             maxWidth: 380,
           }}
         >
-          해당 이메일로 가입된 정보가 없습니다.
+          {t('findIdFail.description')}
         </Typography>
       </Box>
 
@@ -96,7 +98,7 @@ export function JwtFindIdFailView() {
                 color: 'text.secondary',
               }}
             >
-              고객센터 문의하기
+              {t('findIdFail.contactCustomerService')}
             </Typography>
             <Button
               variant="text"
@@ -119,14 +121,8 @@ export function JwtFindIdFailView() {
         </Box>
 
         {/* 다시 입력하기 버튼 */}
-        <Button
-          fullWidth
-          color="inherit"
-          size="large"
-          variant="contained"
-          onClick={handleRetry}
-        >
-          다시 입력하기
+        <Button fullWidth color="inherit" size="large" variant="contained" onClick={handleRetry}>
+          {t('findIdFail.retry')}
         </Button>
       </Box>
 
@@ -150,10 +146,9 @@ export function JwtFindIdFailView() {
           }}
         >
           <Iconify icon="eva:arrow-ios-back-fill" width={16} />
-          돌아가기
+          {t('common.back')}
         </Link>
       </Box>
     </>
   );
 }
-

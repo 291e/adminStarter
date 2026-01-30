@@ -817,11 +817,11 @@ export default function SharedDocumentDetailModal({
 
   // 테이블 렌더링 (모든 테이블 타입 지원)
   const renderTable = () => {
-    if (!parsedTableData || !parsedTableData.tableType) {
+    if (!parsedTableData || (!parsedTableData.tableType && !parsedTableData.type)) {
       return null;
     }
 
-    const tableType = parsedTableData.tableType;
+    const tableType = parsedTableData.tableType || parsedTableData.type;
 
     // tableType에 따라 적절한 테이블 컴포넌트 렌더링
     try {
@@ -833,9 +833,11 @@ export default function SharedDocumentDetailModal({
         const TableComp = tableRegistry['2-1-2100'] as any;
         return <TableComp data={parsedTableData.data} />;
       }
-      if (tableType === '1200-industrial' && parsedTableData.rows) {
+      if (tableType === '1200-industrial' && (parsedTableData.row || parsedTableData.rows)) {
         const TableComp = tableRegistry['1-2-1200-industrial'] as any;
-        return <TableComp row={parsedTableData.rows[0]} />;
+        const row =
+          parsedTableData.row || (parsedTableData.rows?.length ? parsedTableData.rows[0] : null);
+        return row ? <TableComp row={row} /> : null;
       }
       if (tableType === '1200-near-miss' && parsedTableData.row) {
         const TableComp = tableRegistry['1-2-1200'] as any;

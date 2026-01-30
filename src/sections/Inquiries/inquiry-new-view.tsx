@@ -1,0 +1,169 @@
+import { useMemo, useState } from 'react';
+import ReactQuill from 'react-quill-new';
+import 'react-quill-new/dist/quill.snow.css';
+
+import Card from '@mui/material/Card';
+import Stack from '@mui/material/Stack';
+import Button from '@mui/material/Button';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
+import Box from '@mui/material/Box';
+import Container from '@mui/material/Container';
+
+import { DashboardContent } from 'src/layouts/dashboard';
+import InquiryHeader from './components/header';
+// import InquiryEditorToolbar from './components/editor-toolbar';
+import { useBoardCategories, useCreateBoardPost } from 'src/sections/Board/hooks/use-board-api';
+import type { BoardCategory } from 'src/services/board/board.types';
+
+// ----------------------------------------------------------------------
+
+type Props = {
+  onBack: () => void;
+};
+
+export default function InquiryNewView({ onBack }: Props) {
+  const [category, setCategory] = useState('');
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const { data: categoryData } = useBoardCategories({ postCategoryType: '문의/답변' });
+  const createPostMutation = useCreateBoardPost();
+  const categories = categoryData?.categories || [];
+
+  const selectedCategoryIdx = useMemo(() => {
+    if (!category) return undefined;
+    return Number(category) || undefined;
+  }, [category]);
+
+  const handleSubmit = async () => {
+    if (!title.trim()) {
+      return;
+    }
+    await createPostMutation.mutateAsync({
+      postGubun: '문의/답변',
+      postTitle: title.trim(),
+      postContent: content.trim(),
+      postStatus: 'ACTIVE',
+      ...(selectedCategoryIdx && { postCategoryIdx: selectedCategoryIdx }),
+    });
+    onBack();
+  };
+
+  return (
+    <DashboardContent>
+      <Container maxWidth="xl">
+        <InquiryHeader title="문의하기" onBack={onBack} />
+
+        <Card sx={{ p: 0, boxShadow: '0 0 20px rgba(0,0,0,0.05)', borderRadius: 2 }}>
+          <Box sx={{ p: 3, borderBottom: '1px solid', borderColor: 'divider' }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+              문의 등록
+            </Typography>
+          </Box>
+
+          <Stack spacing={3} sx={{ p: 3 }}>
+            <Select
+              size="small"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              displayEmpty
+              sx={{ maxWidth: 240, borderRadius: 1.5 }}
+            >
+              <MenuItem value="" disabled>
+                <Typography variant="body2" sx={{ color: 'text.disabled' }}>
+                  카테고리 선택*
+                </Typography>
+              </MenuItem>
+              {categories.map((item: BoardCategory) => (
+                <MenuItem
+                  key={item.postCategoryIdx ?? item.postCategoryTitle}
+                  value={item.postCategoryIdx ? String(item.postCategoryIdx) : ''}
+                >
+                  {item.postCategoryTitle || '-'}
+                </MenuItem>
+              ))}
+            </Select>
+
+            <TextField
+              fullWidth
+              placeholder="제목"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1.5 } }}
+            />
+
+            <Box>
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>
+                내용
+              </Typography>
+              <Box
+                sx={{
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  borderRadius: 1.5,
+                  overflow: 'hidden',
+                  '& .quill': {
+                    bgcolor: 'grey.50',
+                    border: 'none',
+                    '& .ql-toolbar': {
+                      border: 'none',
+                      borderBottom: '1px solid',
+                      borderColor: 'divider',
+                      bgcolor: 'white',
+                    },
+                    '& .ql-container': {
+                      border: 'none',
+                      minHeight: 320,
+                      typography: 'body1',
+                    },
+                  },
+                }}
+              >
+                <ReactQuill
+                  theme="snow"
+                  value={content}
+                  onChange={setContent}
+                  placeholder="문의 내용을 작성해 주세요."
+                />
+              </Box>
+            </Box>
+
+            <Stack direction="row" justifyContent="flex-end" spacing={1.5} sx={{ mt: 2 }}>
+              <Button
+                variant="outlined"
+                onClick={onBack}
+                sx={{
+                  px: 3,
+                  height: 40,
+                  borderRadius: 1,
+                  borderColor: 'divider',
+                  color: 'text.primary',
+                  fontWeight: 600,
+                }}
+              >
+                취소
+              </Button>
+              <Button
+                variant="contained"
+                onClick={handleSubmit}
+                disabled={createPostMutation.isPending}
+                sx={{
+                  px: 3,
+                  height: 40,
+                  borderRadius: 1,
+                  bgcolor: '#212B36',
+                  '&:hover': { bgcolor: '#161C24' },
+                  fontWeight: 600,
+                }}
+              >
+                등록
+              </Button>
+            </Stack>
+          </Stack>
+        </Card>
+      </Container>
+    </DashboardContent>
+  );
+}

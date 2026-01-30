@@ -20,6 +20,8 @@ const defaultData: Table2400TBMData = {
     { inspectionContent: '작업장 정리/정돈, 통보 확보', result: '완료' },
     { inspectionContent: '점검결과 조치사항', result: '조치 완료' },
   ],
+  educationMethod: 'VIDEO',
+  educationType: 'MANDATORY',
   educationContent:
     '아크릴로니트릴의 특성과 위험성, 작업 시 주의사항, 개인보호구 착용법, 비상대응 절차 등에 대한 안전 교육 내용입니다.',
   educationVideoRows: [
@@ -176,8 +178,40 @@ export default function RiskTable_2_4_2400_TBM({ data = defaultData }: Props) {
     },
   };
 
+  const isInPerson = (data.educationMethod ?? 'VIDEO') === 'IN_PERSON';
+  const educationMethodLabel =
+    data.educationMethod === 'IN_PERSON' ? '집체' : data.educationMethod ? '영상' : '';
+  const educationTypeLabel =
+    data.educationType === 'MANDATORY'
+      ? '의무 교육'
+      : data.educationType === 'REGULAR'
+        ? '정기 교육'
+        : '';
+
   return (
     <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      {/* 교육 방법 / 교육 구분 */}
+      <Box sx={{ pb: 5, pt: 0, px: 0, width: '100%' }}>
+        <Box component="table" sx={tableStyle}>
+          <thead>
+            <tr style={{ height: 60 }}>
+              <th style={{ width: '50%' }}>교육 방법</th>
+              <th style={{ width: '50%' }}>교육 구분</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style={{ height: 48 }}>
+              <td>
+                <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{educationMethodLabel}</Typography>
+              </td>
+              <td>
+                <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{educationTypeLabel}</Typography>
+              </td>
+            </tr>
+          </tbody>
+        </Box>
+      </Box>
+
       {/* 점검내용 테이블 */}
       <Box sx={{ pb: 5, pt: 0, px: 0, width: '100%' }}>
         <Box component="table" sx={tableStyle}>
@@ -261,7 +295,7 @@ export default function RiskTable_2_4_2400_TBM({ data = defaultData }: Props) {
           <thead>
             <tr style={{ height: 60 }}>
               <th style={{ width: '30%' }}>대상자</th>
-              <th style={{ width: '40%' }}>교육영상</th>
+              <th style={{ width: '40%' }}>{isInPerson ? '증빙자료' : '교육영상'}</th>
               <th style={{ width: '30%' }}>서명</th>
             </tr>
           </thead>
@@ -275,7 +309,7 @@ export default function RiskTable_2_4_2400_TBM({ data = defaultData }: Props) {
                 </td>
                 <td>
                   <Typography sx={{ fontSize: 14, fontWeight: 400 }}>
-                    {row.educationVideo || ''}
+                    {isInPerson ? row.evidenceFileName || '' : row.educationVideo || ''}
                   </Typography>
                 </td>
                 <td>

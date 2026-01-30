@@ -13,6 +13,7 @@ export type VodProcessStep = 'QUEUED' | 'EXTRACTING_AUDIO' | 'TRANSCRIBING' | 'T
 // VOD 업로드 요청 파라미터
 export type UploadVodParams = {
   video: File; // 비디오 파일
+  educationType: 'MANDATORY' | 'REGULAR'; // 교육 타입
   targetLanguages?: string[]; // 번역 대상 언어 목록 (기본: en, vi, uk)
 };
 
@@ -55,7 +56,6 @@ export type GetVodStatusResponse = BaseResponseDto<{
   progress: number;
   errorMessage: string | null;
 }>;
-
 
 
 

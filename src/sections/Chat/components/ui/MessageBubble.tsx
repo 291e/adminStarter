@@ -58,11 +58,11 @@ function parseImageMessage(message: string): {
 } {
   // 패턴 1: [이미지]|URL
   // 패턴 2: 사고 현장 보고 [이미지]|URL
-  const imagePattern = /^(.*?)\[이미지\]\|(.+)$/;
+  const imagePattern = /^(.*?)\s*\[이미지\]\|(.+)$/s;
   const match = message.match(imagePattern);
 
   if (match) {
-    const label = match[1].trim();
+    const label = match[1].replace(/\s+$/, '').trim();
     const imageUrl = match[2].trim();
     return { isImage: true, imageUrl, label: label || undefined };
   }

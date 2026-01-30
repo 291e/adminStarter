@@ -61,6 +61,7 @@ export default function LibraryReportTable({
             <TableCell sx={{ bgcolor: 'grey.100', minWidth: 80 }}>순번</TableCell>
             <TableCell sx={{ bgcolor: 'grey.100', minWidth: 120 }}>등록일</TableCell>
             <TableCell sx={{ bgcolor: 'grey.100', minWidth: 140 }}>조직명</TableCell>
+            <TableCell sx={{ bgcolor: 'grey.100', minWidth: 120 }}>교육 구분</TableCell>
             <TableCell sx={{ bgcolor: 'grey.100', minWidth: 160 }}>카테고리</TableCell>
             <TableCell sx={{ bgcolor: 'grey.100', minWidth: 444 }}>제목</TableCell>
             <TableCell align="center" sx={{ bgcolor: 'grey.100', minWidth: 100 }}>
@@ -86,6 +87,12 @@ export default function LibraryReportTable({
             const hasRegistrationDate = Boolean(row.registrationDate);
             const registrationDate = row.registrationDate || '';
             const displayOrg = row.organizationName || '-';
+            const displayEducationType =
+              row.educationType === 'MANDATORY'
+                ? '의무 교육'
+                : row.educationType === 'REGULAR'
+                  ? '정기 교육'
+                  : '-';
             // libraryReportCategoryInformation에서 카테고리 정보 가져오기
             const displayCategory = row.libraryReportCategoryInformation?.name || '-';
             const displayTitle = row.title || '-';
@@ -117,6 +124,9 @@ export default function LibraryReportTable({
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2">{displayOrg}</Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2">{displayEducationType}</Typography>
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2">{displayCategory}</Typography>

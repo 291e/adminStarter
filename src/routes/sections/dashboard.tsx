@@ -18,12 +18,11 @@ import { usePathname } from '../hooks';
 // ----------------------------------------------------------------------
 
 const IndexPage = lazy(() => import('src/pages/dashboard/page'));
+const DocumentStatusPage = lazy(() => import('src/pages/dashboard/documentStatus/page'));
 const NoticePage = lazy(() => import('src/pages/dashboard/notice/page'));
 const SalesPage = lazy(() => import('src/pages/dashboard/sales/page'));
 const InquiriesPage = lazy(() => import('src/pages/dashboard/inquiries/page'));
-const OneToOneInquiryPage = lazy(
-  () => import('src/pages/dashboard/inquiries/one-to-one/page')
-);
+const OneToOneInquiryPage = lazy(() => import('src/pages/dashboard/inquiries/one-to-one/page'));
 const SharedDocumentPage = lazy(() => import('src/pages/dashboard/sharedDocument/page'));
 const OrganizationPage = lazy(() => import('src/pages/dashboard/organization/page'));
 const OrganizationDetailPage = lazy(() => import('src/pages/dashboard/organization/detail/page'));
@@ -95,14 +94,12 @@ function DashboardRoleGuard({
   }
 
   const isSuperAdmin = (myInfo as any)?.isSuperAdmin === true;
-  const memberRole = String((myInfo as any)?.memberRole || (myInfo as any)?.role || '').toUpperCase();
+  const memberRole = String(
+    (myInfo as any)?.memberRole || (myInfo as any)?.role || ''
+  ).toUpperCase();
   const isWorker = memberRole === 'WORKER';
 
-  const isAllowed = isSuperAdmin
-    ? allowSuperAdmin
-    : isWorker
-      ? allowWorker
-      : allowNonWorker;
+  const isAllowed = isSuperAdmin ? allowSuperAdmin : isWorker ? allowWorker : allowNonWorker;
 
   if (!isAllowed) {
     return <Navigate to={paths.dashboard.root} replace />;
@@ -123,6 +120,7 @@ export const dashboardRoutes: RouteObject[] = [
     element: CONFIG.auth.skip ? dashboardLayout() : <AuthGuard>{dashboardLayout()}</AuthGuard>,
     children: [
       { element: <IndexPage />, index: true },
+      { path: 'document-status', element: <DocumentStatusPage /> },
       { path: 'notice', element: <NoticePage /> },
       { path: 'sales', element: <SalesPage /> },
       {

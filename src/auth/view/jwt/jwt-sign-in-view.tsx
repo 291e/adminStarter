@@ -98,7 +98,10 @@ export function JwtSignInView() {
       hasMountedRef.current = true;
       return;
     }
-    methods.trigger();
+
+    if (methods.formState.isSubmitted) {
+      methods.trigger();
+    }
   }, [locale, methods]);
 
   const {
@@ -130,6 +133,7 @@ export function JwtSignInView() {
     <Box sx={{ gap: 3, display: 'flex', flexDirection: 'column' }}>
       <Field.Text
         name="email"
+        placeholder="admin"
         label={t('signIn.emailLabel')}
         slotProps={{
           inputLabel: { shrink: true, required: true },
@@ -140,7 +144,7 @@ export function JwtSignInView() {
         <Field.Text
           name="password"
           label={t('signIn.passwordLabel')}
-          placeholder={t('signIn.passwordPlaceholder')}
+          placeholder={t('signUp.passwordHint')}
           type={showPassword.value ? 'text' : 'password'}
           slotProps={{
             inputLabel: { shrink: true, required: true },

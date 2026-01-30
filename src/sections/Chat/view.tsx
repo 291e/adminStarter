@@ -412,6 +412,12 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
   }, [selectedRoom?.chatRoomIdx, isChatbotRoom]);
 
   const handleSendMessage = async (attachments?: string[]) => {
+    console.debug('[chat] handleSendMessage', {
+      chatRoomId: selectedRoom?.chatRoomId ?? 'chatbot',
+      isChatbotRoom,
+      hasAttachments: Boolean(attachments?.length),
+      inputLength: messageInput.length,
+    });
     // 메시지가 없고 첨부파일도 없으면 전송하지 않음
     if (!messageInput.trim() && !attachments?.length) return;
 
@@ -503,9 +509,12 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     if (!selectedRoom) return;
 
     try {
+      const trimmedMessage = messageInput.trim();
+      const hasAttachments = Boolean(attachments?.length);
+
       // 첨부파일이 있으면 IMAGE 타입으로, 없으면 TEXT 타입으로 전송
-      const messageType = attachments?.length ? 'IMAGE' : 'TEXT';
-      await sendMessage(messageInput.trim() || '', messageType, attachments);
+      const messageType = hasAttachments ? 'IMAGE' : 'TEXT';
+      await sendMessage(trimmedMessage || '', messageType, attachments);
       setMessageInput('');
     } catch (error) {
       console.error('Failed to send message:', error);

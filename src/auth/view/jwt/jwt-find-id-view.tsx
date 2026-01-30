@@ -1,5 +1,5 @@
 import { z as zod } from 'zod';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
@@ -19,28 +19,35 @@ import { Form, Field } from 'src/components/hook-form';
 
 import { getErrorMessage } from '../../utils';
 import { FormHead } from '../../components/form-head';
+import { useAuthI18n } from '../../i18n/auth-i18n';
 
 // ----------------------------------------------------------------------
 
-export type FindIdSchemaType = zod.infer<typeof FindIdSchema>;
+export type FindIdSchemaType = {
+  email: string;
+};
 
-export const FindIdSchema = zod.object({
-  email: zod
-    .string()
-    .min(1, { message: '이메일을 입력해주세요.' })
-    .email({ message: '올바른 이메일 주소를 입력해주세요.' }),
-});
+const createFindIdSchema = (t: (key: string) => string) =>
+  zod.object({
+    email: zod
+      .string()
+      .min(1, { message: t('findId.validation.emailRequired') })
+      .email({ message: t('findId.validation.emailInvalid') }),
+  });
 
 // ----------------------------------------------------------------------
 
 export function JwtFindIdView() {
   const router = useRouter();
+  const { t } = useAuthI18n();
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const defaultValues: FindIdSchemaType = {
     email: '',
   };
+
+  const FindIdSchema = useMemo(() => createFindIdSchema(t), [t]);
 
   const methods = useForm<FindIdSchemaType>({
     resolver: zodResolver(FindIdSchema),
@@ -74,7 +81,7 @@ export function JwtFindIdView() {
     <Box sx={{ gap: 3, display: 'flex', flexDirection: 'column' }}>
       <Field.Text
         name="email"
-        label="이메일"
+        label={t('common.email')}
         placeholder="example@gmail.com"
         slotProps={{
           inputLabel: { shrink: true, required: true },
@@ -88,9 +95,9 @@ export function JwtFindIdView() {
         type="submit"
         variant="contained"
         loading={isSubmitting}
-        loadingIndicator="전송 중..."
+        loadingIndicator={t('findId.sending')}
       >
-        인증 코드 전송
+        {t('findId.sendCode')}
       </Button>
     </Box>
   );
@@ -117,13 +124,13 @@ export function JwtFindIdView() {
           }}
         >
           <img
-            alt="아이디 찾기"
+            alt={t('findId.title')}
             src={`${CONFIG.assetsDir}/auth/jwt.svg`}
             style={{ width: '100%', height: '100%', objectFit: 'contain' }}
           />
         </Box>
 
-        <FormHead title="아이디 찾기" sx={{ textAlign: { xs: 'center', md: 'left' } }} />
+        <FormHead title={t('findId.title')} sx={{ textAlign: { xs: 'center', md: 'left' } }} />
 
         <Typography
           variant="body2"
@@ -134,11 +141,10 @@ export function JwtFindIdView() {
             textAlign: 'center',
             mt: 1.5,
             mb: 0,
+            whiteSpace: 'pre-line',
           }}
         >
-          등록한 이메일을 입력해 주세요.
-          <br />
-          해당 이메일로 인증코드를 보내드립니다.
+          {t('findId.description')}
         </Typography>
       </Box>
 
@@ -172,7 +178,7 @@ export function JwtFindIdView() {
           }}
         >
           <Iconify icon="eva:arrow-ios-back-fill" width={16} />
-          돌아가기
+          {t('common.back')}
         </Link>
       </Box>
     </>

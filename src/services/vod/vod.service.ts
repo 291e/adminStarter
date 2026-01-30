@@ -18,6 +18,7 @@ import type {
 export async function uploadVod(params: UploadVodParams): Promise<UploadVodResponse> {
   const formData = new FormData();
   formData.append('video', params.video);
+  formData.append('educationType', params.educationType);
 
   if (params.targetLanguages && params.targetLanguages.length > 0) {
     params.targetLanguages.forEach((lang) => {

@@ -36,6 +36,7 @@ import type {
   Table2200Row,
   Table2300Row,
   Table2400TBMData,
+  Table2400TBMEducationVideoRow,
   Table2400EducationRow,
   Table2400MinimumEducationRow,
   InvestigationTeamMember,
@@ -372,6 +373,8 @@ export function Risk_2200EditView({
       { inspectionContent: '작업장 정리/정돈, 통보 확보', result: '' },
       { inspectionContent: '점검결과 조치사항', result: '' },
     ],
+    educationMethod: 'VIDEO',
+    educationType: 'MANDATORY',
     educationContent: '',
     educationVideoRows: [
       {
@@ -799,7 +802,13 @@ export function Risk_2200EditView({
             };
           }
 
-          return processedData;
+          return {
+            inspectionRows: processedData.inspectionRows,
+            educationContent: processedData.educationContent,
+            educationVideoRows: processedData.educationVideoRows || [],
+            educationMethod: processedData.educationMethod ?? 'VIDEO',
+            educationType: processedData.educationType ?? 'MANDATORY',
+          };
         });
       } else if (tableType === '2400-education') {
         if (parsedTableData.rows) {
@@ -1079,8 +1088,8 @@ export function Risk_2200EditView({
   const handleTable2400TBMEducationVideoRowChange = useCallback(
     (
       index: number,
-      field: 'participant' | 'educationVideo' | 'signature' | 'vodIdx' | 'workerSignatureIdx',
-      value: InvestigationTeamMember | null | string | number | undefined
+      field: keyof Table2400TBMEducationVideoRow,
+      value: any
     ) => {
       setTable2400TBMData((prev) => {
         const newRows = [...prev.educationVideoRows];
@@ -1119,6 +1128,8 @@ export function Risk_2200EditView({
           participant: null,
           educationVideo: '',
           signature: '',
+          evidenceFileName: undefined,
+          evidenceFileUrl: undefined,
         },
       ],
     }));

@@ -160,12 +160,16 @@ export type Table2400TBMEducationVideoRow = {
   participant: InvestigationTeamMember | null; // 대상자
   educationVideo: string; // 교육영상
   vodIdx?: number; // 교육 영상 Index (VOD)
+  evidenceFileName?: string; // 집체 교육 증빙자료 파일명
+  evidenceFileUrl?: string; // 집체 교육 증빙자료 파일 URL
   signature: string; // 서명 (이미지 URL 또는 파일)
   workerSignatureIdx?: number; // 근로자 서명 Index (서명 등록 후 저장)
 };
 
 export type Table2400TBMData = {
   inspectionRows: Table2400TBMInspectionRow[]; // 점검내용 테이블
+  educationMethod?: 'VIDEO' | 'IN_PERSON'; // 교육 방법 (영상/집체)
+  educationType?: 'MANDATORY' | 'REGULAR'; // 교육 구분 (의무/정기)
   educationContent: string; // 교육내용
   educationVideoRows: Table2400TBMEducationVideoRow[]; // 교육영상 테이블
 };

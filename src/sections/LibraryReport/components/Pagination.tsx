@@ -80,7 +80,7 @@ export default function LibraryReportPagination({
               disabled={selectedCount === 0}
               size="small"
             >
-              이동 ({selectedCount})
+              카테고리 이동 ({selectedCount})
             </Button>
           )}
           {onDeleteSelected && (

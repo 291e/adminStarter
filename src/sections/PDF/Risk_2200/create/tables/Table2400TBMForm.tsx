@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -6,6 +6,11 @@ import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
 import IconButton from '@mui/material/IconButton';
 import Button from '@mui/material/Button';
+import FormControl from '@mui/material/FormControl';
+import RadioGroup from '@mui/material/RadioGroup';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Radio from '@mui/material/Radio';
+import Stack from '@mui/material/Stack';
 
 import { Iconify } from 'src/components/iconify';
 import axiosInstance from 'src/lib/axios';
@@ -20,6 +25,7 @@ import InvestigationTeamSelectModal from './modal/InvestigationTeamSelectModal';
 import EducationVideoSelectModal from './modal/EducationVideoSelectModal';
 import SignatureModal from '../../edit/components/SignatureModal';
 import { addWorkerSignature } from 'src/services/safety-system/safety-system.service';
+import { uploadFile } from 'src/services/system/system.service';
 
 // ----------------------------------------------------------------------
 
@@ -64,11 +70,17 @@ export default function Table2400TBMForm({
   const [draggedInspectionIndex, setDraggedInspectionIndex] = useState<number | null>(null);
 
   // 모달 제어 상태
-  const [participantModalRowIndex, setParticipantModalRowIndex] = useState<number | null>(null);
+  const [participantModalState, setParticipantModalState] = useState<{
+    index: number;
+    mode: 'replace' | 'append';
+  } | null>(null);
   const [educationVideoModalRowIndex, setEducationVideoModalRowIndex] = useState<number | null>(
     null
   );
   const [signatureModalRowIndex, setSignatureModalRowIndex] = useState<number | null>(null);
+  const [evidenceTargetRowIndex, setEvidenceTargetRowIndex] = useState<number | null>(null);
+  const [evidenceUploadingIndex, setEvidenceUploadingIndex] = useState<number | null>(null);
+  const evidenceFileInputRef = useRef<HTMLInputElement>(null);
 
   // 점검내용 드래그 핸들러
   const handleInspectionDragStart = (index: number) => setDraggedInspectionIndex(index);
@@ -377,6 +389,7 @@ export default function Table2400TBMForm({
     title: string;
     summary: string;
     vodIdx?: number;
+    educationType?: 'MANDATORY' | 'REGULAR';
   }) => {
     console.log('🔍 [교육영상 선택] 시작:', {
       educationVideoModalRowIndex,
@@ -402,6 +415,8 @@ export default function Table2400TBMForm({
           ...currentRow,
           educationVideo: video.title,
           vodIdx: video.vodIdx,
+          evidenceFileName: undefined,
+          evidenceFileUrl: undefined,
           // 영상이 변경되면 기존 서명 정보 초기화
           ...(isVideoChanged && {
             workerSignatureIdx: undefined,
@@ -417,7 +432,12 @@ export default function Table2400TBMForm({
         const summary = (video.summary || '').trim();
         const autoContent = summary || video.title?.trim();
         if (!autoContent) {
-          return { ...prev, educationVideoRows: newRows };
+          return {
+            ...prev,
+            educationVideoRows: newRows,
+            educationType: video.educationType || prev.educationType,
+            educationMethod: prev.educationMethod ?? 'VIDEO',
+          };
         }
 
         const currentContent = prev.educationContent?.trim() || '';
@@ -431,50 +451,137 @@ export default function Table2400TBMForm({
           ...prev,
           educationVideoRows: newRows,
           educationContent: nextContent,
+          educationType: video.educationType || prev.educationType,
+          educationMethod: prev.educationMethod ?? 'VIDEO',
         };
       });
       setEducationVideoModalRowIndex(null);
     }
   };
 
+  const handleEducationMethodChange = (value: 'VIDEO' | 'IN_PERSON') => {
+    onDataChange((prev) => {
+      const clearedRows = prev.educationVideoRows.map((row) => ({
+        ...row,
+        ...(value === 'VIDEO'
+          ? { evidenceFileName: undefined, evidenceFileUrl: undefined }
+          : { educationVideo: '', vodIdx: undefined, workerSignatureIdx: undefined, signature: '' }),
+      }));
+      return {
+        ...prev,
+        educationMethod: value,
+        educationVideoRows: clearedRows,
+      };
+    });
+  };
+
+  const handleEducationTypeChange = (value: 'MANDATORY' | 'REGULAR') => {
+    onDataChange((prev) => ({ ...prev, educationType: value }));
+  };
+
+  const handleEvidenceSelectClick = (index: number) => {
+    setEvidenceTargetRowIndex(index);
+    evidenceFileInputRef.current?.click();
+  };
+
+  const handleEvidenceFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || evidenceTargetRowIndex === null) return;
+
+    setEvidenceUploadingIndex(evidenceTargetRowIndex);
+    try {
+      const uploadResponse = await uploadFile({ files: [file] });
+      let fileUrl: string | undefined;
+
+      if ((uploadResponse as any)?.fileUrls && Array.isArray((uploadResponse as any).fileUrls)) {
+        fileUrl = (uploadResponse as any).fileUrls[0];
+      } else if ((uploadResponse as any)?.files && Array.isArray((uploadResponse as any).files)) {
+        fileUrl = (uploadResponse as any).files[0]?.fileUrl;
+      } else if (
+        (uploadResponse as any)?.data?.fileUrls &&
+        Array.isArray((uploadResponse as any).data.fileUrls)
+      ) {
+        fileUrl = (uploadResponse as any).data.fileUrls[0];
+      }
+
+      if (!fileUrl) {
+        toast.error('증빙자료 업로드에 실패했습니다.');
+        return;
+      }
+
+      onDataChange((prev) => {
+        const newRows = [...prev.educationVideoRows];
+        const currentRow = newRows[evidenceTargetRowIndex];
+        if (!currentRow) return prev;
+        newRows[evidenceTargetRowIndex] = {
+          ...currentRow,
+          evidenceFileName: file.name,
+          evidenceFileUrl: fileUrl,
+        };
+        return { ...prev, educationVideoRows: newRows };
+      });
+    } catch (error) {
+      toast.error('증빙자료 업로드 중 오류가 발생했습니다.');
+      if (import.meta.env.DEV) {
+        console.error('❌ [Table2400TBMForm] 증빙자료 업로드 실패', error);
+      }
+    } finally {
+      setEvidenceUploadingIndex(null);
+      setEvidenceTargetRowIndex(null);
+      if (evidenceFileInputRef.current) {
+        evidenceFileInputRef.current.value = '';
+      }
+    }
+  };
+
   // 대상자(참여자) 선택 완료 - 여러 명 선택 가능
   const handleParticipantConfirm = (members: InvestigationTeamMember[]) => {
     console.log('🔍 [대상자 선택] 시작:', {
-      participantModalRowIndex,
+      participantModalState,
       members,
       membersCount: members.length,
       currentData: data.educationVideoRows,
     });
 
-    if (participantModalRowIndex === null || members.length === 0) {
+    if (!participantModalState || members.length === 0) {
       console.log('⚠️ [대상자 선택] 조건 불만족:', {
-        participantModalRowIndex,
+        participantModalState,
         membersLength: members.length,
       });
-      setParticipantModalRowIndex(null);
+      setParticipantModalState(null);
       return;
     }
 
-    const currentRow = data.educationVideoRows[participantModalRowIndex];
+    const currentRow = data.educationVideoRows[participantModalState.index];
+    const isVideoMethod = (data.educationMethod ?? 'VIDEO') === 'VIDEO';
     console.log('🔍 [대상자 선택] 현재 행 정보:', {
-      rowIndex: participantModalRowIndex,
+      rowIndex: participantModalState.index,
       currentRow,
       vodIdx: currentRow.vodIdx,
       educationVideo: currentRow.educationVideo,
     });
 
     // 교육영상이 선택되지 않았으면 경고
-    if (!currentRow.vodIdx || !currentRow.educationVideo) {
+    if (isVideoMethod && (!currentRow.vodIdx || !currentRow.educationVideo)) {
       console.warn('⚠️ [대상자 선택] 교육영상이 선택되지 않음');
       toast.error('먼저 교육영상을 선택해주세요.');
-      setParticipantModalRowIndex(null);
+      setParticipantModalState(null);
       return;
     }
+
+    const groupKey = isVideoMethod
+      ? String(currentRow.vodIdx ?? 'no-vod')
+      : currentRow.evidenceFileUrl || currentRow.evidenceFileName || `row-${participantModalState.index}`;
 
     // 기존 행의 대상자들을 제외하고 새로운 대상자들만 추가
     const existingMemberIndices = new Set(
       data.educationVideoRows
-        .filter((row) => row.vodIdx === currentRow.vodIdx && row.participant?.memberIdx)
+        .filter((row) => {
+          const rowKey = isVideoMethod
+            ? String(row.vodIdx ?? 'no-vod')
+            : row.evidenceFileUrl || row.evidenceFileName || `row-${participantModalState.index}`;
+          return rowKey === groupKey && row.participant?.memberIdx;
+        })
         .map((row) => row.participant!.memberIdx)
     );
 
@@ -503,29 +610,33 @@ export default function Table2400TBMForm({
     if (newMembers.length === 0) {
       console.warn('⚠️ [대상자 선택] 이미 추가된 대상자');
       toast.warning('이미 추가된 대상자입니다.');
-      setParticipantModalRowIndex(null);
+      setParticipantModalState(null);
       return;
     }
 
-    // 기존 행 업데이트 (첫 번째 대상자로)
     const updatedRows = [...data.educationVideoRows];
-    const isParticipantChanged = currentRow.participant?.memberIdx !== newMembers[0].memberIdx;
+    const appendOnly = participantModalState.mode === 'append';
 
-    updatedRows[participantModalRowIndex] = {
-      ...currentRow,
-      participant: newMembers[0],
-      // 대상자가 변경되면 기존 서명 정보 초기화
-      ...(isParticipantChanged && {
-        workerSignatureIdx: undefined,
-        signature: '',
-      }),
-    };
+    if (!appendOnly) {
+      const isParticipantChanged = currentRow.participant?.memberIdx !== newMembers[0].memberIdx;
+      updatedRows[participantModalState.index] = {
+        ...currentRow,
+        participant: newMembers[0],
+        // 대상자가 변경되면 기존 서명 정보 초기화
+        ...(isParticipantChanged && {
+          workerSignatureIdx: undefined,
+          signature: '',
+        }),
+      };
+    }
 
-    // 나머지 대상자들을 새로운 행으로 추가
-    const additionalRows = newMembers.slice(1).map((member) => ({
+    // 추가 대상자들을 새로운 행으로 추가
+    const additionalRows = (appendOnly ? newMembers : newMembers.slice(1)).map((member) => ({
       participant: member,
       educationVideo: currentRow.educationVideo,
       vodIdx: currentRow.vodIdx,
+      evidenceFileName: currentRow.evidenceFileName,
+      evidenceFileUrl: currentRow.evidenceFileUrl,
       signature: '',
       workerSignatureIdx: undefined,
     }));
@@ -573,7 +684,7 @@ export default function Table2400TBMForm({
         createWorkerSignatureMutation.mutate({
           documentIdx: safetySystemDocumentIdx,
           workerList,
-          rowIndex: participantModalRowIndex,
+          rowIndex: participantModalState.index,
         });
       }
     } else {
@@ -583,7 +694,7 @@ export default function Table2400TBMForm({
       });
     }
 
-    setParticipantModalRowIndex(null);
+    setParticipantModalState(null);
   };
 
   const handleSignatureConfirm = async (signatureDataUrl: string) => {
@@ -623,7 +734,13 @@ export default function Table2400TBMForm({
         ...data,
         educationVideoRows: [
           ...data.educationVideoRows,
-          { participant: null, educationVideo: '', signature: '' },
+          {
+            participant: null,
+            educationVideo: '',
+            signature: '',
+            evidenceFileName: undefined,
+            evidenceFileUrl: undefined,
+          },
         ],
       });
     }
@@ -639,14 +756,17 @@ export default function Table2400TBMForm({
     }
   };
 
+  const isInPerson = (data.educationMethod ?? 'VIDEO') === 'IN_PERSON';
+
   // 동일한 영상(vodIdx)을 가진 행들을 그룹화하여 rowspan 계산
   const rowGroups = useMemo(() => {
     const groups: Array<{ startIndex: number; count: number; vodKey: number | string }> = [];
     let currentGroup: { startIndex: number; count: number; vodKey: number | string } | null = null;
 
     data.educationVideoRows.forEach((row, index) => {
-      // vodIdx가 있으면 사용, 없으면 고유 키 생성
-      const vodKey = row.vodIdx ?? `empty-${index}`;
+      const vodKey = isInPerson
+        ? row.evidenceFileUrl || row.evidenceFileName || `empty-${index}`
+        : row.vodIdx ?? `empty-${index}`;
 
       if (!currentGroup || currentGroup.vodKey !== vodKey) {
         // 새로운 그룹 시작
@@ -703,6 +823,64 @@ export default function Table2400TBMForm({
 
   return (
     <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      {/* 0. 교육 방법 / 교육 구분 */}
+      <Box sx={{ pb: 5, width: '100%' }}>
+        <Box component="table" sx={tableStyle}>
+          <thead>
+            <tr>
+              <th style={{ width: '50%' }}>교육 방법</th>
+              <th style={{ width: '50%' }}>교육 구분</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <FormControl component="fieldset" sx={{ width: '100%' }}>
+                  <RadioGroup
+                    row
+                    value={data.educationMethod ?? 'VIDEO'}
+                    onChange={(e) =>
+                      handleEducationMethodChange(e.target.value as 'VIDEO' | 'IN_PERSON')
+                    }
+                    sx={{ justifyContent: 'center' }}
+                  >
+                    <FormControlLabel value="VIDEO" control={<Radio size="small" />} label="영상" />
+                    <FormControlLabel
+                      value="IN_PERSON"
+                      control={<Radio size="small" />}
+                      label="집체"
+                    />
+                  </RadioGroup>
+                </FormControl>
+              </td>
+              <td>
+                <FormControl component="fieldset" sx={{ width: '100%' }}>
+                  <RadioGroup
+                    row
+                    value={data.educationType ?? 'MANDATORY'}
+                    onChange={(e) =>
+                      handleEducationTypeChange(e.target.value as 'MANDATORY' | 'REGULAR')
+                    }
+                    sx={{ justifyContent: 'center' }}
+                  >
+                    <FormControlLabel
+                      value="MANDATORY"
+                      control={<Radio size="small" />}
+                      label="의무 교육"
+                    />
+                    <FormControlLabel
+                      value="REGULAR"
+                      control={<Radio size="small" />}
+                      label="정기 교육"
+                    />
+                  </RadioGroup>
+                </FormControl>
+              </td>
+            </tr>
+          </tbody>
+        </Box>
+      </Box>
+
       {/* 1. 점검내용 */}
       <Box sx={{ pb: 5, width: '100%' }}>
         <Box component="table" sx={tableStyle}>
@@ -797,7 +975,7 @@ export default function Table2400TBMForm({
         <Box component="table" sx={tableStyle}>
           <thead>
             <tr style={{ height: 48 }}>
-              <th style={{ width: '25%' }}>교육영상</th>
+              <th style={{ width: '25%' }}>{isInPerson ? '증빙자료' : '교육영상'}</th>
               <th style={{ width: '25%' }}>대상자</th>
               <th style={{ width: '25%' }}>서명</th>
               <th style={{ width: '15%' }}>삭제</th>
@@ -814,31 +992,53 @@ export default function Table2400TBMForm({
                       <Button
                         variant="outlined"
                         size="small"
-                        onClick={() => setEducationVideoModalRowIndex(index)}
+                        onClick={() =>
+                          isInPerson
+                            ? handleEvidenceSelectClick(index)
+                            : setEducationVideoModalRowIndex(index)
+                        }
+                        disabled={isInPerson && evidenceUploadingIndex === index}
                         sx={{
                           minWidth: 120,
                           justifyContent: 'flex-start',
                           textAlign: 'left',
                         }}
                       >
-                        {row.educationVideo || '교육영상 선택'}
+                        {isInPerson
+                          ? row.evidenceFileName || '증빙자료 선택'
+                          : row.educationVideo || '교육영상 선택'}
                       </Button>
                     </td>
                   ) : null}
                   <td>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      onClick={() => setParticipantModalRowIndex(index)}
-                      disabled={!row.vodIdx || !row.educationVideo}
-                      sx={{
-                        minWidth: 120,
-                        justifyContent: 'flex-start',
-                        textAlign: 'left',
-                      }}
-                    >
-                      {row.participant?.name || '대상자 선택'}
-                    </Button>
+                    <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => setParticipantModalState({ index, mode: 'replace' })}
+                        disabled={
+                          isInPerson
+                            ? false
+                            : !row.vodIdx || !row.educationVideo
+                        }
+                        sx={{
+                          minWidth: 120,
+                          justifyContent: 'flex-start',
+                          textAlign: 'left',
+                        }}
+                      >
+                        {row.participant?.name || '대상자 선택'}
+                      </Button>
+                      {groupInfo.rowspan === 1 && row.participant?.name ? (
+                        <IconButton
+                          size="small"
+                          onClick={() => setParticipantModalState({ index, mode: 'append' })}
+                          sx={{ border: '1px solid', borderColor: 'divider' }}
+                        >
+                          <Iconify icon="solar:add-circle-bold" width={18} />
+                        </IconButton>
+                      ) : null}
+                    </Stack>
                   </td>
                   <td>
                     {row.signature ? (
@@ -866,16 +1066,24 @@ export default function Table2400TBMForm({
             })}
           </tbody>
         </Box>
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-          <Button
-            variant="outlined"
-            startIcon={<Iconify icon="solar:add-circle-bold" />}
-            onClick={handleAddRow}
-          >
-            행 추가
-          </Button>
-        </Box>
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+        <Button
+          variant="outlined"
+          startIcon={<Iconify icon="solar:add-circle-bold" />}
+          onClick={handleAddRow}
+        >
+          행 추가
+        </Button>
       </Box>
+    </Box>
+
+      <input
+        ref={evidenceFileInputRef}
+        type="file"
+        accept="image/*,application/pdf"
+        style={{ display: 'none' }}
+        onChange={handleEvidenceFileChange}
+      />
 
       {/* 모달들 */}
       <EducationVideoSelectModal
@@ -884,8 +1092,8 @@ export default function Table2400TBMForm({
         onConfirm={handleEducationVideoConfirm}
       />
       <InvestigationTeamSelectModal
-        open={participantModalRowIndex !== null}
-        onClose={() => setParticipantModalRowIndex(null)}
+        open={participantModalState !== null}
+        onClose={() => setParticipantModalState(null)}
         onConfirm={handleParticipantConfirm}
         is2400Series
         isSingleSelect={false}

@@ -178,7 +178,10 @@ export function JwtSignUpView() {
       hasMountedRef.current = true;
       return;
     }
-    methods.trigger();
+
+    if (methods.formState.isSubmitted) {
+      methods.trigger();
+    }
   }, [locale, methods]);
 
   // 폼 검증 실패 시 경고 표시 핸들러
@@ -489,12 +492,12 @@ export function JwtSignUpView() {
             name="memberId"
             control={methods.control}
             render={({ field, fieldState: { error } }) => (
-                <TextField
-                  {...field}
-                  fullWidth
-                  variant="outlined"
-                  placeholder={t('signUp.memberIdPlaceholder')}
-                  error={!!error || isIdAvailable === false}
+              <TextField
+                {...field}
+                fullWidth
+                variant="outlined"
+                placeholder={t('signUp.memberIdPlaceholder')}
+                error={!!error || isIdAvailable === false}
                 helperText={
                   error?.message ||
                   (idCheckMessage && (

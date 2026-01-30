@@ -31,7 +31,12 @@ import type { LibraryReport } from 'src/services/library-report/library-report.t
 type Props = {
   open: boolean;
   onClose: () => void;
-  onConfirm: (video: { title: string; summary: string; vodIdx?: number }) => void;
+  onConfirm: (video: {
+    title: string;
+    summary: string;
+    vodIdx?: number;
+    educationType?: 'MANDATORY' | 'REGULAR';
+  }) => void;
 };
 
 export default function EducationVideoSelectModal({ open, onClose, onConfirm }: Props) {
@@ -69,6 +74,7 @@ export default function EducationVideoSelectModal({ open, onClose, onConfirm }: 
       vodIdx: report.vodIdx, // VOD Index 추가
       number: index + 1,
       category: report.libraryReportCategoryInformation?.name || '미분류',
+      educationType: report.educationType,
       title: report.title || '',
       duration: report.playbackTime || '00:00:00',
       hasSubtitle: report.hasSubtitles || false,
@@ -92,6 +98,7 @@ export default function EducationVideoSelectModal({ open, onClose, onConfirm }: 
           title: selectedVideo.title,
           summary: selectedVideo.summary,
           vodIdx: selectedVideo.vodIdx,
+          educationType: selectedVideo.educationType,
         });
         onClose();
       }

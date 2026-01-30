@@ -73,6 +73,7 @@ const normalizeLibraryReport = (item: any, index: number): LibraryReport => {
     libraryReportIdx:
       typeof libraryReportIdx === 'number' ? libraryReportIdx : Number(libraryReportIdx) || index,
     vodIdx: item?.vodIdx ?? undefined,
+    educationType: item?.educationType ?? item?.education_type ?? undefined,
     libraryCategoryIdx: item?.libraryCategoryIdx ?? item?.categoryIdx ?? null,
     libraryReportCategoryInformation: item?.libraryReportCategoryInformation ?? null,
 

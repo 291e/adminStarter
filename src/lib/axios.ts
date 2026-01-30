@@ -231,6 +231,12 @@ export const endpoints = {
   vod: {
     base: '/vods',
   },
+  // Board
+  board: {
+    categories: '/board/category',
+    posts: '/board/post',
+    comments: '/board/comment',
+  },
   // Legacy (기존 호환성 유지)
   auth: {
     me: '/member/my-info',

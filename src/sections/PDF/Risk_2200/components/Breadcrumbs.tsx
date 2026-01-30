@@ -4,6 +4,8 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 
+import { RouterLink } from 'src/routes/components';
+
 // ----------------------------------------------------------------------
 
 type Props = {
@@ -43,7 +45,13 @@ export default function Risk_2200Breadcrumbs({
       <Breadcrumbs>
         {items.map((item, idx) =>
           item.href ? (
-            <Link key={idx} color="inherit" href={item.href} underline="hover">
+            <Link
+              key={idx}
+              component={RouterLink}
+              href={item.href}
+              color="inherit"
+              underline="hover"
+            >
               {item.label}
             </Link>
           ) : (

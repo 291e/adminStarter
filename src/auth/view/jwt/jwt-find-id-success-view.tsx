@@ -13,6 +13,7 @@ import { CONFIG } from 'src/global-config';
 
 import { Iconify } from 'src/components/iconify';
 import { FormHead } from '../../components/form-head';
+import { useAuthI18n } from '../../i18n/auth-i18n';
 
 // ----------------------------------------------------------------------
 
@@ -31,6 +32,7 @@ const maskUserId = (id: string): string => {
 
 export function JwtFindIdSuccessView() {
   const router = useRouter();
+  const { t } = useAuthI18n();
   const [searchParams] = useSearchParams();
   const email = searchParams.get('email') || '';
 
@@ -69,13 +71,16 @@ export function JwtFindIdSuccessView() {
           }}
         >
           <img
-            alt="아이디 찾기 완료"
+            alt={t('findIdSuccess.title')}
             src={`${CONFIG.assetsDir}/auth/jwt2.svg`}
             style={{ width: '100%', height: '100%', objectFit: 'contain' }}
           />
         </Box>
 
-        <FormHead title="아이디 찾기 완료" sx={{ textAlign: { xs: 'center', md: 'left' } }} />
+        <FormHead
+          title={t('findIdSuccess.title')}
+          sx={{ textAlign: { xs: 'center', md: 'left' } }}
+        />
 
         <Typography
           variant="body2"
@@ -87,18 +92,17 @@ export function JwtFindIdSuccessView() {
             mt: 1.5,
             mb: 0,
             maxWidth: 380,
+            whiteSpace: 'pre-line',
           }}
         >
-          아이디 확인이 완료되었습니다!
-          <br />
-          안전한 이용을 위해 일부 정보는 마스킹 처리되었습니다.
+          {t('findIdSuccess.description')}
         </Typography>
       </Box>
 
       <Box sx={{ gap: 3, display: 'flex', flexDirection: 'column' }}>
         {/* 아이디 필드 (비활성화) */}
         <TextField
-          label="아이디"
+          label={t('findIdSuccess.idLabel')}
           value={userId}
           disabled
           fullWidth
@@ -115,14 +119,8 @@ export function JwtFindIdSuccessView() {
 
         {/* 버튼들 */}
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-          <Button
-            fullWidth
-            color="inherit"
-            size="large"
-            variant="contained"
-            onClick={handleLogin}
-          >
-            로그인 하기
+          <Button fullWidth color="inherit" size="large" variant="contained" onClick={handleLogin}>
+            {t('findIdSuccess.login')}
           </Button>
 
           <Button
@@ -139,7 +137,7 @@ export function JwtFindIdSuccessView() {
               },
             }}
           >
-            비밀번호 찾기
+            {t('findIdSuccess.findPassword')}
           </Button>
         </Box>
       </Box>
@@ -164,10 +162,9 @@ export function JwtFindIdSuccessView() {
           }}
         >
           <Iconify icon="eva:arrow-ios-back-fill" width={16} />
-          돌아가기
+          {t('common.back')}
         </Link>
       </Box>
     </>
   );
 }
-
