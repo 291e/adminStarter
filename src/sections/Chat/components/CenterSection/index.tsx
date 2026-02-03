@@ -2,6 +2,7 @@ import NormalChatView from './NormalChatView';
 import EmergencyChatView from './EmergencyChatView';
 import ChatbotView from './ChatbotView';
 import type { ChatRoomDto } from 'src/services/chat/chat.types';
+import type { ChatInputPayload } from '../ui/ChatInput';
 
 type ChatMessage = {
   id: string;
@@ -11,7 +12,7 @@ type ChatMessage = {
   dateLabel?: string;
   avatarUrl?: string;
   isOwn?: boolean;
-  messageType?: 'TEXT' | 'IMAGE' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
+  messageType?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
   sharedDocumentIdx?: number;
   attachments?: string[] | null;
   metadata?: {
@@ -30,7 +31,7 @@ type Props = {
   conversationDate?: string;
   messageInput?: string;
   onMessageInputChange?: (value: string) => void;
-  onSendMessage?: () => void;
+  onSendMessage?: (payload?: ChatInputPayload) => void;
   emergencyStats?: { month: number; count: number };
   onFileMessageClick?: (sharedDocumentIdx: number) => void;
   hasMore?: boolean;

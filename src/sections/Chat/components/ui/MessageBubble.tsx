@@ -10,6 +10,7 @@ import IconButton from '@mui/material/IconButton';
 import CircularProgress from '@mui/material/CircularProgress';
 import { Iconify } from 'src/components/iconify';
 import { getChatAvatarUrl } from 'src/sections/Chat/utils/avatar';
+import { resolveFileUrl } from 'src/sections/Chat/utils/file-url';
 
 const reverseGeocodeCache = new Map<string, string>();
 let reverseGeocodeDisabled = false;
@@ -23,18 +24,23 @@ type LocationMetadata = {
 type MessageMetadata = {
   type?:
     | 'rescue_request'
+    | 'evacuation_signal'
     | 'evacuation'
     | 'risk_report'
     | 'accident_report'
     | 'video'
     | 'multi_image'
     | 'image'
+    | 'file'
     | string;
   location?: LocationMetadata;
   imageUrl?: string;
   imageUrls?: string[];
   videoUrl?: string;
+  fileUrl?: string;
+  fileName?: string;
   address?: string;
+  addressTranslations?: Record<string, string>;
 };
 
 type Props = {
@@ -43,7 +49,7 @@ type Props = {
   timestamp: string;
   isOwn: boolean;
   avatarUrl?: string;
-  messageType?: 'TEXT' | 'IMAGE' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
+  messageType?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
   sharedDocumentIdx?: number;
   attachments?: string[] | null;
   metadata?: MessageMetadata;
@@ -70,6 +76,22 @@ function parseImageMessage(message: string): {
   return { isImage: false };
 }
 
+// 동영상 URL 패턴 파싱 함수 ([동영상]|URL 형식)
+function parseVideoMessage(message: string): {
+  isVideo: boolean;
+  videoUrl?: string;
+} {
+  const videoPattern = /^(.*?)\s*\[동영상\]\|(.+)$/s;
+  const match = message.match(videoPattern);
+
+  if (match) {
+    const videoUrl = match[2].trim();
+    return { isVideo: true, videoUrl };
+  }
+
+  return { isVideo: false };
+}
+
 // URL이 이미지인지 확인
 function isImageUrl(url: string): boolean {
   const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'];
@@ -86,26 +108,9 @@ function isVideoUrl(url: string): boolean {
   return videoExtensions.some((ext) => urlPath.endsWith(ext) || urlPath.includes(ext));
 }
 
-// URL이 미디어(이미지 또는 동영상)인지 확인
-function isMediaUrl(url: string): boolean {
-  return isImageUrl(url) || isVideoUrl(url);
-}
-
-// 상대 경로 URL을 절대 경로로 변환 (베이스 도메인 추가)
-const BASE_URL = 'https://safeyou365.com';
-
+// 상대 경로 URL을 절대 경로로 변환 (서버 URL 기준)
 function normalizeMediaUrl(url: string | undefined | null): string | null {
-  if (!url) return null;
-  // 이미 절대 URL인 경우
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    return url;
-  }
-  // 상대 경로인 경우 (/data/admin/... 형식)
-  if (url.startsWith('/')) {
-    return `${BASE_URL}${url}`;
-  }
-  // 그 외 경우
-  return `${BASE_URL}/${url}`;
+  return resolveFileUrl(url);
 }
 
 // 메타데이터 타입에 따른 레이블 반환
@@ -113,6 +118,7 @@ function getEmergencyTypeLabel(type?: string): string {
   switch (type) {
     case 'rescue_request':
       return '구조 요청';
+    case 'evacuation_signal':
     case 'evacuation':
       return '대피 신호';
     case 'risk_report':
@@ -156,8 +162,9 @@ export default function MessageBubble({
   const [isLoadingAddress, setIsLoadingAddress] = useState(false);
   const normalizedAvatarUrl = getChatAvatarUrl(avatarUrl);
 
+  const isSharedDocument = messageType === 'FILE' && Boolean(sharedDocumentIdx);
   const handleFileClick = () => {
-    if (messageType === 'FILE' && sharedDocumentIdx && onFileClick) {
+    if (isSharedDocument && sharedDocumentIdx && onFileClick) {
       onFileClick(sharedDocumentIdx);
     }
   };
@@ -193,11 +200,14 @@ export default function MessageBubble({
   // 역지오코딩으로 주소 가져오기
   useEffect(() => {
     const fetchAddress = async () => {
-      if (!metadata?.location || address) return;
+      if (!metadata?.location) return;
       if (metadata?.address) {
-        setAddress(metadata.address);
+        if (metadata.address !== address) {
+          setAddress(metadata.address);
+        }
         return;
       }
+      if (address) return;
       if (reverseGeocodeDisabled) {
         const { latitude, longitude } = metadata.location;
         setAddress(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
@@ -249,12 +259,14 @@ export default function MessageBubble({
     };
 
     fetchAddress();
-  }, [metadata?.location, address]);
+  }, [metadata?.location, metadata?.address, address]);
 
-  const isFileMessage = messageType === 'FILE' && sharedDocumentIdx;
+  const isFileMessage = messageType === 'FILE';
 
   // 이미지 메시지 파싱 (앱에서 보낸 형식)
   const parsedImage = parseImageMessage(message);
+  const parsedVideo = parseVideoMessage(message);
+  const fileLabel = (metadata?.fileName || message || '첨부파일').trim();
 
   // metadata에서 동영상/이미지 확인 (RTDB 구조)
   const isVideoFromMetadata = metadata?.type === 'video' && metadata?.videoUrl;
@@ -269,7 +281,6 @@ export default function MessageBubble({
       .filter((url): url is string => url !== null) || [];
 
   // 미디어 첨부파일 필터링 (이미지와 동영상)
-  const mediaAttachments = normalizedAttachments.filter((url) => isMediaUrl(url));
   const imageAttachments = normalizedAttachments.filter((url) => isImageUrl(url));
   const videoAttachments = normalizedAttachments.filter((url) => isVideoUrl(url));
 
@@ -280,6 +291,15 @@ export default function MessageBubble({
       .filter((url): url is string => url !== null) || [];
   // metadata에서 온 동영상 URL - 정규화 적용
   const metadataVideoUrl = normalizeMediaUrl(metadata?.videoUrl);
+  const parsedVideoUrl = parsedVideo.videoUrl
+    ? normalizeMediaUrl(parsedVideo.videoUrl)
+    : null;
+  const metadataFileUrl = normalizeMediaUrl(metadata?.fileUrl);
+  const fileVideoUrl =
+    metadataFileUrl &&
+    (isVideoUrl(metadataFileUrl) || isVideoUrl(metadata?.fileName || ''))
+      ? metadataFileUrl
+      : null;
   // metadata에서 온 단일 이미지 URL - 정규화 적용
   const metadataSingleImageUrl = normalizeMediaUrl(metadata?.imageUrl);
 
@@ -294,6 +314,8 @@ export default function MessageBubble({
   const allVideoUrls: string[] = [
     ...videoAttachments,
     ...(metadataVideoUrl ? [metadataVideoUrl] : []),
+    ...(parsedVideoUrl ? [parsedVideoUrl] : []),
+    ...(fileVideoUrl ? [fileVideoUrl] : []),
   ].filter((url, idx, arr) => arr.indexOf(url) === idx); // 중복 제거
 
   // 미디어 메시지 여부 (이미지 또는 동영상)
@@ -309,12 +331,18 @@ export default function MessageBubble({
   const parsedImageUrl = parsedImage.imageUrl ? normalizeMediaUrl(parsedImage.imageUrl) : null;
   const imageUrl = parsedImageUrl || (allImageUrls.length > 0 ? allImageUrls[0] : null);
 
+  const emergencyType = (metadata?.type || '').toString();
+  const isEmergencyCardType = ['rescue_request', 'evacuation_signal', 'accident_report'].includes(
+    emergencyType
+  );
+
   // 긴급 메시지 (위치 정보 포함)
-  const isEmergencyWithLocation = messageType === 'EMERGENCY' && metadata?.location;
-  const emergencyTypeLabel = getEmergencyTypeLabel(metadata?.type);
+  const isEmergencyWithLocation =
+    Boolean(metadata?.location) && (messageType === 'EMERGENCY' || isEmergencyCardType);
+  const emergencyTypeLabel = getEmergencyTypeLabel(emergencyType);
 
   // 이미지와 위치를 함께 가진 메시지 (사고 현장 보고)
-  const isImageWithLocation = messageType === 'IMAGE' && metadata?.location;
+  const isImageWithLocation = emergencyType === 'accident_report' && Boolean(metadata?.location);
   const accidentImageUrl =
     normalizeMediaUrl(metadata?.imageUrl) ||
     parsedImageUrl ||
@@ -366,6 +394,26 @@ export default function MessageBubble({
         <Iconify icon={'mdi:play' as any} width={32} sx={{ color: 'white', ml: 0.5 }} />
       </Box>
     </Box>
+  );
+
+  // 파일 메시지 렌더링 컴포넌트
+  const renderFileContent = () => (
+    <Stack direction="row" spacing={1} alignItems="center" sx={{ maxWidth: 220 }}>
+      <Iconify icon={'solar:file-bold' as any} width={20} sx={{ color: 'inherit' }} />
+      <Typography
+        variant="body2"
+        sx={{
+          fontSize: 14,
+          lineHeight: '22px',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+          color: 'inherit',
+        }}
+      >
+        {fileLabel || '첨부파일'}
+      </Typography>
+    </Stack>
   );
 
   // 이미지 메시지 렌더링 컴포넌트
@@ -487,7 +535,9 @@ export default function MessageBubble({
             position: 'absolute',
             top: 8,
             right: 8,
-            bgcolor: metadata?.type === 'evacuation' ? 'warning.main' : 'primary.main',
+            bgcolor: ['evacuation_signal', 'evacuation'].includes(emergencyType)
+              ? 'warning.main'
+              : 'primary.main',
             color: 'white',
             px: 1,
             py: 0.25,
@@ -764,14 +814,14 @@ export default function MessageBubble({
               borderRadius: '12px 0px 12px 12px',
               bgcolor: 'primary.main',
               color: 'primary.contrastText',
-              ...(isFileMessage && {
+              ...(isSharedDocument && {
                 cursor: 'pointer',
                 '&:hover': {
                   bgcolor: 'primary.dark',
                 },
               }),
             }}
-            onClick={isFileMessage ? handleFileClick : undefined}
+            onClick={isSharedDocument ? handleFileClick : undefined}
           >
             {isImageWithLocation && accidentImageUrl && metadata?.location ? (
               renderAccidentReportContent(accidentImageUrl, metadata.location)
@@ -782,6 +832,8 @@ export default function MessageBubble({
               renderMultipleAttachments()
             ) : isImageMessage && imageUrl ? (
               renderImageContent(imageUrl, parsedImage.label)
+            ) : isFileMessage ? (
+              renderFileContent()
             ) : (
               <Typography variant="body2" sx={{ fontSize: 14, lineHeight: '22px' }}>
                 {message}
@@ -907,14 +959,14 @@ export default function MessageBubble({
                 borderRadius: '0px 12px 12px 12px',
                 bgcolor: 'grey.200',
                 color: 'text.primary',
-                ...(isFileMessage && {
+                ...(isSharedDocument && {
                   cursor: 'pointer',
                   '&:hover': {
                     bgcolor: 'grey.300',
                   },
                 }),
               }}
-              onClick={isFileMessage ? handleFileClick : undefined}
+              onClick={isSharedDocument ? handleFileClick : undefined}
             >
               {isImageWithLocation && accidentImageUrl && metadata?.location ? (
                 renderAccidentReportContent(accidentImageUrl, metadata.location)
@@ -925,6 +977,8 @@ export default function MessageBubble({
                 renderMultipleAttachments()
               ) : isImageMessage && imageUrl ? (
                 renderImageContent(imageUrl, parsedImage.label)
+              ) : isFileMessage ? (
+                renderFileContent()
               ) : (
                 <Typography variant="body2" sx={{ fontSize: 14, lineHeight: '22px' }}>
                   {message}

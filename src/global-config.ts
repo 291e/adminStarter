@@ -24,6 +24,7 @@ export type ConfigValue = {
     storageBucket: string;
     measurementId: string;
     messagingSenderId: string;
+    vapidKey: string;
   };
   amplify: { userPoolId: string; userPoolWebClientId: string; region: string };
   auth0: { clientId: string; domain: string; callbackUrl: string };
@@ -66,6 +67,7 @@ export const CONFIG: ConfigValue = {
     messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID ?? '',
     appId: import.meta.env.VITE_FIREBASE_APPID ?? '',
     measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID ?? '',
+    vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY ?? '',
   },
   /**
    * Amplify

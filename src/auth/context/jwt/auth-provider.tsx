@@ -4,6 +4,7 @@ import { useSetState } from 'minimal-shared/hooks';
 import { useMemo, useEffect, useCallback } from 'react';
 
 import axios, { endpoints } from 'src/lib/axios';
+import { initWebFcm } from 'src/services/notifications/web-fcm';
 
 import { JWT_STORAGE_KEY } from './constant';
 import { AuthContext } from '../auth-context';
@@ -51,6 +52,12 @@ export function AuthProvider({ children }: Props) {
   }, []);
 
   // ----------------------------------------------------------------------
+  useEffect(() => {
+    if (state.user) {
+      initWebFcm();
+    }
+  }, [state.user]);
+
 
   const checkAuthenticated = state.user ? 'authenticated' : 'unauthenticated';
 

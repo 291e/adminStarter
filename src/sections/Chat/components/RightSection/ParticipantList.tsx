@@ -112,6 +112,20 @@ export default function ParticipantList({ room, participants, onInvite, onRemove
   // 대화 상대가 1명일 때 프로필 형태로 표시 (참가자 수에 따라 결정)
   const isSingleParticipant = filteredParticipants.length === 1;
 
+  const singleParticipant = isSingleParticipant ? filteredParticipants[0] : null;
+  const singleIsOnline =
+    singleParticipant?.online === 1 || singleParticipant?.online === true;
+  const singleStatusLabel = singleIsOnline ? '온라인' : '오프라인';
+  const singleInfoText = singleParticipant
+    ? [
+        getRoleLabel(singleParticipant.memberRole),
+        singleParticipant.positionName || singleParticipant.position,
+        singleStatusLabel,
+      ]
+        .filter(Boolean)
+        .join(' / ')
+    : '';
+
   const handleToggleSelect = (participantId: string) => {
     setSelectedIds((prev) =>
       prev.includes(participantId)
@@ -237,22 +251,36 @@ export default function ParticipantList({ room, participants, onInvite, onRemove
                 gap: 1,
               }}
             >
-              <Avatar
-                src={getChatAvatarUrl(
-                  filteredParticipants[0].profileImage ||
-                    (filteredParticipants[0] as any).memberThumbnail ||
-                    (filteredParticipants[0] as any).avatar
-                )}
-                alt={filteredParticipants[0].name}
-                sx={{
-                  width: 64,
-                  height: 64,
-                  bgcolor: 'grey.300',
-                  mb: 0.5,
-                }}
-              >
-                <Iconify icon="solar:user-rounded-bold" width={32} />
-              </Avatar>
+              <Box sx={{ position: 'relative' }}>
+                <Avatar
+                  src={getChatAvatarUrl(
+                    filteredParticipants[0].profileImage ||
+                      (filteredParticipants[0] as any).memberThumbnail ||
+                      (filteredParticipants[0] as any).avatar
+                  )}
+                  alt={filteredParticipants[0].name}
+                  sx={{
+                    width: 64,
+                    height: 64,
+                    bgcolor: 'grey.300',
+                    mb: 0.5,
+                  }}
+                >
+                  <Iconify icon="solar:user-rounded-bold" width={32} />
+                </Avatar>
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    right: 0,
+                    bottom: 0,
+                    width: 10,
+                    height: 10,
+                    borderRadius: '50%',
+                    bgcolor: singleIsOnline ? 'success.main' : 'text.disabled',
+                    border: '2px solid white',
+                  }}
+                />
+              </Box>
               <Stack spacing={0.5} alignItems="center">
                 <Typography
                   variant="subtitle1"
@@ -266,9 +294,7 @@ export default function ParticipantList({ room, participants, onInvite, onRemove
                 >
                   {filteredParticipants[0].name}
                 </Typography>
-                {(filteredParticipants[0].memberRole ||
-                  filteredParticipants[0].positionName ||
-                  filteredParticipants[0].position) && (
+                {singleInfoText && (
                   <Typography
                     variant="caption"
                     sx={{
@@ -277,12 +303,7 @@ export default function ParticipantList({ room, participants, onInvite, onRemove
                       lineHeight: '18px',
                     }}
                   >
-                    {[
-                      getRoleLabel(filteredParticipants[0].memberRole),
-                      filteredParticipants[0].positionName || filteredParticipants[0].position,
-                    ]
-                      .filter(Boolean)
-                      .join(' / ')}
+                    {singleInfoText}
                   </Typography>
                 )}
               </Stack>
@@ -292,6 +313,15 @@ export default function ParticipantList({ room, participants, onInvite, onRemove
               {filteredParticipants.map((participant, idx) => {
                 const participantId = getParticipantId(participant, idx);
                 const isSelected = selectedIds.includes(participantId);
+                const isOnline = participant.online === 1 || participant.online === true;
+                const statusLabel = isOnline ? '온라인' : '오프라인';
+                const infoText = [
+                  getRoleLabel(participant.memberRole),
+                  participant.positionName || participant.position,
+                  statusLabel,
+                ]
+                  .filter(Boolean)
+                  .join(' / ');
 
                 return (
                   <ListItem
@@ -321,17 +351,31 @@ export default function ParticipantList({ room, participants, onInvite, onRemove
                         />
                       </Box>
                     )}
-                    <Avatar
-                      src={getChatAvatarUrl(
-                        participant.profileImage ||
-                          (participant as any).memberThumbnail ||
-                          (participant as any).avatar
-                      )}
-                      alt={participant.name}
-                      sx={{ width: 40, height: 40, bgcolor: 'grey.300' }}
-                    >
-                      <Iconify icon="solar:user-rounded-bold" width={24} />
-                    </Avatar>
+                    <Box sx={{ position: 'relative' }}>
+                      <Avatar
+                        src={getChatAvatarUrl(
+                          participant.profileImage ||
+                            (participant as any).memberThumbnail ||
+                            (participant as any).avatar
+                        )}
+                        alt={participant.name}
+                        sx={{ width: 40, height: 40, bgcolor: 'grey.300' }}
+                      >
+                        <Iconify icon="solar:user-rounded-bold" width={24} />
+                      </Avatar>
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          right: 0,
+                          bottom: 0,
+                          width: 10,
+                          height: 10,
+                          borderRadius: '50%',
+                          bgcolor: isOnline ? 'success.main' : 'text.disabled',
+                          border: '2px solid white',
+                        }}
+                      />
+                    </Box>
                     <Stack spacing={0.5} sx={{ flex: 1, minWidth: 0 }}>
                       <Typography
                         variant="body2"
@@ -345,9 +389,7 @@ export default function ParticipantList({ room, participants, onInvite, onRemove
                       >
                         {participant.name}
                       </Typography>
-                      {(participant.memberRole ||
-                        participant.positionName ||
-                        participant.position) && (
+                      {infoText && (
                         <Typography
                           variant="caption"
                           sx={{
@@ -359,12 +401,7 @@ export default function ParticipantList({ room, participants, onInvite, onRemove
                             whiteSpace: 'nowrap',
                           }}
                         >
-                          {[
-                            getRoleLabel(participant.memberRole),
-                            participant.positionName || participant.position,
-                          ]
-                            .filter(Boolean)
-                            .join(' / ')}
+                          {infoText}
                         </Typography>
                       )}
                     </Stack>

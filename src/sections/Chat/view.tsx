@@ -21,6 +21,7 @@ import CenterSection from './components/CenterSection';
 import RightSection from './components/RightSection';
 import ChatHeader from './components/ui/ChatHeader';
 import SharedDocumentDetailModal from './components/SharedDocumentDetailModal';
+import type { ChatInputPayload } from './components/ui/ChatInput';
 
 import {
   useGetChatRooms,
@@ -43,6 +44,7 @@ import type {
 } from 'src/services/chat/chat.types';
 import { sendChatbotMessage } from 'src/services/member/member.service';
 import { getChatAvatarUrl } from 'src/sections/Chat/utils/avatar';
+import { resolveFileUrl } from 'src/sections/Chat/utils/file-url';
 
 // ----------------------------------------------------------------------
 
@@ -60,7 +62,7 @@ type ChatMessageItem = {
   dateLabel?: string;
   avatarUrl?: string;
   isOwn: boolean;
-  messageType?: 'TEXT' | 'IMAGE' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
+  messageType?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
   sharedDocumentIdx?: number;
   attachments?: string[] | null;
   metadata?: {
@@ -136,9 +138,9 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     hasMore,
     loadMore,
     isLoadingMore,
+    participantsMeta,
   } = useChatRoomFirebase({
     chatRoomId: !isChatbotRoom ? selectedRoom?.chatRoomId : undefined,
-    chatRoomIdx: !isChatbotRoom ? selectedRoom?.chatRoomIdx : undefined,
     memberIdx: currentMemberIdx ?? undefined,
   });
 
@@ -222,6 +224,26 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     }
     return normalizeParticipants(selectedRoom?.participants);
   }, [participantsFromAPI, selectedRoom]);
+
+  const participantsWithPresence: ChatParticipantDto[] = useMemo(() => {
+    if (!participantsFromRoom.length) return participantsFromRoom;
+    if (!participantsMeta || Object.keys(participantsMeta).length === 0) return participantsFromRoom;
+
+    return participantsFromRoom.map((participant) => {
+      const key = String(
+        (participant as any)?.memberIdx ?? (participant as any)?.memberIndex
+      );
+      const meta = (participantsMeta as any)?.[key];
+      if (!meta) return participant;
+
+      return {
+        ...participant,
+        online: meta.online ?? participant.online,
+        lastSeen: meta.lastSeen ?? participant.lastSeen,
+        unreadCount: meta.unreadCount ?? participant.unreadCount,
+      };
+    });
+  }, [participantsFromRoom, participantsMeta]);
 
   const participantLookup = useMemo(() => {
     const map = new Map<number, { name: string; avatarUrl?: string }>();
@@ -311,6 +333,13 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
       return base || '[이미지]';
     }
 
+    if (type === 'VIDEO') {
+      if (base.includes('[동영상]|')) {
+        return '[동영상]';
+      }
+      return base || '[동영상]';
+    }
+
     if (type === 'FILE') {
       return base || '공유 문서';
     }
@@ -326,6 +355,10 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     if (base.includes('[이미지]|')) {
       const label = base.split('[이미지]|')[0]?.trim();
       return label ? `${label} [이미지]` : '[이미지]';
+    }
+
+    if (base.includes('[동영상]|')) {
+      return '[동영상]';
     }
 
     return base;
@@ -352,6 +385,20 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
       const translated = pickTranslation(msg.translations, preferredLang);
       const messageText = formatMessageText(msg, translated);
 
+      const rawMetadata = (msg.metadata || undefined) as any;
+      const translatedAddress =
+        rawMetadata?.addressTranslations &&
+        typeof rawMetadata.addressTranslations === 'object'
+          ? pickTranslation(rawMetadata.addressTranslations, preferredLang) ||
+            rawMetadata.address
+          : rawMetadata?.address;
+      const metadata = rawMetadata
+        ? {
+            ...rawMetadata,
+            address: translatedAddress ?? rawMetadata.address,
+          }
+        : undefined;
+
       return {
         id: msg.id,
         sender: senderName,
@@ -365,7 +412,7 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
         sharedDocumentIdx: msg.sharedDocumentIdx,
         attachments: msg.attachments,
         // metadata 전달 (위치 정보 등)
-        metadata: msg.metadata,
+        metadata,
       };
     });
   }, [
@@ -411,7 +458,13 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     }
   }, [selectedRoom?.chatRoomIdx, isChatbotRoom]);
 
-  const handleSendMessage = async (attachments?: string[]) => {
+  const handleSendMessage = async (payload?: ChatInputPayload) => {
+    const attachments = payload?.attachments;
+    const attachmentMeta = {
+      fileName: payload?.fileName,
+      mimeType: payload?.mimeType,
+    };
+
     console.debug('[chat] handleSendMessage', {
       chatRoomId: selectedRoom?.chatRoomId ?? 'chatbot',
       isChatbotRoom,
@@ -420,6 +473,10 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     });
     // 메시지가 없고 첨부파일도 없으면 전송하지 않음
     if (!messageInput.trim() && !attachments?.length) return;
+
+    if (isChatbotRoom && !messageInput.trim()) {
+      return;
+    }
 
     // 챗봇방인 경우 (이미지는 지원하지 않음)
     if (isChatbotRoom) {
@@ -512,9 +569,9 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
       const trimmedMessage = messageInput.trim();
       const hasAttachments = Boolean(attachments?.length);
 
-      // 첨부파일이 있으면 IMAGE 타입으로, 없으면 TEXT 타입으로 전송
-      const messageType = hasAttachments ? 'IMAGE' : 'TEXT';
-      await sendMessage(trimmedMessage || '', messageType, attachments);
+      // 첨부파일이 있으면 Flutter와 동일하게 파일 메시지만 전송
+      const messageContent = hasAttachments ? '' : trimmedMessage;
+      await sendMessage(messageContent || '', 'TEXT', attachments, undefined, undefined, attachmentMeta);
       setMessageInput('');
     } catch (error) {
       console.error('Failed to send message:', error);
@@ -693,11 +750,11 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     if (!currentMemberIdx) return [];
 
     // 본인을 제외한 모든 참가자 반환
-    return participantsFromRoom.filter((p: ChatParticipantDto) => {
+    return participantsWithPresence.filter((p: ChatParticipantDto) => {
       const participantIdx = Number(p.memberIdx ?? (p as any)?.memberIndex);
       return participantIdx !== currentMemberIdx;
     });
-  }, [participantsFromRoom, currentMemberIdx]);
+  }, [participantsWithPresence, currentMemberIdx]);
 
   // EMERGENCY 타입의 채팅방 찾기
   const emergencyRoom = useMemo(
@@ -762,12 +819,30 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     const rawAttachments =
       (attachmentsData as any)?.attachments || (attachmentsData as any)?.body?.attachments || [];
 
+    const normalizeUrl = (url: string | undefined | null): string => {
+      const resolved = resolveFileUrl(url);
+      return resolved ?? '';
+    };
+
+    const isVideoFile = (name: string) => {
+      const lower = name.toLowerCase();
+      return (
+        lower.endsWith('.mp4') ||
+        lower.endsWith('.mov') ||
+        lower.endsWith('.avi') ||
+        lower.endsWith('.webm') ||
+        lower.endsWith('.mkv') ||
+        lower.endsWith('.m4v') ||
+        lower.endsWith('.3gp')
+      );
+    };
+
     const apiAttachments = rawAttachments.map(
       (att: any): ChatAttachmentDto => ({
         id: att.id || '',
         name: att.name || '',
         type: att.type || 'txt',
-        url: att.url || '',
+        url: normalizeUrl(att.url || ''),
         createdAt: att.createdAt || '',
       })
     );
@@ -775,88 +850,109 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     // 메시지에서 이미지와 문서 파일 추출
     const messageAttachments: ChatAttachmentDto[] = [];
 
-    // URL 정규화 함수 (상대 경로 -> 절대 경로)
-    const normalizeUrl = (url: string): string => {
-      if (!url) return '';
-      if (url.startsWith('http://') || url.startsWith('https://')) return url;
-      if (url.startsWith('/')) return `https://safeyou365.com${url}`;
-      return `https://safeyou365.com/${url}`;
-    };
-
     firebaseMessages.forEach((msg) => {
-      // metadata.videoUrl에서 동영상 추출
-      const videoUrl = (msg.metadata as any)?.videoUrl;
+      const createdAt = msg.timestamp;
+      const metadata = (msg.metadata || {}) as any;
+      const fileName =
+        metadata.fileName ||
+        (msg.messageType === 'FILE' ? msg.message : '') ||
+        (metadata.fileUrl ? metadata.fileUrl.split('/').pop() : '');
+
+      const videoUrl = normalizeUrl(metadata.videoUrl);
       if (videoUrl) {
-        const normalizedVideoUrl = normalizeUrl(videoUrl);
-        const fileName = normalizedVideoUrl.split('/').pop() || '동영상';
+        const name = videoUrl.split('/').pop() || '동영상';
         messageAttachments.push({
           id: `video-${msg.id}`,
-          name: fileName,
+          name,
           type: 'video',
-          url: normalizedVideoUrl,
-          createdAt: msg.timestamp,
+          url: videoUrl,
+          createdAt,
         });
       }
 
-      // metadata.imageUrls에서 이미지들 추출 (multi_image)
-      const imageUrls = (msg.metadata as any)?.imageUrls;
-      if (imageUrls && Array.isArray(imageUrls)) {
-        imageUrls.forEach((imgUrl: string, idx: number) => {
-          const normalizedImgUrl = normalizeUrl(imgUrl);
-          const fileName = normalizedImgUrl.split('/').pop() || `이미지${idx + 1}`;
-          messageAttachments.push({
-            id: `meta-img-${msg.id}-${idx}`,
-            name: fileName,
-            type: 'image',
-            url: normalizedImgUrl,
-            createdAt: msg.timestamp,
-          });
+      const imageUrls = Array.isArray(metadata.imageUrls) ? metadata.imageUrls : [];
+      imageUrls.forEach((imgUrl: string, idx: number) => {
+        const normalizedImgUrl = normalizeUrl(imgUrl);
+        if (!normalizedImgUrl) return;
+        const name = normalizedImgUrl.split('/').pop() || `이미지${idx + 1}`;
+        messageAttachments.push({
+          id: `meta-img-${msg.id}-${idx}`,
+          name,
+          type: 'image',
+          url: normalizedImgUrl,
+          createdAt,
         });
-      }
+      });
 
-      // metadata.imageUrl에서 단일 이미지 추출
-      const singleImageUrl = (msg.metadata as any)?.imageUrl;
-      if (singleImageUrl && !imageUrls) {
-        const normalizedSingleImageUrl = normalizeUrl(singleImageUrl);
-        const fileName = normalizedSingleImageUrl.split('/').pop() || '이미지';
+      const singleImageUrl = normalizeUrl(metadata.imageUrl);
+      if (singleImageUrl && imageUrls.length === 0) {
+        const name = singleImageUrl.split('/').pop() || '이미지';
         messageAttachments.push({
           id: `meta-single-img-${msg.id}`,
-          name: fileName,
+          name,
           type: 'image',
-          url: normalizedSingleImageUrl,
-          createdAt: msg.timestamp,
+          url: singleImageUrl,
+          createdAt,
         });
       }
 
-      // 이미지 메시지 ([이미지]|URL 형식)
+      const fileUrl = normalizeUrl(metadata.fileUrl);
+      if (fileUrl) {
+        const name = fileName || fileUrl.split('/').pop() || '첨부파일';
+        messageAttachments.push({
+          id: `file-${msg.id}`,
+          name,
+          type: isVideoFile(name) ? 'video' : 'document',
+          url: fileUrl,
+          createdAt,
+        });
+      }
+
       const imageMatch = msg.message?.match(/\[이미지\]\|(.+)$/);
       if (imageMatch) {
         const imageUrl = normalizeUrl(imageMatch[1].trim());
-        const fileName = imageUrl.split('/').pop() || '이미지';
-        messageAttachments.push({
-          id: `img-${msg.id}`,
-          name: fileName,
-          type: 'image',
-          url: imageUrl,
-          createdAt: msg.timestamp,
-        });
+        if (imageUrl) {
+          const name = imageUrl.split('/').pop() || '이미지';
+          messageAttachments.push({
+            id: `img-${msg.id}`,
+            name,
+            type: 'image',
+            url: imageUrl,
+            createdAt,
+          });
+        }
       }
 
-      // attachments 배열에서 이미지/동영상 추출
+      const videoMatch = msg.message?.match(/\[동영상\]\|(.+)$/);
+      if (!videoUrl && videoMatch) {
+        const parsedVideoUrl = normalizeUrl(videoMatch[1].trim());
+        if (parsedVideoUrl) {
+          const name = parsedVideoUrl.split('/').pop() || '동영상';
+          messageAttachments.push({
+            id: `video-msg-${msg.id}`,
+            name,
+            type: 'video',
+            url: parsedVideoUrl,
+            createdAt,
+          });
+        }
+      }
+
       if (msg.attachments && msg.attachments.length > 0) {
         msg.attachments.forEach((url, idx) => {
           const normalizedUrl = normalizeUrl(url);
-          const fileName = normalizedUrl.split('/').pop() || '첨부파일';
-          const ext = fileName.split('.').pop()?.toLowerCase() || '';
+          if (!normalizedUrl) return;
+          const name = normalizedUrl.split('/').pop() || '첨부파일';
+          const ext = name.split('.').pop()?.toLowerCase() || '';
           const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext);
           const isVideo = ['mp4', 'mov', 'avi', 'webm', 'mkv', 'm4v', '3gp'].includes(ext);
 
           messageAttachments.push({
             id: `att-${msg.id}-${idx}`,
-            name: fileName,
+            name,
             type: isImage ? 'image' : isVideo ? 'video' : ext === 'pdf' ? 'pdf' : 'document',
             url: normalizedUrl,
-            createdAt: msg.timestamp,
+            createdAt,
           });
         });
       }
@@ -867,8 +963,8 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
           id: `doc-${msg.id}`,
           name: msg.message || `문서 ${msg.sharedDocumentIdx}`,
           type: 'pdf',
-          url: '', // 공유 문서는 별도 모달로 열람
-          createdAt: msg.timestamp,
+          url: '',
+          createdAt,
         });
       }
     });
@@ -877,9 +973,16 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     const allAttachments = [...apiAttachments, ...messageAttachments];
 
     // 중복 제거 (URL 기준)
-    const uniqueAttachments = allAttachments.filter(
-      (att, idx, arr) => arr.findIndex((a) => a.url === att.url || a.id === att.id) === idx
-    );
+    const uniqueAttachments = allAttachments.filter((att, idx, arr) => {
+      return (
+        arr.findIndex((other) => {
+          if (att.url && other.url) {
+            return other.url === att.url;
+          }
+          return other.id === att.id;
+        }) === idx
+      );
+    });
 
     // 최신순 정렬
     return uniqueAttachments.sort((a, b) => {
@@ -888,6 +991,7 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
       return dateB - dateA;
     });
   }, [attachmentsData, firebaseMessages]);
+
 
   const renderContent = () => (
     <Box

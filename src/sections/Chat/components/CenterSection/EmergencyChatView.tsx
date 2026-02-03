@@ -2,7 +2,7 @@ import Box from '@mui/material/Box';
 
 import EmergencyStatsHeader from '../ui/EmergencyStatsHeader';
 import MessageList from '../ui/MessageList';
-import ChatInput from '../ui/ChatInput';
+import ChatInput, { type ChatInputPayload } from '../ui/ChatInput';
 
 type ChatMessage = {
   id: string;
@@ -12,7 +12,7 @@ type ChatMessage = {
   dateLabel?: string;
   avatarUrl?: string;
   isOwn?: boolean;
-  messageType?: 'TEXT' | 'IMAGE' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
+  messageType?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
   sharedDocumentIdx?: number;
   attachments?: string[] | null;
   metadata?: {
@@ -31,7 +31,7 @@ type Props = {
   conversationDate?: string;
   messageInput?: string;
   onMessageInputChange?: (value: string) => void;
-  onSendMessage?: () => void;
+  onSendMessage?: (payload?: ChatInputPayload) => void;
   roomId?: string | number;
   hasMore?: boolean;
   isLoadingMore?: boolean;

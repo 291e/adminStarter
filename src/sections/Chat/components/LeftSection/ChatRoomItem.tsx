@@ -131,6 +131,12 @@ export default function ChatRoomItem({
       }
       return trimmed || '[이미지]';
     }
+    if (type === 'VIDEO') {
+      if (trimmed.includes('[동영상]|')) {
+        return '[동영상]';
+      }
+      return trimmed || '[동영상]';
+    }
     if (type === 'FILE') {
       return trimmed || '공유 문서';
     }
@@ -143,6 +149,9 @@ export default function ChatRoomItem({
     if (trimmed.includes('[이미지]|')) {
       const label = trimmed.split('[이미지]|')[0]?.trim();
       return label ? `${label} [이미지]` : '[이미지]';
+    }
+    if (trimmed.includes('[동영상]|')) {
+      return '[동영상]';
     }
     return trimmed;
   };

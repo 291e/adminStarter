@@ -9,10 +9,16 @@ import Stack from '@mui/material/Stack';
 import { Iconify } from 'src/components/iconify';
 import { uploadFile } from 'src/services/system/system.service';
 
+export type ChatInputPayload = {
+  attachments?: string[];
+  fileName?: string;
+  mimeType?: string;
+};
+
 type Props = {
   value?: string;
   onChange?: (value: string) => void;
-  onSend?: (attachments?: string[]) => void;
+  onSend?: (payload?: ChatInputPayload) => void;
   isEmergency?: boolean;
 };
 
@@ -102,8 +108,17 @@ export default function ChatInput({ value = '', onChange, onSend, isEmergency = 
     }
 
     // 메시지 전송 (파일 URL이 있으면 attachments로 전달)
-    onSend?.(attachments);
+    onSend?.({
+      attachments,
+      fileName: selectedFile?.name,
+      mimeType: selectedFile?.type,
+    });
   };
+
+  const hasFile = Boolean(selectedFile);
+  const fileIcon = selectedFile?.type.startsWith('video/')
+    ? 'solar:videocamera-bold'
+    : 'solar:file-bold';
 
   return (
     <Box
@@ -132,7 +147,13 @@ export default function ChatInput({ value = '', onChange, onSend, isEmergency = 
       >
         <Iconify icon={'mdi:camera' as any} width={24} />
       </IconButton>
-      <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleFileSelect} />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,video/*,application/*"
+        hidden
+        onChange={handleFileSelect}
+      />
       <InputBase
         fullWidth
         placeholder="메시지를 입력하세요..."
@@ -192,7 +213,7 @@ export default function ChatInput({ value = '', onChange, onSend, isEmergency = 
         <Iconify icon={'solar:plain-2-bold' as any} width={24} />
       </IconButton>
       {/* 파일 미리보기 */}
-      {previewUrl && (
+      {hasFile && (
         <Box
           sx={{
             position: 'absolute',
@@ -208,17 +229,33 @@ export default function ChatInput({ value = '', onChange, onSend, isEmergency = 
             gap: 1,
           }}
         >
-          <Box
-            component="img"
-            src={previewUrl}
-            alt="미리보기"
-            sx={{
-              width: 60,
-              height: 60,
-              objectFit: 'cover',
-              borderRadius: 1,
-            }}
-          />
+          {previewUrl ? (
+            <Box
+              component="img"
+              src={previewUrl}
+              alt="미리보기"
+              sx={{
+                width: 60,
+                height: 60,
+                objectFit: 'cover',
+                borderRadius: 1,
+              }}
+            />
+          ) : (
+            <Box
+              sx={{
+                width: 60,
+                height: 60,
+                borderRadius: 1,
+                bgcolor: 'grey.100',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Iconify icon={fileIcon as any} width={28} />
+            </Box>
+          )}
           <Stack spacing={0.5} sx={{ flex: 1, minWidth: 0 }}>
             <Typography
               variant="caption"
