@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import dayjs from 'dayjs';
+import { toast } from 'sonner';
 
 import Card from '@mui/material/Card';
 import Container from '@mui/material/Container';
@@ -18,12 +19,15 @@ import type { BoardCategory, BoardPost } from 'src/services/board/board.types';
 import InquiryNewView from './inquiry-new-view';
 import InquiryEditView from './inquiry-edit-view';
 import InquiryDetailsView from './inquiry-details-view';
+import InquiryReplyView from './inquiry-reply-view';
+import CategoryManageModal from './components/CategoryManageModal';
 
 // ----------------------------------------------------------------------
 
 export default function InquiriesView() {
-  const [view, setView] = useState<'list' | 'new' | 'edit' | 'details'>('list');
+  const [view, setView] = useState<'list' | 'new' | 'edit' | 'details' | 'reply'>('list');
   const [selectedInquiry, setSelectedInquiry] = useState<any>(null);
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
 
   const [currentTab, setCurrentTab] = useState('all');
   const [filters, setFilters] = useState({
@@ -85,9 +89,18 @@ export default function InquiriesView() {
     setView('new');
   };
 
+  const handleCategoryManage = () => {
+    setCategoryModalOpen(true);
+  };
+
   const handleEditInquiry = (row: InquiryRow) => {
     setSelectedInquiry(row);
     setView('edit');
+  };
+
+  const handleReplyInquiry = (row: InquiryRow) => {
+    setSelectedInquiry(row);
+    setView('reply');
   };
 
   const handleViewAnswer = (row: InquiryRow) => {
@@ -122,14 +135,19 @@ export default function InquiriesView() {
         id: String(post.postIdx ?? `${pagination.currentPage}-${index}`),
         postIdx: post.postIdx,
         sequence: sequence < 1 ? index + 1 : sequence,
+        inquirerName: post.memberName || post.adminName || '-', // 문의자 이름
+        inquirerEmail: post.memberEmail || '-', // 문의자 이메일
+        inquirerId: post.memberId || undefined, // 회원 ID
+        inquirerPhone: post.memberPhone || undefined, // 전화번호
         inquiryAt: post.registrationDate || post.createAt || post.updateAt || '-',
-        category: post.postCategoryTitle || '-',
-        postCategoryIdx: post.postCategoryIdx,
+        answeredAt: post.postAnswerAt,
+        category: post.postCategoryTitle || post.categoryTitle || '-', // 카테고리 (두 필드 모두 확인)
+        postCategoryIdx: post.postCategoryIdx || post.categoryIdx,
         title: post.postTitle || '-',
         status,
-        answeredAt: post.postAnswerAt,
         content: post.postContent || '',
         answer: post.postAnswerContent || '',
+        commentInformation: post.commentInformation,
       } as InquiryRow;
     });
   }, [postsData, filters.startDate, filters.endDate, pagination.currentPage, pagination.rowsPerPage]);
@@ -157,10 +175,14 @@ export default function InquiriesView() {
     return <InquiryDetailsView onBack={handleBackToList} inquiry={selectedInquiry} />;
   }
 
+  if (view === 'reply' && selectedInquiry) {
+    return <InquiryReplyView onBack={handleBackToList} inquiry={selectedInquiry} />;
+  }
+
   return (
     <DashboardContent>
       <Container maxWidth="xl">
-        <InquiriesBreadcrumbs onNewInquiry={handleNewInquiry} />
+        <InquiriesBreadcrumbs onNewInquiry={handleNewInquiry} onCategoryManage={handleCategoryManage} />
 
         <Card sx={{ boxShadow: '0 0 20px rgba(0,0,0,0.05)', borderRadius: 2 }}>
           <InquiriesTabs
@@ -174,6 +196,7 @@ export default function InquiriesView() {
           <InquiriesTable
             rows={rows}
             onEdit={handleEditInquiry}
+            onReply={handleReplyInquiry}
             onViewAnswer={handleViewAnswer}
           />
 
@@ -186,6 +209,12 @@ export default function InquiriesView() {
           />
         </Card>
       </Container>
+
+      <CategoryManageModal
+        open={categoryModalOpen}
+        onClose={() => setCategoryModalOpen(false)}
+        postCategoryType="문의/답변"
+      />
     </DashboardContent>
   );
 }

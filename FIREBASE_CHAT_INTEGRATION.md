@@ -1,6 +1,7 @@
 # Firebase 채팅 기능 연동 가이드
 
 ## 목차
+
 1. [Firebase 콘솔 설정](#1-firebase-콘솔-설정)
 2. [Firebase Security Rules 설정](#2-firebase-security-rules-설정)
 3. [프론트엔드 Firebase SDK 설정](#3-프론트엔드-firebase-sdk-설정)
@@ -25,11 +26,13 @@
 ### 1.2 데이터베이스 URL 확인
 
 Realtime Database 생성 후 상단에 표시되는 URL을 확인:
+
 ```
 https://your-project-id-default-rtdb.asia-northeast3.firebasedatabase.app
 ```
 
 이 URL을 `.env` 파일에 설정:
+
 ```env
 FIREBASE_DATABASE_URL=https://your-project-id-default-rtdb.asia-northeast3.firebasedatabase.app
 ```
@@ -40,11 +43,13 @@ FIREBASE_DATABASE_URL=https://your-project-id-default-rtdb.asia-northeast3.fireb
 2. **새 비공개 키 생성** 클릭
 3. JSON 파일 다운로드
 4. JSON 파일 내용을 `.env` 파일에 설정 (한 줄로 변환):
+
 ```env
 FIREBASE_SERVICE_ACCOUNT={"type":"service_account","project_id":"your-project-id",...}
 ```
 
 또는 `firebase-adminsdk.json` 파일로 저장하고 경로 지정:
+
 ```env
 FIREBASE_SERVER_KEY=./firebase-adminsdk.json
 ```
@@ -63,7 +68,7 @@ Firebase 콘솔 → **Realtime Database** → **규칙** 탭에서 다음 규칙
         // 채팅방 접근 권한: 참가자만 읽기/쓰기 가능
         ".read": "auth != null && (root.child('chatRooms').child($roomId).child('participants').child(auth.uid).exists() || root.child('chatRooms').child($roomId).child('participants').child('chatbot').exists())",
         ".write": "auth != null && (root.child('chatRooms').child($roomId).child('participants').child(auth.uid).exists() || root.child('chatRooms').child($roomId).child('participants').child('chatbot').exists())",
-        
+
         "messages": {
           "$messageId": {
             // 메시지는 참가자만 읽기 가능
@@ -73,7 +78,7 @@ Firebase 콘솔 → **Realtime Database** → **규칙** 탭에서 다음 규칙
             ".validate": "newData.hasChildren(['id', 'chatRoomId', 'senderMemberIdx', 'message', 'messageType', 'timestamp'])"
           }
         },
-        
+
         "participants": {
           "$memberIdx": {
             // 참가자 정보는 참가자만 읽기 가능
@@ -84,7 +89,7 @@ Firebase 콘솔 → **Realtime Database** → **규칙** 탭에서 다음 규칙
         }
       }
     },
-    
+
     "users": {
       "$memberIdx": {
         // 사용자 정보는 본인만 읽기/쓰기 가능
@@ -103,6 +108,7 @@ Firebase 콘솔 → **Realtime Database** → **규칙** 탭에서 다음 규칙
 ### 3.1 React Native (Expo) 예시
 
 #### 패키지 설치
+
 ```bash
 npm install firebase
 # 또는
@@ -118,13 +124,13 @@ import { getAuth } from 'firebase/auth';
 
 // Firebase 설정 (프로젝트 설정에서 확인)
 const firebaseConfig = {
-  apiKey: "your-api-key",
-  authDomain: "your-project-id.firebaseapp.com",
-  databaseURL: "https://your-project-id-default-rtdb.asia-northeast3.firebasedatabase.app",
-  projectId: "your-project-id",
-  storageBucket: "your-project-id.appspot.com",
-  messagingSenderId: "your-sender-id",
-  appId: "your-app-id"
+  apiKey: 'your-api-key',
+  authDomain: 'your-project-id.firebaseapp.com',
+  databaseURL: 'https://your-project-id-default-rtdb.asia-northeast3.firebasedatabase.app',
+  projectId: 'your-project-id',
+  storageBucket: 'your-project-id.appspot.com',
+  messagingSenderId: 'your-sender-id',
+  appId: 'your-app-id',
 };
 
 // Firebase 초기화
@@ -171,11 +177,11 @@ const getFirebaseToken = async (accessToken: string) => {
   const response = await fetch('https://your-api.com/sign/firebase-token', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${accessToken}`,
+      Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
     },
   });
-  
+
   const data = await response.json();
   return data.data.customToken; // Firebase 커스텀 토큰
 };
@@ -191,11 +197,11 @@ const authenticateFirebase = async (accessToken: string) => {
   try {
     // 1. 백엔드에서 커스텀 토큰 받기
     const customToken = await getFirebaseToken(accessToken);
-    
+
     // 2. Firebase에 커스텀 토큰으로 로그인
     const userCredential = await signInWithCustomToken(auth, customToken);
     const firebaseUser = userCredential.user;
-    
+
     console.log('Firebase 인증 성공:', firebaseUser.uid);
     return firebaseUser;
   } catch (error) {
@@ -214,21 +220,24 @@ const authenticateFirebase = async (accessToken: string) => {
 ### 5.1 채팅방 생성 (백엔드 API 호출)
 
 ```typescript
-const createChatRoom = async (accessToken: string, roomData: {
-  name: string;
-  type: 'NORMAL' | 'GROUP' | 'EMERGENCY' | 'CHATBOT';
-  isGroup: number;
-  memberIndexes?: number[];
-}) => {
+const createChatRoom = async (
+  accessToken: string,
+  roomData: {
+    name: string;
+    type: 'NORMAL' | 'GROUP' | 'EMERGENCY' | 'CHATBOT';
+    isGroup: number;
+    memberIndexes?: number[];
+  }
+) => {
   const response = await fetch('https://your-api.com/chat/rooms', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${accessToken}`,
+      Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(roomData),
   });
-  
+
   return await response.json();
 };
 ```
@@ -241,9 +250,13 @@ const createChatRoom = async (accessToken: string, roomData: {
 import { ref, set, get } from 'firebase/database';
 import { database } from './config/firebase';
 
-const createFirebaseChatRoom = async (chatRoomId: string, chatRoomIdx: number, participants: number[]) => {
+const createFirebaseChatRoom = async (
+  chatRoomId: string,
+  chatRoomIdx: number,
+  participants: number[]
+) => {
   const roomRef = ref(database, `chatRooms/${chatRoomId}`);
-  
+
   const roomData = {
     id: chatRoomId,
     chatRoomIdx: chatRoomIdx,
@@ -252,7 +265,7 @@ const createFirebaseChatRoom = async (chatRoomId: string, chatRoomIdx: number, p
     participants: {},
     messages: {},
   };
-  
+
   // 참가자 정보 추가
   participants.forEach((memberIdx) => {
     roomData.participants[memberIdx] = {
@@ -263,7 +276,7 @@ const createFirebaseChatRoom = async (chatRoomId: string, chatRoomIdx: number, p
       visible: true,
     };
   });
-  
+
   await set(roomRef, roomData);
 };
 ```
@@ -283,7 +296,7 @@ const sendMessage = async (
 ) => {
   const messagesRef = ref(database, `chatRooms/${chatRoomId}/messages`);
   const newMessageRef = push(messagesRef);
-  
+
   const messageData = {
     id: newMessageRef.key, // Firebase가 생성한 고유 ID
     chatRoomId: chatRoomId,
@@ -295,12 +308,12 @@ const sendMessage = async (
     timestamp: Date.now().toString(),
     isRead: false,
   };
-  
+
   await set(newMessageRef, messageData);
-  
+
   // 메시지 전송 후 백엔드에 백업 요청
   await backupMessageToBackend(messageData);
-  
+
   return messageData;
 };
 ```
@@ -311,18 +324,15 @@ const sendMessage = async (
 import { ref, onChildAdded, off } from 'firebase/database';
 import { database } from './config/firebase';
 
-const listenToMessages = (
-  chatRoomId: string,
-  onMessageReceived: (message: any) => void
-) => {
+const listenToMessages = (chatRoomId: string, onMessageReceived: (message: any) => void) => {
   const messagesRef = ref(database, `chatRooms/${chatRoomId}/messages`);
-  
+
   // 새 메시지가 추가될 때마다 호출
   const unsubscribe = onChildAdded(messagesRef, (snapshot) => {
     const message = snapshot.val();
     onMessageReceived(message);
   });
-  
+
   // 컴포넌트 언마운트 시 리스너 제거
   return () => {
     off(messagesRef, 'child_added', unsubscribe);
@@ -334,7 +344,7 @@ useEffect(() => {
   const unsubscribe = listenToMessages(chatRoomId, (message) => {
     setMessages((prev) => [...prev, message]);
   });
-  
+
   return () => {
     unsubscribe();
   };
@@ -349,19 +359,15 @@ import { database } from './config/firebase';
 
 const loadMessages = async (chatRoomId: string, limit: number = 50) => {
   const messagesRef = ref(database, `chatRooms/${chatRoomId}/messages`);
-  const messagesQuery = query(
-    messagesRef,
-    orderByChild('timestamp'),
-    limitToLast(limit)
-  );
-  
+  const messagesQuery = query(messagesRef, orderByChild('timestamp'), limitToLast(limit));
+
   const snapshot = await get(messagesQuery);
   const messages: any[] = [];
-  
+
   snapshot.forEach((child) => {
     messages.push(child.val());
   });
-  
+
   return messages.reverse(); // 최신 메시지가 마지막에 오도록
 };
 ```
@@ -373,20 +379,16 @@ const loadMessages = async (chatRoomId: string, limit: number = 50) => {
 ### 6.1 채팅방 목록 조회
 
 ```typescript
-const getChatRoomList = async (
-  accessToken: string,
-  page: number = 1,
-  pageSize: number = 10
-) => {
+const getChatRoomList = async (accessToken: string, page: number = 1, pageSize: number = 10) => {
   const response = await fetch(
     `https://your-api.com/chat/rooms?page=${page}&pageSize=${pageSize}`,
     {
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
       },
     }
   );
-  
+
   return await response.json();
 };
 ```
@@ -395,15 +397,12 @@ const getChatRoomList = async (
 
 ```typescript
 const getChatRoom = async (accessToken: string, chatRoomIdx: number) => {
-  const response = await fetch(
-    `https://your-api.com/chat/rooms/${chatRoomIdx}`,
-    {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-      },
-    }
-  );
-  
+  const response = await fetch(`https://your-api.com/chat/rooms/${chatRoomIdx}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
   return await response.json();
 };
 ```
@@ -416,18 +415,15 @@ const inviteParticipants = async (
   chatRoomIdx: number,
   memberIndexes: number[]
 ) => {
-  const response = await fetch(
-    `https://your-api.com/chat/rooms/${chatRoomIdx}/participants`,
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ memberIndexes }),
-    }
-  );
-  
+  const response = await fetch(`https://your-api.com/chat/rooms/${chatRoomIdx}/participants`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ memberIndexes }),
+  });
+
   return await response.json();
 };
 ```
@@ -435,23 +431,16 @@ const inviteParticipants = async (
 ### 6.4 마지막 읽은 시간 업데이트
 
 ```typescript
-const updateLastReadAt = async (
-  accessToken: string,
-  chatRoomIdx: number,
-  timestamp: string
-) => {
-  const response = await fetch(
-    `https://your-api.com/chat/rooms/${chatRoomIdx}/read`,
-    {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ timestamp }),
-    }
-  );
-  
+const updateLastReadAt = async (accessToken: string, chatRoomIdx: number, timestamp: string) => {
+  const response = await fetch(`https://your-api.com/chat/rooms/${chatRoomIdx}/read`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ timestamp }),
+  });
+
   return await response.json();
 };
 ```
@@ -477,18 +466,15 @@ const backupMessageToBackend = async (
   }
 ) => {
   try {
-    const response = await fetch(
-      'https://your-api.com/chat/messages/backup',
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(messageData),
-      }
-    );
-    
+    const response = await fetch('https://your-api.com/chat/messages/backup', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(messageData),
+    });
+
     if (!response.ok) {
       console.error('메시지 백업 실패:', await response.text());
     }
@@ -500,9 +486,67 @@ const backupMessageToBackend = async (
 
 ---
 
-## 8. 데이터 구조
+## 8. 채팅 푸시 알림 (Android / iOS)
 
-### 8.1 Firebase RTDB 구조
+채팅 메시지 전송 시 **발신자를 제외한 참가자**에게 Android/iOS 푸시가 가도록 하려면 아래를 준비합니다.
+
+### 8.1 전체 흐름
+
+1. **프론트(이미 적용됨)**  
+   메시지를 Firebase RTDB에 저장한 뒤 `POST /notification/push`를 호출해, **다른 참가자 memberIndexes**와 제목/내용/`data`(type, chatRoomId, messageId)를 넘깁니다.
+
+2. **백엔드**
+
+   - `memberIndexes`에 해당하는 회원의 **FCM 디바이스 토큰**을 DB에서 조회
+   - Firebase Admin SDK(FCM)로 해당 토큰들에 푸시 전송
+   - Android / iOS 모두 **FCM**을 쓰면 되고, iOS는 Firebase 콘솔에서 APNs 설정만 해 두면 FCM이 APNs로 전달합니다.
+
+3. **모바일 앱(Android/iOS)**
+   - 앱 설치 후 FCM 토큰을 발급받아 `PATCH /member/fcm-token`으로 서버에 등록
+   - 푸시 수신 시 `data.type === 'CHAT'`이면 `data.chatRoomId` 등으로 채팅 화면으로 딥링크
+
+### 8.2 백엔드에서 해야 할 일
+
+- **FCM 토큰 저장**  
+  `PATCH /member/fcm-token` 요청 시 해당 회원의 FCM 토큰을 DB에 저장(회원별 여러 기기 허용 시 토큰 목록으로 저장).
+
+- **`POST /notification/push` 처리**
+
+  - 요청 body: `memberIndexes`, `title`, `message`, `data` (예: `{ type, chatRoomId, messageId }`)
+  - `memberIndexes`로 회원의 FCM 토큰(들) 조회
+  - **Firebase Admin SDK**로 FCM HTTP v1 API 호출:
+    - **Android**: `notification` + `data` 페이로드
+    - **iOS**: `apns.payload.aps` + `data` 페이로드(필요 시 `mutable-content`, `content-available` 등 설정)
+
+- **iOS 전용**
+  - Firebase 콘솔 → 프로젝트 설정 → Cloud Messaging → **Apple 앱 설정**에서 APNs 인증 키(.p8) 또는 인증서 업로드
+  - 없으면 iOS 기기로 푸시가 가지 않습니다.
+
+### 8.3 모바일 앱에서 해야 할 일
+
+- **Android**
+
+  - Firebase Android SDK 추가 후 FCM 토큰 수신
+  - 토큰을 `PATCH /member/fcm-token`으로 전송
+  - 포그라운드/백그라운드에서 `data` payload 처리 후 `chatRoomId` 등으로 채팅 화면 오픈
+
+- **iOS**
+  - Firebase iOS SDK 추가, APNs 권한 요청
+  - FCM 토큰 수신 후 `PATCH /member/fcm-token`으로 전송
+  - 푸시 탭 시 `data.type === 'CHAT'`, `data.chatRoomId` 등으로 채팅 화면으로 이동
+
+### 8.4 프론트엔드(이 프로젝트)에서 이미 하는 일
+
+- `use-chat-room-firebase.ts`의 `sendMessage` 성공 후:
+  - 해당 채팅방 `participants`에서 **발신자·챗봇 제외**한 memberIdx 목록 계산
+  - `sendPushNotification({ memberIndexes, title: 발신자명, message: 메시지 요약, data: { type: 'CHAT', chatRoomId, messageId } })` 호출
+- 실패해도 메시지 전송 자체는 유지되고, 푸시만 실패 로그로 남김.
+
+---
+
+## 9. 데이터 구조
+
+### 9.1 Firebase RTDB 구조
 
 ```
 chatRooms/
@@ -544,7 +588,7 @@ users/
     updateAt: "2024-01-01T00:00:00Z"
 ```
 
-### 8.2 백엔드 RDBMS 구조
+### 9.2 백엔드 RDBMS 구조
 
 - `chatRoom`: 채팅방 메타데이터
 - `chatParticipant`: 채팅방 참가자 정보
@@ -552,7 +596,7 @@ users/
 
 ---
 
-## 9. 주의사항
+## 10. 주의사항
 
 1. **Firebase Auth UID**: 백엔드에서 생성한 커스텀 토큰의 `uid`는 `memberIdx.toString()`과 동일해야 합니다.
 
@@ -566,25 +610,27 @@ users/
 
 ---
 
-## 10. 트러블슈팅
+## 11. 트러블슈팅
 
-### 10.1 Firebase 인증 실패
+### 11.1 Firebase 인증 실패
+
 - 커스텀 토큰이 올바르게 생성되었는지 확인
 - Firebase 프로젝트 설정에서 Authentication이 활성화되었는지 확인
 
-### 10.2 메시지 전송 실패
+### 11.2 메시지 전송 실패
+
 - Firebase Security Rules 확인
 - 채팅방 참가자 목록에 현재 사용자가 포함되어 있는지 확인
 
-### 10.3 실시간 업데이트가 안 됨
+### 11.3 실시간 업데이트가 안 됨
+
 - Firebase 리스너가 올바르게 등록되었는지 확인
 - 컴포넌트 언마운트 시 리스너가 제거되었는지 확인
 
 ---
 
-## 11. 참고 자료
+## 12. 참고 자료
 
 - [Firebase Realtime Database 문서](https://firebase.google.com/docs/database)
 - [Firebase Authentication 문서](https://firebase.google.com/docs/auth)
 - [Firebase Security Rules 문서](https://firebase.google.com/docs/database/security)
-

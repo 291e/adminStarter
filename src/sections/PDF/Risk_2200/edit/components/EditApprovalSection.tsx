@@ -109,29 +109,41 @@ export default function EditApprovalSection({
   // 파일 URL을 전체 URL로 변환하는 헬퍼 함수
   const getFullFileUrl = (url: string | null | undefined): string | null => {
     if (!url) return null;
+    const trimmedUrl = url.trim();
+    if (!trimmedUrl || trimmedUrl === 'SIGNED') return null;
     // 잘못된 형식: data:image/png;base64,data/admin/... 같은 경우 처리
     if (
-      url.startsWith('data:image/png;base64,data/admin/') ||
-      url.startsWith('data:image/png;base64,/data/admin/')
+      trimmedUrl.startsWith('data:image/png;base64,data/admin/') ||
+      trimmedUrl.startsWith('data:image/png;base64,/data/admin/')
     ) {
       // base64 접두사를 제거하고 URL로 처리
-      const cleanUrl = url.replace(/^data:image\/png;base64,/, '');
+      const cleanUrl = trimmedUrl.replace(/^data:image\/png;base64,/, '');
       const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
       const path = cleanUrl.startsWith('/') ? cleanUrl : `/${cleanUrl}`;
       return `${baseUrl}${path}`;
     }
     // 이미 전체 URL인 경우 (http:// 또는 https://로 시작)
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      return url;
+    if (trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://')) {
+      return trimmedUrl;
     }
     // base64 데이터 URL인 경우 그대로 반환 (실제 base64 데이터인 경우)
-    if (url.startsWith('data:image/') && !url.includes('data/admin/')) {
-      return url;
+    if (trimmedUrl.startsWith('data:image/') && !trimmedUrl.includes('data/admin/')) {
+      return trimmedUrl;
+    }
+    // base64 문자열인 경우 (data URL이 없는 경우)
+    const isLikelyBase64 =
+      trimmedUrl.length > 80 &&
+      !trimmedUrl.startsWith('data/admin/') &&
+      !trimmedUrl.startsWith('/data/') &&
+      !trimmedUrl.startsWith('/') &&
+      /^[A-Za-z0-9+/=_-]+$/.test(trimmedUrl);
+    if (isLikelyBase64) {
+      return `data:image/png;base64,${trimmedUrl}`;
     }
     // 상대 경로인 경우 CONFIG.serverUrl과 결합
     // data/admin/로 시작하는 경우도 처리
     const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
-    const path = url.startsWith('/') ? url : `/${url}`;
+    const path = trimmedUrl.startsWith('/') ? trimmedUrl : `/${trimmedUrl}`;
     return `${baseUrl}${path}`;
   };
 

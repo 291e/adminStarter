@@ -15,6 +15,7 @@ import type { CategoryItem } from './CategorySettingsModal';
 
 type Props = {
   categories: CategoryItem[];
+  showInactive?: boolean;
   category: string;
   onChangeCategory: (value: string) => void;
   startDate: Dayjs | null;
@@ -29,6 +30,7 @@ type Props = {
 
 export default function LibraryReportFilters({
   categories,
+  showInactive = false,
   category,
   onChangeCategory,
   startDate,
@@ -40,6 +42,8 @@ export default function LibraryReportFilters({
   searchValue,
   onChangeSearchValue,
 }: Props) {
+  const visibleCategories = showInactive ? categories : categories.filter((cat) => cat.isActive);
+
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ p: 2.5 }}>
@@ -52,13 +56,11 @@ export default function LibraryReportFilters({
             onChange={(e) => onChangeCategory(e.target.value)}
           >
             <MenuItem value="all">전체</MenuItem>
-            {categories
-              .filter((cat) => cat.isActive)
-              .map((cat) => (
-                <MenuItem key={cat.id} value={cat.name}>
-                  {cat.name}
-                </MenuItem>
-              ))}
+            {visibleCategories.map((cat) => (
+              <MenuItem key={cat.id} value={cat.name}>
+                {cat.name}
+              </MenuItem>
+            ))}
           </Select>
         </FormControl>
 

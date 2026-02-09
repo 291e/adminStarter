@@ -11,6 +11,7 @@ import RadioGroup from '@mui/material/RadioGroup';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Radio from '@mui/material/Radio';
 import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
 
 import { Iconify } from 'src/components/iconify';
 import axiosInstance from 'src/lib/axios';
@@ -18,6 +19,7 @@ import { endpoints } from 'src/lib/axios';
 
 import type {
   Table2400TBMData,
+  Table2400TBMEducationMethod,
   Table2400TBMEducationVideoRow,
   InvestigationTeamMember,
 } from '../../types/table-data';
@@ -66,6 +68,15 @@ export default function Table2400TBMForm({
   safetySystemDocumentIdx,
 }: Props) {
   const queryClient = useQueryClient();
+
+  const normalizeEducationMethod = (method?: Table2400TBMEducationMethod) => {
+    if (method === 'IN_PERSON') return 'OFFLINE';
+    if (method === 'VIDEO') return 'ONLINE';
+    return method ?? 'ONLINE';
+  };
+
+  const normalizedEducationMethod = normalizeEducationMethod(data.educationMethod);
+  const isOffline = normalizedEducationMethod === 'OFFLINE';
 
   const [draggedInspectionIndex, setDraggedInspectionIndex] = useState<number | null>(null);
 
@@ -436,7 +447,7 @@ export default function Table2400TBMForm({
             ...prev,
             educationVideoRows: newRows,
             educationType: video.educationType || prev.educationType,
-            educationMethod: prev.educationMethod ?? 'VIDEO',
+            educationMethod: normalizeEducationMethod(prev.educationMethod),
           };
         }
 
@@ -452,18 +463,18 @@ export default function Table2400TBMForm({
           educationVideoRows: newRows,
           educationContent: nextContent,
           educationType: video.educationType || prev.educationType,
-          educationMethod: prev.educationMethod ?? 'VIDEO',
+          educationMethod: normalizeEducationMethod(prev.educationMethod),
         };
       });
       setEducationVideoModalRowIndex(null);
     }
   };
 
-  const handleEducationMethodChange = (value: 'VIDEO' | 'IN_PERSON') => {
+  const handleEducationMethodChange = (value: 'ONLINE' | 'OFFLINE') => {
     onDataChange((prev) => {
       const clearedRows = prev.educationVideoRows.map((row) => ({
         ...row,
-        ...(value === 'VIDEO'
+        ...(value === 'ONLINE'
           ? { evidenceFileName: undefined, evidenceFileUrl: undefined }
           : { educationVideo: '', vodIdx: undefined, workerSignatureIdx: undefined, signature: '' }),
       }));
@@ -477,6 +488,37 @@ export default function Table2400TBMForm({
 
   const handleEducationTypeChange = (value: 'MANDATORY' | 'REGULAR') => {
     onDataChange((prev) => ({ ...prev, educationType: value }));
+  };
+
+  const handleEducationTimeMinutesChange = (value: string) => {
+    const numeric = value === '' ? undefined : Number(value);
+    const nextValue =
+      typeof numeric === 'number' && Number.isFinite(numeric)
+        ? Math.max(0, Math.floor(numeric))
+        : undefined;
+    onDataChange((prev) => ({ ...prev, educationTimeMinutes: nextValue }));
+  };
+
+  const getSignatureSrc = (signature?: string) => {
+    if (!signature) return null;
+    const trimmed = signature.trim();
+    if (!trimmed || trimmed === 'SIGNED') return null;
+    if (trimmed.startsWith('data:image/') && !trimmed.includes('data/admin/')) {
+      return trimmed;
+    }
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    const isLikelyBase64 =
+      trimmed.length > 80 &&
+      !trimmed.startsWith('data/admin/') &&
+      !trimmed.startsWith('/data/') &&
+      !trimmed.startsWith('/') &&
+      /^[A-Za-z0-9+/=_-]+$/.test(trimmed);
+    if (isLikelyBase64) {
+      return `data:image/png;base64,${trimmed}`;
+    }
+    return trimmed;
   };
 
   const handleEvidenceSelectClick = (index: number) => {
@@ -553,7 +595,7 @@ export default function Table2400TBMForm({
     }
 
     const currentRow = data.educationVideoRows[participantModalState.index];
-    const isVideoMethod = (data.educationMethod ?? 'VIDEO') === 'VIDEO';
+    const isVideoMethod = normalizeEducationMethod(data.educationMethod) === 'ONLINE';
     console.log('🔍 [대상자 선택] 현재 행 정보:', {
       rowIndex: participantModalState.index,
       currentRow,
@@ -756,7 +798,7 @@ export default function Table2400TBMForm({
     }
   };
 
-  const isInPerson = (data.educationMethod ?? 'VIDEO') === 'IN_PERSON';
+  const isInPerson = isOffline;
 
   // 동일한 영상(vodIdx)을 가진 행들을 그룹화하여 rowspan 계산
   const rowGroups = useMemo(() => {
@@ -789,7 +831,7 @@ export default function Table2400TBMForm({
     }
 
     return groups;
-  }, [data.educationVideoRows]);
+  }, [data.educationVideoRows, isInPerson]);
 
   // 각 행이 그룹의 첫 번째 행인지 확인하는 함수
   const getRowGroupInfo = (index: number) => {
@@ -823,13 +865,14 @@ export default function Table2400TBMForm({
 
   return (
     <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-      {/* 0. 교육 방법 / 교육 구분 */}
+      {/* 0. 교육 방법 / 교육 구분 / 교육 시간 */}
       <Box sx={{ pb: 5, width: '100%' }}>
         <Box component="table" sx={tableStyle}>
           <thead>
             <tr>
-              <th style={{ width: '50%' }}>교육 방법</th>
-              <th style={{ width: '50%' }}>교육 구분</th>
+              <th style={{ width: '34%' }}>교육 방법</th>
+              <th style={{ width: '33%' }}>교육 구분</th>
+              <th style={{ width: '33%' }}>교육 시간(분)</th>
             </tr>
           </thead>
           <tbody>
@@ -838,15 +881,19 @@ export default function Table2400TBMForm({
                 <FormControl component="fieldset" sx={{ width: '100%' }}>
                   <RadioGroup
                     row
-                    value={data.educationMethod ?? 'VIDEO'}
+                    value={normalizedEducationMethod}
                     onChange={(e) =>
-                      handleEducationMethodChange(e.target.value as 'VIDEO' | 'IN_PERSON')
+                      handleEducationMethodChange(e.target.value as 'ONLINE' | 'OFFLINE')
                     }
                     sx={{ justifyContent: 'center' }}
                   >
-                    <FormControlLabel value="VIDEO" control={<Radio size="small" />} label="영상" />
                     <FormControlLabel
-                      value="IN_PERSON"
+                      value="ONLINE"
+                      control={<Radio size="small" />}
+                      label="온라인(영상)"
+                    />
+                    <FormControlLabel
+                      value="OFFLINE"
                       control={<Radio size="small" />}
                       label="집체"
                     />
@@ -875,6 +922,23 @@ export default function Table2400TBMForm({
                     />
                   </RadioGroup>
                 </FormControl>
+              </td>
+              <td>
+                {isOffline ? (
+                  <TextField
+                    size="small"
+                    type="number"
+                    value={data.educationTimeMinutes ?? ''}
+                    onChange={(e) => handleEducationTimeMinutesChange(e.target.value)}
+                    placeholder="분"
+                    inputProps={{ min: 0, step: 1 }}
+                    sx={{ maxWidth: 140 }}
+                  />
+                ) : (
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                    VOD 길이 자동 계산
+                  </Typography>
+                )}
               </td>
             </tr>
           </tbody>
@@ -1041,8 +1105,12 @@ export default function Table2400TBMForm({
                     </Stack>
                   </td>
                   <td>
-                    {row.signature ? (
-                      <Box component="img" src={row.signature} sx={{ maxHeight: 30 }} />
+                    {getSignatureSrc(row.signature) ? (
+                      <Box
+                        component="img"
+                        src={getSignatureSrc(row.signature) || ''}
+                        sx={{ maxHeight: 30 }}
+                      />
                     ) : (
                       <Button
                         variant="outlined"

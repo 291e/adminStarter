@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   ref,
   push,
+  set,
   update,
   onChildAdded,
   onValue,
@@ -15,6 +16,7 @@ import {
 } from 'firebase/database';
 import { database } from 'src/config/firebase';
 import { useAuthContext } from 'src/auth/hooks';
+import { sendPushNotification } from 'src/services/notification/notification.service';
 
 // ----------------------------------------------------------------------
 
@@ -158,26 +160,21 @@ const resolveAttachmentType = (
   return 'FILE';
 };
 
-const resolveSenderName = (user: ReturnType<typeof useAuthContext>['user']) => {
-  return (
-    user?.memberName ||
-    user?.name ||
-    user?.member?.memberName ||
-    user?.member?.name ||
-    user?.companyMember?.memberName ||
-    ''
-  );
-};
+const resolveSenderName = (user: ReturnType<typeof useAuthContext>['user']) =>
+  user?.memberName ||
+  user?.name ||
+  user?.displayName ||
+  user?.memberNameOrg ||
+  user?.member?.memberName ||
+  user?.member?.name ||
+  user?.companyMember?.memberName ||
+  (user as any)?.memberName ||
+  '';
 
-export function useChatRoomFirebase({
-  chatRoomId,
-  memberIdx,
-}: UseChatRoomFirebaseProps) {
+export function useChatRoomFirebase({ chatRoomId, memberIdx }: UseChatRoomFirebaseProps) {
   const { user } = useAuthContext();
   const [messages, setMessages] = useState<FirebaseMessage[]>([]);
-  const [participantsMeta, setParticipantsMeta] = useState<
-    Record<string, ParticipantPresence>
-  >({});
+  const [participantsMeta, setParticipantsMeta] = useState<Record<string, ParticipantPresence>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [oldestTimestamp, setOldestTimestamp] = useState<number | null>(null);
@@ -224,9 +221,7 @@ export function useChatRoomFirebase({
         }
         setHasMore(loaded.length >= 50);
 
-        const lastTimestamp = loaded.length
-          ? getMessageTimestamp(loaded[loaded.length - 1])
-          : 0;
+        const lastTimestamp = loaded.length ? getMessageTimestamp(loaded[loaded.length - 1]) : 0;
         const liveQuery = query(
           messagesRef,
           orderByChild('timestamp'),
@@ -406,6 +401,21 @@ export function useChatRoomFirebase({
 
       const senderId = String(senderMemberIdx);
       const senderName = resolveSenderName(user);
+      if (import.meta.env.DEV && !senderName) {
+        const nameKeys = [
+          'memberName',
+          'name',
+          'displayName',
+          'memberNameOrg',
+          'member',
+          'companyMember',
+        ];
+        const nameCandidates = nameKeys.reduce(
+          (acc, k) => ({ ...acc, [k]: (user as any)?.[k] }),
+          {} as Record<string, unknown>
+        );
+        console.debug('[chat] 푸시 발신자 이름 없음 — auth user 이름 후보:', nameCandidates);
+      }
       const sourceLang =
         (user as any)?.memberLang ||
         (user as any)?.language ||
@@ -477,7 +487,7 @@ export function useChatRoomFirebase({
           senderMemberIdx,
         });
 
-        await newMessageRef.set(messageData);
+        await set(newMessageRef, messageData);
         await update(ref(db, `chatRooms/${chatRoomId}`), {
           lastMessage: messageData,
           lastMessageAt: timestamp,
@@ -496,7 +506,7 @@ export function useChatRoomFirebase({
                   : ({} as Record<string, any>);
 
               if (String(map.lastMessageId || '') === messageId) {
-                return;
+                return undefined;
               }
 
               if (pid === senderId) {
@@ -511,6 +521,52 @@ export function useChatRoomFirebase({
             });
           });
           await Promise.all(updates.filter(Boolean));
+        }
+
+        // Android/iOS 푸시: 발신자 제외, 현재 방에 있는 참가자 제외 (lastSeen이 최근이면 방 안에 있는 것으로 간주)
+        const IN_ROOM_LAST_SEEN_MS = 60 * 1000; // 60초 이내 lastSeen이면 방 안에 있음
+        const nowMs = Date.now();
+        const isInRoom = (pid: string) => {
+          const p = participants?.[pid];
+          if (!p || typeof p !== 'object') return false;
+          const lastSeen = p.lastSeen;
+          if (lastSeen == null) return false;
+          const lastSeenMs =
+            typeof lastSeen === 'number' ? lastSeen : new Date(String(lastSeen)).getTime();
+          return !Number.isNaN(lastSeenMs) && nowMs - lastSeenMs < IN_ROOM_LAST_SEEN_MS;
+        };
+        const otherParticipantIds =
+          participants && typeof participants === 'object'
+            ? Object.keys(participants).filter(
+                (pid) => pid !== senderId && pid !== 'chatbot' && !isInRoom(pid)
+              )
+            : [];
+        const memberIndexes = otherParticipantIds
+          .map((id) => Number(id))
+          .filter((n) => !Number.isNaN(n) && n > 0);
+        if (memberIndexes.length > 0) {
+          const pushBody =
+            messageData.messageType === 'TEXT'
+              ? (messageData.message || '').slice(0, 50)
+              : messageData.messageType === 'IMAGE'
+                ? '[이미지]'
+                : messageData.messageType === 'VIDEO'
+                  ? '[동영상]'
+                  : messageData.messageType === 'FILE'
+                    ? '[파일]'
+                    : '[메시지]';
+          // 푸시 알림: "보내는 사람 이름: 메시지 내용" (이름은 messageData.senderName 우선)
+          const displayName =
+            (messageData.senderName && String(messageData.senderName).trim()) ||
+            senderName ||
+            '새 메시지';
+          sendPushNotification({
+            memberIndexes: memberIndexes.join(','),
+            message: pushBody ? `${displayName}: ${pushBody}` : displayName,
+            link: `/dashboard/chat?room=${chatRoomId}`,
+          }).catch((err) => {
+            console.warn('[chat] push 알림 요청 실패', err);
+          });
         }
       } catch (error) {
         console.error('Failed to send message:', error);

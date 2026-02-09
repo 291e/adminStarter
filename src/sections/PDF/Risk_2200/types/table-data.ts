@@ -166,10 +166,18 @@ export type Table2400TBMEducationVideoRow = {
   workerSignatureIdx?: number; // 근로자 서명 Index (서명 등록 후 저장)
 };
 
+export type Table2400TBMEducationMethod =
+  | 'ONLINE'
+  | 'OFFLINE'
+  | 'VIDEO' // legacy
+  | 'IN_PERSON'; // legacy
+
 export type Table2400TBMData = {
   inspectionRows: Table2400TBMInspectionRow[]; // 점검내용 테이블
-  educationMethod?: 'VIDEO' | 'IN_PERSON'; // 교육 방법 (영상/집체)
+  educationApply?: 0 | 1; // 교육 자동 반영 여부 (0/1)
+  educationMethod?: Table2400TBMEducationMethod; // 교육 방법 (온라인/오프라인)
   educationType?: 'MANDATORY' | 'REGULAR'; // 교육 구분 (의무/정기)
+  educationTimeMinutes?: number | null; // 집체 교육 시간(분)
   educationContent: string; // 교육내용
   educationVideoRows: Table2400TBMEducationVideoRow[]; // 교육영상 테이블
 };

@@ -31,6 +31,17 @@ export type SaveBoardCategoriesParams = {
 
 export type SaveBoardCategoriesResponse = BaseResponseDto;
 
+export type BoardCommentInformation = {
+  commentIdx?: number;
+  commentContent?: string;
+  commentFilePath?: string;
+  commentCreateAt?: string;
+  memberIdx?: number;
+  memberId?: string;
+  memberName?: string;
+  memberThumbnail?: string;
+};
+
 export type BoardPost = {
   postIdx?: number;
   postGubun?: PostGubun | string;
@@ -44,15 +55,23 @@ export type BoardPost = {
   postStatus?: PostStatus;
   postCategoryIdx?: number;
   postCategoryTitle?: string;
+  categoryIdx?: number; // API 응답에서 오는 경우
+  categoryTitle?: string; // API 응답에서 오는 경우
+  categoryType?: string; // API 응답에서 오는 경우
   postViews?: number;
+  viewCount?: number; // API 응답에서 오는 경우
   adminName?: string;
   memberName?: string;
+  memberEmail?: string; // API 응답에서 오는 경우
+  memberId?: string; // 회원 ID
+  memberPhone?: string; // 전화번호
   createAt?: string;
   updateAt?: string;
   registrationDate?: string;
   postAnswerStatus?: number;
   postAnswerContent?: string;
   postAnswerAt?: string;
+  commentInformation?: BoardCommentInformation; // 답변 정보
 };
 
 export type GetBoardPostsParams = {

@@ -307,7 +307,7 @@ export default function EducationDetailModal({ open, onClose, educationReportIdx
     (sum, record) => sum + (record.educationTime || record.educationHours || 0),
     0
   );
-  const totalTime = mandatoryTotal + regularTotal;
+  const totalTime = regularTotal;
   const remainingTime = Math.max(0, (report?.standardEducation || 0) - totalTime);
 
   if (!educationReportIdx && !isLoading) {

@@ -36,6 +36,7 @@ import type {
   Table2200Row,
   Table2300Row,
   Table2400TBMData,
+  Table2400TBMEducationMethod,
   Table2400TBMEducationVideoRow,
   Table2400EducationRow,
   Table2400MinimumEducationRow,
@@ -373,8 +374,10 @@ export function Risk_2200EditView({
       { inspectionContent: '작업장 정리/정돈, 통보 확보', result: '' },
       { inspectionContent: '점검결과 조치사항', result: '' },
     ],
-    educationMethod: 'VIDEO',
+    educationApply: 0,
+    educationMethod: 'ONLINE',
     educationType: 'MANDATORY',
+    educationTimeMinutes: undefined,
     educationContent: '',
     educationVideoRows: [
       {
@@ -384,6 +387,12 @@ export function Risk_2200EditView({
       },
     ],
   });
+
+  const normalizeTbmEducationMethod = (method?: Table2400TBMEducationMethod) => {
+    if (method === 'IN_PERSON') return 'OFFLINE';
+    if (method === 'VIDEO') return 'ONLINE';
+    return method ?? 'ONLINE';
+  };
   const [table2400EducationRows, setTable2400EducationRows] = useState<Table2400EducationRow[]>([
     {
       number: 1,
@@ -654,10 +663,18 @@ export function Risk_2200EditView({
 
   // 초기 로드 여부 추적 (사용자 수정 상태 보호)
   const isInitialLoadRef = useRef(true);
+  const initialWorkerListRef = useRef<string[] | null>(null);
+  const initialWorkerListDocRef = useRef<number | null>(null);
 
   // 기존 문서 데이터 로드
   useEffect(() => {
     if (!currentDocument) return;
+
+    const currentDocId = currentDocument.safetySystemDocumentIdx;
+    if (currentDocId && initialWorkerListDocRef.current !== currentDocId) {
+      initialWorkerListDocRef.current = currentDocId;
+      initialWorkerListRef.current = null;
+    }
 
     // 초기 로드가 아니고 사용자가 수정한 상태가 있으면 덮어쓰지 않음
     if (!isInitialLoadRef.current) {
@@ -708,6 +725,21 @@ export function Risk_2200EditView({
 
     if (parsedTableData) {
       const tableType = parsedTableData.tableType;
+
+      if (
+        tableType === '2400-tbm' &&
+        parsedTableData.data?.educationVideoRows &&
+        !initialWorkerListRef.current
+      ) {
+        const toKey = (row: any) =>
+          row?.participant?.memberIdx && row?.vodIdx
+            ? `${row.participant.memberIdx}:${row.vodIdx}`
+            : null;
+        const keys = parsedTableData.data.educationVideoRows
+          .map((row: any) => toKey(row))
+          .filter(Boolean) as string[];
+        initialWorkerListRef.current = keys;
+      }
 
       // documentType 자동 추론
       if (tableType === '1200-industrial') {
@@ -802,12 +834,24 @@ export function Risk_2200EditView({
             };
           }
 
+          const documentEducationApply = (currentDocument as any)?.educationApply;
+          const documentEducationType = (currentDocument as any)?.educationType;
+          const documentEducationMethod = (currentDocument as any)?.educationMethod;
+          const documentEducationTimeMinutes = (currentDocument as any)?.educationTimeMinutes;
+
           return {
             inspectionRows: processedData.inspectionRows,
             educationContent: processedData.educationContent,
             educationVideoRows: processedData.educationVideoRows || [],
-            educationMethod: processedData.educationMethod ?? 'VIDEO',
-            educationType: processedData.educationType ?? 'MANDATORY',
+            educationApply:
+              processedData.educationApply === 1 || documentEducationApply === 1 ? 1 : 0,
+            educationMethod: normalizeTbmEducationMethod(
+              (processedData.educationMethod ??
+                documentEducationMethod) as Table2400TBMEducationMethod
+            ),
+            educationType: processedData.educationType ?? documentEducationType ?? 'MANDATORY',
+            educationTimeMinutes:
+              processedData.educationTimeMinutes ?? documentEducationTimeMinutes ?? undefined,
           };
         });
       } else if (tableType === '2400-education') {
@@ -879,7 +923,30 @@ export function Risk_2200EditView({
               });
               return prev;
             }
-            return tableData.data as Table2400TBMData;
+            const raw = tableData.data as Table2400TBMData;
+            const documentEducationApply = (currentDocument as any)?.educationApply;
+            const documentEducationType = (currentDocument as any)?.educationType;
+            const documentEducationMethod = (currentDocument as any)?.educationMethod;
+            const documentEducationTimeMinutes = (currentDocument as any)?.educationTimeMinutes;
+
+            return {
+              ...prev,
+              ...raw,
+              educationApply:
+                raw.educationApply === 1 || documentEducationApply === 1 ? 1 : 0,
+              educationMethod: normalizeTbmEducationMethod(
+                (raw.educationMethod ??
+                  documentEducationMethod) as Table2400TBMEducationMethod
+              ),
+              educationType: raw.educationType ?? documentEducationType ?? prev.educationType,
+              educationTimeMinutes:
+                raw.educationTimeMinutes ??
+                documentEducationTimeMinutes ??
+                prev.educationTimeMinutes,
+              educationContent: raw.educationContent ?? prev.educationContent,
+              educationVideoRows: raw.educationVideoRows ?? prev.educationVideoRows,
+              inspectionRows: raw.inspectionRows ?? prev.inspectionRows,
+            };
           });
         } else if (tableData.type === '2400-education') {
           setTable2400EducationRows(tableData.rows as Table2400EducationRow[]);
@@ -1604,6 +1671,15 @@ export function Risk_2200EditView({
       approvalStep, // approvalStep 포함
     };
 
+    if (is2400TBM) {
+      const normalizedMethod = normalizeTbmEducationMethod(table2400TBMData.educationMethod);
+      requestData.educationType = table2400TBMData.educationType;
+      requestData.educationMethod = normalizedMethod;
+      if (normalizedMethod === 'OFFLINE') {
+        requestData.educationTimeMinutes = table2400TBMData.educationTimeMinutes ?? undefined;
+      }
+    }
+
     // 2400 TBM 문서인 경우 workerList 추가
     if (is2400TBM && table2400TBMData) {
       console.log('🔍 [문서 수정] 2400 TBM 데이터 확인:', {
@@ -1630,8 +1706,36 @@ export function Risk_2200EditView({
         })),
       });
 
-      if (workerList.length > 0) {
+      const existingWorkerSource =
+        (currentDocument as any)?.workerSignatureList ||
+        (currentDocument as any)?.educationVideoRows ||
+        [];
+      const existingWorkerList = Array.isArray(existingWorkerSource)
+        ? existingWorkerSource
+            .filter((row: any) => row?.targetMemberIdx && row?.vodIdx)
+            .map((row: any) => ({
+              targetMemberIdx: row.targetMemberIdx,
+              vodIdx: row.vodIdx,
+            }))
+        : [];
+
+      const toKey = (w: { targetMemberIdx: number; vodIdx: number }) =>
+        `${w.targetMemberIdx}:${w.vodIdx}`;
+      const nextKeySet = new Set(workerList.map(toKey));
+      const initialKeys =
+        initialWorkerListRef.current && initialWorkerListRef.current.length > 0
+          ? initialWorkerListRef.current
+          : existingWorkerList.map(toKey);
+      const existingKeySet = new Set(initialKeys);
+      const isSameWorkerList =
+        nextKeySet.size === existingKeySet.size &&
+        Array.from(nextKeySet).every((key) => existingKeySet.has(key));
+
+      if (workerList.length > 0 && !isSameWorkerList) {
         requestData.workerList = workerList;
+        console.log('✅ [문서 수정] workerList 변경 감지 → API 전송');
+      } else if (workerList.length > 0 && isSameWorkerList) {
+        console.log('ℹ️ [문서 수정] workerList 동일 → 전송 생략 (서명 유지)');
       } else {
         console.warn('⚠️ [문서 수정] workerList가 비어있습니다. educationVideoRows 확인:', {
           educationVideoRows: table2400TBMData.educationVideoRows.map((row, idx) => ({

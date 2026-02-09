@@ -6,6 +6,7 @@ import Container from '@mui/material/Container';
 
 import { DashboardContent } from 'src/layouts/dashboard';
 import InquiryHeader from './components/header';
+import type { BoardCommentInformation } from 'src/services/board/board.types';
 
 // ----------------------------------------------------------------------
 
@@ -16,6 +17,7 @@ type Props = {
     title: string;
     content: string;
     answer?: string;
+    commentInformation?: BoardCommentInformation; // 답변 정보
   };
 };
 
@@ -127,7 +129,12 @@ export default function InquiryDetailsView({ onBack, inquiry }: Props) {
                     variant="body2"
                     component="div"
                     sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}
-                    dangerouslySetInnerHTML={{ __html: inquiry.answer || '답변 대기 중입니다.' }}
+                    dangerouslySetInnerHTML={{
+                      __html:
+                        inquiry.commentInformation?.commentContent ||
+                        inquiry.answer ||
+                        '답변 대기 중입니다.',
+                    }}
                   />
                 </Box>
               </Box>

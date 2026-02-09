@@ -34,9 +34,15 @@ export function AuthProvider({ children }: Props) {
 
         const res = await axios.get(endpoints.auth.me);
 
-        const { user } = res.data;
+        // body.data가 평탄화되어 오면 res.data = { memberIdx, memberName, ..., header } 또는 { user: {...}, header }
+        // user 키가 없으면 res.data 전체(header 제외)를 user로 사용; data 한 단계 감싼 경우도 처리
+        const { user: userFromData, header, data: nestedData, ...restData } = res.data || {};
+        const user = userFromData ?? nestedData ?? restData;
 
-        setState({ user: { ...user, accessToken }, loading: false });
+        setState({
+          user: user && typeof user === 'object' ? { ...user, accessToken } : null,
+          loading: false,
+        });
       } else {
         setState({ user: null, loading: false });
       }
@@ -57,7 +63,6 @@ export function AuthProvider({ children }: Props) {
       initWebFcm();
     }
   }, [state.user]);
-
 
   const checkAuthenticated = state.user ? 'authenticated' : 'unauthenticated';
 

@@ -2,12 +2,14 @@
 
 import type { BaseResponseDto } from '../common';
 
-// 푸시 알림 전송 요청
+// 푸시 알림 전송 요청 (백엔드 SendNotificationByMemberIndexesDto)
 export type SendPushNotificationDto = {
-  memberIndexes: number[];
-  title: string;
+  /** 멤버 인덱스들 (쉼표 구분 문자열, 예: "1,2,3") */
+  memberIndexes: string;
+  /** 알림 제목 */
   message: string;
-  data?: Record<string, unknown>;
+  /** 클릭 시 이동할 링크 (선택) */
+  link?: string;
 };
 
 // 알림 이력 조회 파라미터
@@ -49,6 +51,9 @@ export type SafetySystemDocumentInformation = {
 export type NotificationHistoryItem = {
   documentNotificationIdx: number;
   notificationType: NotificationType;
+  message?: string; // 알림 메시지 (백엔드에서 제공될 수 있음)
+  notificationMessage?: string; // 다른 필드명 호환
+  senderName?: string; // 완료/발송자 이름 등
   scheduledAt: string;
   sentAt: string | null;
   reminderDays: number | null;

@@ -170,7 +170,7 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
     const mandatoryTotal =
       typeof detail.mandatoryEducation === 'number' ? detail.mandatoryEducation : 0;
     const regularTotal = typeof detail.regularEducation === 'number' ? detail.regularEducation : 0;
-    const totalTime = mandatoryTotal + regularTotal;
+    const totalTime = regularTotal;
     // 이수 기준시간 (standardEducation 또는 totalEducation 사용)
     const standardTime =
       typeof detail.standardEducation === 'number'
@@ -266,7 +266,7 @@ export default function EducationDetailModal({ open, onClose, onSave, user }: Pr
     (sum, record) => sum + (record.educationTime || 0),
     0
   );
-  const totalTime = mandatoryTotal + regularTotal;
+  const totalTime = regularTotal;
   const remainingTime = Math.max(0, (educationDetail.standardTime || 0) - totalTime);
 
   // 페이지네이션 계산

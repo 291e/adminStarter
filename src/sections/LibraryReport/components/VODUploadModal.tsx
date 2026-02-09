@@ -353,8 +353,8 @@ export default function VODUploadModal({ open, onClose, onSave, categories }: Pr
   };
 
   const handleClose = () => {
-    if (uploadStep === 'processing') {
-      // 처리 중일 때는 닫기 방지
+    if (uploadStep === 'uploading' || uploadStep === 'processing') {
+      // 업로드/처리 중일 때는 닫기 방지 (백드롭 클릭·ESC·닫기 버튼 모두)
       return;
     }
     setFormData({

@@ -126,9 +126,6 @@ const VideoPlayerWithSubtitle = ({
         borderColor: 'divider',
       }}
     >
-      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-        {videoTitle}
-      </Typography>
       <VideoPlayer
         vodIdx={vodIdx}
         videoUrl={videoUrl}
@@ -159,7 +156,7 @@ export default function SharedDocumentDetailModal({
   // 현재 재생 중인 영상 상태
   const [playingVideoRow, setPlayingVideoRow] = useState<{
     vodIdx: number;
-    workerSignatureIdx: number;
+    workerSignatureIdx: number | null;
     rowIndex: number;
     videoTitle?: string;
   } | null>(null);
@@ -216,9 +213,57 @@ export default function SharedDocumentDetailModal({
   const originalDocument =
     sharedDocument?.originalDocument || safetySystemDocumentDetail?.originalDocument;
 
-  const workerSignatureList = (originalDocument as any)?.workerSignatureList as
+  // 공유 문서의 원본이 안전시스템 문서일 경우 최신 서명 상태를 위해 별도 조회
+  const safetySystemDocumentIdxFromShared =
+    isUsingSharedDocument && sharedDocument?.referenceType === 'SAFETY_SYSTEM_DOCUMENT'
+      ? Number(sharedDocument?.referenceId)
+      : undefined;
+
+  const { data: safetySystemDocumentDetailFromShared } =
+    useQuery<GetSafetySystemDocumentDetailResponse>({
+      queryKey: ['safetySystemDocumentDetail', safetySystemDocumentIdxFromShared],
+      queryFn: () =>
+        getSafetySystemDocumentDetail({
+          safetySystemDocumentIdx: safetySystemDocumentIdxFromShared!,
+        }),
+      enabled: open && isUsingSharedDocument && !!safetySystemDocumentIdxFromShared,
+    });
+
+  const workerSignatureSourceDocument =
+    safetySystemDocumentDetailFromShared?.originalDocument || originalDocument;
+
+  const workerSignatureList = (workerSignatureSourceDocument as any)?.workerSignatureList as
     | WorkerSignatureStatusInfo[]
     | undefined;
+
+  const resolvedWorkerSignatureList = useMemo(() => {
+    if (Array.isArray(workerSignatureList) && workerSignatureList.length > 0) {
+      return workerSignatureList;
+    }
+
+    const fallbackRows = (workerSignatureSourceDocument as any)?.educationVideoRows;
+    if (Array.isArray(fallbackRows) && fallbackRows.length > 0) {
+      return fallbackRows.map((row: any) => ({
+        documentWorkerSignatureIdx:
+          row.documentWorkerSignatureIdx ?? row.workerSignatureIdx ?? undefined,
+        workerSignatureIdx: row.workerSignatureIdx ?? undefined,
+        targetMemberIdx: row.targetMemberIdx,
+        signatureData: row.signatureData ?? row.signature ?? undefined,
+        status: row.status,
+        vodIdx: row.vodIdx,
+        signedAt: row.signedAt,
+        watchProgress: row.watchProgress,
+        watchedAt: row.watchedAt,
+        memberName: row.memberName,
+        memberEmail: row.memberEmail,
+        memberRole: row.memberRole,
+        position: row.position,
+        department: row.department,
+      })) as WorkerSignatureStatusInfo[];
+    }
+
+    return undefined;
+  }, [workerSignatureList, workerSignatureSourceDocument]);
 
   // tableData 파싱 및 최신 서명 정보 병합
   const parsedTableData = useMemo(() => {
@@ -230,10 +275,11 @@ export default function SharedDocumentDetailModal({
           : originalDocument.tableData;
 
       // 2400-tbm 타입이고 workerSignatureList가 있는 경우 서명 정보 업데이트
+      const tableType = tableData?.tableType || tableData?.type;
       if (
-        tableData?.type === '2400-tbm' &&
+        tableType === '2400-tbm' &&
         tableData?.data?.educationVideoRows &&
-        workerSignatureList
+        resolvedWorkerSignatureList
       ) {
         // educationVideoRows 업데이트
         // 타입 캐스팅을 통해 Table2400TBMData 구조에 맞게 처리
@@ -244,15 +290,28 @@ export default function SharedDocumentDetailModal({
           if (!row.participant?.memberIdx) return row;
 
           // 해당 대상자의 최신 서명/상태 정보 찾기
-          const workerInfo = workerSignatureList.find(
-            (worker) => worker.targetMemberIdx === row.participant?.memberIdx
-          );
+          const workerInfo = resolvedWorkerSignatureList.find((worker) => {
+            if (worker.targetMemberIdx !== row.participant?.memberIdx) {
+              return false;
+            }
+            if (worker.vodIdx && row.vodIdx) {
+              return worker.vodIdx === row.vodIdx;
+            }
+            return true;
+          });
 
           if (workerInfo) {
+            const signatureData =
+              (workerInfo as any).signatureData ?? (workerInfo as any).signature ?? row.signature;
+            const resolvedSignature =
+              signatureData || workerInfo.status === 'SIGNED' ? signatureData || 'SIGNED' : '';
             return {
               ...row,
-              workerSignatureIdx: workerInfo.workerSignatureIdx, // workerSignatureIdx 주입 (중요: 이것이 없으면 404 발생)
-              signature: workerInfo.signatureData || row.signature || '', // 최신 서명 이미지 사용
+              workerSignatureIdx:
+                workerInfo.documentWorkerSignatureIdx ??
+                workerInfo.workerSignatureIdx ??
+                row.workerSignatureIdx,
+              signature: resolvedSignature || row.signature || '', // 최신 서명 이미지 사용
               // 필요한 경우 status 등 다른 정보도 업데이트 가능
             };
           }
@@ -270,7 +329,7 @@ export default function SharedDocumentDetailModal({
       console.error('tableData 파싱 실패:', parseError);
       return null;
     }
-  }, [originalDocument?.tableData, workerSignatureList]);
+  }, [originalDocument?.tableData, resolvedWorkerSignatureList]);
 
   // 날짜 포맷팅
   const registeredAt = originalDocument?.createAt
@@ -317,7 +376,11 @@ export default function SharedDocumentDetailModal({
   // 결재 정보 처리
   const approvalStep = originalDocument?.approvalStep || 0;
   const safetySystemDocumentIdx =
-    originalDocument?.safetySystemDocumentIdx || propSafetySystemDocumentIdx || undefined;
+    (workerSignatureSourceDocument as any)?.safetySystemDocumentIdx ||
+    originalDocument?.safetySystemDocumentIdx ||
+    safetySystemDocumentIdxFromShared ||
+    propSafetySystemDocumentIdx ||
+    undefined;
 
   // approvalStep에 따라 결재 정보 매핑
   const approvalSignatures = useMemo(() => {
@@ -464,6 +527,15 @@ export default function SharedDocumentDetailModal({
           queryKey: ['safetySystemDocumentDetail', propSafetySystemDocumentIdx],
         });
       }
+      if (safetySystemDocumentIdx) {
+        queryClient.invalidateQueries({
+          queryKey: ['safetySystemDocumentDetail', safetySystemDocumentIdx],
+        });
+      }
+      // 리스트 진행률/상태 갱신
+      queryClient.invalidateQueries({ queryKey: ['safety-system-item'] });
+      // 서명 대기 문서 목록 갱신
+      queryClient.invalidateQueries({ queryKey: ['pendingSignatures'] });
     },
   });
 
@@ -585,11 +657,20 @@ export default function SharedDocumentDetailModal({
           })
         );
       }
+      if (safetySystemDocumentIdx) {
+        promises.push(
+          queryClient.invalidateQueries({
+            queryKey: ['safetySystemDocumentDetail', safetySystemDocumentIdx],
+          })
+        );
+      }
 
       // 서명 대기 문서 목록 새로고침 (대시보드) - PendingSignaturesCard 갱신용
       promises.push(queryClient.invalidateQueries({ queryKey: ['pendingSignatures'] }));
       // 공유 문서 목록 새로고침
       promises.push(queryClient.invalidateQueries({ queryKey: ['sharedDocuments'] }));
+      // 안전보건체계 문서 목록/진행률 갱신
+      promises.push(queryClient.invalidateQueries({ queryKey: ['safety-system-item'] }));
 
       await Promise.all(promises);
       console.log('✅ 서명 등록 후 모든 관련 쿼리 무효화 완료');
@@ -607,7 +688,7 @@ export default function SharedDocumentDetailModal({
     }
     setPlayingVideoRow({
       vodIdx: row.vodIdx,
-      workerSignatureIdx: row.workerSignatureIdx || 0,
+      workerSignatureIdx: row.workerSignatureIdx ?? null,
       rowIndex,
       videoTitle: row.educationVideo || '교육영상',
     });
@@ -627,15 +708,17 @@ export default function SharedDocumentDetailModal({
 
     // workerSignatureIdx가 있으면 (0 포함) 시청 완료 처리 및 서명 모달 열기
     // undefined 또는 null이 아닌지 체크 (0도 유효한 값으로 처리)
-    if (
-      playingVideoRow.workerSignatureIdx !== undefined &&
-      playingVideoRow.workerSignatureIdx !== null
-    ) {
-      console.log('🎬 [handleVideoEnded] workerSignatureIdx:', playingVideoRow.workerSignatureIdx);
+    const hasValidWorkerSignatureIdx =
+      typeof playingVideoRow.workerSignatureIdx === 'number' &&
+      playingVideoRow.workerSignatureIdx > 0;
+
+    if (hasValidWorkerSignatureIdx) {
+      const workerSignatureIdx = playingVideoRow.workerSignatureIdx;
+      console.log('🎬 [handleVideoEnded] workerSignatureIdx:', workerSignatureIdx);
       console.log('🎬 [handleVideoEnded] 시청 완료 처리 및 서명 모달 열기 시작');
       updateWatchMutation.mutate({
         documentIdx: safetySystemDocumentIdx,
-        workerSignatureIdx: playingVideoRow.workerSignatureIdx,
+        workerSignatureIdx: workerSignatureIdx ?? 0,
       });
     } else {
       // workerSignatureIdx가 없어도 서명 모달은 열기
@@ -650,9 +733,31 @@ export default function SharedDocumentDetailModal({
     if (!playingVideoRow || !safetySystemDocumentIdx) return;
     addWorkerSignatureMutation.mutate({
       documentIdx: safetySystemDocumentIdx,
-      workerSignatureIdx: playingVideoRow.workerSignatureIdx,
+      workerSignatureIdx: playingVideoRow.workerSignatureIdx ?? 0,
       signatureData: signatureDataUrl,
     });
+  };
+
+  const getSignatureSrc = (signature?: string) => {
+    if (!signature) return null;
+    const trimmed = signature.trim();
+    if (!trimmed || trimmed === 'SIGNED') return null;
+    if (trimmed.startsWith('data:image/') && !trimmed.includes('data/admin/')) {
+      return trimmed;
+    }
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    const isLikelyBase64 =
+      trimmed.length > 80 &&
+      !trimmed.startsWith('data/admin/') &&
+      !trimmed.startsWith('/data/') &&
+      !trimmed.startsWith('/') &&
+      /^[A-Za-z0-9+/=_-]+$/.test(trimmed);
+    if (isLikelyBase64) {
+      return `data:image/png;base64,${trimmed}`;
+    }
+    return `${CONFIG.serverUrl}${trimmed}`;
   };
 
   // 2400-tbm 테이블 커스텀 렌더링
@@ -748,7 +853,10 @@ export default function SharedDocumentDetailModal({
               </tr>
             </thead>
             <tbody>
-              {data.educationVideoRows.map((row, index) => (
+              {data.educationVideoRows.map((row, index) => {
+                const signatureSrc = getSignatureSrc(row.signature);
+                const isSigned = Boolean(signatureSrc) || row.signature === 'SIGNED';
+                return (
                 <tr key={index} style={{ height: 48 }}>
                   <td>
                     <Typography sx={{ fontSize: 14, fontWeight: 400 }}>
@@ -762,6 +870,7 @@ export default function SharedDocumentDetailModal({
                         variant={playingVideoRow?.rowIndex === index ? 'outlined' : 'contained'}
                         startIcon={<Iconify icon="solar:play-circle-bold" width={20} />}
                         onClick={() => handleEducationVideoClick(row, index)}
+                        disabled={isSigned}
                         sx={{
                           minHeight: 36,
                           fontSize: 14,
@@ -778,14 +887,10 @@ export default function SharedDocumentDetailModal({
                     )}
                   </td>
                   <td>
-                    {row.signature ? (
+                    {signatureSrc ? (
                       <Box
                         component="img"
-                        src={
-                          row.signature.startsWith('http')
-                            ? row.signature
-                            : `${CONFIG.serverUrl}${row.signature}`
-                        }
+                        src={signatureSrc}
                         alt="서명"
                         sx={{
                           maxWidth: 100,
@@ -793,6 +898,10 @@ export default function SharedDocumentDetailModal({
                           objectFit: 'contain',
                         }}
                       />
+                    ) : row.signature === 'SIGNED' ? (
+                      <Typography sx={{ fontSize: 14, fontWeight: 400, color: 'text.primary' }}>
+                        서명 완료
+                      </Typography>
                     ) : (
                       <Typography sx={{ fontSize: 14, fontWeight: 400, color: 'text.secondary' }}>
                         미서명
@@ -800,7 +909,7 @@ export default function SharedDocumentDetailModal({
                     )}
                   </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </Box>
         </Box>
@@ -1093,7 +1202,10 @@ export default function SharedDocumentDetailModal({
       {/* 비디오 팝업 모달 */}
       <Dialog
         open={videoModalOpen}
-        onClose={() => {
+        onClose={(_event, reason) => {
+          if (reason === 'backdropClick') {
+            return;
+          }
           setVideoModalOpen(false);
           setPlayingVideoRow(null);
         }}

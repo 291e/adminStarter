@@ -77,6 +77,7 @@ export default function SubscriptionService({ organizationId }: Props) {
     price: number;
     icon: string;
     isSubscribed: boolean;
+    memberCount: number;
     serviceSetting: ServiceSetting; // 원본 서비스 설정 정보 보관
   };
 
@@ -100,6 +101,7 @@ export default function SubscriptionService({ organizationId }: Props) {
               : service.monthlyFee || 0,
           icon: 'solar:card-bold', // 기본 아이콘 (필요시 서비스별로 매핑)
           isSubscribed,
+          memberCount: service.memberCount,
           serviceSetting: service, // 원본 정보 보관
         };
       });

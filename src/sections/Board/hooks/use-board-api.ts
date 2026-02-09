@@ -118,10 +118,18 @@ export function useDeleteBoardPosts() {
 }
 
 export function useCreateBoardComment() {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (params: CreateBoardCommentParams) => createBoardComment(params),
-    onSuccess: () => toast.success('댓글이 등록되었습니다.'),
-    onError: (error: any) => toast.error(error?.message || '댓글 등록에 실패했습니다.'),
+    onSuccess: () => {
+      toast.success('답변이 등록되었습니다.');
+      // 게시글 목록 새로고침 (답변 상태 업데이트 반영)
+      queryClient.invalidateQueries({ queryKey: ['boardPosts'] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || '답변 등록에 실패했습니다.');
+    },
   });
 }
 

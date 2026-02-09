@@ -91,8 +91,10 @@ export async function getEducationReports(
               item.totalEducation ??
               item.totalTime ??
               item.totalEducationTime ??
-              (item.mandatoryEducation || item.mandatoryTotal || 0) +
-                (item.regularEducation || item.regularTotal || 0),
+              item.regularEducation ??
+              item.regularTotal ??
+              item.regularEducationTime ??
+              0,
             standardEducation: item.standardEducation ?? item.standardHours ?? 0,
             completionRate: item.completionRate ?? 0,
             createAt: item.createAt,
@@ -394,7 +396,8 @@ export async function getEducationDetail(
         [],
       mandatoryTotal: rawData.educationDetail?.mandatoryTotal || 0,
       regularTotal: rawData.educationDetail?.regularTotal || 0,
-      totalTime: rawData.educationDetail?.totalTime || 0,
+      totalTime:
+        rawData.educationDetail?.totalTime ?? rawData.educationDetail?.regularTotal ?? 0,
       joinDate: rawData.educationDetail?.joinDate,
       isAccidentFreeWorkplace: rawData.educationDetail?.isAccidentFreeWorkplace || false,
       ...rawData.educationDetail,

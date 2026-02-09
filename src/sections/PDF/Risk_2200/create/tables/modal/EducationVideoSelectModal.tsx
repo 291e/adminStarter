@@ -25,6 +25,7 @@ import Alert from '@mui/material/Alert';
 import { Iconify } from 'src/components/iconify';
 import { useLibraryReports } from 'src/sections/LibraryReport/hooks/use-library-report-api';
 import type { LibraryReport } from 'src/services/library-report/library-report.types';
+import { useMyInfo } from 'src/sections/Chat/hooks/use-my-info';
 
 // ----------------------------------------------------------------------
 
@@ -45,6 +46,8 @@ export default function EducationVideoSelectModal({ open, onClose, onConfirm }: 
   const [categoryFilter, setCategoryFilter] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const rowsPerPage = 10;
+  const { data: myInfoData } = useMyInfo();
+  const isSuperAdmin = (myInfoData as any)?.isSuperAdmin === true;
 
   // 라이브러리 리포트 목록 조회
   const {
@@ -68,7 +71,16 @@ export default function EducationVideoSelectModal({ open, onClose, onConfirm }: 
   // 라이브러리 리포트를 EducationVideo 형식으로 변환
   const educationVideos = useMemo(() => {
     if (!reportsData?.libraryReports) return [];
-    return reportsData.libraryReports.map((report: LibraryReport, index: number) => ({
+    const visibleReports = isSuperAdmin
+      ? reportsData.libraryReports
+      : reportsData.libraryReports.filter((report) => {
+          if (report.status) return report.status === 'active';
+          if (typeof report.isActive === 'number') return report.isActive === 1;
+          if (typeof report.isActive === 'boolean') return report.isActive;
+          return true;
+        });
+
+    return visibleReports.map((report: LibraryReport, index: number) => ({
       id: report.id || String(report.libraryReportIdx || index),
       libraryReportIdx: report.libraryReportIdx,
       vodIdx: report.vodIdx, // VOD Index 추가
@@ -80,7 +92,7 @@ export default function EducationVideoSelectModal({ open, onClose, onConfirm }: 
       hasSubtitle: report.hasSubtitles || false,
       summary: report.description || report.memo || '',
     }));
-  }, [reportsData]);
+  }, [reportsData, isSuperAdmin]);
 
   const handlePageChange = (_: React.ChangeEvent<unknown>, value: number) => {
     setPage(value);

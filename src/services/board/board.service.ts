@@ -48,20 +48,29 @@ const normalizeBoardPost = (item: any, index: number): BoardPost => {
     isPinned: typeof item?.isPinned === 'number' ? item.isPinned : Number(item?.isPinned) || 0,
     postStatus: item?.postStatus ?? item?.status,
     postCategoryIdx:
-      item?.postCategoryIdx ?? item?.postCategoryId ?? item?.categoryIdx ?? item?.categoryId,
+      item?.postCategoryIdx ?? item?.postCategoryId ?? item?.categoryIdx ?? item?.categoryId ?? null,
     postCategoryTitle:
       item?.postCategoryTitle ??
       item?.postCategoryName ??
       item?.categoryTitle ??
-      item?.categoryName,
+      item?.categoryName ??
+      null,
+    categoryIdx: item?.categoryIdx ?? item?.postCategoryIdx ?? null,
+    categoryTitle: item?.categoryTitle ?? item?.postCategoryTitle ?? null,
+    categoryType: item?.categoryType ?? item?.postCategoryType ?? null,
     postViews:
       typeof item?.postViews === 'number'
         ? item.postViews
-        : typeof item?.views === 'number'
-          ? item.views
-          : Number(item?.postViews || item?.views) || 0,
+        : typeof item?.viewCount === 'number'
+          ? item.viewCount
+          : typeof item?.views === 'number'
+            ? item.views
+            : Number(item?.postViews || item?.viewCount || item?.views) || 0,
     adminName: item?.adminName ?? item?.author ?? item?.writerName ?? item?.createdByName,
     memberName: item?.memberName ?? item?.memberNickname ?? item?.writerMemberName,
+    memberEmail: item?.memberEmail ?? item?.email ?? null,
+    memberId: item?.memberId ?? item?.memberID ?? null,
+    memberPhone: item?.memberPhone ?? item?.phone ?? item?.phoneNumber ?? null,
     createAt: item?.createAt ?? item?.createdAt,
     updateAt: item?.updateAt ?? item?.updatedAt,
     registrationDate,
@@ -74,6 +83,7 @@ const normalizeBoardPost = (item: any, index: number): BoardPost => {
       item?.answer ??
       undefined,
     postAnswerAt: item?.postAnswerAt ?? item?.answerAt ?? item?.commentAt ?? undefined,
+    commentInformation: item?.commentInformation ?? undefined,
   };
 };
 
@@ -86,9 +96,15 @@ export async function getBoardCategories(
     params,
   });
   const data = response.data as any;
-  const list = data?.postCategoryList || data?.list || data?.categories || [];
+  // 응답 구조: data.data 배열 또는 data.postCategoryList 등
+  const list =
+    data?.data ||
+    data?.postCategoryList ||
+    data?.list ||
+    data?.categories ||
+    (Array.isArray(data) ? data : []);
   return {
-    categories: list,
+    categories: Array.isArray(list) ? list : [],
     header: data?.header,
   };
 }
@@ -109,11 +125,17 @@ export async function getBoardPosts(params: GetBoardPostsParams): Promise<GetBoa
   });
 
   const data = response.data as any;
-  const list = data?.postList || data?.list || data?.posts || [];
-  const totalCount = data?.totalCount ?? data?.total ?? list.length ?? 0;
+  // 응답 구조: data.data 배열 또는 data.postList 등
+  const list =
+    data?.data ||
+    data?.postList ||
+    data?.list ||
+    data?.posts ||
+    (Array.isArray(data) ? data : []);
+  const totalCount = data?.totalCount ?? data?.total ?? (Array.isArray(list) ? list.length : 0);
 
   return {
-    posts: list.map((item: any, index: number) => normalizeBoardPost(item, index)),
+    posts: Array.isArray(list) ? list.map((item: any, index: number) => normalizeBoardPost(item, index)) : [],
     totalCount: typeof totalCount === 'number' ? totalCount : Number(totalCount) || 0,
     header: data?.header,
   };

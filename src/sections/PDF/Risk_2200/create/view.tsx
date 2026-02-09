@@ -32,6 +32,7 @@ import type {
   Table2200Row,
   Table2300Row,
   Table2400TBMData,
+  Table2400TBMEducationMethod,
   Table2400TBMEducationVideoRow,
   Table2400EducationRow,
   Table2400MinimumEducationRow,
@@ -312,8 +313,10 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
       { inspectionContent: '작업장 정리/정돈, 통보 확보', result: '' },
       { inspectionContent: '점검결과 조치사항', result: '' },
     ],
-    educationMethod: 'VIDEO',
+    educationApply: 0,
+    educationMethod: 'ONLINE',
     educationType: 'MANDATORY',
+    educationTimeMinutes: undefined,
     educationContent: '',
     educationVideoRows: [
       {
@@ -323,6 +326,12 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
       },
     ],
   });
+
+  const normalizeTbmEducationMethod = (method?: Table2400TBMEducationMethod) => {
+    if (method === 'IN_PERSON') return 'OFFLINE';
+    if (method === 'VIDEO') return 'ONLINE';
+    return method ?? 'ONLINE';
+  };
   const [table2400EducationRows, setTable2400EducationRows] = useState<Table2400EducationRow[]>([
     {
       number: 1,
@@ -647,7 +656,20 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
         } else if (tableType === '1200-near-miss' && parsedTableData.row) {
           setTable1200NearMissRow(parsedTableData.row as Table1200NearMissRow);
         } else if (tableType === '2400-tbm' && parsedTableData.data) {
-          setTable2400TBMData(parsedTableData.data as Table2400TBMData);
+          setTable2400TBMData((prev) => {
+            const raw = parsedTableData.data as Table2400TBMData;
+            return {
+              ...prev,
+              ...raw,
+              educationApply: raw.educationApply === 1 ? 1 : prev.educationApply ?? 0,
+              educationMethod: normalizeTbmEducationMethod(raw.educationMethod),
+              educationType: raw.educationType ?? prev.educationType,
+              educationTimeMinutes: raw.educationTimeMinutes ?? prev.educationTimeMinutes,
+              educationContent: raw.educationContent ?? prev.educationContent,
+              educationVideoRows: raw.educationVideoRows ?? prev.educationVideoRows,
+              inspectionRows: raw.inspectionRows ?? prev.inspectionRows,
+            };
+          });
         } else if (tableType === '2400-education') {
           if (parsedTableData.rows) {
             setTable2400EducationRows(parsedTableData.rows as Table2400EducationRow[]);
@@ -688,7 +710,20 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
             } else if (tableData.type === '1200-near-miss' && (tableData as any).rows?.[0]) {
               setTable1200NearMissRow((tableData as any).rows[0] as Table1200NearMissRow);
             } else if (tableData.type === '2400-tbm') {
-              setTable2400TBMData(tableData.data as Table2400TBMData);
+              setTable2400TBMData((prev) => {
+                const raw = tableData.data as Table2400TBMData;
+                return {
+                  ...prev,
+                  ...raw,
+                  educationApply: raw.educationApply === 1 ? 1 : prev.educationApply ?? 0,
+                  educationMethod: normalizeTbmEducationMethod(raw.educationMethod),
+                  educationType: raw.educationType ?? prev.educationType,
+                  educationTimeMinutes: raw.educationTimeMinutes ?? prev.educationTimeMinutes,
+                  educationContent: raw.educationContent ?? prev.educationContent,
+                  educationVideoRows: raw.educationVideoRows ?? prev.educationVideoRows,
+                  inspectionRows: raw.inspectionRows ?? prev.inspectionRows,
+                };
+              });
             } else if (tableData.type === '2400-education') {
               setTable2400EducationRows(tableData.rows as Table2400EducationRow[]);
             }
@@ -1207,6 +1242,8 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
 
       // 알림 쿼리 무효화 (문서 생성 시 근로자 등록 후 알림 자동 발송됨)
       queryClient.invalidateQueries({ queryKey: ['notificationHistory'] });
+      // 서명 대기 문서 목록 갱신 (대시보드)
+      queryClient.invalidateQueries({ queryKey: ['pendingSignatures'] });
 
       // 아이템 상세 정보 쿼리 무효화하여 문서 목록 갱신
       if (state?.item?.safetySystemItemIdx) {
@@ -1335,6 +1372,15 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
       tableData: JSON.stringify(tableData),
       // approvalDeadline은 API 스펙에 없으므로 제외 (나중에 수정 API로 업데이트 가능)
     };
+
+    if (is2400TBM) {
+      const normalizedMethod = normalizeTbmEducationMethod(table2400TBMData.educationMethod);
+      requestData.educationType = table2400TBMData.educationType;
+      requestData.educationMethod = normalizedMethod;
+      if (normalizedMethod === 'OFFLINE') {
+        requestData.educationTimeMinutes = table2400TBMData.educationTimeMinutes ?? undefined;
+      }
+    }
 
     // approvalStep이 있으면 추가
     if (approvalStep !== undefined) {

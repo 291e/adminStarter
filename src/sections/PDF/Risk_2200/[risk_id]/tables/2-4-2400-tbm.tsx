@@ -4,7 +4,7 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 
 import { CONFIG } from 'src/global-config';
-import type { Table2400TBMData } from '../../types/table-data';
+import type { Table2400TBMData, Table2400TBMEducationMethod } from '../../types/table-data';
 
 // ----------------------------------------------------------------------
 
@@ -20,8 +20,10 @@ const defaultData: Table2400TBMData = {
     { inspectionContent: '작업장 정리/정돈, 통보 확보', result: '완료' },
     { inspectionContent: '점검결과 조치사항', result: '조치 완료' },
   ],
-  educationMethod: 'VIDEO',
+  educationApply: 0,
+  educationMethod: 'ONLINE',
   educationType: 'MANDATORY',
+  educationTimeMinutes: undefined,
   educationContent:
     '아크릴로니트릴의 특성과 위험성, 작업 시 주의사항, 개인보호구 착용법, 비상대응 절차 등에 대한 안전 교육 내용입니다.',
   educationVideoRows: [
@@ -178,9 +180,26 @@ export default function RiskTable_2_4_2400_TBM({ data = defaultData }: Props) {
     },
   };
 
-  const isInPerson = (data.educationMethod ?? 'VIDEO') === 'IN_PERSON';
+  const normalizeEducationMethod = (method?: Table2400TBMEducationMethod) => {
+    if (method === 'IN_PERSON') return 'OFFLINE';
+    if (method === 'VIDEO') return 'ONLINE';
+    return method ?? 'ONLINE';
+  };
+
+  const normalizedEducationMethod = normalizeEducationMethod(data.educationMethod);
+  const isInPerson = normalizedEducationMethod === 'OFFLINE';
   const educationMethodLabel =
-    data.educationMethod === 'IN_PERSON' ? '집체' : data.educationMethod ? '영상' : '';
+    normalizedEducationMethod === 'OFFLINE'
+      ? '집체'
+      : normalizedEducationMethod
+        ? '온라인(영상)'
+        : '';
+  const educationTimeLabel =
+    normalizedEducationMethod === 'OFFLINE'
+      ? data.educationTimeMinutes
+        ? `${data.educationTimeMinutes}분`
+        : '-'
+      : 'VOD 길이 자동 계산';
   const educationTypeLabel =
     data.educationType === 'MANDATORY'
       ? '의무 교육'
@@ -190,22 +209,28 @@ export default function RiskTable_2_4_2400_TBM({ data = defaultData }: Props) {
 
   return (
     <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-      {/* 교육 방법 / 교육 구분 */}
+      {/* 교육 방법 / 교육 구분 / 교육 시간 */}
       <Box sx={{ pb: 5, pt: 0, px: 0, width: '100%' }}>
         <Box component="table" sx={tableStyle}>
           <thead>
             <tr style={{ height: 60 }}>
-              <th style={{ width: '50%' }}>교육 방법</th>
-              <th style={{ width: '50%' }}>교육 구분</th>
+              <th style={{ width: '34%' }}>교육 방법</th>
+              <th style={{ width: '33%' }}>교육 구분</th>
+              <th style={{ width: '33%' }}>교육 시간(분)</th>
             </tr>
           </thead>
           <tbody>
             <tr style={{ height: 48 }}>
               <td>
-                <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{educationMethodLabel}</Typography>
+                <Typography sx={{ fontSize: 14, fontWeight: 400 }}>
+                  {educationMethodLabel}
+                </Typography>
               </td>
               <td>
                 <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{educationTypeLabel}</Typography>
+              </td>
+              <td>
+                <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{educationTimeLabel}</Typography>
               </td>
             </tr>
           </tbody>

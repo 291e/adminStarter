@@ -47,6 +47,7 @@ import {
   getVodBatchDownloadUrl,
 } from 'src/services/vod/vod.service';
 import { toast } from 'sonner';
+import { useMyInfo } from 'src/sections/Chat/hooks/use-my-info';
 
 // ----------------------------------------------------------------------
 
@@ -58,6 +59,8 @@ type Props = {
 
 export function LibraryReportView({ title = '라이브러리', description, sx }: Props) {
   const queryClient = useQueryClient();
+  const { data: myInfoData } = useMyInfo();
+  const isSuperAdmin = (myInfoData as any)?.isSuperAdmin === true;
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [vodUploadModalOpen, setVodUploadModalOpen] = useState(false);
@@ -99,9 +102,31 @@ export function LibraryReportView({ title = '라이브러리', description, sx }
     }
   }, [mappedCategories]);
 
+  const visibleCategories = useMemo(
+    () => (isSuperAdmin ? categories : categories.filter((category) => category.isActive)),
+    [categories, isSuperAdmin]
+  );
+
   // 훅에서 필터링 및 페이지네이션 처리
   const allRows = useMemo(() => reportsQuery.data?.libraryReports ?? [], [reportsQuery.data]);
-  const logic = useLibraryReport(allRows);
+  const filteredRows = useMemo(() => {
+    if (isSuperAdmin) {
+      return allRows;
+    }
+    return allRows.filter((row) => {
+      if (row.status) {
+        return row.status === 'active';
+      }
+      if (typeof row.isActive === 'number') {
+        return row.isActive === 1;
+      }
+      if (typeof row.isActive === 'boolean') {
+        return row.isActive;
+      }
+      return true;
+    });
+  }, [allRows, isSuperAdmin]);
+  const logic = useLibraryReport(filteredRows);
   const { resetSelection, paginatedRows: rows, totalCount } = logic;
 
   useEffect(() => {
@@ -188,6 +213,7 @@ export function LibraryReportView({ title = '라이브러리', description, sx }
             fileUrl: videoPath,
             thumbnailUrl: undefined, // VOD API에서 썸네일을 제공하지 않으면 undefined
             description: data.description || undefined,
+            educationType: data.educationType,
           };
 
           await uploadVodMutation.mutateAsync(payload);
@@ -255,6 +281,7 @@ export function LibraryReportView({ title = '라이브러리', description, sx }
           fileUrl,
           thumbnailUrl,
           description: data.description || undefined,
+          educationType: data.educationType,
         };
 
         await uploadVodMutation.mutateAsync(payload);
@@ -859,7 +886,8 @@ export function LibraryReportView({ title = '라이브러리', description, sx }
       />
 
       <LibraryReportFilters
-        categories={categories}
+        categories={visibleCategories}
+        showInactive={isSuperAdmin}
         category={logic.filters.category}
         onChangeCategory={(category) => {
           logic.onChangeCategory(category);
@@ -919,14 +947,14 @@ export function LibraryReportView({ title = '라이브러리', description, sx }
         open={categoryModalOpen}
         onClose={() => setCategoryModalOpen(false)}
         onSave={handleSaveCategories}
-        initialCategories={categories}
+        initialCategories={visibleCategories}
       />
 
       <VODUploadModal
         open={vodUploadModalOpen}
         onClose={() => setVodUploadModalOpen(false)}
         onSave={handleUploadVod}
-        categories={categories}
+        categories={visibleCategories}
       />
 
       <EditContentModal
@@ -940,7 +968,7 @@ export function LibraryReportView({ title = '라이브러리', description, sx }
         }}
         onSave={handleUpdateContent}
         onDelete={handleDeleteContent}
-        categories={categories}
+        categories={visibleCategories}
         initialData={selectedRow}
         uploadStep={editUploadStep}
         uploadProgress={editUploadProgress}
@@ -967,7 +995,7 @@ export function LibraryReportView({ title = '라이브러리', description, sx }
 
       <MoveContentModal
         open={moveModalOpen}
-        categories={categories}
+        categories={visibleCategories}
         selectedCount={logic.selectedIds.length}
         onClose={() => setMoveModalOpen(false)}
         onConfirm={handleMoveSelectedConfirm}

@@ -227,12 +227,11 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
 
   const participantsWithPresence: ChatParticipantDto[] = useMemo(() => {
     if (!participantsFromRoom.length) return participantsFromRoom;
-    if (!participantsMeta || Object.keys(participantsMeta).length === 0) return participantsFromRoom;
+    if (!participantsMeta || Object.keys(participantsMeta).length === 0)
+      return participantsFromRoom;
 
     return participantsFromRoom.map((participant) => {
-      const key = String(
-        (participant as any)?.memberIdx ?? (participant as any)?.memberIndex
-      );
+      const key = String((participant as any)?.memberIdx ?? (participant as any)?.memberIndex);
       const meta = (participantsMeta as any)?.[key];
       if (!meta) return participant;
 
@@ -387,10 +386,8 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
 
       const rawMetadata = (msg.metadata || undefined) as any;
       const translatedAddress =
-        rawMetadata?.addressTranslations &&
-        typeof rawMetadata.addressTranslations === 'object'
-          ? pickTranslation(rawMetadata.addressTranslations, preferredLang) ||
-            rawMetadata.address
+        rawMetadata?.addressTranslations && typeof rawMetadata.addressTranslations === 'object'
+          ? pickTranslation(rawMetadata.addressTranslations, preferredLang) || rawMetadata.address
           : rawMetadata?.address;
       const metadata = rawMetadata
         ? {
@@ -571,7 +568,14 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
 
       // 첨부파일이 있으면 Flutter와 동일하게 파일 메시지만 전송
       const messageContent = hasAttachments ? '' : trimmedMessage;
-      await sendMessage(messageContent || '', 'TEXT', attachments, undefined, undefined, attachmentMeta);
+      await sendMessage(
+        messageContent || '',
+        'TEXT',
+        attachments,
+        undefined,
+        undefined,
+        attachmentMeta
+      );
       setMessageInput('');
     } catch (error) {
       console.error('Failed to send message:', error);
@@ -957,14 +961,23 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
         });
       }
 
-      // 문서 공유 메시지 (FILE 타입)
-      if (msg.messageType === 'FILE' && msg.sharedDocumentIdx) {
-        messageAttachments.push({
-          id: `doc-${msg.id}`,
-          name: msg.message || `문서 ${msg.sharedDocumentIdx}`,
-          type: 'pdf',
-          url: '',
-          createdAt,
+      // 문서 공유 메시지 (FILE 타입): 한 메시지에 여러 문서(sharedDocumentIndexes) 또는 단일(sharedDocumentIdx)
+      if (msg.messageType === 'FILE') {
+        const docIndices = Array.isArray((metadata as any)?.sharedDocumentIndexes)
+          ? (metadata as any).sharedDocumentIndexes.filter(
+              (n: unknown) => typeof n === 'number' && !Number.isNaN(n)
+            )
+          : msg.sharedDocumentIdx != null && !Number.isNaN(Number(msg.sharedDocumentIdx))
+            ? [Number(msg.sharedDocumentIdx)]
+            : [];
+        docIndices.forEach((docIdx: number) => {
+          messageAttachments.push({
+            id: `doc-${msg.id}-${docIdx}`,
+            name: msg.message || `문서 ${docIdx}`,
+            type: 'pdf',
+            url: '',
+            createdAt,
+          });
         });
       }
     });
@@ -973,16 +986,12 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     const allAttachments = [...apiAttachments, ...messageAttachments];
 
     // 중복 제거 (URL 기준)
-    const uniqueAttachments = allAttachments.filter((att, idx, arr) => {
-      return (
-        arr.findIndex((other) => {
-          if (att.url && other.url) {
-            return other.url === att.url;
-          }
-          return other.id === att.id;
-        }) === idx
-      );
-    });
+    const uniqueAttachments = allAttachments.filter(
+      (att, idx, arr) =>
+        arr.findIndex((other) =>
+          att.url && other.url ? other.url === att.url : other.id === att.id
+        ) === idx
+    );
 
     // 최신순 정렬
     return uniqueAttachments.sort((a, b) => {
@@ -991,7 +1000,6 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
       return dateB - dateA;
     });
   }, [attachmentsData, firebaseMessages]);
-
 
   const renderContent = () => (
     <Box
@@ -1129,16 +1137,22 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
                   onRemove={handleRemoveParticipants}
                   attachments={attachments}
                   onFileClick={(attachment) => {
-                    // 문서 파일인 경우 (doc- 접두사가 있거나 pdf 타입인 경우)
+                    // 문서 파일인 경우 (doc- 접두사, id 형식: doc-{msgId}-{sharedDocumentIdx})
                     if (attachment.id.startsWith('doc-') && attachment.type === 'pdf') {
-                      // sharedDocumentIdx 추출
-                      const docIdMatch = attachment.id.match(/^doc-(.+)$/);
-                      const msgId = docIdMatch?.[1];
-                      if (msgId) {
-                        // 메시지에서 sharedDocumentIdx 찾기
-                        const msg = firebaseMessages.find((m) => m.id === msgId);
-                        if (msg?.sharedDocumentIdx) {
-                          handleFileMessageClick(msg.sharedDocumentIdx);
+                      const withIdxMatch = attachment.id.match(/^doc-(.+)-(\d+)$/);
+                      if (withIdxMatch) {
+                        const sharedDocumentIdx = Number(withIdxMatch[2]);
+                        if (!Number.isNaN(sharedDocumentIdx)) {
+                          handleFileMessageClick(sharedDocumentIdx);
+                        }
+                      } else {
+                        const legacyMatch = attachment.id.match(/^doc-(.+)$/);
+                        const msgId = legacyMatch?.[1];
+                        if (msgId) {
+                          const msg = firebaseMessages.find((m) => m.id === msgId);
+                          if (msg?.sharedDocumentIdx != null) {
+                            handleFileMessageClick(msg.sharedDocumentIdx);
+                          }
                         }
                       }
                     } else if (attachment.url) {

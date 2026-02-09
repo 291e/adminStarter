@@ -12,13 +12,11 @@ type Props = {
 
 export default function InquiryHeader({ title, onBack }: Props) {
   return (
-    <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 3 }}>
-      <IconButton onClick={onBack} sx={{ p: 0.5 }}>
-        <Iconify icon={'solar:alt-arrow-left-bold' as any} width={24} />
+    <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
+      <IconButton onClick={onBack} sx={{ p: 0 }}>
+        <Iconify icon="eva:arrow-ios-back-fill" width={24} />
       </IconButton>
-      <Typography variant="h5" sx={{ fontWeight: 700 }}>
-        {title}
-      </Typography>
+      <Typography variant="h4">{title}</Typography>
     </Stack>
   );
 }

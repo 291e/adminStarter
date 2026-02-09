@@ -177,6 +177,14 @@ export default function ProgressModal({
       };
     });
 
+    const allWorkersSigned =
+      workerTargets.length > 0 && workerTargets.every((t) => t.status === 'completed');
+
+    // 근로자 서명이 모두 완료된 후에만 결재 상태를 노출
+    if (workerTargets.length > 0 && !allWorkersSigned) {
+      return workerTargets;
+    }
+
     return [...approvalTargets, ...workerTargets];
   }, [documentDetail, signatureList, workerSignatureList]);
 
@@ -223,17 +231,22 @@ export default function ProgressModal({
     [signatureTargets, selectedIds]
   );
 
+  const selectableTargets = useMemo(
+    () => paginatedTargets.filter((target) => target.status !== 'completed'),
+    [paginatedTargets]
+  );
+
   const isAllSelected =
-    paginatedTargets.length > 0 &&
-    paginatedTargets.every((target) => selectedIds.includes(target.id));
+    selectableTargets.length > 0 &&
+    selectableTargets.every((target) => selectedIds.includes(target.id));
   const isIndeterminate =
-    paginatedTargets.some((target) => selectedIds.includes(target.id)) && !isAllSelected;
+    selectableTargets.some((target) => selectedIds.includes(target.id)) && !isAllSelected;
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
       const newSelectedIds = [
         ...selectedIds,
-        ...paginatedTargets
+        ...selectableTargets
           .filter((target) => !selectedIds.includes(target.id))
           .map((target) => target.id),
       ];
@@ -244,9 +257,14 @@ export default function ProgressModal({
     }
   };
 
-  const handleSelectTarget = (id: string) => {
+  const handleSelectTarget = (target: { id: string; status: string }) => {
+    if (target.status === 'completed') {
+      return;
+    }
     setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((selectedId) => selectedId !== id) : [...prev, id]
+      prev.includes(target.id)
+        ? prev.filter((selectedId) => selectedId !== target.id)
+        : [...prev, target.id]
     );
   };
 
@@ -266,7 +284,10 @@ export default function ProgressModal({
       const targetMemberIndexList = selectedIds
         .map((id) => {
           const target = signatureTargets.find((t) => t.id === id);
-          return target?.targetMemberIdx;
+          if (!target || target.status === 'completed') {
+            return undefined;
+          }
+          return target.targetMemberIdx;
         })
         .filter((idx): idx is number => idx !== undefined);
 
@@ -512,7 +533,8 @@ export default function ProgressModal({
                     <TableCell sx={{ p: 1 }}>
                       <Checkbox
                         checked={selectedIds.includes(target.id)}
-                        onChange={() => handleSelectTarget(target.id)}
+                        onChange={() => handleSelectTarget(target)}
+                        disabled={target.status === 'completed'}
                         size="small"
                       />
                     </TableCell>

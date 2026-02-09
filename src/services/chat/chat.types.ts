@@ -34,7 +34,7 @@ export type ChatParticipantDto = {
   unreadCount?: number;
   joinedAt?: string | number;
   lastSeen?: string | number;
-  online?: number;
+  online?: number | boolean;
   customRoomName?: string; // 참가자별 커스텀 채팅방 이름
   memberRole?: string;
   position?: string;

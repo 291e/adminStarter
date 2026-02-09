@@ -44,18 +44,6 @@ export default function VideoPlayer({
   disableControls = false,
   disableControlInteraction = false,
 }: Props) {
-  // 🐛 디버깅: VideoPlayer props 확인
-  console.log('🎥 [VideoPlayer] Props 수신:', {
-    vodIdx,
-    videoUrl,
-    availableLanguages,
-    vttMap,
-    defaultLanguage,
-    serverUrl,
-    disableControls,
-    disableControlInteraction,
-  });
-
   const controlsListValue = useMemo(() => {
     const list: string[] = [];
     if (disableControls) {
@@ -101,8 +89,6 @@ export default function VideoPlayer({
         // 비디오와 동일한 방식으로 URL 생성: CONFIG.serverUrl + vttPath
         const path = vttPath.startsWith('/') ? vttPath : `/${vttPath}`;
         const vttUrl = `${baseUrl}${path}`;
-
-        console.log(`🎥 [VideoPlayer] 자막 트랙 생성 - 언어: ${lang}, URL: ${vttUrl}`);
 
         return {
           kind: 'captions' as const,

@@ -49,17 +49,45 @@ axiosInstance.interceptors.response.use(
   (response) => {
     // BaseResponseDto 구조 평탄화: data.body.data -> data
     if (response.data?.body?.data !== undefined) {
-      // body.data를 최상위로 이동
-      response.data = {
-        ...response.data.body.data,
-        header: response.data.header, // header는 유지
-      };
+      const bodyData = response.data.body.data;
+      // body.data가 배열이면 그대로 유지, 객체면 spread
+      if (Array.isArray(bodyData)) {
+        response.data = {
+          data: bodyData,
+          ...(response.data.body.total !== undefined && { total: response.data.body.total }),
+          ...(response.data.body.totalCount !== undefined && { totalCount: response.data.body.totalCount }),
+          header: response.data.header, // header는 유지
+        };
+      } else if (bodyData && typeof bodyData === 'object') {
+        // body.data가 객체면 spread
+        response.data = {
+          ...bodyData,
+          header: response.data.header, // header는 유지
+        };
+      } else {
+        // 그 외의 경우 (원시값 등)
+        response.data = {
+          data: bodyData,
+          header: response.data.header,
+        };
+      }
     } else if (response.data?.body !== undefined && !response.data.body.data) {
       // body만 있고 data가 없는 경우 (단순 객체)
       response.data = {
         ...response.data.body,
         header: response.data.header, // header는 유지
       };
+    }
+
+    // HTTP 200이어도 isSuccess: false면 에러로 처리 (toast 등 onError에서 메시지 표시)
+    const header = response.data?.header;
+    if (header && header.isSuccess === false) {
+      const message =
+        header.resultMessage ||
+        header.message ||
+        response.data?.message ||
+        '요청 처리에 실패했습니다.';
+      return Promise.reject(new Error(message));
     }
 
     // 디버깅: 성공 응답 로그

@@ -100,6 +100,7 @@ export type CreateLibraryReportParams = {
   memo?: string;
   fileUrl: string;
   thumbnailUrl?: string;
+  educationType?: 'MANDATORY' | 'REGULAR';
 };
 
 export type CreateLibraryReportResponse = BaseResponseDto<LibraryReport>;

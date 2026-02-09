@@ -4,14 +4,19 @@ import Typography from '@mui/material/Typography';
 import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Link from '@mui/material/Link';
 
+import { useMyInfo } from 'src/sections/Chat/hooks/use-my-info';
 import { paths } from 'src/routes/paths';
 import { RouterLink } from 'src/routes/components';
 
 type Props = {
   onNewInquiry?: () => void;
+  onCategoryManage?: () => void;
 };
 
-export default function InquiriesBreadcrumbs({ onNewInquiry }: Props) {
+export default function InquiriesBreadcrumbs({ onNewInquiry, onCategoryManage }: Props) {
+  const { data: myInfo } = useMyInfo();
+  const isSuperAdmin = myInfo?.isSuperAdmin === true;
+
   return (
     <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
       <Stack spacing={1}>
@@ -31,20 +36,36 @@ export default function InquiriesBreadcrumbs({ onNewInquiry }: Props) {
         </Breadcrumbs>
       </Stack>
 
-      <Button
-        variant="contained"
-        onClick={onNewInquiry}
-        sx={{
-          bgcolor: '#212B36',
-          '&:hover': { bgcolor: '#161C24' },
-          px: 2,
-          height: 40,
-          borderRadius: 1,
-          fontWeight: 600,
-        }}
-      >
-        문의하기
-      </Button>
+      {isSuperAdmin ? (
+        <Button
+          variant="contained"
+          color="info"
+          onClick={onCategoryManage}
+          sx={{
+            px: 2,
+            height: 40,
+            borderRadius: 1,
+            fontWeight: 600,
+          }}
+        >
+          카테고리 관리
+        </Button>
+      ) : (
+        <Button
+          variant="contained"
+          onClick={onNewInquiry}
+          sx={{
+            bgcolor: '#212B36',
+            '&:hover': { bgcolor: '#161C24' },
+            px: 2,
+            height: 40,
+            borderRadius: 1,
+            fontWeight: 600,
+          }}
+        >
+          문의하기
+        </Button>
+      )}
     </Stack>
   );
 }

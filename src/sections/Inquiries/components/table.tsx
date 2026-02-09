@@ -10,12 +10,19 @@ import Typography from '@mui/material/Typography';
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
+import { fDateTime } from 'src/utils/format-time';
 
 // ----------------------------------------------------------------------
+
+import type { BoardCommentInformation } from 'src/services/board/board.types';
 
 export type InquiryRow = {
   id: string;
   sequence: number;
+  inquirerName?: string; // 문의자 이름
+  inquirerEmail?: string; // 문의자 이메일
+  inquirerId?: string; // 회원 ID
+  inquirerPhone?: string; // 전화번호
   inquiryAt: string;
   category: string;
   postCategoryIdx?: number;
@@ -25,15 +32,17 @@ export type InquiryRow = {
   postIdx?: number;
   content?: string;
   answer?: string;
+  commentInformation?: BoardCommentInformation; // 답변 정보
 };
 
 type Props = {
   rows: InquiryRow[];
   onEdit?: (row: InquiryRow) => void;
+  onReply?: (row: InquiryRow) => void; // 답변하기
   onViewAnswer?: (row: InquiryRow) => void;
 };
 
-export default function InquiriesTable({ rows, onEdit, onViewAnswer }: Props) {
+export default function InquiriesTable({ rows, onEdit, onReply, onViewAnswer }: Props) {
   return (
     <TableContainer sx={{ overflow: 'unset' }}>
       <Scrollbar>
@@ -41,6 +50,8 @@ export default function InquiriesTable({ rows, onEdit, onViewAnswer }: Props) {
           <TableHead sx={{ bgcolor: 'background.neutral' }}>
             <TableRow>
               <TableCell sx={{ color: 'text.secondary', fontWeight: 600 }}>순번</TableCell>
+              <TableCell sx={{ color: 'text.secondary', fontWeight: 600 }}>이름</TableCell>
+              <TableCell sx={{ color: 'text.secondary', fontWeight: 600 }}>이메일</TableCell>
               <TableCell sx={{ color: 'text.secondary', fontWeight: 600 }}>문의일</TableCell>
               <TableCell sx={{ color: 'text.secondary', fontWeight: 600 }}>카테고리</TableCell>
               <TableCell sx={{ color: 'text.secondary', fontWeight: 600 }}>제목</TableCell>
@@ -55,77 +66,114 @@ export default function InquiriesTable({ rows, onEdit, onViewAnswer }: Props) {
           </TableHead>
 
           <TableBody>
-            {rows.map((row) => (
-              <TableRow key={row.id} hover>
-                <TableCell sx={{ py: 2.5 }}>{row.sequence}</TableCell>
-                <TableCell>
-                  <Typography variant="body2">{row.inquiryAt.split(' ')[0]}</Typography>
-                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                    {row.inquiryAt.split(' ')[1]}
-                  </Typography>
-                </TableCell>
-                <TableCell>{row.category}</TableCell>
-                <TableCell sx={{ maxWidth: 350 }}>
-                  <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>
-                    {row.title}
-                  </Typography>
-                </TableCell>
-                <TableCell align="center">
-                  <Label variant="soft" color={row.status === 'completed' ? 'success' : 'default'}>
-                    {row.status === 'completed' ? '답변 완료' : '미답변'}
-                  </Label>
-                </TableCell>
-                <TableCell>
-                  {row.answeredAt ? (
-                    <>
-                      <Typography variant="body2">{row.answeredAt.split(' ')[0]}</Typography>
-                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                        {row.answeredAt.split(' ')[1]}
-                      </Typography>
-                    </>
-                  ) : (
-                    '-'
-                  )}
-                </TableCell>
-                <TableCell align="center">
-                  {row.status === 'pending' ? (
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      color="success"
-                      onClick={() => onEdit?.(row)}
-                      startIcon={<Iconify icon="solar:pen-bold" width={16} />}
-                      sx={{
-                        borderRadius: 1,
-                        bgcolor: 'rgba(34, 197, 94, 0.08)',
-                        borderColor: 'transparent',
-                        '&:hover': {
-                          bgcolor: 'rgba(34, 197, 94, 0.16)',
+            {rows.map((row) => {
+              // 문의일 파싱 (YYYY-MM-DD 밑에 HH:mm:ss)
+              const inquiryDateStr =
+                row.inquiryAt && row.inquiryAt !== '-'
+                  ? fDateTime(row.inquiryAt, 'YYYY-MM-DD')
+                  : '-';
+              const inquiryTimeStr =
+                row.inquiryAt && row.inquiryAt !== '-' ? fDateTime(row.inquiryAt, 'HH:mm:ss') : '';
+
+              // 답변일 파싱
+              const answerDateStr = row.answeredAt ? fDateTime(row.answeredAt, 'YYYY-MM-DD') : null;
+              const answerTimeStr = row.answeredAt ? fDateTime(row.answeredAt, 'HH:mm:ss') : null;
+
+              return (
+                <TableRow key={row.id} hover>
+                  <TableCell sx={{ py: 2.5 }}>{row.sequence}</TableCell>
+                  <TableCell>
+                    <Typography variant="body2">{row.inquirerName || '-'}</Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2">{row.inquirerEmail || '-'}</Typography>
+                  </TableCell>
+                  <TableCell>
+                    {inquiryDateStr !== '-' ? (
+                      <>
+                        <Typography variant="body2">{inquiryDateStr}</Typography>
+                        {inquiryTimeStr && (
+                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                            {inquiryTimeStr}
+                          </Typography>
+                        )}
+                      </>
+                    ) : (
+                      <Typography variant="body2">-</Typography>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2">
+                      {row.category !== '-' ? row.category : '-'}
+                    </Typography>
+                  </TableCell>
+                  <TableCell sx={{ maxWidth: 350 }}>
+                    <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>
+                      {row.title}
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="center">
+                    <Label
+                      variant="soft"
+                      color={row.status === 'completed' ? 'success' : 'default'}
+                    >
+                      {row.status === 'completed' ? '답변 완료' : '미답변'}
+                    </Label>
+                  </TableCell>
+                  <TableCell>
+                    {answerDateStr ? (
+                      <>
+                        <Typography variant="body2">{answerDateStr}</Typography>
+                        {answerTimeStr && (
+                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                            {answerTimeStr}
+                          </Typography>
+                        )}
+                      </>
+                    ) : (
+                      <Typography variant="body2">-</Typography>
+                    )}
+                  </TableCell>
+                  <TableCell align="center">
+                    {row.status === 'pending' ? (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color="success"
+                        onClick={() => onReply?.(row)}
+                        startIcon={<Iconify icon="solar:letter-bold" width={16} />}
+                        sx={{
+                          borderRadius: 1,
+                          bgcolor: 'rgba(34, 197, 94, 0.08)',
                           borderColor: 'transparent',
-                        },
-                      }}
-                    >
-                      수정하기
-                    </Button>
-                  ) : (
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      color="inherit"
-                      onClick={() => onViewAnswer?.(row)}
-                      endIcon={<Iconify icon={'solar:alt-arrow-right-bold' as any} width={16} />}
-                      sx={{
-                        borderRadius: 1,
-                        borderColor: 'divider',
-                        fontWeight: 600,
-                      }}
-                    >
-                      답변보기
-                    </Button>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
+                          '&:hover': {
+                            bgcolor: 'rgba(34, 197, 94, 0.16)',
+                            borderColor: 'transparent',
+                          },
+                        }}
+                      >
+                        답변하기
+                      </Button>
+                    ) : (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color="inherit"
+                        onClick={() => onViewAnswer?.(row)}
+                        endIcon={<Iconify icon={'solar:alt-arrow-right-bold' as any} width={16} />}
+                        sx={{
+                          borderRadius: 1,
+                          borderColor: 'divider',
+                          fontWeight: 600,
+                        }}
+                      >
+                        상세보기
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </Scrollbar>

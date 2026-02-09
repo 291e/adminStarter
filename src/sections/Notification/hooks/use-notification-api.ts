@@ -43,6 +43,11 @@ function mapNotificationTypeToUIType(notificationType: string): string {
 function generateNotificationTitle(item: NotificationHistoryItem): string {
   const { notificationType, safetySystemDocumentInformation } = item;
   const docName = safetySystemDocumentInformation?.documentName || '문서';
+  const message = item.message || item.notificationMessage;
+
+  if (message) {
+    return message;
+  }
 
   const titleMap: Record<string, string> = {
     APPROVAL_REQUEST: `<strong>${docName}</strong>에 대한 결재 요청이 있습니다.`,

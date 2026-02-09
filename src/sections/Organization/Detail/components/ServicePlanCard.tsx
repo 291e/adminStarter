@@ -15,6 +15,7 @@ type Plan = {
   price: number;
   icon: string;
   isSubscribed: boolean;
+  memberCount: number;
 };
 
 type ServicePlanCardProps = {
@@ -30,17 +31,11 @@ export function ServicePlanCard({ plan, isSelected, onClick, formatPrice }: Serv
       onClick={onClick}
       sx={{
         flex: '1 1 auto',
-        maxWidth: 200,
         position: 'relative',
         border: plan.isSubscribed ? '2px solid' : isSelected ? '2px solid' : '1px solid',
-        borderColor: plan.isSubscribed
-          ? 'primary.main'
-          : isSelected
-            ? 'primary.main'
-            : 'divider',
+        borderColor: plan.isSubscribed ? 'primary.main' : isSelected ? 'primary.main' : 'divider',
         bgcolor: isSelected ? 'primary.lighter' : 'transparent',
-        boxShadow:
-          plan.isSubscribed || isSelected ? (theme) => theme.customShadows.card : 'none',
+        boxShadow: plan.isSubscribed || isSelected ? (theme) => theme.customShadows.card : 'none',
         cursor: 'pointer',
         transition: 'all 0.2s',
         '&:hover': {
@@ -86,6 +81,9 @@ export function ServicePlanCard({ plan, isSelected, onClick, formatPrice }: Serv
           <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
             {plan.planName}
           </Typography>
+          <Typography variant="body2" sx={{ fontWeight: 400 }}>
+            {plan.memberCount}인 미만
+          </Typography>
           <Stack spacing={0.5}>
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
               {formatPrice(plan.price)}원
@@ -96,4 +94,3 @@ export function ServicePlanCard({ plan, isSelected, onClick, formatPrice }: Serv
     </Card>
   );
 }
-

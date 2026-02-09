@@ -112,11 +112,48 @@ export default function Risk_2200Table({
     }
   };
 
-  // 상태 라벨 매핑 (백엔드 status 값 그대로 사용)
+  const getWorkerSignatureInfo = (row: Risk_2200Row) => {
+    const workerList = row.workerSignatureList ?? [];
+    if (workerList.length > 0) {
+      const signedCount = workerList.filter((w) => w.status === 'SIGNED').length;
+      const progress = Math.round((signedCount / workerList.length) * 100);
+      return { hasWorkers: true, allSigned: signedCount === workerList.length, progress };
+    }
+
+    const workerProgress = (row as any).workerSignatureProgress;
+    if (typeof workerProgress === 'number') {
+      return { hasWorkers: true, allSigned: workerProgress >= 100, progress: workerProgress };
+    }
+
+    return { hasWorkers: false, allSigned: false, progress: 0 };
+  };
+
+  // 상태 라벨 매핑 (서명 진행 상태 우선)
   // DRAFT=임시저장, PENDING=결재대기, IN_PROGRESS=결재진행중, COMPLETED=결재완료
   // SIGNATURE_IN_PROGRESS=서명진행중, SIGNATURE_COMPLETED=서명완료
+  const getDisplayStatus = (row: Risk_2200Row): Risk_2200Row['status'] => {
+    const workerInfo = getWorkerSignatureInfo(row);
+    const hasApproval = (row.signatureList?.length ?? 0) > 0 || (row.approvalStep ?? 0) > 0;
+
+    if (workerInfo.hasWorkers && !workerInfo.allSigned) {
+      return 'SIGNATURE_IN_PROGRESS';
+    }
+
+    if (workerInfo.hasWorkers && workerInfo.allSigned) {
+      if (hasApproval) {
+        const approvalProgress = row.approvalProgress ?? 0;
+        if (approvalProgress >= 100) return 'COMPLETED';
+        if (approvalProgress > 0) return 'IN_PROGRESS';
+        return 'PENDING';
+      }
+      return 'SIGNATURE_COMPLETED';
+    }
+
+    return row.status;
+  };
+
   const getStatusLabel = (row: Risk_2200Row): string => {
-    switch (row.status) {
+    switch (getDisplayStatus(row)) {
       case 'DRAFT':
         return '임시저장';
       case 'PENDING':
@@ -138,7 +175,7 @@ export default function Risk_2200Table({
   const getStatusVariant = (
     row: Risk_2200Row
   ): 'default' | 'info' | 'warning' | 'error' | 'success' => {
-    switch (row.status) {
+    switch (getDisplayStatus(row)) {
       case 'DRAFT':
         return 'default'; // 임시저장 - 회색
       case 'PENDING':
@@ -159,25 +196,19 @@ export default function Risk_2200Table({
   // 진행률 계산 (결재자 > 근로자 서명 우선순위)
   // 백엔드에서 workerSignatureProgress도 제공하면 그것 활용
   const getProgress = (row: Risk_2200Row): number => {
-    const hasApproval = (row.signatureList?.length ?? 0) > 0;
+    const workerInfo = getWorkerSignatureInfo(row);
+    const hasApproval = (row.signatureList?.length ?? 0) > 0 || (row.approvalStep ?? 0) > 0;
 
-    // 결재자가 있으면 결재 진행률 사용 (백엔드에서 계산된 값)
+    if (workerInfo.hasWorkers && !workerInfo.allSigned) {
+      return workerInfo.progress;
+    }
+
     if (hasApproval) {
       return row.approvalProgress ?? 0;
     }
 
-    // 백엔드에서 workerSignatureProgress를 제공하면 사용
-
-    const workerProgress = (row as any).workerSignatureProgress;
-    if (typeof workerProgress === 'number') {
-      return workerProgress;
-    }
-
-    // 프론트에서 계산 (fallback)
-    const workerList = row.workerSignatureList ?? [];
-    if (workerList.length > 0) {
-      const signedCount = workerList.filter((w) => w.status === 'SIGNED').length;
-      return Math.round((signedCount / workerList.length) * 100);
+    if (workerInfo.hasWorkers && workerInfo.allSigned) {
+      return 100;
     }
 
     return 0;

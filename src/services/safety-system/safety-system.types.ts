@@ -88,6 +88,10 @@ export type SafetySystemDocument = {
   safetySystemItemIdx: number;
   documentName: string;
   organizationName: string;
+  educationApply?: number; // 교육 자동 반영 여부 (0/1)
+  educationType?: 'MANDATORY' | 'REGULAR'; // 교육 구분
+  educationMethod?: 'ONLINE' | 'OFFLINE'; // 교육 방법
+  educationTimeMinutes?: number | null; // 집체 교육 시간(분)
   approvalDeadline?: string; // YYYY-MM-DD
   approvalProgress?: number; // 결재 진행률 (0-100)
   approvalStep?: number | null; // 결재 단계 (0: 없음, 1: 승인만, 2: 작성+승인, 3: 작성+검토+승인)
@@ -115,6 +119,10 @@ export type CreateSafetySystemDocumentDto = {
   safetySystemItemIdx: number;
   organizationName: string;
   documentName: string;
+  educationApply?: number; // 교육 자동 반영 여부 (0/1)
+  educationType?: 'MANDATORY' | 'REGULAR';
+  educationMethod?: 'ONLINE' | 'OFFLINE';
+  educationTimeMinutes?: number | null;
   tableData?: string; // JSON string
   workerList?: WorkerTargetDto[]; // 근로자 목록 (선택적) - 문서 생성 시 함께 등록
 };
@@ -128,6 +136,10 @@ export type UpdateSafetySystemDocumentDto = {
   approvalDeadline?: string; // 승인 마감일 (YYYY-MM-DD)
   tableData?: string; // 테이블 데이터 (JSON)
   approvalStep?: number; // 결재 단계 (0: 없음, 1: 승인만, 2: 작성+승인, 3: 작성+검토+승인)
+  educationApply?: number; // 교육 자동 반영 여부 (0/1)
+  educationType?: 'MANDATORY' | 'REGULAR';
+  educationMethod?: 'ONLINE' | 'OFFLINE';
+  educationTimeMinutes?: number | null;
 };
 
 // 문서 상세 조회 응답
@@ -208,6 +220,7 @@ export type DocumentSignatureInfo = {
 export type WorkerSignatureStatusInfo = {
   workerSignatureIdx?: number; // 구버전 호환
   documentWorkerSignatureIdx?: number; // 새 API 응답
+  vodIdx?: number; // 교육 영상 ID (TBM용)
   targetMemberIdx: number;
   memberName: string;
   memberEmail?: string;
