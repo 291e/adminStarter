@@ -15,12 +15,12 @@ import { CustomPopover } from 'src/components/custom-popover';
 import { CONFIG } from 'src/global-config';
 import RenameChatRoomModal from './RenameChatRoomModal';
 import LeaveChatRoomModal from './LeaveChatRoomModal';
-import type { ChatRoomDto, ChatParticipantDto } from 'src/services/chat/chat.types';
 import { getChatAvatarUrl } from 'src/sections/Chat/utils/avatar';
+import type { ChatParticipant2, ChatRoom2 } from '../../chat2.types';
 
 type Props = {
-  room: ChatRoomDto;
-  participants?: ChatParticipantDto[];
+  room: ChatRoom2;
+  participants?: ChatParticipant2[];
   onRoomNameChange?: (newName: string) => void;
   onLeaveRoom?: () => void;
 };

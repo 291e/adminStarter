@@ -11,11 +11,11 @@ import Dialog from '@mui/material/Dialog';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 import { fDate } from 'src/utils/format-time';
-import type { ChatAttachmentDto } from 'src/services/chat/chat.types';
+import type { ChatAttachment2 } from '../../chat2.types';
 
 type Props = {
-  attachments: ChatAttachmentDto[];
-  onFileClick?: (attachment: ChatAttachmentDto) => void;
+  attachments: ChatAttachment2[];
+  onFileClick?: (attachment: ChatAttachment2) => void;
 };
 
 export default function AttachmentList({ attachments, onFileClick }: Props) {
@@ -37,7 +37,7 @@ export default function AttachmentList({ attachments, onFileClick }: Props) {
     return '#3B82F6';
   };
 
-  const handleItemClick = (file: ChatAttachmentDto) => {
+  const handleItemClick = (file: ChatAttachment2) => {
     if (file.type === 'image' && file.url) {
       setSelectedImage(file.url);
     } else if (file.type === 'video' && file.url) {

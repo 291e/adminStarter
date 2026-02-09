@@ -132,11 +132,11 @@ export function Risk_2200View({ safetyId, title = 'Blank', description, sx }: Pr
     state?.item?.itemName || state?.item?.documentName || state?.system?.systemName || title;
   const breadcrumbItems = state
     ? [
-        { label: '대시보드', href: '/admin/dashboard' },
-        { label: '안전보건체계 관리', href: '/admin/dashboard/safety-system' },
+        { label: '대시보드', href: '/dashboard' },
+        { label: '안전보건체계 관리', href: '/dashboard/safety-system' },
         { label: computedTitle },
       ]
-    : [{ label: '대시보드', href: '/admin/dashboard' }, { label: title }];
+    : [{ label: '대시보드', href: '/dashboard' }, { label: title }];
 
   const handleCreate = () => {
     if (safetyId) {

@@ -9,7 +9,7 @@ import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
 
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
-import type { ChatRoomDto } from 'src/services/chat/chat.types';
+import type { ChatRoom2 } from '../../chat2.types';
 
 // ----------------------------------------------------------------------
 
@@ -17,7 +17,7 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onConfirm: (newName: string) => void;
-  room: ChatRoomDto | null;
+  room: ChatRoom2 | null;
   currentName?: string;
 };
 

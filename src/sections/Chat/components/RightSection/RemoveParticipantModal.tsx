@@ -7,10 +7,8 @@ import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 
 import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
-import { useRemoveParticipants } from 'src/sections/Chat/hooks/use-chat-api';
-import { useQueryClient } from '@tanstack/react-query';
-import type { ChatRoomDto, ChatParticipantDto } from 'src/services/chat/chat.types';
 import { Iconify } from 'src/components/iconify';
+import type { ChatParticipant2, ChatRoom2 } from '../../chat2.types';
 
 // ----------------------------------------------------------------------
 
@@ -18,8 +16,8 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onConfirm: (participantIds: string[]) => void;
-  room?: ChatRoomDto | null;
-  participants: ChatParticipantDto[];
+  room?: ChatRoom2 | null;
+  participants: ChatParticipant2[];
   selectedParticipantIds: string[];
 };
 
@@ -32,7 +30,7 @@ export default function RemoveParticipantModal({
   selectedParticipantIds,
 }: Props) {
   // 선택된 참가자 이름 가져오기
-  const getParticipantId = (participant: ChatParticipantDto, idx: number) =>
+  const getParticipantId = (participant: ChatParticipant2, idx: number) =>
     participant.memberIdx?.toString() || `participant-${idx}`;
 
   const selectedParticipants = participants.filter((participant, idx) =>
@@ -42,54 +40,10 @@ export default function RemoveParticipantModal({
   // 선택된 참가자가 1명인지 여부
   const isSingleParticipant = selectedParticipants.length === 1;
 
-  const queryClient = useQueryClient();
-  const removeParticipantsMutation = useRemoveParticipants();
-
   const handleConfirm = async () => {
-    if (!room?.chatRoomIdx || selectedParticipantIds.length === 0) return;
-
-    // 챗봇 채팅에서는 내보내기 불가
-    if (room.type === 'CHATBOT') {
-      console.error('챗봇 채팅에서는 참가자를 내보낼 수 없습니다.');
-      return;
-    }
-
-    try {
-      // participantIds를 memberIndexes로 변환
-      const memberIndexes = selectedParticipantIds
-        .map((id) => {
-          // id가 memberIdx 문자열인 경우
-          const parsed = Number(id);
-          if (!Number.isNaN(parsed)) return parsed;
-
-          // participants에서 memberIdx로 찾기
-          const participant = participants.find(
-            (p) => p.memberIdx?.toString() === id || p.memberIdx === Number(id)
-          );
-          return participant?.memberIdx ? Number(participant.memberIdx) : null;
-        })
-        .filter((idx): idx is number => idx !== null && !Number.isNaN(idx));
-
-      if (memberIndexes.length === 0) {
-        console.error('유효한 참가자 인덱스를 찾을 수 없습니다.');
-        return;
-      }
-
-      await removeParticipantsMutation.mutateAsync({
-        chatRoomIdx: room.chatRoomIdx,
-        memberIndexes,
-      });
-
-      // 쿼리 무효화
-      queryClient.invalidateQueries({ queryKey: ['chatParticipants', room.chatRoomIdx] });
-      queryClient.invalidateQueries({ queryKey: ['chatRooms'] });
-      queryClient.invalidateQueries({ queryKey: ['chatRoom', room.chatRoomIdx] });
-
-      onConfirm(selectedParticipantIds);
-      onClose();
-    } catch (error) {
-      console.error('참가자 내보내기 실패:', error);
-    }
+    if (!room || selectedParticipantIds.length === 0) return;
+    onConfirm(selectedParticipantIds);
+    onClose();
   };
 
   return (

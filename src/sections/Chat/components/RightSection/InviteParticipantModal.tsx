@@ -23,11 +23,11 @@ import DialogBtn from 'src/components/safeyoui/button/dialogBtn';
 import { Iconify } from 'src/components/iconify';
 import { getChatAvatarUrl } from 'src/sections/Chat/utils/avatar';
 import { useAuthContext } from 'src/auth/hooks/use-auth-context';
-import { useInviteParticipants, useGetParticipants } from 'src/sections/Chat/hooks/use-chat-api';
-import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useMyInfo } from 'src/sections/Chat/hooks/use-my-info';
 import { getCompanyMembers } from 'src/services/organization/organization.service';
-import type { ChatRoomDto, ChatParticipantDto } from 'src/services/chat/chat.types';
+import type { ChatRoom2 } from '../../chat2.types';
+import { useInviteChat2Participants } from '../../hooks/use-chat2-api';
 
 // ----------------------------------------------------------------------
 
@@ -69,12 +69,11 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onConfirm: (userIds: string[]) => void;
-  room?: ChatRoomDto | null;
+  room?: ChatRoom2 | null;
 };
 
 export default function InviteParticipantModal({ open, onClose, onConfirm, room }: Props) {
   const { user } = useAuthContext();
-  const queryClient = useQueryClient();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const rowsPerPage = 5;
@@ -112,37 +111,15 @@ export default function InviteParticipantModal({ open, onClose, onConfirm, room 
     staleTime: 5 * 60 * 1000,
   });
 
-  // 현재 채팅방 참가자 목록 조회 (이미 참가한 사용자 제외용)
-  // useGetParticipants는 chatRoomIdx가 0이면 자동으로 비활성화됨 (enabled: !!chatRoomIdx)
-  const { data: participantsData } = useGetParticipants(room?.chatRoomIdx || 0);
+  const inviteParticipantsMutation = useInviteChat2Participants();
 
-  // 참가자 memberIdx 목록 추출
+  // 참가자 memberIdx 목록 추출 (이미 참가한 사용자 제외용)
   const participantMemberIndexes = useMemo(() => {
-    if (!participantsData && !room?.participants) return new Set<string>();
-
-    const rawParticipants =
-      (participantsData as any)?.participants ||
-      (participantsData as any)?.body?.participants ||
-      room?.participants ||
-      [];
-
-    // rawParticipants가 배열인지 확인
-    const participantsArray = Array.isArray(rawParticipants)
-      ? rawParticipants
-      : typeof rawParticipants === 'object' && rawParticipants !== null
-        ? Object.values(rawParticipants)
-        : [];
-
     const indexes = new Set<string>();
-    participantsArray.forEach((p: ChatParticipantDto | any) => {
-      const memberIdx = p.memberIdx || (p as any)?.memberIndex;
-      if (memberIdx) {
-        indexes.add(memberIdx.toString());
-      }
-    });
+    (room?.participantIds || []).forEach((id) => indexes.add(String(id)));
 
     return indexes;
-  }, [participantsData, room?.participants]);
+  }, [room?.participantIds]);
 
   const isLoading = isMembersLoading;
 
@@ -221,9 +198,6 @@ export default function InviteParticipantModal({ open, onClose, onConfirm, room 
       });
   }, [membersData, currentMemberIdx, user, participantMemberIndexes]);
 
-  // 참가자 초대 Mutation
-  const inviteParticipantsMutation = useInviteParticipants();
-
   // 페이지네이션된 사용자 목록
   const paginatedUsers = useMemo(() => {
     const startIndex = (page - 1) * rowsPerPage;
@@ -268,20 +242,13 @@ export default function InviteParticipantModal({ open, onClose, onConfirm, room 
   };
 
   const handleConfirm = async () => {
-    if (!room?.chatRoomIdx || selectedIds.length === 0) return;
+    if (!room?.roomId || selectedIds.length === 0) return;
 
     try {
-      const memberIndexes = selectedIds.map((id) => Number(id)).filter((idx) => !Number.isNaN(idx));
-
       await inviteParticipantsMutation.mutateAsync({
-        chatRoomIdx: room.chatRoomIdx,
-        memberIndexes,
+        roomId: room.roomId,
+        participantIds: selectedIds,
       });
-
-      // 쿼리 무효화
-      queryClient.invalidateQueries({ queryKey: ['chatParticipants', room.chatRoomIdx] });
-      queryClient.invalidateQueries({ queryKey: ['chatRooms'] });
-      queryClient.invalidateQueries({ queryKey: ['chatRoom', room.chatRoomIdx] });
 
       onConfirm(selectedIds);
       handleClose();

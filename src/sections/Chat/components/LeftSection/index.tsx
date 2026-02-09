@@ -22,12 +22,12 @@ import { CONFIG } from 'src/global-config';
 import { getChatAvatarUrl } from 'src/sections/Chat/utils/avatar';
 import CreateChatRoomModal from './CreateChatRoomModal';
 import ChatRoomItem from './ChatRoomItem';
-import type { ChatRoomDto, ChatParticipantDto } from 'src/services/chat/chat.types';
+import type { ChatParticipant2, ChatRoom2 } from '../../chat2.types';
 
 type Props = {
-  rooms: ChatRoomDto[];
+  rooms: ChatRoom2[];
   selectedRoomId: string | null;
-  onSelectRoom: (room: ChatRoomDto) => void;
+  onSelectRoom: (room: ChatRoom2) => void;
   onCreateRoom?: (roomName: string, memberIndexes: number[]) => void;
 };
 
@@ -54,52 +54,39 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom, onCre
     user?.companyMember?.memberIndex ||
     null;
 
-  const filteredRooms = rooms
-    .map((room) => {
-      let displayTime = '';
+  const currentMemberIdxNumber = useMemo(() => {
+    const parsed = Number(currentUserMemberIdx);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  }, [currentUserMemberIdx]);
 
-      // 1. room.lastMessage 객체 내부의 lastMessageAt 확인
-      let rawTime = room.lastMessageAt || (room as any).lastMessageTime;
+  const filteredRooms = rooms.filter((room) =>
+    room.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-      if (typeof room.lastMessage === 'object' && room.lastMessage !== null) {
-        const msg = room.lastMessage as any;
-        // lastMessage 객체 안에 lastMessageAt이 있고 유효한 값이면 우선 사용
-        if (msg.lastMessageAt) {
-          rawTime = msg.lastMessageAt;
-        }
-      }
+  const normalizeLang = (lang: string) => {
+    const lower = lang.toLowerCase().trim();
+    if (lower === 'vn') return 'vi';
+    if (lower === 'cn') return 'zh';
+    if (lower === 'kr') return 'ko';
+    return lower;
+  };
 
-      if (rawTime) {
-        const timestamp = Number(rawTime);
-        if (!Number.isNaN(timestamp) && timestamp > 10000000000) {
-          const date = new Date(timestamp);
-          if (!Number.isNaN(date.getTime())) {
-            displayTime = date.toLocaleTimeString('ko-KR', {
-              hour: '2-digit',
-              minute: '2-digit',
-            });
-          }
-        } else if (typeof rawTime === 'string') {
-          const date = new Date(rawTime);
-          if (!Number.isNaN(date.getTime()) && date.getTime() > 0) {
-            displayTime = date.toLocaleTimeString('ko-KR', {
-              hour: '2-digit',
-              minute: '2-digit',
-            });
-          }
-        }
-      }
-      return {
-        ...room,
-        displayTime,
-      };
-    })
-    .filter((room) => room.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  const preferredLang = useMemo(() => {
+    const raw =
+      (myInfoData as any)?.memberLang ||
+      (myInfoData as any)?.language ||
+      (myInfoData as any)?.lang ||
+      (myInfoData as any)?.locale ||
+      (user as any)?.memberLang;
+    if (raw) return normalizeLang(String(raw).split('-')[0]);
+    if (typeof navigator !== 'undefined' && navigator.language) {
+      return normalizeLang(navigator.language.split('-')[0]);
+    }
+    return 'ko';
+  }, [myInfoData, user]);
 
-  // participants 배열에서 현재 사용자를 제외한 상대방 수로 일반/그룹 채팅 구분
-  // 상대방 1명 = 일반 채팅 (나 포함 2명)
-  // 상대방 2명 이상 = 그룹 채팅 (나 포함 3명 이상)
-  const getOtherParticipants = (participants?: ChatParticipantDto[]) => {
+  // participants 배열에서 현재 사용자를 제외한 상대방 수로 1:1 채팅 아바타를 결정할 때 사용
+  const getOtherParticipants = (participants?: ChatParticipant2[]) => {
     if (!participants || !Array.isArray(participants)) return [];
     if (currentUserMemberIdx === null || currentUserMemberIdx === undefined) return participants;
 
@@ -112,56 +99,36 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom, onCre
     });
   };
 
-  // 일반 채팅 목록: 상대방이 1명인 경우 (나 포함 2명)
+  // 일반 채팅 목록: Firestore userRooms.type === DIRECT
   const normalRooms = filteredRooms.filter((room) => {
     if (room.type === 'CHATBOT' || room.type === 'EMERGENCY') return false;
-    const otherParticipants = getOtherParticipants(room.participants);
-    return otherParticipants.length === 1;
+    return room.type === 'DIRECT';
   });
 
-  // 그룹 채팅 목록: 상대방이 2명 이상인 경우 (나 포함 3명 이상)
+  // 그룹 채팅 목록: Firestore userRooms.type === GROUP
   const groupRooms = filteredRooms.filter((room) => {
     if (room.type === 'CHATBOT' || room.type === 'EMERGENCY') return false;
-    const otherParticipants = getOtherParticipants(room.participants);
-    return otherParticipants.length >= 2;
+    return room.type === 'GROUP';
   });
 
   // participants 배열에서 현재 사용자를 제외한 상대방 목록 반환
-  const getFilteredParticipants = (participants?: ChatParticipantDto[]) =>
+  const getFilteredParticipants = (participants?: ChatParticipant2[]) =>
     getOtherParticipants(participants);
 
-  // lastMessage가 객체일 경우 text를 추출하는 헬퍼 함수
-  const getLastMessageText = (
-    lastMessage?:
-      | string
-      | { text: string; senderId?: string; translations?: Record<string, string> }
-  ): string => {
-    if (!lastMessage) return '';
-    
-    let text = '';
-    if (typeof lastMessage === 'string') {
-      text = lastMessage;
-    } else {
-      text = lastMessage.text || '';
-    }
-    
-    // [이미지]|url 형식을 [이미지]로 변환
-    if (text.includes('[이미지]|')) {
-      text = text.split('|')[0]; // | 기준으로 분리하여 첫 번째 부분만 사용
-    }
-    
-    return text;
-  };
-
   // 챗봇방은 항상 표시 (API 응답에 없어도)
-  const chatbotRoom: ChatRoomDto = {
-    chatRoomIdx: 0,
+  const chatbotRoom: ChatRoom2 = {
+    roomId: 'chatbot',
     chatRoomId: 'chatbot',
+    chatRoomIdx: 0,
     name: '챗봇',
     type: 'CHATBOT',
-    isGroup: 0,
-    lastMessage: '',
-    lastMessageAt: '',
+    participantIds: [],
+    lastMessagePreview: '',
+    unreadCount: 0,
+    notificationsEnabled: true,
+    pinned: false,
+    archived: false,
+    participants: [],
   };
 
   const emergencyRoom = filteredRooms.find((r) => r.type === 'EMERGENCY');
@@ -187,7 +154,7 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom, onCre
   );
 
   // Avatar 렌더링 헬퍼 함수 (프로필 이미지가 있으면 사용, 없으면 아이콘)
-  const renderAvatar = (participant: ChatParticipantDto, size: number = 40) => {
+  const renderAvatar = (participant: ChatParticipant2, size: number = 40) => {
     const profileImageUrl = getChatAvatarUrl(
       participant.profileImage || (participant as any).memberThumbnail || (participant as any).avatar
     );
@@ -199,7 +166,7 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom, onCre
   };
 
   // 그룹 채팅 Avatar 렌더링 함수 (Figma 디자인에 맞춰 멤버 수에 따라 다르게 표시)
-  const renderGroupAvatar = (participants?: ChatParticipantDto[]) => {
+  const renderGroupAvatar = (participants?: ChatParticipant2[]) => {
     const filteredParticipants = getFilteredParticipants(participants);
     const participantCount = filteredParticipants.length;
 
@@ -482,8 +449,9 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom, onCre
                 selectedRoomId === 'emergency' || selectedRoomId === emergencyRoom.chatRoomId
               }
               onSelect={onSelectRoom}
-              currentMemberIdx={Number(currentUserMemberIdx)}
+              currentMemberIdx={currentMemberIdxNumber}
               isGroup
+              preferredLang={preferredLang}
               scrollContainerRef={scrollContainerRef}
             />
           )}
@@ -535,8 +503,9 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom, onCre
                       room={room}
                       selected={selectedRoomId === room.chatRoomId}
                       onSelect={onSelectRoom}
-                      currentMemberIdx={Number(currentUserMemberIdx)}
+                      currentMemberIdx={currentMemberIdxNumber}
                       isGroup={false}
+                      preferredLang={preferredLang}
                       scrollContainerRef={scrollContainerRef}
                     />
                   ))}
@@ -592,8 +561,9 @@ export default function LeftSection({ rooms, selectedRoomId, onSelectRoom, onCre
                       room={room}
                       selected={selectedRoomId === room.chatRoomId}
                       onSelect={onSelectRoom}
-                      currentMemberIdx={Number(currentUserMemberIdx)}
+                      currentMemberIdx={currentMemberIdxNumber}
                       isGroup
+                      preferredLang={preferredLang}
                       scrollContainerRef={scrollContainerRef}
                     />
                   ))}

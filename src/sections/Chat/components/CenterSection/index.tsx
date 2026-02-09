@@ -1,8 +1,8 @@
 import NormalChatView from './NormalChatView';
 import EmergencyChatView from './EmergencyChatView';
 import ChatbotView from './ChatbotView';
-import type { ChatRoomDto } from 'src/services/chat/chat.types';
 import type { ChatInputPayload } from '../ui/ChatInput';
+import type { ChatRoom2 } from '../../chat2.types';
 
 type ChatMessage = {
   id: string;
@@ -26,7 +26,7 @@ type ChatMessage = {
 };
 
 type Props = {
-  room: ChatRoomDto;
+  room: ChatRoom2;
   messages: ChatMessage[];
   conversationDate?: string;
   messageInput?: string;
@@ -56,7 +56,6 @@ export default function CenterSection({
     return null;
   }
 
-  // ChatRoomDto의 type은 'NORMAL' | 'GROUP' | 'EMERGENCY' | 'CHATBOT'
   switch (room.type) {
     case 'CHATBOT':
       return (
@@ -66,7 +65,7 @@ export default function CenterSection({
           messageInput={messageInput}
           onMessageInputChange={onMessageInputChange}
           onSendMessage={onSendMessage}
-          roomId={room.chatRoomId || room.chatRoomIdx}
+          roomId={room.chatRoomId}
         />
       );
     case 'EMERGENCY':
@@ -78,14 +77,14 @@ export default function CenterSection({
           messageInput={messageInput}
           onMessageInputChange={onMessageInputChange}
           onSendMessage={onSendMessage}
-          roomId={room.chatRoomId || room.chatRoomIdx}
+          roomId={room.chatRoomId}
           hasMore={hasMore}
           isLoadingMore={isLoadingMore}
           onLoadMore={onLoadMore}
         />
       );
-    case 'NORMAL':
     case 'GROUP':
+    case 'DIRECT':
     default:
       return (
         <NormalChatView
@@ -94,7 +93,7 @@ export default function CenterSection({
           messageInput={messageInput}
           onMessageInputChange={onMessageInputChange}
           onSendMessage={onSendMessage}
-          roomId={room.chatRoomId || room.chatRoomIdx}
+          roomId={room.chatRoomId}
           onFileMessageClick={onFileMessageClick}
           hasMore={hasMore}
           isLoadingMore={isLoadingMore}

@@ -7,7 +7,7 @@ import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 
 import { Iconify } from 'src/components/iconify';
-import type { ChatRoomDto } from 'src/services/chat/chat.types';
+import type { ChatRoom2 } from '../../chat2.types';
 
 // ----------------------------------------------------------------------
 
@@ -15,7 +15,7 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onConfirm: () => void;
-  room: ChatRoomDto | null;
+  room: ChatRoom2 | null;
 };
 
 export default function LeaveChatRoomModal({ open, onClose, onConfirm, room }: Props) {

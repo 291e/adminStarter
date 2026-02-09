@@ -2,19 +2,15 @@ import Box from '@mui/material/Box';
 
 import ParticipantList from './ParticipantList';
 import AttachmentList from './AttachmentList';
-import type {
-  ChatRoomDto,
-  ChatParticipantDto,
-  ChatAttachmentDto,
-} from 'src/services/chat/chat.types';
+import type { ChatAttachment2, ChatParticipant2, ChatRoom2 } from '../../chat2.types';
 
 type Props = {
-  room?: ChatRoomDto | null;
-  participants: ChatParticipantDto[];
-  attachments: ChatAttachmentDto[];
+  room?: ChatRoom2 | null;
+  participants: ChatParticipant2[];
+  attachments: ChatAttachment2[];
   onInvite?: () => void;
   onRemove?: (participantIds: string[]) => void;
-  onFileClick?: (attachment: ChatAttachmentDto) => void;
+  onFileClick?: (attachment: ChatAttachment2) => void;
 };
 
 export default function RightSection({

@@ -4,6 +4,8 @@ import { getDatabase } from 'firebase/database';
 import type { Database } from 'firebase/database';
 import { getAuth } from 'firebase/auth';
 import type { Auth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
+import type { Firestore } from 'firebase/firestore';
 
 import { CONFIG } from 'src/global-config';
 
@@ -56,6 +58,7 @@ if (!isDatabaseUrlValid) {
 let firebaseApp: FirebaseApp;
 let database: Database | undefined;
 let auth: Auth;
+let firestore: Firestore;
 
 try {
   firebaseApp = initializeApp(firebaseConfig);
@@ -71,6 +74,7 @@ try {
   }
 
   auth = getAuth(firebaseApp);
+  firestore = getFirestore(firebaseApp);
 } catch (error) {
   console.error('❌ Firebase 초기화 실패:', error);
   throw new Error(
@@ -86,4 +90,4 @@ try {
   );
 }
 
-export { firebaseApp, database, auth };
+export { firebaseApp, database, auth, firestore };

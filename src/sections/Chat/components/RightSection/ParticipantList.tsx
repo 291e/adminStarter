@@ -15,7 +15,7 @@ import { getChatAvatarUrl } from 'src/sections/Chat/utils/avatar';
 import { Scrollbar } from 'src/components/scrollbar';
 import RemoveParticipantModal from './RemoveParticipantModal';
 import InviteParticipantModal from './InviteParticipantModal';
-import type { ChatRoomDto, ChatParticipantDto } from 'src/services/chat/chat.types';
+import type { ChatParticipant2, ChatRoom2 } from '../../chat2.types';
 
 // 역할 한글 맵핑 함수 (EducationDetailModal.tsx 참고)
 const getRoleLabel = (role?: string): string => {
@@ -44,8 +44,8 @@ const getRoleLabel = (role?: string): string => {
 };
 
 type Props = {
-  room?: ChatRoomDto | null;
-  participants: ChatParticipantDto[];
+  room?: ChatRoom2 | null;
+  participants: ChatParticipant2[];
   onInvite?: () => void;
   onRemove?: (participantIds: string[]) => void;
 };
@@ -165,7 +165,7 @@ export default function ParticipantList({ room, participants, onInvite, onRemove
     handleCloseInviteModal();
   };
 
-  const getParticipantId = (participant: ChatParticipantDto, idx: number) =>
+  const getParticipantId = (participant: ChatParticipant2, idx: number) =>
     participant.memberIdx?.toString() || `participant-${idx}`;
 
   return (

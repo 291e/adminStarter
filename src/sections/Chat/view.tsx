@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router';
-import { useQueryClient } from '@tanstack/react-query';
-import { ref, get, query, orderByChild, startAt, endAt } from 'firebase/database';
-import { database } from 'src/config/firebase';
+import { useQuery } from '@tanstack/react-query';
+import { collection, getDocs, query, Timestamp, where } from 'firebase/firestore';
+import { auth, firestore } from 'src/config/firebase';
 import { CONFIG } from 'src/global-config';
 
 import type { SxProps, Theme } from '@mui/material/styles';
@@ -14,6 +14,7 @@ import Snackbar from '@mui/material/Snackbar';
 import Alert from '@mui/material/Alert';
 
 import { DashboardContent } from 'src/layouts/dashboard';
+import { useAuthContext } from 'src/auth/hooks/use-auth-context';
 
 import ChatBreadcrumbs from './components/Breadcrumbs';
 import LeftSection from './components/LeftSection';
@@ -23,28 +24,21 @@ import ChatHeader from './components/ui/ChatHeader';
 import SharedDocumentDetailModal from './components/SharedDocumentDetailModal';
 import type { ChatInputPayload } from './components/ui/ChatInput';
 
+import { useChat2RoomsFirestore } from './hooks/use-chat2-rooms-firestore';
+import { useChat2RoomFirestore } from './hooks/use-chat2-room-firestore';
 import {
-  useGetChatRooms,
-  useUpdateChatRoom,
-  useCreateChatRoom,
-  useRemoveParticipants,
-  useLeaveChatRoom,
-  useGetAttachments,
-  useGetParticipants,
-  useUpdateLastReadAt,
-} from './hooks/use-chat-api';
-import { useChatRoomFirebase } from './hooks/use-chat-room-firebase';
-import { useChatRoomsEvent } from './hooks/use-chat-rooms-event';
+  useCreateChat2Room,
+  useLeaveChat2Room,
+  useMarkChat2Read,
+  useRenameChat2Room,
+} from './hooks/use-chat2-api';
 import { useMyInfo } from './hooks/use-my-info';
 import { fDate, fTime } from 'src/utils/format-time';
-import type {
-  ChatRoomDto,
-  ChatParticipantDto,
-  ChatAttachmentDto,
-} from 'src/services/chat/chat.types';
 import { sendChatbotMessage } from 'src/services/member/member.service';
 import { getChatAvatarUrl } from 'src/sections/Chat/utils/avatar';
 import { resolveFileUrl } from 'src/sections/Chat/utils/file-url';
+import { getCompanyMembers } from 'src/services/organization/organization.service';
+import type { ChatAttachment2, ChatParticipant2, ChatRoom2 } from './chat2.types';
 
 // ----------------------------------------------------------------------
 
@@ -76,9 +70,9 @@ type ChatMessageItem = {
 };
 
 export function ChatView({ title = '채팅', description, sx }: Props) {
-  const [searchParams] = useSearchParams();
-  const queryClient = useQueryClient();
-  const [selectedRoom, setSelectedRoom] = useState<ChatRoomDto | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { user } = useAuthContext();
+  const [selectedRoom, setSelectedRoom] = useState<ChatRoom2 | null>(null);
   const [messageInput, setMessageInput] = useState('');
   const [isChatbotRoom, setIsChatbotRoom] = useState(false);
   const [chatbotMessages, setChatbotMessages] = useState<ChatMessageItem[]>([]);
@@ -89,17 +83,7 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
   const [documentDetailModalOpen, setDocumentDetailModalOpen] = useState(false);
   const [selectedDocumentIdx, setSelectedDocumentIdx] = useState<number | null>(null);
 
-  // Firebase 사용자 노드 변경 감지 및 채팅방 목록 갱신
-  useChatRoomsEvent();
-
-  // 백엔드 API에서 채팅방 목록 조회
-  const { data: chatRoomsData, isLoading: isRoomsLoading } = useGetChatRooms();
-  // axios 인터셉터가 평탄화하므로 body를 거치지 않고 직접 접근
-  const rooms = useMemo(() => {
-    const list =
-      (chatRoomsData as any)?.chatRoomList || (chatRoomsData as any)?.body?.chatRoomList || [];
-    return Array.isArray(list) ? list : [];
-  }, [chatRoomsData]);
+  const { rooms: rooms, isLoading: isRoomsLoading } = useChat2RoomsFirestore(true);
 
   // 내 정보 (Firebase 메시지 전송 시 memberIdx 사용)
   const { data: myInfoData } = useMyInfo();
@@ -124,141 +108,135 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     return null;
   }, [myInfoData]);
 
-  // 채팅방 변이 훅
-  const updateChatRoomMutation = useUpdateChatRoom();
-  const createChatRoomMutation = useCreateChatRoom();
-  const removeParticipantsMutation = useRemoveParticipants();
-  const leaveChatRoomMutation = useLeaveChatRoom();
-  const updateLastReadAtMutation = useUpdateLastReadAt();
+  const uid = useMemo(() => {
+    const authUid = auth.currentUser?.uid;
+    if (authUid) return authUid;
+    if (currentMemberIdx) return String(currentMemberIdx);
+    return null;
+  }, [currentMemberIdx]);
 
-  // 선택된 채팅방의 Firebase 메시지 수신 (챗봇방이 아닐 때만)
+  const companyIdx = useMemo(() => {
+    const candidates = [
+      (myInfoData as any)?.companyIdx,
+      (myInfoData as any)?.companyIndex,
+      (myInfoData as any)?.company?.companyIdx,
+      (myInfoData as any)?.company?.companyIndex,
+      (user as any)?.companyIdx,
+      (user as any)?.companyIndex,
+    ];
+    for (const candidate of candidates) {
+      const parsed = Number(candidate);
+      if (!Number.isNaN(parsed) && parsed > 0) return parsed;
+    }
+    return 0;
+  }, [myInfoData, user]);
+
+  const { data: membersData } = useQuery({
+    queryKey: ['companyMembers', companyIdx],
+    queryFn: () => getCompanyMembers(companyIdx),
+    enabled: !!companyIdx,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const memberMap = useMemo(() => {
+    const rawMembers =
+      (membersData as any)?.memberList ||
+      (membersData as any)?.members ||
+      (membersData as any)?.body?.memberList ||
+      (membersData as any)?.body?.members ||
+      [];
+    const map = new Map<string, any>();
+    if (Array.isArray(rawMembers)) {
+      rawMembers.forEach((m: any) => {
+        const id = m.memberIdx?.toString() || m.memberIndex?.toString() || m.id?.toString();
+        if (!id) return;
+        map.set(id, m);
+      });
+    }
+    return map;
+  }, [membersData]);
+
+  const roomsWithParticipants: ChatRoom2[] = useMemo(
+    () =>
+      (rooms || []).map((room) => {
+        const participants: ChatParticipant2[] = room.participantIds.map((id) => {
+          const member = memberMap.get(id);
+          const memberIdx = Number(id);
+          return {
+            memberIdx: Number.isNaN(memberIdx) ? 0 : memberIdx,
+            name: member?.memberName || member?.name || `사용자 ${id}`,
+            profileImage: member?.memberThumbnail || member?.profileImage || '',
+            memberRole: member?.memberRole || member?.role,
+            position: member?.position,
+            positionName: member?.positionName || member?.position,
+            department: member?.department || member?.deptName,
+          };
+        });
+        return { ...room, participants };
+      }),
+    [rooms, memberMap],
+  );
+
+  // 채팅방 변이 훅 (chat2)
+  const createChatRoomMutation = useCreateChat2Room();
+  const renameChatRoomMutation = useRenameChat2Room();
+  const leaveChatRoomMutation = useLeaveChat2Room();
+  const markReadMutation = useMarkChat2Read();
+
   const {
     messages: firebaseMessages,
     sendMessage,
     hasMore,
     loadMore,
     isLoadingMore,
-    participantsMeta,
-  } = useChatRoomFirebase({
+    participants: roomParticipantDocs,
+    presenceByUserId,
+  } = useChat2RoomFirestore({
     chatRoomId: !isChatbotRoom ? selectedRoom?.chatRoomId : undefined,
-    memberIdx: currentMemberIdx ?? undefined,
   });
 
-  const normalizeParticipants = (
-    participants?: ChatParticipantDto[] | Record<string, ChatParticipantDto>
-  ): ChatParticipantDto[] => {
-    if (!participants) {
-      return [];
-    }
-
-    if (Array.isArray(participants)) {
-      return participants.map((p) => {
-        const avatar = (p as any).avatar || (p as any).memberThumbnail || (p as any).thumbnail;
-        return {
-          ...p,
-          profileImage: p.profileImage || avatar || undefined,
-        };
-      });
-    }
-
-    return Object.entries(participants).map(([key, value]) => {
-      const avatar =
-        (value as any).avatar || (value as any).memberThumbnail || (value as any).thumbnail;
+  const participantsFromRoom: ChatParticipant2[] = useMemo(() => {
+    if (!selectedRoom) return [];
+    const byId = new Map<string, any>();
+    roomParticipantDocs.forEach((p) => byId.set(p.userId, p));
+    return selectedRoom.participantIds.map((id) => {
+      const member = memberMap.get(id);
+      const baseIdx = Number(id);
+      const participantDoc = byId.get(id);
+      const presence = presenceByUserId[id];
+      const online = presence?.state === 'active';
+      const lastSeen = presence?.lastActiveAt ?? participantDoc?.lastReadAt;
       return {
-        ...(value as ChatParticipantDto),
-        memberIdx: (value as any)?.memberIdx ?? (value as any)?.memberIndex ?? Number(key),
-        profileImage: (value as ChatParticipantDto).profileImage || avatar || undefined,
+        memberIdx: Number.isNaN(baseIdx) ? 0 : baseIdx,
+        name: member?.memberName || member?.name || `사용자 ${id}`,
+        profileImage: member?.memberThumbnail || member?.profileImage || '',
+        unreadCount: participantDoc?.unreadCount,
+        joinedAt: participantDoc?.joinedAt,
+        lastSeen,
+        online: online ? 1 : 0,
+        customRoomName: participantDoc?.customRoomName,
+        memberRole: member?.memberRole || member?.role,
+        position: member?.position,
+        positionName: member?.positionName || member?.position,
+        department: member?.department || member?.deptName,
+        leftAt: participantDoc?.leftAt ?? null,
+        notificationsEnabled: participantDoc?.notificationsEnabled,
+        mutedUntil: participantDoc?.mutedUntil ?? null,
       };
     });
-  };
-
-  const getRoomParticipants = (room?: ChatRoomDto | null) =>
-    normalizeParticipants(
-      (room as any)?.participants ||
-        (room as any)?.participantList ||
-        (room as any)?.participantInfos ||
-        (room as any)?.memberList
-    );
-
-  // 참가자 목록 API 조회 (챗봇방이 아닐 때만)
-  const { data: participantsData } = useGetParticipants(
-    !isChatbotRoom && selectedRoom?.chatRoomIdx ? selectedRoom.chatRoomIdx : 0
-  );
-
-  // API 응답에서 참가자 목록 추출
-  const participantsFromAPI: ChatParticipantDto[] = useMemo(() => {
-    if (!participantsData) return [];
-
-    // axios 인터셉터가 평탄화하므로 body를 거치지 않고 직접 접근
-    // 응답 구조: { header: {...}, participantList: [...], totalCount: 3 }
-    const rawParticipants =
-      (participantsData as any).participantList ||
-      (participantsData as any).participants ||
-      (participantsData as any).body?.participantList ||
-      (participantsData as any).body?.participants ||
-      [];
-
-    // API 응답 구조를 ChatParticipantDto로 매핑 (memberRole도 함께 저장)
-    return rawParticipants.map((p: any): ChatParticipantDto & { memberRole?: string } => {
-      const avatar = p.avatar || p.memberThumbnail || p.profileImage || p.thumbnail;
-      return {
-        memberIdx: p.memberIdx,
-        name: p.memberName || p.name || `사용자 ${p.memberIdx}`,
-        profileImage: avatar || undefined,
-        unreadCount: p.unreadCount,
-        joinedAt: p.joinedAt,
-        lastSeen: p.lastReadAt,
-        online: p.isActive === 1 ? 1 : 0,
-        memberRole: p.memberRole, // 원본 memberRole 저장
-        position: p.position,
-        positionName: p.positionName || p.position,
-        department: p.department,
-      };
-    });
-  }, [participantsData]);
-
-  // 참가자 목록: API 응답 우선, 없으면 selectedRoom.participants 사용
-  const participantsFromRoom: ChatParticipantDto[] = useMemo(() => {
-    if (participantsFromAPI.length > 0) {
-      return participantsFromAPI;
-    }
-    return normalizeParticipants(selectedRoom?.participants);
-  }, [participantsFromAPI, selectedRoom]);
-
-  const participantsWithPresence: ChatParticipantDto[] = useMemo(() => {
-    if (!participantsFromRoom.length) return participantsFromRoom;
-    if (!participantsMeta || Object.keys(participantsMeta).length === 0)
-      return participantsFromRoom;
-
-    return participantsFromRoom.map((participant) => {
-      const key = String((participant as any)?.memberIdx ?? (participant as any)?.memberIndex);
-      const meta = (participantsMeta as any)?.[key];
-      if (!meta) return participant;
-
-      return {
-        ...participant,
-        online: meta.online ?? participant.online,
-        lastSeen: meta.lastSeen ?? participant.lastSeen,
-        unreadCount: meta.unreadCount ?? participant.unreadCount,
-      };
-    });
-  }, [participantsFromRoom, participantsMeta]);
+  }, [selectedRoom, roomParticipantDocs, presenceByUserId, memberMap]);
 
   const participantLookup = useMemo(() => {
     const map = new Map<number, { name: string; avatarUrl?: string }>();
-
     participantsFromRoom.forEach((participant) => {
-      const idx = Number((participant as any)?.memberIdx ?? (participant as any)?.memberIndex);
-      if (!Number.isNaN(idx)) {
+      const idx = Number(participant.memberIdx);
+      if (!Number.isNaN(idx) && idx > 0) {
         map.set(idx, {
-          name: participant.name || (participant as any)?.memberName || `사용자 ${idx}`,
-          avatarUrl: getChatAvatarUrl(
-            participant.profileImage || (participant as any)?.memberThumbnail
-          ),
+          name: participant.name || `사용자 ${idx}`,
+          avatarUrl: getChatAvatarUrl(participant.profileImage),
         });
       }
     });
-
     return map;
   }, [participantsFromRoom]);
 
@@ -371,11 +349,10 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
 
     // 일반 채팅방이면 Firebase 메시지 반환
     return firebaseMessages.map((msg) => {
-      // senderMemberIdx가 string일 수 있으므로 number로 변환
-      const senderMemberIdxNum = Number(msg.senderMemberIdx);
+      const senderMemberIdxNum = Number(msg.senderId);
       const senderInfo = participantLookup.get(senderMemberIdxNum);
       // senderName 우선순위: msg.senderName > participantLookup > 기본값
-      const senderName = msg.senderName || senderInfo?.name || `사용자 ${msg.senderMemberIdx}`;
+      const senderName = msg.senderName || senderInfo?.name || `사용자 ${msg.senderId}`;
       const avatarUrl = senderInfo?.avatarUrl;
       const dateValue = parseTimestamp(msg.timestamp || msg.createdAt?.toString() || '');
       const dateLabel = dateValue ? fDate(dateValue, 'YYYY년 M월 D일') : undefined;
@@ -425,35 +402,35 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
 
   // URL 쿼리 파라미터에서 roomId를 읽어서 초기 채팅방 선택
   useEffect(() => {
-    const roomId = searchParams.get('roomId');
-    if (roomId && rooms.length > 0) {
-      const room = rooms.find((r: ChatRoomDto) => r.chatRoomId === roomId);
+    const roomId = searchParams.get('room') || searchParams.get('roomId');
+    if (!roomId) return;
+
+    if (roomId === 'chatbot') {
+      setIsChatbotRoom(true);
+      setSelectedRoom(null);
+      return;
+    }
+
+    if (roomsWithParticipants.length > 0) {
+      const room = roomsWithParticipants.find((r) => r.chatRoomId === roomId || r.roomId === roomId);
       if (room) {
+        setIsChatbotRoom(false);
         setSelectedRoom(room);
       }
     }
-  }, [searchParams, rooms]);
+  }, [searchParams, roomsWithParticipants]);
 
-  // 이전 chatRoomIdx 추적 (무한 루프 방지)
-  const prevChatRoomIdxRef = useRef<number | undefined>(undefined);
-  // mutation 함수를 ref에 저장 (의존성 배열 문제 해결)
-  const updateLastReadAtRef = useRef(updateLastReadAtMutation.mutate);
-  updateLastReadAtRef.current = updateLastReadAtMutation.mutate;
-
-  // 채팅방 선택 시 마지막 읽은 시간 업데이트 (챗봇방 제외)
+  // 채팅방 선택 시 읽음 처리 (챗봇방 제외)
+  const prevRoomIdRef = useRef<string | undefined>(undefined);
   useEffect(() => {
-    const currentChatRoomIdx = selectedRoom?.chatRoomIdx;
+    const roomId = selectedRoom?.chatRoomId;
+    if (!roomId || isChatbotRoom) return;
+    if (!uid) return;
+    if (roomId === prevRoomIdRef.current) return;
+    prevRoomIdRef.current = roomId;
 
-    // 챗봇방이 아니고, chatRoomIdx가 있고, 이전 값과 다를 때만 호출
-    if (!isChatbotRoom && currentChatRoomIdx && currentChatRoomIdx !== prevChatRoomIdxRef.current) {
-      prevChatRoomIdxRef.current = currentChatRoomIdx;
-      const timestamp = new Date().toISOString();
-      updateLastReadAtRef.current({
-        chatRoomIdx: currentChatRoomIdx,
-        timestamp,
-      });
-    }
-  }, [selectedRoom?.chatRoomIdx, isChatbotRoom]);
+    markReadMutation.mutate({ roomId, userId: uid });
+  }, [selectedRoom?.chatRoomId, isChatbotRoom, uid, markReadMutation]);
 
   const handleSendMessage = async (payload?: ChatInputPayload) => {
     const attachments = payload?.attachments;
@@ -587,46 +564,20 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
   };
 
   const handleRemoveParticipants = async (participantIds: string[]) => {
-    if (!selectedRoom?.chatRoomIdx || participantIds.length === 0) return;
-
-    try {
-      // participantIds를 memberIndexes로 변환
-      const memberIndexes = participantIds
-        .map((id) => {
-          const parsed = Number(id);
-          if (!Number.isNaN(parsed)) return parsed;
-
-          const participant = participantsFromRoom.find((p) => {
-            const pId = (p as any)?.memberIdx?.toString() || (p as any)?.id;
-            return pId === id;
-          });
-          return participant?.memberIdx ? Number(participant.memberIdx) : null;
-        })
-        .filter((idx): idx is number => idx !== null && !Number.isNaN(idx));
-
-      if (memberIndexes.length === 0) {
-        console.error('유효한 참가자 인덱스를 찾을 수 없습니다.');
-        return;
-      }
-
-      await removeParticipantsMutation.mutateAsync({
-        chatRoomIdx: selectedRoom.chatRoomIdx,
-        memberIndexes,
-      });
-    } catch (error) {
-      console.error('참가자 내보내기 실패:', error);
-    }
+    if (!selectedRoom || participantIds.length === 0) return;
+    setErrorSnackbar({
+      open: true,
+      message: '현재 버전에서는 참가자 내보내기 기능이 지원되지 않습니다.',
+    });
   };
 
   const handleRoomNameChange = async (newName: string) => {
     if (selectedRoom) {
       try {
-        await updateChatRoomMutation.mutateAsync({
-          chatRoomIdx: selectedRoom.chatRoomIdx,
+        await renameChatRoomMutation.mutateAsync({
+          roomId: selectedRoom.roomId,
           name: newName,
         });
-        // 성공 시 selectedRoom 업데이트는 useUpdateChatRoom의 onSuccess에서 쿼리 무효화로 처리됨
-        // 하지만 UI 즉각 반영을 위해 로컬 상태 업데이트도 가능
         setSelectedRoom((prev) => (prev ? { ...prev, name: newName } : null));
       } catch (error) {
         console.error('Failed to rename room:', error);
@@ -635,17 +586,14 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
   };
 
   const handleLeaveRoom = () => {
-    if (!selectedRoom?.chatRoomIdx) return;
-
+    if (!selectedRoom) return;
     leaveChatRoomMutation.mutate(
-      { chatRoomIdx: selectedRoom.chatRoomIdx },
+      { roomId: selectedRoom.roomId },
       {
         onSuccess: () => {
           setSelectedRoom(null);
-        },
-        onError: (error: any) => {
-          // 에러 처리 (필요시 Toast 메시지 표시)
-          console.error('채팅방 나가기 실패:', error);
+          setIsChatbotRoom(false);
+          setSearchParams({});
         },
       }
     );
@@ -663,102 +611,49 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
 
   const handleCreateRoom = async (roomName: string, memberIndexes: number[]) => {
     try {
-      // 채팅방 생성
+      const participantIds = memberIndexes
+        .map((id) => String(id))
+        .filter((id) => id.trim().length > 0);
+      const type = participantIds.length <= 1 ? 'DIRECT' : 'GROUP';
+
       const createResponse = await createChatRoomMutation.mutateAsync({
-        memberIndexes,
+        type,
+        name: roomName.trim() || undefined,
+        participantIds,
       });
 
-      // axios 인터셉터가 평탄화하므로 body를 거치지 않고 직접 접근
-      // 응답 구조: { header: {...}, chatRoomIdx: number, chatRoomId: string }
-      const chatRoomIdx =
-        (createResponse as any).chatRoomIdx ||
-        (createResponse as any).body?.chatRoomIdx ||
-        (createResponse as any).data?.chatRoomIdx;
+      const roomId =
+        (createResponse as any)?.roomId ||
+        (createResponse as any)?.data?.roomId ||
+        (createResponse as any)?.body?.roomId ||
+        (createResponse as any)?.body?.data?.roomId;
 
-      if (!chatRoomIdx) {
-        console.warn('채팅방 생성 응답에서 chatRoomIdx를 찾을 수 없습니다:', createResponse);
+      if (!roomId) {
+        console.warn('채팅방 생성 응답에서 roomId를 찾을 수 없습니다:', createResponse);
         return;
       }
 
-      // 채팅방 생성 후 쿼리 무효화가 완료될 때까지 기다림
-      await queryClient.invalidateQueries({ queryKey: ['chatRooms'] });
-      // 쿼리 리패치 완료 대기
-      await queryClient.refetchQueries({ queryKey: ['chatRooms'] });
-
-      // 생성 성공 후 채팅방 이름이 있으면 이름 변경
-      if (roomName.trim()) {
-        // 추가 지연을 두어 트랜잭션이 완전히 커밋되도록 함
-        await new Promise((resolve) => setTimeout(resolve, 500));
-
-        try {
-          await updateChatRoomMutation.mutateAsync({
-            chatRoomIdx: Number(chatRoomIdx),
-            name: roomName.trim(),
-          });
-        } catch (updateError: any) {
-          // 이름 변경 실패는 별도로 처리 (채팅방은 이미 생성됨)
-          console.error('채팅방 이름 변경 실패:', updateError);
-          const updateErrorMessage =
-            updateError?.response?.data?.header?.resultMessage ||
-            updateError?.message ||
-            '채팅방은 생성되었지만 이름 변경에 실패했습니다.';
-          setErrorSnackbar({
-            open: true,
-            message: updateErrorMessage,
-          });
-        }
-      }
+      setIsChatbotRoom(false);
+      setSearchParams({ room: roomId });
     } catch (error: any) {
       // API 응답에서 에러 메시지 추출
-      const errorMessage =
-        error?.response?.data?.header?.resultMessage ||
-        error?.response?.data?.resultMessage ||
-        error?.message ||
-        '채팅방 생성에 실패했습니다.';
-
-      // resultCode가 500이면 중복 채팅방 생성 시도로 간주
-      const resultCode =
-        error?.response?.data?.header?.resultCode || error?.response?.data?.resultCode;
-      const isDuplicateError = resultCode === 500;
-
+      const errorMessage = error?.message || '채팅방 생성에 실패했습니다.';
       setErrorSnackbar({
         open: true,
-        message: isDuplicateError
-          ? '이미 존재하는 채팅방입니다. 중복 채팅방을 생성할 수 없습니다.'
-          : errorMessage,
+        message: errorMessage,
       });
     }
   };
 
-  // LeftSection용 ChatRoomDto 배열 (customRoomName 우선 사용)
-  const leftSectionRooms: ChatRoomDto[] = rooms.map((room: ChatRoomDto) => {
-    const participants = getRoomParticipants(room);
-    const currentParticipant = participants.find(
-      (participant) =>
-        Number(participant.memberIdx ?? (participant as any)?.memberIndex) === currentMemberIdx
-    );
-
-    // customRoomName 우선 사용, 없으면 room.name 사용
-    const displayName = currentParticipant?.customRoomName || room.name;
-
-    return {
-      ...room,
-      name: displayName, // 표시용 이름으로 교체
-      unreadCount: currentParticipant?.unreadCount ?? room.unreadCount ?? 0,
-      participants,
-    };
-  });
+  const leftSectionRooms: ChatRoom2[] = roomsWithParticipants;
 
   // RightSection용 참가자 목록 변환 (본인 제외)
-  const rightSectionParticipants: ChatParticipantDto[] = useMemo(() => {
+  const rightSectionParticipants: ChatParticipant2[] = useMemo(() => {
     if (!currentMemberIdx) return [];
 
     // 본인을 제외한 모든 참가자 반환
-    return participantsWithPresence.filter((p: ChatParticipantDto) => {
-      const participantIdx = Number(p.memberIdx ?? (p as any)?.memberIndex);
-      return participantIdx !== currentMemberIdx;
-    });
-  }, [participantsWithPresence, currentMemberIdx]);
+    return participantsFromRoom.filter((p) => p.memberIdx !== currentMemberIdx);
+  }, [participantsFromRoom, currentMemberIdx]);
 
   // EMERGENCY 타입의 채팅방 찾기
   const emergencyRoom = useMemo(
@@ -766,36 +661,32 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     [rooms]
   );
 
-  // 응급 통계 집계 (Firebase 기반)
+  // 응급 통계 집계 (Firestore 기반)
   const [emergencyCount, setEmergencyCount] = useState(0);
 
   useEffect(() => {
-    if (!emergencyRoom?.chatRoomId || !database) return;
+    if (!emergencyRoom?.chatRoomId) return;
 
     const fetchMonthlyEmergencyCount = async () => {
-      const db = database;
-      if (!db || !emergencyRoom?.chatRoomId) return;
+      if (!emergencyRoom?.chatRoomId) return;
 
       try {
         const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime().toString();
-        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
-          .getTime()
-          .toString();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
-        const messagesRef = ref(db, `chatRooms/${emergencyRoom.chatRoomId}/messages`);
+        const messagesCol = collection(firestore, 'chatRooms', emergencyRoom.chatRoomId, 'messages');
         const messagesQuery = query(
-          messagesRef,
-          orderByChild('timestamp'),
-          startAt(startOfMonth),
-          endAt(endOfMonth)
+          messagesCol,
+          where('createdAt', '>=', Timestamp.fromDate(startOfMonth)),
+          where('createdAt', '<', Timestamp.fromDate(startOfNextMonth))
         );
 
-        const snapshot = await get(messagesQuery);
+        const snapshot = await getDocs(messagesQuery);
         let count = 0;
-        snapshot.forEach((child) => {
-          const val = child.val();
-          if (val.messageType === 'EMERGENCY') {
+        snapshot.forEach((docSnap) => {
+          const val = docSnap.data() as any;
+          if (String(val?.messageType || '').toUpperCase() === 'EMERGENCY') {
             count += 1;
           }
         });
@@ -816,13 +707,7 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     };
   }, [emergencyCount]);
 
-  // 첨부파일 조회
-  const { data: attachmentsData } = useGetAttachments(selectedRoom?.chatRoomIdx || 0);
-  const attachments: ChatAttachmentDto[] = useMemo(() => {
-    // API에서 가져온 첨부파일
-    const rawAttachments =
-      (attachmentsData as any)?.attachments || (attachmentsData as any)?.body?.attachments || [];
-
+  const attachments: ChatAttachment2[] = useMemo(() => {
     const normalizeUrl = (url: string | undefined | null): string => {
       const resolved = resolveFileUrl(url);
       return resolved ?? '';
@@ -841,21 +726,14 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
       );
     };
 
-    const apiAttachments = rawAttachments.map(
-      (att: any): ChatAttachmentDto => ({
-        id: att.id || '',
-        name: att.name || '',
-        type: att.type || 'txt',
-        url: normalizeUrl(att.url || ''),
-        createdAt: att.createdAt || '',
-      })
-    );
-
     // 메시지에서 이미지와 문서 파일 추출
-    const messageAttachments: ChatAttachmentDto[] = [];
+    const messageAttachments: ChatAttachment2[] = [];
 
     firebaseMessages.forEach((msg) => {
-      const createdAt = msg.timestamp;
+      const createdAtMs = Number(msg.timestamp);
+      const createdAt = !Number.isNaN(createdAtMs)
+        ? new Date(createdAtMs).toISOString()
+        : new Date().toISOString();
       const metadata = (msg.metadata || {}) as any;
       const fileName =
         metadata.fileName ||
@@ -982,11 +860,8 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
       }
     });
 
-    // API 첨부파일 + 메시지에서 추출한 첨부파일 합치기 (최신순 정렬)
-    const allAttachments = [...apiAttachments, ...messageAttachments];
-
     // 중복 제거 (URL 기준)
-    const uniqueAttachments = allAttachments.filter(
+    const uniqueAttachments = messageAttachments.filter(
       (att, idx, arr) =>
         arr.findIndex((other) =>
           att.url && other.url ? other.url === att.url : other.id === att.id
@@ -999,7 +874,7 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
       const dateB = new Date(b.createdAt || 0).getTime();
       return dateB - dateA;
     });
-  }, [attachmentsData, firebaseMessages]);
+  }, [firebaseMessages]);
 
   const renderContent = () => (
     <Box
@@ -1025,12 +900,14 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
           if (room.chatRoomId === 'chatbot' || room.type === 'CHATBOT') {
             setIsChatbotRoom(true);
             setSelectedRoom(null);
+            setSearchParams({ room: 'chatbot' });
             return;
           }
 
           // 일반 채팅방 선택
           setIsChatbotRoom(false);
           setSelectedRoom(room);
+          setSearchParams({ room: room.chatRoomId });
         }}
         onCreateRoom={handleCreateRoom}
       />
@@ -1054,25 +931,20 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
                 room={
                   isChatbotRoom
                     ? {
-                        chatRoomIdx: 0,
+                        roomId: 'chatbot',
                         chatRoomId: 'chatbot',
-                        name: '챗봇',
+                        chatRoomIdx: 0,
                         type: 'CHATBOT',
-                        isGroup: 0,
+                        name: '챗봇',
+                        participantIds: [],
+                        lastMessagePreview: '',
+                        unreadCount: 0,
+                        notificationsEnabled: true,
+                        pinned: false,
+                        archived: false,
+                        participants: [],
                       }
-                    : (() => {
-                        // selectedRoom의 participants에서 현재 사용자의 customRoomName 찾기
-                        const participants = normalizeParticipants(selectedRoom?.participants);
-                        const currentParticipant = participants.find(
-                          (p) => Number(p.memberIdx ?? (p as any)?.memberIndex) === currentMemberIdx
-                        );
-                        const displayName =
-                          currentParticipant?.customRoomName || selectedRoom?.name || '';
-                        return {
-                          ...selectedRoom!,
-                          name: displayName,
-                        };
-                      })()
+                    : selectedRoom!
                 }
                 participants={isChatbotRoom ? [] : rightSectionParticipants}
                 onRoomNameChange={handleRoomNameChange}
@@ -1105,11 +977,18 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
                   room={
                     isChatbotRoom
                       ? {
-                          chatRoomIdx: 0,
+                          roomId: 'chatbot',
                           chatRoomId: 'chatbot',
-                          name: '챗봇',
+                          chatRoomIdx: 0,
                           type: 'CHATBOT',
-                          isGroup: 0,
+                          name: '챗봇',
+                          participantIds: [],
+                          lastMessagePreview: '',
+                          unreadCount: 0,
+                          notificationsEnabled: true,
+                          pinned: false,
+                          archived: false,
+                          participants: [],
                         }
                       : selectedRoom!
                   }

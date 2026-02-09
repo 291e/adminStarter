@@ -190,6 +190,10 @@ export const endpoints = {
     messages: '/chat/messages',
     emergencyRooms: '/chat/emergency-rooms',
   },
+  chat2: {
+    rooms: '/chat2/rooms',
+    messages: '/chat2/messages',
+  },
   // Operation
   operation: {
     riskReports: '/operation/risk-reports',
