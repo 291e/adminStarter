@@ -42,6 +42,22 @@ export type BoardCommentInformation = {
   memberThumbnail?: string;
 };
 
+export type BoardMemberInformation = {
+  memberIdx?: number;
+  memberId?: string;
+  memberName?: string;
+  memberRole?: string;
+  isSuperAdmin?: boolean;
+  memberEmail?: string | null;
+  memberPhone?: string | null;
+  memberThumbnail?: string | null;
+};
+
+export type BoardPostFile = {
+  originalFileName: string;
+  fileUrl: string;
+};
+
 export type BoardPost = {
   postIdx?: number;
   postGubun?: PostGubun | string;
@@ -49,7 +65,7 @@ export type BoardPost = {
   postTarget2?: string;
   postTitle?: string;
   postContent?: string;
-  postFilePath?: string;
+  postFilePath?: string | BoardPostFile[];
   isPop?: number;
   isPinned?: number;
   postStatus?: PostStatus;
@@ -65,6 +81,9 @@ export type BoardPost = {
   memberEmail?: string; // API 응답에서 오는 경우
   memberId?: string; // 회원 ID
   memberPhone?: string; // 전화번호
+  memberRole?: string; // 작성자 역할
+  authorIsSuperAdmin?: boolean; // 작성자 최고관리자 여부
+  memberInformation?: BoardMemberInformation; // 작성자 정보
   createAt?: string;
   updateAt?: string;
   registrationDate?: string;
@@ -106,6 +125,11 @@ export type GetBoardPostsResult = {
   header?: BaseResponseHeader;
 };
 
+export type GetBoardPostDetailResult = {
+  post: BoardPost | null;
+  header?: BaseResponseHeader;
+};
+
 export type GetBoardCategoriesResult = {
   categories: BoardCategory[];
   header?: BaseResponseHeader;
@@ -117,7 +141,7 @@ export type CreateBoardPostParams = {
   postTarget2?: string;
   postTitle: string;
   postContent?: string;
-  postFilePath?: string;
+  postFilePath?: string | BoardPostFile[];
   isPop?: number;
   isPinned?: number;
   postStatus?: PostStatus;

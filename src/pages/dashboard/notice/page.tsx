@@ -4,7 +4,7 @@ import { BoardView } from 'src/sections/Board/view';
 
 // ----------------------------------------------------------------------
 
-const metadata = { title: `공지사항 | Dashboard - ${CONFIG.appName}` };
+const metadata = { title: `산업안전보건 게시판 | Dashboard - ${CONFIG.appName}` };
 
 export default function NoticePage() {
   return (

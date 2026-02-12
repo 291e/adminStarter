@@ -136,6 +136,9 @@ export default function ChemicalNameSearchModal({
             }
             sx={{ width: '100%' }}
           />
+          <Typography variant="caption" sx={{ mt: 0.75, display: 'block', color: 'text.secondary' }}>
+            검색어 입력 후 Enter를 누르거나 검색 결과를 클릭하면 값이 적용됩니다.
+          </Typography>
           {chemicalData && (
             <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
               <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>

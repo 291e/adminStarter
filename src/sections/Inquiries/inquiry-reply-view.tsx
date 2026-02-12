@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 
@@ -14,6 +14,12 @@ import { Iconify } from 'src/components/iconify';
 import { fDateTime } from 'src/utils/format-time';
 import { useCreateBoardComment } from 'src/sections/Board/hooks/use-board-api';
 import type { InquiryRow } from './components/table';
+import { resolveAdminImageUrlsInHtml, stripAdminImageOriginFromHtml } from 'src/utils/rich-text';
+import IconButton from '@mui/material/IconButton';
+import InquiryQuillToolbar, {
+  inquiryQuillFormats,
+  inquiryQuillModules,
+} from './components/quill-toolbar';
 
 // ----------------------------------------------------------------------
 
@@ -22,11 +28,25 @@ type Props = {
   inquiry: InquiryRow;
 };
 
+const toolbarId = 'inquiry-quill-toolbar-reply';
+
 export default function InquiryReplyView({ onBack, inquiry }: Props) {
   // 기존 답변이 있으면 초기값으로 설정
   const existingAnswerContent = inquiry.commentInformation?.commentContent || inquiry.answer || '';
-  const [answerContent, setAnswerContent] = useState(existingAnswerContent);
+  const [answerContent, setAnswerContent] = useState(() =>
+    stripAdminImageOriginFromHtml(existingAnswerContent)
+  );
   const createCommentMutation = useCreateBoardComment();
+
+  const renderedInquiryContent = useMemo(
+    () => resolveAdminImageUrlsInHtml(inquiry.content ?? ''),
+    [inquiry.content]
+  );
+
+  const renderedAnswerContent = useMemo(
+    () => resolveAdminImageUrlsInHtml(answerContent),
+    [answerContent]
+  );
 
   const handleSubmit = async () => {
     if (!inquiry.postIdx) return;
@@ -56,19 +76,11 @@ export default function InquiryReplyView({ onBack, inquiry }: Props) {
     <DashboardContent>
       <Container maxWidth="xl">
         {/* 헤더: 목록으로 */}
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 3 }}>
-          <Button
-            startIcon={<Iconify icon={'solar:alt-arrow-left-bold' as any} width={20} />}
-            onClick={onBack}
-            sx={{
-              color: 'text.primary',
-              fontWeight: 600,
-              px: 0,
-              '&:hover': { bgcolor: 'transparent', opacity: 0.8 },
-            }}
-          >
-            목록으로
-          </Button>
+        <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
+          <IconButton onClick={onBack} sx={{ p: 0 }}>
+            <Iconify icon="eva:arrow-ios-back-fill" width={24} />
+          </IconButton>
+          <Typography variant="h4">목록으로</Typography>
         </Stack>
 
         <Stack spacing={3}>
@@ -181,11 +193,10 @@ export default function InquiryReplyView({ onBack, inquiry }: Props) {
                       >
                         내용
                       </Typography>
-                      <Typography
-                        variant="body2"
-                        component="div"
-                        sx={{ whiteSpace: 'pre-wrap' }}
-                        dangerouslySetInnerHTML={{ __html: inquiry.content ?? '' }}
+                      <Box
+                        className="quill-rendered-content ql-editor"
+                        sx={{ typography: 'body2' }}
+                        dangerouslySetInnerHTML={{ __html: renderedInquiryContent }}
                       />
                     </Box>
                   </Stack>
@@ -210,12 +221,6 @@ export default function InquiryReplyView({ onBack, inquiry }: Props) {
                   '& .quill': {
                     bgcolor: 'background.paper',
                     border: 'none',
-                    '& .ql-toolbar': {
-                      border: 'none',
-                      borderBottom: '1px solid',
-                      borderColor: 'divider',
-                      bgcolor: 'background.paper',
-                    },
                     '& .ql-container': {
                       border: 'none',
                       minHeight: 400,
@@ -225,12 +230,24 @@ export default function InquiryReplyView({ onBack, inquiry }: Props) {
                       },
                     },
                   },
+                  '& .ql-toolbar': {
+                    border: 'none',
+                    borderBottom: '1px solid',
+                    borderColor: 'divider',
+                    bgcolor: 'background.paper',
+                  },
+                  '& .ql-formats': {
+                    marginRight: '8px',
+                  },
                 }}
               >
+                <InquiryQuillToolbar toolbarId={toolbarId} />
                 <ReactQuill
                   theme="snow"
-                  value={answerContent}
-                  onChange={setAnswerContent}
+                  modules={inquiryQuillModules(toolbarId)}
+                  formats={inquiryQuillFormats}
+                  value={renderedAnswerContent}
+                  onChange={(value) => setAnswerContent(stripAdminImageOriginFromHtml(value))}
                   placeholder="내용"
                 />
               </Box>

@@ -18,6 +18,7 @@ import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
 import Switch from '@mui/material/Switch';
 import FormControlLabel from '@mui/material/FormControlLabel';
+import Checkbox from '@mui/material/Checkbox';
 import Alert from '@mui/material/Alert';
 import LoadingButton from '@mui/lab/LoadingButton';
 import LinearProgress from '@mui/material/LinearProgress';
@@ -33,6 +34,7 @@ import DeleteContentModal from './DeleteContentModal';
 export type EditContentFormData = {
   category: string;
   title: string;
+  educationType: 'MANDATORY' | 'REGULAR';
   videoFile: File | null;
   description: string;
   isActive: boolean;
@@ -67,6 +69,7 @@ export default function EditContentModal({
   const [formData, setFormData] = useState<EditContentFormData>({
     category: '',
     title: '',
+    educationType: 'MANDATORY',
     videoFile: null,
     description: '',
     isActive: true,
@@ -117,6 +120,8 @@ export default function EditContentModal({
       setFormData({
         category: categoryName,
         title: initialData.title || '',
+        educationType:
+          initialData.educationType === 'REGULAR' ? 'REGULAR' : 'MANDATORY',
         videoFile: null,
         description: initialData.description || '',
         isActive: (initialData.status ?? 'active') === 'active',
@@ -149,6 +154,7 @@ export default function EditContentModal({
       setFormData({
         category: '',
         title: '',
+        educationType: 'MANDATORY',
         videoFile: null,
         description: '',
         isActive: true,
@@ -301,6 +307,7 @@ export default function EditContentModal({
     setFormData({
       category: '',
       title: '',
+      educationType: 'MANDATORY',
       videoFile: null,
       description: '',
       isActive: true,
@@ -408,6 +415,92 @@ export default function EditContentModal({
               </Stack>
             </Alert>
           )}
+
+          {/* 교육 구분 */}
+          <Box>
+            <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 700 }}>
+              교육 구분
+              <Box component="span" sx={{ color: 'error.main', ml: 0.5 }}>
+                *
+              </Box>
+            </Typography>
+            <Stack direction="row" spacing={2}>
+              {[
+                { value: 'MANDATORY', label: '의무교육' },
+                { value: 'REGULAR', label: '정기교육' },
+              ].map((type) => (
+                <Box
+                  key={type.value}
+                  onClick={() =>
+                    !isSaving &&
+                    uploadStep === 'idle' &&
+                    handleChange('educationType', type.value as 'MANDATORY' | 'REGULAR')
+                  }
+                  sx={{
+                    flex: 1,
+                    px: 3,
+                    height: 48,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    cursor: isSaving || uploadStep !== 'idle' ? 'default' : 'pointer',
+                    borderRadius: 1.5,
+                    border: '1px solid',
+                    borderColor:
+                      formData.educationType === type.value ? 'primary.main' : '#E5E8EB',
+                    bgcolor: 'background.paper',
+                    transition: 'all 0.2s',
+                    opacity: isSaving || uploadStep !== 'idle' ? 0.6 : 1,
+                    '&:hover': {
+                      borderColor:
+                        isSaving || uploadStep !== 'idle'
+                          ? formData.educationType === type.value
+                            ? 'primary.main'
+                            : '#E5E8EB'
+                          : formData.educationType === type.value
+                            ? 'primary.main'
+                            : 'text.disabled',
+                    },
+                  }}
+                >
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                    {type.label}
+                  </Typography>
+                  <Checkbox
+                    checked={formData.educationType === type.value}
+                    icon={
+                      <Box
+                        sx={{
+                          width: 20,
+                          height: 20,
+                          borderRadius: 0.5,
+                          border: '1px solid #E5E8EB',
+                        }}
+                      />
+                    }
+                    checkedIcon={
+                      <Box
+                        sx={{
+                          width: 20,
+                          height: 20,
+                          borderRadius: 0.5,
+                          bgcolor: 'primary.main',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <Iconify icon="eva:checkmark-fill" width={14} sx={{ color: 'white' }} />
+                      </Box>
+                    }
+                    sx={{ p: 0 }}
+                    readOnly
+                  />
+                </Box>
+              ))}
+            </Stack>
+          </Box>
+
           {/* 카테고리 선택 */}
           <FormControl fullWidth>
             <InputLabel id="category-label">카테고리</InputLabel>

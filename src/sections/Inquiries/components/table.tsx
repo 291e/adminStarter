@@ -37,12 +37,19 @@ export type InquiryRow = {
 
 type Props = {
   rows: InquiryRow[];
+  isSuperAdmin?: boolean;
   onEdit?: (row: InquiryRow) => void;
   onReply?: (row: InquiryRow) => void; // 답변하기
   onViewAnswer?: (row: InquiryRow) => void;
 };
 
-export default function InquiriesTable({ rows, onEdit, onReply, onViewAnswer }: Props) {
+export default function InquiriesTable({
+  rows,
+  isSuperAdmin = false,
+  onEdit,
+  onReply,
+  onViewAnswer,
+}: Props) {
   return (
     <TableContainer sx={{ overflow: 'unset' }}>
       <Scrollbar>
@@ -60,7 +67,7 @@ export default function InquiriesTable({ rows, onEdit, onReply, onViewAnswer }: 
               </TableCell>
               <TableCell sx={{ color: 'text.secondary', fontWeight: 600 }}>답변일</TableCell>
               <TableCell sx={{ color: 'text.secondary', fontWeight: 600 }} align="center">
-                액션
+                &nbsp;
               </TableCell>
             </TableRow>
           </TableHead>
@@ -135,39 +142,63 @@ export default function InquiriesTable({ rows, onEdit, onReply, onViewAnswer }: 
                     )}
                   </TableCell>
                   <TableCell align="center">
-                    {row.status === 'pending' ? (
+                    {isSuperAdmin ? (
                       <Button
                         size="small"
                         variant="outlined"
-                        color="success"
-                        onClick={() => onReply?.(row)}
+                        color={row.status === 'pending' ? 'success' : 'inherit'}
+                        onClick={() => {
+                          if (row.status === 'pending') onReply?.(row);
+                          else onViewAnswer?.(row);
+                        }}
                         startIcon={<Iconify icon="solar:letter-bold" width={16} />}
                         sx={{
                           borderRadius: 1,
-                          bgcolor: 'rgba(34, 197, 94, 0.08)',
-                          borderColor: 'transparent',
-                          '&:hover': {
-                            bgcolor: 'rgba(34, 197, 94, 0.16)',
-                            borderColor: 'transparent',
-                          },
+                          ...(row.status === 'pending'
+                            ? {
+                                bgcolor: 'rgba(34, 197, 94, 0.08)',
+                                borderColor: 'transparent',
+                                '&:hover': {
+                                  bgcolor: 'rgba(34, 197, 94, 0.16)',
+                                  borderColor: 'transparent',
+                                },
+                              }
+                            : {
+                                borderColor: 'divider',
+                                fontWeight: 600,
+                              }),
                         }}
                       >
-                        답변하기
+                        {row.status === 'pending' ? '답변하기' : '상세보기'}
                       </Button>
                     ) : (
                       <Button
                         size="small"
                         variant="outlined"
-                        color="inherit"
-                        onClick={() => onViewAnswer?.(row)}
+                        color={row.status === 'pending' ? 'success' : 'inherit'}
+                        onClick={() => {
+                          if (row.status === 'pending') onEdit?.(row);
+                          else onViewAnswer?.(row);
+                        }}
                         endIcon={<Iconify icon={'solar:alt-arrow-right-bold' as any} width={16} />}
                         sx={{
                           borderRadius: 1,
-                          borderColor: 'divider',
-                          fontWeight: 600,
+                          ...(row.status === 'pending'
+                            ? {
+                                bgcolor: 'rgba(34, 197, 94, 0.08)',
+                                borderColor: 'transparent',
+                                '&:hover': {
+                                  bgcolor: 'rgba(34, 197, 94, 0.16)',
+                                  borderColor: 'transparent',
+                                },
+                              }
+                            : {
+                                borderColor: 'divider',
+                                fontWeight: 600,
+                              }),
                         }}
                       >
-                        상세보기
+                        {row.status === 'pending' ? '수정하기' : '답변보기'}
                       </Button>
                     )}
                   </TableCell>

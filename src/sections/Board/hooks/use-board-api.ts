@@ -5,6 +5,7 @@ import {
   getBoardCategories,
   saveBoardCategories,
   getBoardPosts,
+  getBoardPostDetail,
   createBoardPost,
   updateBoardPost,
   updateBoardPostsBulk,
@@ -18,6 +19,7 @@ import type {
   SaveBoardCategoriesParams,
   GetBoardPostsParams,
   GetBoardPostsResult,
+  GetBoardPostDetailResult,
   CreateBoardPostParams,
   UpdateBoardPostParams,
   UpdateBoardPostsBulkParams,
@@ -27,6 +29,14 @@ import type {
 } from 'src/services/board/board.types';
 
 // ----------------------------------------------------------------------
+
+const invalidateBoardQueries = async (queryClient: ReturnType<typeof useQueryClient>, postIdx?: number) => {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['boardPosts'] }),
+    queryClient.invalidateQueries({ queryKey: ['boardPostDetail'] }),
+    ...(postIdx ? [queryClient.invalidateQueries({ queryKey: ['boardPostDetail', postIdx] })] : []),
+  ]);
+};
 
 export function useBoardCategories(params: GetBoardCategoriesParams) {
   return useQuery<GetBoardCategoriesResult>({
@@ -57,14 +67,22 @@ export function useBoardPosts(params: GetBoardPostsParams) {
   });
 }
 
+export function useBoardPostDetail(postIdx?: number, enabled: boolean = true) {
+  return useQuery<GetBoardPostDetailResult>({
+    queryKey: ['boardPostDetail', postIdx],
+    queryFn: () => getBoardPostDetail(postIdx as number),
+    enabled: enabled && !!postIdx,
+  });
+}
+
 export function useCreateBoardPost() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (params: CreateBoardPostParams) => createBoardPost(params),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success('게시글이 등록되었습니다.');
-      queryClient.invalidateQueries({ queryKey: ['boardPosts'] });
+      await invalidateBoardQueries(queryClient);
     },
     onError: (error: any) => {
       toast.error(error?.message || '게시글 등록에 실패했습니다.');
@@ -77,9 +95,9 @@ export function useUpdateBoardPost() {
 
   return useMutation({
     mutationFn: (params: UpdateBoardPostParams) => updateBoardPost(params),
-    onSuccess: () => {
+    onSuccess: async (_, variables) => {
       toast.success('게시글이 수정되었습니다.');
-      queryClient.invalidateQueries({ queryKey: ['boardPosts'] });
+      await invalidateBoardQueries(queryClient, variables.postIdx);
     },
     onError: (error: any) => {
       toast.error(error?.message || '게시글 수정에 실패했습니다.');
@@ -92,9 +110,9 @@ export function useUpdateBoardPostsBulk() {
 
   return useMutation({
     mutationFn: (params: UpdateBoardPostsBulkParams) => updateBoardPostsBulk(params),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success('게시글이 업데이트되었습니다.');
-      queryClient.invalidateQueries({ queryKey: ['boardPosts'] });
+      await invalidateBoardQueries(queryClient);
     },
     onError: (error: any) => {
       toast.error(error?.message || '게시글 업데이트에 실패했습니다.');
@@ -107,9 +125,9 @@ export function useDeleteBoardPosts() {
 
   return useMutation({
     mutationFn: (params: DeleteBoardPostsParams) => deleteBoardPosts(params),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success('게시글이 삭제되었습니다.');
-      queryClient.invalidateQueries({ queryKey: ['boardPosts'] });
+      await invalidateBoardQueries(queryClient);
     },
     onError: (error: any) => {
       toast.error(error?.message || '게시글 삭제에 실패했습니다.');
@@ -122,10 +140,9 @@ export function useCreateBoardComment() {
 
   return useMutation({
     mutationFn: (params: CreateBoardCommentParams) => createBoardComment(params),
-    onSuccess: () => {
+    onSuccess: async (_, variables) => {
       toast.success('답변이 등록되었습니다.');
-      // 게시글 목록 새로고침 (답변 상태 업데이트 반영)
-      queryClient.invalidateQueries({ queryKey: ['boardPosts'] });
+      await invalidateBoardQueries(queryClient, variables.postIdx);
     },
     onError: (error: any) => {
       toast.error(error?.message || '답변 등록에 실패했습니다.');

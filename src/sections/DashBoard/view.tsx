@@ -7,7 +7,7 @@ import Stack from '@mui/material/Stack';
 
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useAuthContext } from 'src/auth/hooks';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import ProfileCard from './components/ProfileCard';
 import AccidentReportCard from './components/AccidentReportCard';
@@ -24,14 +24,14 @@ import {
 } from './hooks/use-dashboard-api';
 import { useMyInfo } from 'src/sections/Chat/hooks/use-my-info';
 import { useNavigate } from 'react-router';
-import dayjs from 'dayjs';
 import { paths } from 'src/routes/paths';
+import dayjs from 'dayjs';
 
-import { useRiskReports } from 'src/sections/Operation/hooks/use-operation-api';
 import { useGetChatRooms } from 'src/sections/Chat/hooks/use-chat-api';
-import { ref, get, query, orderByChild, startAt, endAt } from 'firebase/database';
-import { database } from 'src/config/firebase';
-import type { RiskReport } from 'src/services/operation/operation.types';
+import { collection, getDocs, query, Timestamp, where } from 'firebase/firestore';
+import { firestore } from 'src/config/firebase';
+import { getSafetySystemList } from 'src/services/safety-system/safety-system.service';
+import type { SafetySystem, SafetySystemItem } from 'src/services/safety-system/safety-system.types';
 
 // ----------------------------------------------------------------------
 
@@ -55,38 +55,7 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
   >(null);
 
   const navigate = useNavigate();
-  // 기간 계산 (periodType과 periodValue에 따라 startDate, endDate 계산)
-  const getDateRange = () => {
-    const now = dayjs();
-    let start = dayjs();
-    let end = dayjs();
-
-    if (periodType === 'year') {
-      const year = periodValue ? parseInt(periodValue.replace('년', '')) : now.year();
-      start = dayjs().year(year).startOf('year');
-      end = dayjs().year(year).endOf('year');
-    } else if (periodType === 'month') {
-      const month = periodValue ? parseInt(periodValue.replace('월', '')) - 1 : now.month();
-      start = dayjs().month(month).startOf('month');
-      end = dayjs().month(month).endOf('month');
-    } else {
-      // week
-      const week = periodValue ? parseInt(periodValue.replace('주차', '')) : 1;
-      // 해당 연도의 n주차 계산
-      start = dayjs()
-        .startOf('year')
-        .add(week - 1, 'week')
-        .startOf('week');
-      end = start.endOf('week');
-    }
-
-    return {
-      startDate: start.format('YYYY-MM-DD'),
-      endDate: end.format('YYYY-MM-DD'),
-    };
-  };
-
-  const dateRange = getDateRange();
+  const { data: myInfoData } = useMyInfo(); // isSuperAdmin/companyIdx 정보 가져오기
 
   // API 호출
   const {
@@ -105,12 +74,31 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
   });
   const { data: profileData, isLoading: profileLoading, error: profileError } = useUserProfile();
 
-  const { data: reportsData, isLoading: reportsLoading } = useRiskReports({
-    page: 1,
-    pageSize: 1000,
+  const { data: safetySystems, isLoading: safetySystemsLoading } = useQuery<SafetySystem[]>({
+    queryKey: ['safety-system', 'systems'],
+    queryFn: async () => {
+      const response = await getSafetySystemList();
+      const list =
+        (response as any)?.systemList ||
+        (response as any)?.body?.data?.systemList ||
+        (response as any)?.body?.systemList ||
+        [];
+      return Array.isArray(list) ? (list as SafetySystem[]) : [];
+    },
+    staleTime: 5 * 60 * 1000,
   });
 
-  const allReports = useMemo(() => (reportsData as any)?.body?.riskReportList || [], [reportsData]);
+  const target1200 = useMemo(() => {
+    const targetSystem = safetySystems?.find((system) => system.safetyIdx === 1);
+    const item =
+      targetSystem?.itemList?.find((targetItem) => targetItem.safetyIdx === 1 && targetItem.itemNumber === 2) ||
+      targetSystem?.items?.find((targetItem) => targetItem.safetyIdx === 1 && targetItem.itemNumber === 2);
+
+    return {
+      system: targetSystem,
+      item: item as SafetySystemItem | undefined,
+    };
+  }, [safetySystems]);
 
   // 사고 발생 건수 동기화를 위한 채팅방 및 통계 조회 (Firebase 기반)
   const { data: chatRoomsData } = useGetChatRooms();
@@ -121,13 +109,66 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
   }, [chatRoomsData]);
 
   const emergencyRoom = useMemo(() => rooms.find((r: any) => r.type === 'EMERGENCY'), [rooms]);
+  const companyIdx = useMemo(() => {
+    const candidates = [
+      (myInfoData as any)?.companyIdx,
+      (myInfoData as any)?.companyIndex,
+      (myInfoData as any)?.company?.companyIdx,
+      (myInfoData as any)?.company?.companyIndex,
+      (user as any)?.companyIdx,
+      (user as any)?.companyIndex,
+    ];
+    for (const candidate of candidates) {
+      const parsed = Number(candidate);
+      if (!Number.isNaN(parsed) && parsed > 0) return parsed;
+    }
+    return 0;
+  }, [myInfoData, user]);
 
   const [emergencyCount, setEmergencyCount] = useState(0);
   const [isEmergencyLoading, setIsEmergencyLoading] = useState(false);
+  const emergencyTargetRoomId =
+    companyIdx > 0 ? `emergency_${companyIdx}` : emergencyRoom?.chatRoomId || 'emergency_1';
+  const emergencyDateRange = useMemo(() => {
+    const now = dayjs();
+
+    if (periodType === 'year') {
+      const parsedYear = Number.parseInt(periodValue.replace(/[^\d]/g, ''), 10);
+      const targetYear = Number.isNaN(parsedYear) ? now.year() : parsedYear;
+      const base = dayjs().year(targetYear);
+
+      return {
+        start: base.startOf('year').toDate(),
+        endExclusive: base.add(1, 'year').startOf('year').toDate(),
+      };
+    }
+
+    if (periodType === 'week') {
+      const parsedWeek = Number.parseInt(periodValue.replace(/[^\d]/g, ''), 10);
+      const targetWeek = Number.isNaN(parsedWeek) || parsedWeek < 1 ? 1 : parsedWeek;
+      const weekStart = dayjs()
+        .startOf('year')
+        .add(targetWeek - 1, 'week')
+        .startOf('week');
+
+      return {
+        start: weekStart.toDate(),
+        endExclusive: weekStart.add(1, 'week').toDate(),
+      };
+    }
+
+    const parsedMonth = Number.parseInt(periodValue.replace(/[^\d]/g, ''), 10);
+    const monthIndex = Number.isNaN(parsedMonth) ? now.month() : Math.min(Math.max(parsedMonth, 1), 12) - 1;
+    const monthStart = dayjs().month(monthIndex).startOf('month');
+
+    return {
+      start: monthStart.toDate(),
+      endExclusive: monthStart.add(1, 'month').toDate(),
+    };
+  }, [periodType, periodValue]);
 
   useEffect(() => {
-    const db = database;
-    if (!emergencyRoom?.chatRoomId || !db) {
+    if (!emergencyTargetRoomId) {
       setEmergencyCount(0);
       return;
     }
@@ -135,22 +176,19 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
     const fetchEmergencyCount = async () => {
       setIsEmergencyLoading(true);
       try {
-        const start = dayjs(dateRange.startDate).startOf('day').valueOf().toString();
-        const end = dayjs(dateRange.endDate).endOf('day').valueOf().toString();
-
-        const messagesRef = ref(db, `chatRooms/${emergencyRoom.chatRoomId}/messages`);
+        const messagesCol = collection(firestore, 'chatRooms', emergencyTargetRoomId, 'messages');
         const messagesQuery = query(
-          messagesRef,
-          orderByChild('timestamp'),
-          startAt(start),
-          endAt(end)
+          messagesCol,
+          where('createdAt', '>=', Timestamp.fromDate(emergencyDateRange.start)),
+          where('createdAt', '<', Timestamp.fromDate(emergencyDateRange.endExclusive))
         );
 
-        const snapshot = await get(messagesQuery);
+        const snapshot = await getDocs(messagesQuery);
         let count = 0;
+
         snapshot.forEach((child) => {
-          const val = child.val();
-          if (val.messageType === 'EMERGENCY') {
+          const val = child.data() as any;
+          if (String(val?.messageType || '').toUpperCase() === 'EMERGENCY') {
             count += 1;
           }
         });
@@ -163,9 +201,8 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
     };
 
     fetchEmergencyCount();
-  }, [emergencyRoom?.chatRoomId, dateRange.startDate, dateRange.endDate]);
+  }, [emergencyDateRange.endExclusive, emergencyDateRange.start, emergencyTargetRoomId]);
 
-  const { data: myInfoData } = useMyInfo(); // isSuperAdmin 정보 가져오기
   const {
     data: educationData,
     isLoading: educationLoading,
@@ -235,24 +272,10 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
     return pendingSignatures.slice(start, start + pendingPageSize);
   }, [pendingSignatures, pendingPage]);
 
-  // 사고·위험 보고 현황 통계 계산 (클라이언트 사이드 필터링)
-  const { accidentCount, riskCount } = useMemo(() => {
-    const { startDate, endDate } = dateRange;
-    const start = dayjs(startDate).startOf('day');
-    const end = dayjs(endDate).endOf('day');
-
-    // 위험 보고 건수: 해당 기간 내 등록된 전체 위험 보고서 (createAt 기준)
-    const filteredReports = allReports.filter((report: RiskReport) => {
-      if (!report.registeredAt) return false;
-      const regDate = dayjs(report.registeredAt);
-      return regDate.isSameOrAfter(start) && regDate.isSameOrBefore(end);
-    });
-
-    return {
-      accidentCount: emergencyCount,
-      riskCount: filteredReports.length,
-    };
-  }, [allReports, dateRange, emergencyCount]);
+  const documentCount = useMemo(
+    () => target1200.item?.documentCount ?? target1200.item?.documentList?.length ?? 0,
+    [target1200.item?.documentCount, target1200.item?.documentList?.length]
+  );
 
   // 프로필 정보 (에러 처리 포함)
   const profileName =
@@ -293,14 +316,19 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
     }
   };
 
-  const handleAccidentNavigate = () => {
-    // 사고 발생 현황 채팅방으로 이동
-    navigate(`${paths.dashboard.operation.chat}?roomId=emergency`);
+  const handleDocumentNavigate = () => {
+    if (!target1200.system || !target1200.item) {
+      navigate(paths.dashboard.safetySystem.root);
+      return;
+    }
+
+    navigate(`/dashboard/safety-system/${target1200.system.safetyIdx}/risk-2200`, {
+      state: { system: target1200.system, item: target1200.item, isGuide: false },
+    });
   };
 
-  const handleRiskNavigate = () => {
-    // 위험 보고 페이지로 이동
-    navigate(paths.dashboard.operation.riskReport);
+  const handleEmergencyNavigate = () => {
+    navigate(`${paths.dashboard.operation.chat}?room=${emergencyTargetRoomId}`);
   };
 
   const handleViewDocument = (id: string, isSafetySystemDocumentIdx = false) => {
@@ -351,7 +379,7 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
   const isLoading =
     pendingLoading ||
     sharedLoading ||
-    reportsLoading ||
+    safetySystemsLoading ||
     profileLoading ||
     educationLoading ||
     isEmergencyLoading;
@@ -408,12 +436,12 @@ export function DashBoardView({ title = '대시보드', description, sx }: Props
             <AccidentReportCard
               periodType={periodType}
               periodValue={periodValue}
-              accidentCount={accidentCount}
-              riskCount={riskCount}
+              documentCount={documentCount}
+              emergencyCount={emergencyCount}
               onPeriodTypeChange={handlePeriodTypeChange}
               onPeriodValueChange={handlePeriodValueChange}
-              onAccidentNavigate={handleAccidentNavigate}
-              onRiskNavigate={handleRiskNavigate}
+              onDocumentNavigate={handleDocumentNavigate}
+              onEmergencyNavigate={handleEmergencyNavigate}
             />
           </Box>
         </Stack>

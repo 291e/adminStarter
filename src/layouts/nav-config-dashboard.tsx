@@ -149,7 +149,7 @@ const managerNavData: NavSectionProps['data'] = [
         deepMatch: true,
       },
       {
-        title: '공지사항',
+        title: '산업안전보건 게시판',
         path: paths.dashboard.notice,
         icon: ICONS.blog,
       },
@@ -177,7 +177,7 @@ const superAdminNavData: NavSectionProps['data'] = [
     subheader: 'Management',
     items: [
       {
-        title: '공지사항',
+        title: '산업안전보건 게시판',
         path: paths.dashboard.notice,
         icon: ICONS.blog,
       },

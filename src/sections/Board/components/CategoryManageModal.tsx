@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -15,14 +15,14 @@ import Divider from '@mui/material/Divider';
 
 import { Iconify } from 'src/components/iconify';
 import { useBoardCategories, useSaveBoardCategories } from 'src/sections/Board/hooks/use-board-api';
-import type { BoardCategory } from 'src/services/board/board.types';
+import type { PostGubun } from 'src/services/board/board.types';
 
 // ----------------------------------------------------------------------
 
 type Props = {
   open: boolean;
   onClose: () => void;
-  postCategoryType: '문의/답변';
+  postCategoryType: PostGubun | string;
 };
 
 export default function CategoryManageModal({ open, onClose, postCategoryType }: Props) {
@@ -52,13 +52,12 @@ export default function CategoryManageModal({ open, onClose, postCategoryType }:
         postCategoryIdx: cat.postCategoryIdx,
       }));
       if (import.meta.env.DEV) {
-        console.log('✅ [CategoryManageModal] 매핑된 카테고리:', mapped);
+        console.log('✅ [CategoryManageModal] mapped categories:', mapped);
       }
       setCategories(mapped);
-    } else if (categoriesData && !categoriesData.categories) {
-      // 카테고리가 없는 경우 빈 배열로 설정
+    } else if (categoriesData && !(categoriesData as any).categories) {
       if (import.meta.env.DEV) {
-        console.warn('⚠️ [CategoryManageModal] categories가 없음:', categoriesData);
+        console.warn('⚠️ [CategoryManageModal] categories missing:', categoriesData);
       }
       setCategories([]);
     }
@@ -72,15 +71,11 @@ export default function CategoryManageModal({ open, onClose, postCategoryType }:
   }, [open]);
 
   const handleAddCategory = () => {
-    if (newCategoryName.trim() && !categories.some((cat) => cat.name === newCategoryName.trim())) {
-      const newCategory = {
-        id: `new-${Date.now()}`,
-        name: newCategoryName.trim(),
-        isActive: true,
-      };
-      setCategories([...categories, newCategory]);
-      setNewCategoryName('');
-    }
+    const nextName = newCategoryName.trim();
+    if (!nextName) return;
+    if (categories.some((cat) => cat.name === nextName)) return;
+    setCategories([...categories, { id: `new-${Date.now()}`, name: nextName, isActive: true }]);
+    setNewCategoryName('');
   };
 
   const handleRenameCategory = (id: string, value: string) => {
@@ -93,12 +88,7 @@ export default function CategoryManageModal({ open, onClose, postCategoryType }:
 
   const handleToggleActive = (id: string) => {
     setCategories((prev) =>
-      prev.map((cat) => {
-        if (cat.id === id) {
-          return { ...cat, isActive: !cat.isActive };
-        }
-        return cat;
-      })
+      prev.map((cat) => (cat.id === id ? { ...cat, isActive: !cat.isActive } : cat))
     );
   };
 
@@ -111,13 +101,10 @@ export default function CategoryManageModal({ open, onClose, postCategoryType }:
         ...(cat.postCategoryIdx && { postCategoryIdx: cat.postCategoryIdx }),
       }));
 
-      await saveCategoriesMutation.mutateAsync({
-        postCategoryType,
-        postCategoryList,
-      });
+      await saveCategoriesMutation.mutateAsync({ postCategoryType, postCategoryList });
       onClose();
     } catch (error) {
-      console.error('❌ [CategoryManageModal] 저장 실패', error);
+      console.error('❌ [CategoryManageModal] save failed', error);
     }
   };
 
@@ -181,11 +168,7 @@ export default function CategoryManageModal({ open, onClose, postCategoryType }:
                 </Box>
                 <IconButton
                   onClick={() => handleDeleteCategory(category.id)}
-                  sx={{
-                    width: 36,
-                    height: 54,
-                    color: 'text.secondary',
-                  }}
+                  sx={{ width: 36, height: 54, color: 'text.secondary' }}
                 >
                   <Iconify icon="solar:trash-bin-trash-bold" width={24} />
                 </IconButton>
@@ -198,27 +181,19 @@ export default function CategoryManageModal({ open, onClose, postCategoryType }:
                 placeholder="카테고리명 입력"
                 value={newCategoryName}
                 onChange={(e) => setNewCategoryName(e.target.value)}
-                onKeyPress={(e) => {
+                onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
                     handleAddCategory();
                   }
                 }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    height: 36,
-                  },
-                }}
+                sx={{ '& .MuiOutlinedInput-root': { height: 36 } }}
               />
               <Button
                 variant="outlined"
                 onClick={handleAddCategory}
                 startIcon={<Iconify icon="solar:add-circle-bold" width={20} />}
-                sx={{
-                  minWidth: 100,
-                  height: 36,
-                  whiteSpace: 'nowrap',
-                }}
+                sx={{ minWidth: 100, height: 36, whiteSpace: 'nowrap' }}
               >
                 항목추가
               </Button>
@@ -230,7 +205,11 @@ export default function CategoryManageModal({ open, onClose, postCategoryType }:
       <Divider />
 
       <DialogActions sx={{ p: 3 }}>
-        <Button variant="outlined" onClick={handleClose} disabled={saveCategoriesMutation.isPending}>
+        <Button
+          variant="outlined"
+          onClick={handleClose}
+          disabled={saveCategoriesMutation.isPending}
+        >
           취소
         </Button>
         <Button

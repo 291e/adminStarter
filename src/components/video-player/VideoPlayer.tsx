@@ -33,6 +33,29 @@ const LANGUAGE_LABELS: Record<string, string> = {
   ru: 'Русский',
 };
 
+const pinCaptionsToBottom = (textTrack: TextTrack | null | undefined) => {
+  if (!textTrack) return;
+
+  // Note: `textTrack.cues` is not always available (CORS, unsupported browser, etc).
+  const cues = textTrack.cues;
+  if (!cues) return;
+
+  for (let i = 0; i < cues.length; i += 1) {
+    const cue = cues[i] as any;
+    if (!cue) continue;
+
+    // Only override auto-positioned cues.
+    if (cue.line === 'auto' || cue.line === undefined || cue.line === null) {
+      try {
+        cue.line = -1; // bottom line
+        cue.lineAlign = 'end';
+      } catch {
+        // ignore (read-only in some browsers)
+      }
+    }
+  }
+};
+
 export default function VideoPlayer({
   vodIdx,
   videoUrl,
@@ -143,6 +166,13 @@ export default function VideoPlayer({
         } else if (track.language === lang) {
           track.mode = 'showing';
           console.log(`🎥 [VideoPlayer] 자막 표시: ${track.language} (${track.label})`);
+          // Chrome/Safari native captions tend to float above the bottom as a "safe" position.
+          // Force cues to the bottom when we restrict native controls interaction.
+          if (disableControls || disableControlInteraction) {
+            // Track cues might not be ready immediately; do a couple of best-effort passes.
+            setTimeout(() => pinCaptionsToBottom(track), 0);
+            setTimeout(() => pinCaptionsToBottom(track), 250);
+          }
         } else {
           track.mode = 'hidden';
         }
@@ -173,6 +203,25 @@ export default function VideoPlayer({
                 width: '100%',
                 maxHeight: '500px',
                 display: 'block',
+                position: 'relative',
+                // 자막을 비디오 최하단에 고정 (웹킷/블링크)
+                '&::-webkit-media-text-track-container': {
+                  position: 'absolute !important',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  top: 'auto',
+                  padding: '0 !important',
+                  margin: '0 !important',
+                },
+                '&::-webkit-media-text-track-display': {
+                  position: 'absolute !important',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  padding: '0 !important',
+                  margin: '0 !important',
+                },
                 '&::-webkit-media-controls-panel': {
                   display: 'flex !important',
                 },
@@ -234,6 +283,10 @@ export default function VideoPlayer({
                     if (textTrack.language === selectedLanguage) {
                       textTrack.mode = 'showing';
                       console.log(`🎥 [Native Video] 자막 활성화: ${textTrack.language}`);
+                      if (disableControls || disableControlInteraction) {
+                        setTimeout(() => pinCaptionsToBottom(textTrack), 0);
+                        setTimeout(() => pinCaptionsToBottom(textTrack), 250);
+                      }
                     } else {
                       textTrack.mode = 'hidden';
                     }

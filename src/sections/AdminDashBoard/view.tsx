@@ -2,9 +2,11 @@ import type { Theme, SxProps } from '@mui/material/styles';
 
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
+import Box from '@mui/material/Box';
 
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useAdminDashboardData } from './hooks/use-admin-dashboard';
+import { CONFIG } from 'src/global-config';
 
 import AdminSummaryCard from './components/AdminSummaryCard';
 import AdminOrganizationList from './components/AdminOrganizationList';
@@ -12,14 +14,21 @@ import AdminSalesChart from './components/AdminSalesChart';
 import AdminSubscriptionChart from './components/AdminSubscriptionChart';
 import AdminDocumentStatus from './components/AdminDocumentStatus';
 
-import { Iconify } from 'src/components/iconify';
-
 // ----------------------------------------------------------------------
 
 type Props = {
   title?: string;
   sx?: SxProps<Theme>;
 };
+
+const renderSalesIcon = (fileName: string) => (
+  <Box
+    component="img"
+    src={`${CONFIG.assetsDir}/assets/icons/sales/${fileName}`}
+    alt=""
+    sx={{ width: 32, height: 32, objectFit: 'cover' }}
+  />
+);
 
 export function AdminDashBoardView({ title = '최고관리자 대시보드', sx }: Props) {
   const { organizationData } = useAdminDashboardData();
@@ -57,7 +66,7 @@ export function AdminDashBoardView({ title = '최고관리자 대시보드', sx 
             total={totalOrganizations}
             unit="개"
             color="primary"
-            icon={<Iconify icon="solar:users-group-rounded-bold" width={32} />}
+            icon={renderSalesIcon('sales1.svg')}
           />
         </Grid>
 
@@ -67,7 +76,7 @@ export function AdminDashBoardView({ title = '최고관리자 대시보드', sx 
             total="12 / 2"
             unit="건"
             color="info"
-            icon={<Iconify icon="solar:user-plus-bold" width={32} />}
+            icon={renderSalesIcon('sales2.svg')}
           />
         </Grid>
 
@@ -77,7 +86,7 @@ export function AdminDashBoardView({ title = '최고관리자 대시보드', sx 
             total="56,315,000"
             unit="원"
             color="warning"
-            icon={<Iconify icon="solar:wad-of-money-bold" width={32} />}
+            icon={renderSalesIcon('sales3.svg')}
           />
         </Grid>
 
@@ -87,7 +96,7 @@ export function AdminDashBoardView({ title = '최고관리자 대시보드', sx 
             total="8,045,000"
             unit="원"
             color="success"
-            icon={<Iconify icon="solar:chart-square-outline" width={32} />}
+            icon={renderSalesIcon('sales4.svg')}
           />
         </Grid>
 

@@ -17,6 +17,7 @@ import type {
   Table1200RiskGrade,
   InvestigationTeamMember,
 } from '../../types/table-data';
+import { resolveFileUrl } from '../../utils/file-url';
 import ImageUploadModal from './modal/ImageUploadModal';
 import InvestigationTeamSelectModal from './modal/InvestigationTeamSelectModal';
 
@@ -237,7 +238,9 @@ export default function Table1200NearMissForm({ row, onRowChange }: Props) {
   useEffect(() => {
     // siteImages는 이제 URL 문자열 배열
     if (row.siteImages && row.siteImages.length > 0) {
-      setImagePreviewUrls(row.siteImages);
+      setImagePreviewUrls(
+        row.siteImages.map((value) => resolveFileUrl(value) || value).filter(Boolean)
+      );
     } else {
       setImagePreviewUrls([]);
     }

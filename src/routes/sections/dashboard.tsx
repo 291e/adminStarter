@@ -177,6 +177,14 @@ export const dashboardRoutes: RouteObject[] = [
         ],
       },
       {
+        path: 'service-setting',
+        element: (
+          <DashboardRoleGuard allowSuperAdmin>
+            <ServiceSettingPage />
+          </DashboardRoleGuard>
+        ),
+      },
+      {
         path: 'system-setting',
         element: (
           <DashboardRoleGuard allowSuperAdmin>
@@ -185,7 +193,7 @@ export const dashboardRoutes: RouteObject[] = [
         ),
         children: [
           { element: <SystemSettingPage />, index: true },
-          { path: 'service-setting', element: <ServiceSettingPage /> },
+          { path: 'service-setting', element: <Navigate to={paths.dashboard.systemSetting.serviceSetting} replace /> },
           { path: 'code-setting', element: <CodeSettingPage /> },
           { path: 'api-setting', element: <ApiSettingPage /> },
           { path: 'industry-checklist-setting', element: <IndustryChecklistSettingPage /> },

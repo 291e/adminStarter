@@ -47,7 +47,7 @@ const cycleUnitLabels: Record<SafetySystemItem['cycleUnit'], string> = {
 const statusLabels: Record<SafetySystemItem['status'], string> = {
   normal: '정상',
   always: '상시 작성',
-  approaching: '마감 임박',
+  approaching: '기한 임박',
   overdue: '기한 초과',
 };
 

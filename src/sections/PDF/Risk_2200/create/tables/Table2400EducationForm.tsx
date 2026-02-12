@@ -334,7 +334,7 @@ export default function Table2400EducationForm({
                       }}
                       onMouseDown={(e) => e.stopPropagation()}
                     >
-                      <Iconify icon="custom:drag-dots-fill" width={20} />
+                      <Iconify icon="carbon:chevron-sort" width={20} />
                     </IconButton>
                   </Box>
                 </td>

@@ -19,6 +19,9 @@
 /** **************************************
 * Plugins
 *************************************** */
+/* quill */
+@import 'react-quill-new/dist/quill.snow.css';
+
 /* scrollbar */
 @import './components/scrollbar/styles.css';
 
@@ -57,4 +60,23 @@ input[type='number']::-webkit-outer-spin-button {
 input[type='number']::-webkit-inner-spin-button {
   margin: 0;
   -webkit-appearance: none;
+}
+
+/* Quill rendered content alignment support (detail/read-only views) */
+.ql-align-center {
+  text-align: center;
+}
+
+.ql-align-right {
+  text-align: right;
+}
+
+.ql-align-justify {
+  text-align: justify;
+}
+
+/* Rendered html (non-editor) should still follow Quill classes */
+.quill-rendered-content.ql-editor {
+  padding: 0;
+  min-height: unset;
 }

@@ -9,6 +9,7 @@ import type {
   GetBoardPostsParams,
   GetBoardPostsResponse,
   GetBoardPostsResult,
+  GetBoardPostDetailResult,
   CreateBoardPostParams,
   CreateBoardPostResponse,
   UpdateBoardPostParams,
@@ -26,6 +27,66 @@ import type {
 
 // ----------------------------------------------------------------------
 
+const normalizePostFilePath = (raw: any): string | Array<{ originalFileName: string; fileUrl: string }> | undefined => {
+  if (!raw) return undefined;
+
+  const normalizeArray = (value: any[]) =>
+    value
+      .map((item) => {
+        const fileUrl = item?.fileUrl ?? item?.url ?? item?.path ?? item;
+        const originalFileName =
+          item?.originalFileName ??
+          item?.fileName ??
+          item?.name ??
+          (typeof fileUrl === 'string' ? fileUrl.split('/').pop() : '');
+
+        if (!fileUrl || typeof fileUrl !== 'string') return null;
+        return {
+          originalFileName: String(originalFileName || fileUrl.split('/').pop() || ''),
+          fileUrl,
+        };
+      })
+      .filter(Boolean) as Array<{ originalFileName: string; fileUrl: string }>;
+
+  if (Array.isArray(raw)) {
+    return normalizeArray(raw);
+  }
+
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) return undefined;
+    if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) return normalizeArray(parsed);
+      } catch {
+        return raw;
+      }
+    }
+    return raw;
+  }
+
+  if (typeof raw === 'object') {
+    const normalized = normalizeArray([raw]);
+    return normalized.length ? normalized : undefined;
+  }
+
+  return undefined;
+};
+
+const serializePostFilePath = (value: any) => {
+  if (Array.isArray(value)) {
+    return JSON.stringify(
+      value.map((item) => ({
+        originalFileName: item?.originalFileName ?? '',
+        fileUrl: item?.fileUrl ?? item?.url ?? '',
+      }))
+    );
+  }
+
+  return value;
+};
+
 const normalizeBoardPost = (item: any, index: number): BoardPost => {
   const postIdx = item?.postIdx ?? item?.postId ?? item?.id ?? item?.postIDX ?? index;
   const registrationDate =
@@ -35,6 +96,18 @@ const normalizeBoardPost = (item: any, index: number): BoardPost => {
     item?.postCreatedAt ||
     item?.updatedAt ||
     '';
+  const memberInformation = item?.memberInformation ?? {};
+  const memberRole =
+    item?.memberRole ??
+    item?.role ??
+    item?.writerRole ??
+    memberInformation?.memberRole ??
+    memberInformation?.role;
+  const normalizedMemberRole = typeof memberRole === 'string' ? memberRole.toUpperCase() : '';
+  const authorIsSuperAdmin =
+    item?.isSuperAdmin === true ||
+    memberInformation?.isSuperAdmin === true ||
+    normalizedMemberRole === 'SUPER_ADMIN';
 
   return {
     postIdx: typeof postIdx === 'number' ? postIdx : Number(postIdx) || index,
@@ -43,7 +116,7 @@ const normalizeBoardPost = (item: any, index: number): BoardPost => {
     postTarget2: item?.postTarget2 ?? item?.target2,
     postTitle: item?.postTitle ?? item?.title,
     postContent: item?.postContent ?? item?.content,
-    postFilePath: item?.postFilePath ?? item?.filePath ?? item?.fileUrl,
+    postFilePath: normalizePostFilePath(item?.postFilePath ?? item?.filePath ?? item?.fileUrl),
     isPop: typeof item?.isPop === 'number' ? item.isPop : Number(item?.isPop) || 0,
     isPinned: typeof item?.isPinned === 'number' ? item.isPinned : Number(item?.isPinned) || 0,
     postStatus: item?.postStatus ?? item?.status,
@@ -66,11 +139,36 @@ const normalizeBoardPost = (item: any, index: number): BoardPost => {
           : typeof item?.views === 'number'
             ? item.views
             : Number(item?.postViews || item?.viewCount || item?.views) || 0,
-    adminName: item?.adminName ?? item?.author ?? item?.writerName ?? item?.createdByName,
-    memberName: item?.memberName ?? item?.memberNickname ?? item?.writerMemberName,
-    memberEmail: item?.memberEmail ?? item?.email ?? null,
-    memberId: item?.memberId ?? item?.memberID ?? null,
-    memberPhone: item?.memberPhone ?? item?.phone ?? item?.phoneNumber ?? null,
+    adminName:
+      item?.adminName ??
+      item?.author ??
+      item?.writerName ??
+      item?.createdByName ??
+      memberInformation?.memberName,
+    memberName:
+      item?.memberName ??
+      item?.memberNickname ??
+      item?.writerMemberName ??
+      memberInformation?.memberName,
+    memberRole: typeof memberRole === 'string' ? memberRole : undefined,
+    authorIsSuperAdmin,
+    memberEmail: item?.memberEmail ?? item?.email ?? memberInformation?.memberEmail ?? null,
+    memberId: item?.memberId ?? item?.memberID ?? memberInformation?.memberId ?? null,
+    memberPhone:
+      item?.memberPhone ?? item?.phone ?? item?.phoneNumber ?? memberInformation?.memberPhone ?? null,
+    memberInformation:
+      memberInformation && typeof memberInformation === 'object'
+        ? {
+            memberIdx: memberInformation?.memberIdx,
+            memberId: memberInformation?.memberId,
+            memberName: memberInformation?.memberName,
+            memberRole: memberInformation?.memberRole ?? memberInformation?.role,
+            isSuperAdmin: memberInformation?.isSuperAdmin === true,
+            memberEmail: memberInformation?.memberEmail ?? null,
+            memberPhone: memberInformation?.memberPhone ?? null,
+            memberThumbnail: memberInformation?.memberThumbnail ?? null,
+          }
+        : undefined,
     createAt: item?.createAt ?? item?.createdAt,
     updateAt: item?.updateAt ?? item?.updatedAt,
     registrationDate,
@@ -141,19 +239,48 @@ export async function getBoardPosts(params: GetBoardPostsParams): Promise<GetBoa
   };
 }
 
+export async function getBoardPostDetail(postIdx: number): Promise<GetBoardPostDetailResult> {
+  const response = await axiosInstance.get<any>(`${endpoints.board.posts}/${postIdx}`);
+  const data = response.data as any;
+  const rawPost = data?.data || data?.post || data;
+
+  if (!rawPost || typeof rawPost !== 'object') {
+    return { post: null, header: data?.header };
+  }
+
+  return {
+    post: normalizeBoardPost(rawPost, 0),
+    header: data?.header,
+  };
+}
+
 export async function createBoardPost(
   params: CreateBoardPostParams
 ): Promise<CreateBoardPostResponse> {
-  const response = await axiosInstance.post<CreateBoardPostResponse>(endpoints.board.posts, params);
+  const payload = {
+    ...params,
+    ...(params.postFilePath !== undefined && {
+      postFilePath: serializePostFilePath(params.postFilePath),
+    }),
+  };
+
+  const response = await axiosInstance.post<CreateBoardPostResponse>(endpoints.board.posts, payload);
   return response.data;
 }
 
 export async function updateBoardPost(
   params: UpdateBoardPostParams
 ): Promise<UpdateBoardPostResponse> {
+  const payload = {
+    ...params,
+    ...(params.postFilePath !== undefined && {
+      postFilePath: serializePostFilePath(params.postFilePath),
+    }),
+  };
+
   const response = await axiosInstance.put<UpdateBoardPostResponse>(
     `${endpoints.board.posts}/${params.postIdx}`,
-    params
+    payload
   );
   return response.data;
 }

@@ -32,7 +32,7 @@ const cycleUnitLabels: Record<string, string> = {
 const statusLabels: Record<string, string> = {
   NORMAL: '정상',
   ALWAYS: '상시 작성',
-  APPROACHING: '마감 임박',
+  APPROACHING: '기한 임박',
   OVERDUE: '기한 초과',
 };
 

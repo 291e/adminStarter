@@ -1,3 +1,5 @@
+import { useMemo } from 'react';
+
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
@@ -7,6 +9,7 @@ import Container from '@mui/material/Container';
 import { DashboardContent } from 'src/layouts/dashboard';
 import InquiryHeader from './components/header';
 import type { BoardCommentInformation } from 'src/services/board/board.types';
+import { resolveAdminImageUrlsInHtml } from 'src/utils/rich-text';
 
 // ----------------------------------------------------------------------
 
@@ -22,6 +25,19 @@ type Props = {
 };
 
 export default function InquiryDetailsView({ onBack, inquiry }: Props) {
+  const renderedInquiryContent = useMemo(
+    () => resolveAdminImageUrlsInHtml(inquiry.content),
+    [inquiry.content]
+  );
+
+  const renderedAnswerContent = useMemo(
+    () =>
+      resolveAdminImageUrlsInHtml(
+        inquiry.commentInformation?.commentContent || inquiry.answer || '답변 대기 중입니다.'
+      ),
+    [inquiry.answer, inquiry.commentInformation?.commentContent]
+  );
+
   return (
     <DashboardContent>
       <Container maxWidth="xl">
@@ -90,11 +106,10 @@ export default function InquiryDetailsView({ onBack, inquiry }: Props) {
                     minHeight: 120,
                   }}
                 >
-                  <Typography
-                    variant="body2"
-                    component="div"
-                    sx={{ whiteSpace: 'pre-wrap' }}
-                    dangerouslySetInnerHTML={{ __html: inquiry.content }}
+                  <Box
+                    className="quill-rendered-content ql-editor"
+                    sx={{ typography: 'body2' }}
+                    dangerouslySetInnerHTML={{ __html: renderedInquiryContent }}
                   />
                 </Box>
               </Box>
@@ -125,15 +140,11 @@ export default function InquiryDetailsView({ onBack, inquiry }: Props) {
                     minHeight: 200,
                   }}
                 >
-                  <Typography
-                    variant="body2"
-                    component="div"
-                    sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}
+                  <Box
+                    className="quill-rendered-content ql-editor"
+                    sx={{ typography: 'body2', lineHeight: 1.8 }}
                     dangerouslySetInnerHTML={{
-                      __html:
-                        inquiry.commentInformation?.commentContent ||
-                        inquiry.answer ||
-                        '답변 대기 중입니다.',
+                      __html: renderedAnswerContent,
                     }}
                   />
                 </Box>

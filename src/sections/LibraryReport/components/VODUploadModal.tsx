@@ -41,11 +41,13 @@ type Props = {
   onClose: () => void;
   onSave?: (data: VODUploadFormData, vodIdx?: number) => Promise<void> | void; // 선택적 (새 API 사용 시, vodIdx 전달)
   categories: CategoryItem[];
+  /** 이미 업로드·처리 완료된 VOD 인덱스. 있으면 1-2단계 생략하고 바로 3-4(상세 조회 + 라이브러리 리포트 생성)만 수행 */
+  existingVodIdx?: number | null;
 };
 
 type UploadStep = 'idle' | 'uploading' | 'processing' | 'completed' | 'error';
 
-export default function VODUploadModal({ open, onClose, onSave, categories }: Props) {
+export default function VODUploadModal({ open, onClose, onSave, categories, existingVodIdx }: Props) {
   const [formData, setFormData] = useState<VODUploadFormData>({
     category: '',
     title: '',
@@ -63,6 +65,8 @@ export default function VODUploadModal({ open, onClose, onSave, categories }: Pr
   const [errorMessage, setErrorMessage] = useState('');
   const [uploadStep, setUploadStep] = useState<UploadStep>('idle');
   const [vodIdx, setVodIdx] = useState<number | null>(null);
+  /** POST /vods로 따로 올린 경우, 응답으로 받은 vodIdx를 여기 입력하면 1-2단계 생략 */
+  const [enteredVodIdx, setEnteredVodIdx] = useState('');
   const formDataRef = useRef<VODUploadFormData>(formData);
   // onSave 호출 여부 추적 (무한 호출 방지)
   const onSaveCalledRef = useRef(false);
@@ -116,6 +120,11 @@ export default function VODUploadModal({ open, onClose, onSave, categories }: Pr
     }
   }, [vodIdx, uploadStep, shouldPoll, vodStatus]);
 
+  // prop 또는 입력값으로 결정되는 "기존 VOD 인덱스" (1-2단계 생략 시 사용)
+  const parsedEntered = enteredVodIdx.trim() ? Number(enteredVodIdx.trim()) : NaN;
+  const effectiveExistingVodIdx =
+    existingVodIdx ?? (Number.isInteger(parsedEntered) && parsedEntered > 0 ? parsedEntered : null);
+
   useEffect(() => {
     if (open) {
       const initialData: VODUploadFormData = {
@@ -134,6 +143,7 @@ export default function VODUploadModal({ open, onClose, onSave, categories }: Pr
       setErrorMessage('');
       setUploadStep('idle');
       setVodIdx(null);
+      setEnteredVodIdx('');
       // 모달이 열릴 때 onSave 호출 플래그 리셋
       onSaveCalledRef.current = false;
     }
@@ -306,6 +316,35 @@ export default function VODUploadModal({ open, onClose, onSave, categories }: Pr
       setErrorMessage('교육 구분을 선택해주세요.');
       return;
     }
+    // 이미 처리 완료된 VOD가 있으면 1-2단계 생략, 바로 3-4(상세 조회 + 라이브러리 리포트 생성)만 수행
+    if (effectiveExistingVodIdx != null) {
+      setErrorMessage('');
+      setIsSaving(true);
+      setUploadStep('uploading');
+      try {
+        if (onSave) {
+          const saveResult = onSave(formDataRef.current, effectiveExistingVodIdx);
+          if (saveResult instanceof Promise) {
+            await saveResult;
+          }
+        }
+        setUploadStep('completed');
+      } catch (error) {
+        if (import.meta.env.DEV) {
+          console.error('❌ [VODUploadModal] 라이브러리 리포트 생성 실패', error);
+        }
+        setUploadStep('error');
+        const message =
+          error instanceof Error
+            ? error.message || '라이브러리 리포트 생성 중 오류가 발생했습니다.'
+            : '라이브러리 리포트 생성 중 오류가 발생했습니다.';
+        setErrorMessage(message);
+      } finally {
+        setIsSaving(false);
+      }
+      return;
+    }
+
     if (!formData.videoFile) {
       setErrorMessage('비디오 파일을 업로드해주세요.');
       return;
@@ -401,10 +440,12 @@ export default function VODUploadModal({ open, onClose, onSave, categories }: Pr
             <Alert severity="success" sx={{ mb: 1 }}>
               <Stack spacing={1}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                  ✅ VOD 업로드 및 처리 완료!
+                  {effectiveExistingVodIdx != null ? '✅ 라이브러리 리포트 생성 완료!' : '✅ VOD 업로드 및 처리 완료!'}
                 </Typography>
                 <Typography variant="body2">
-                  비디오가 성공적으로 업로드되었고 STT/번역 처리가 완료되었습니다.
+                  {effectiveExistingVodIdx != null
+                    ? '기존 VOD로 라이브러리 리포트가 생성되었습니다.'
+                    : '비디오가 성공적으로 업로드되었고 STT/번역 처리가 완료되었습니다.'}
                 </Typography>
               </Stack>
             </Alert>
@@ -414,6 +455,30 @@ export default function VODUploadModal({ open, onClose, onSave, categories }: Pr
           {errorMessage && uploadStep !== 'completed' && (
             <Alert severity="error" sx={{ mb: 1 }}>
               {errorMessage}
+            </Alert>
+          )}
+
+          {/* 기존 VOD 인덱스 입력 (POST /vods로 따로 올린 경우) */}
+          {uploadStep === 'idle' && (
+            <TextField
+              fullWidth
+              label="기존 VOD 인덱스 (이미 업로드한 경우)"
+              placeholder="예: 123 (POST /vods 응답의 vodIdx)"
+              value={enteredVodIdx}
+              onChange={(e) => setEnteredVodIdx(e.target.value.replace(/\D/g, ''))}
+              type="text"
+              inputMode="numeric"
+              helperText="POST /vods로 이미 영상을 올렸다면, 응답으로 받은 vodIdx를 입력하면 업로드·처리 단계 없이 바로 라이브러리 리포트만 생성합니다."
+              sx={{ mb: 1 }}
+            />
+          )}
+
+          {/* 기존 VOD로 라이브러리 리포트 생성 안내 */}
+          {effectiveExistingVodIdx != null && uploadStep === 'idle' && (
+            <Alert severity="info" sx={{ mb: 1 }}>
+              <Typography variant="body2">
+                이미 처리 완료된 VOD(#{effectiveExistingVodIdx})로 라이브러리 리포트를 생성합니다. 카테고리·제목·내용을 입력한 뒤 버튼을 눌러주세요.
+              </Typography>
             </Alert>
           )}
 
@@ -537,6 +602,7 @@ export default function VODUploadModal({ open, onClose, onSave, categories }: Pr
                 onChange={(e) => handleChange('title', e.target.value)}
               />
 
+              {effectiveExistingVodIdx == null && (
               <Box>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>
                   파일 업로드
@@ -648,6 +714,7 @@ export default function VODUploadModal({ open, onClose, onSave, categories }: Pr
                   />
                 </Box>
               </Box>
+              )}
 
               <TextField
                 fullWidth
@@ -754,9 +821,15 @@ export default function VODUploadModal({ open, onClose, onSave, categories }: Pr
               variant="contained"
               onClick={handleSave}
               loading={isSaving || uploadStep === 'processing'}
-              disabled={uploadStep === 'processing'}
+              disabled={effectiveExistingVodIdx == null && uploadStep === 'processing'}
             >
-              {uploadStep === 'uploading' ? '업로드 중...' : '등록'}
+              {effectiveExistingVodIdx != null
+                ? isSaving
+                  ? '라이브러리 리포트 생성 중...'
+                  : '라이브러리 리포트 생성'
+                : uploadStep === 'uploading'
+                  ? '업로드 중...'
+                  : '등록'}
             </LoadingButton>
           </>
         )}

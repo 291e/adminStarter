@@ -15,6 +15,16 @@ type HookState = {
   error: string | null;
 };
 
+const compareRoomsByLastMessage = (a: ChatRoom2, b: ChatRoom2) => {
+  if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+
+  const aLastMessageAt = a.lastMessageAt ?? 0;
+  const bLastMessageAt = b.lastMessageAt ?? 0;
+  if (aLastMessageAt !== bLastMessageAt) return bLastMessageAt - aLastMessageAt;
+
+  return a.roomId.localeCompare(b.roomId);
+};
+
 const toStringArray = (value: unknown): string[] => {
   if (!Array.isArray(value)) return [];
   return value.map((item) => String(item)).filter((v) => v.trim().length > 0);
@@ -108,7 +118,9 @@ const mapUserRoomDoc = (doc: QueryDocumentSnapshot<DocumentData>): ChatRoom2 => 
 
 export function useChat2RoomsFirestore(enabled: boolean = true): HookState {
   const { user } = useAuthContext();
-  const [firebaseUid, setFirebaseUid] = useState<string | null>(() => auth.currentUser?.uid ?? null);
+  const [firebaseUid, setFirebaseUid] = useState<string | null>(
+    () => auth.currentUser?.uid ?? null
+  );
   const [state, setState] = useState<HookState>({
     rooms: [],
     isLoading: false,
@@ -140,7 +152,9 @@ export function useChat2RoomsFirestore(enabled: boolean = true): HookState {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const rooms = snapshot.docs.map(mapUserRoomDoc);
+        // Do not rely on `updatedAt` ordering because mark-read can update it and make the list jump.
+        // Keep rooms ordered by last message time (and pinned first) for stable UX.
+        const rooms = snapshot.docs.map(mapUserRoomDoc).sort(compareRoomsByLastMessage);
         setState({ rooms, isLoading: false, error: null });
       },
       (error) => {

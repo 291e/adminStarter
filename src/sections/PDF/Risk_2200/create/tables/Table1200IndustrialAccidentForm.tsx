@@ -22,6 +22,7 @@ import type {
   InvestigationTeamMember,
   HumanDamage,
 } from '../../types/table-data';
+import { resolveFileUrl } from '../../utils/file-url';
 import InvestigationTeamSelectModal from './modal/InvestigationTeamSelectModal';
 import ImageUploadModal from './modal/ImageUploadModal';
 
@@ -371,7 +372,9 @@ export default function Table1200IndustrialAccidentForm({
   useEffect(() => {
     // investigationImages는 이제 URL 문자열 배열
     if (row.investigationImages && row.investigationImages.length > 0) {
-      setImagePreviewUrls(row.investigationImages);
+      setImagePreviewUrls(
+        row.investigationImages.map((value) => resolveFileUrl(value) || value).filter(Boolean)
+      );
     } else {
       setImagePreviewUrls([]);
     }
@@ -647,7 +650,7 @@ export default function Table1200IndustrialAccidentForm({
                                 }}
                                 onMouseDown={(e) => e.stopPropagation()}
                               >
-                                <Iconify icon="custom:drag-dots-fill" width={20} />
+                                <Iconify icon="carbon:chevron-sort" width={20} />
                               </IconButton>
                             </Box>
                           </td>
@@ -903,7 +906,7 @@ export default function Table1200IndustrialAccidentForm({
                                 }}
                                 onMouseDown={(e) => e.stopPropagation()}
                               >
-                                <Iconify icon="custom:drag-dots-fill" width={20} />
+                                <Iconify icon="carbon:chevron-sort" width={20} />
                               </IconButton>
                             </Box>
                           </td>

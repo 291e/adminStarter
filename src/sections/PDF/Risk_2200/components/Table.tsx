@@ -120,8 +120,13 @@ export default function Risk_2200Table({
       return { hasWorkers: true, allSigned: signedCount === workerList.length, progress };
     }
 
+    const isSignatureStatus =
+      row.status === 'SIGNATURE_IN_PROGRESS' || row.status === 'SIGNATURE_COMPLETED';
+
     const workerProgress = (row as any).workerSignatureProgress;
-    if (typeof workerProgress === 'number') {
+    // Some APIs return `workerSignatureProgress` even when there are no worker signature targets.
+    // Only treat it as a worker-signature document when the document status itself is signature-related.
+    if (isSignatureStatus && typeof workerProgress === 'number') {
       return { hasWorkers: true, allSigned: workerProgress >= 100, progress: workerProgress };
     }
 
@@ -214,15 +219,15 @@ export default function Risk_2200Table({
     return 0;
   };
 
-  // 완료 상태 판별 헬퍼
-  const isCompletedStatus = (status: string) =>
-    status === 'COMPLETED' || status === 'SIGNATURE_COMPLETED';
+  // 수정/삭제는 '결재완료(COMPLETED)'일 때만 비활성화
+  const isCompletedStatus = (row: Risk_2200Row) =>
+    row.status === 'COMPLETED' || getDisplayStatus(row) === 'COMPLETED';
 
   // 완료되지 않은 문서만 필터링하여 전체 선택 상태 계산
-  const nonCompletedRows = rows.filter((row) => !isCompletedStatus(row.status));
+  const nonCompletedRows = rows.filter((row) => !isCompletedStatus(row));
   const selectedNonCompletedIds = selectedIds.filter((id) => {
     const row = rows.find((r) => r.id === id);
-    return row && !isCompletedStatus(row.status);
+    return row && !isCompletedStatus(row);
   });
   const isAllSelected =
     nonCompletedRows.length > 0 && selectedNonCompletedIds.length === nonCompletedRows.length;
@@ -250,7 +255,7 @@ export default function Risk_2200Table({
                   onChange={(e) => {
                     // 완료되지 않은 문서만 선택/해제
                     const nonCompletedIds = rows
-                      .filter((row) => row.status !== 'COMPLETED')
+                      .filter((row) => !isCompletedStatus(row))
                       .map((row) => row.id);
                     if (e.target.checked) {
                       // 완료되지 않은 문서만 선택
@@ -451,7 +456,7 @@ export default function Risk_2200Table({
                   <Checkbox
                     checked={selectedIds.includes(row.id)}
                     onChange={() => onSelectRow(row.id)}
-                    disabled={isCompletedStatus(row.status)}
+                    disabled={isCompletedStatus(row)}
                     size="small"
                   />
                 </TableCell>
@@ -634,7 +639,7 @@ export default function Risk_2200Table({
                     {onEdit && (
                       <MenuItem
                         onClick={() => handleMenuItemClick('edit', row.id)}
-                        disabled={isCompletedStatus(row.status)}
+                        disabled={isCompletedStatus(row)}
                         sx={{ px: 2 }}
                       >
                         수정
@@ -643,7 +648,7 @@ export default function Risk_2200Table({
                     {onDelete && (
                       <MenuItem
                         onClick={() => handleMenuItemClick('delete', row.id)}
-                        disabled={isCompletedStatus(row.status)}
+                        disabled={isCompletedStatus(row)}
                         sx={{ color: 'error.main', px: 2 }}
                       >
                         삭제

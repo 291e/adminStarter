@@ -722,7 +722,7 @@ export default function Table1400Form({ data, onDataChange }: Props) {
                         }}
                         onMouseDown={(e) => e.stopPropagation()}
                       >
-                        <Iconify icon="custom:drag-dots-fill" width={20} />
+                        <Iconify icon="carbon:chevron-sort" width={20} />
                       </IconButton>
                     </Box>
                   </td>
@@ -778,15 +778,15 @@ export default function Table1400Form({ data, onDataChange }: Props) {
         <Typography sx={{ mb: 2, fontSize: 16, fontWeight: 600, px: 1 }}>
           [물리적·생물학적·인간공학적 인자]
         </Typography>
-        <Box sx={{ pb: 5, pt: 0, px: 0, width: '100%' }}>
+        <Box sx={{ pb: 5, pt: 0, px: 0, width: '100%', overflowX: 'auto' }}>
           <Box
             component="table"
             sx={{
               width: '100%',
+              minWidth: 1013,
               border: '2px solid',
               borderColor: 'text.primary',
               borderCollapse: 'collapse',
-              tableLayout: 'fixed',
               '& th, & td': {
                 border: '1px solid',
                 borderColor: 'text.primary',
@@ -1013,7 +1013,7 @@ export default function Table1400Form({ data, onDataChange }: Props) {
                         }}
                         onMouseDown={(e) => e.stopPropagation()}
                       >
-                        <Iconify icon="custom:drag-dots-fill" width={20} />
+                        <Iconify icon="carbon:chevron-sort" width={20} />
                       </IconButton>
                     </Box>
                   </td>

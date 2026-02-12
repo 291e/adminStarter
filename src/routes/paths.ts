@@ -78,7 +78,7 @@ export const paths = {
     },
     systemSetting: {
       root: `${ROOTS.DASHBOARD}/system-setting`,
-      serviceSetting: `${ROOTS.DASHBOARD}/system-setting/service-setting`,
+      serviceSetting: `${ROOTS.DASHBOARD}/service-setting`,
       codeSetting: `${ROOTS.DASHBOARD}/system-setting/code-setting`,
       apiSetting: `${ROOTS.DASHBOARD}/system-setting/api-setting`,
       industryChecklistSetting: `${ROOTS.DASHBOARD}/system-setting/industry-checklist-setting`,

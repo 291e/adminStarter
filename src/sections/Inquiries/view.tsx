@@ -15,12 +15,13 @@ import InquiriesPagination from './components/pagination';
 import InquiriesBreadcrumbs from './components/breadcrumbs';
 import { useBoardCategories, useBoardPosts } from 'src/sections/Board/hooks/use-board-api';
 import type { BoardCategory, BoardPost } from 'src/services/board/board.types';
+import { useMyInfo } from 'src/sections/Chat/hooks/use-my-info';
 
 import InquiryNewView from './inquiry-new-view';
 import InquiryEditView from './inquiry-edit-view';
 import InquiryDetailsView from './inquiry-details-view';
 import InquiryReplyView from './inquiry-reply-view';
-import CategoryManageModal from './components/CategoryManageModal';
+import CategoryManageModal from 'src/sections/Board/components/CategoryManageModal';
 
 // ----------------------------------------------------------------------
 
@@ -46,6 +47,8 @@ export default function InquiriesView() {
 
   const { data: categoryData } = useBoardCategories({ postCategoryType: '문의/답변' });
   const categories = categoryData?.categories || [];
+  const { data: myInfo } = useMyInfo();
+  const isSuperAdmin = myInfo?.isSuperAdmin === true;
 
   const statusFilter =
     currentTab === 'completed' ? '1' : currentTab === 'pending' ? '0' : undefined;
@@ -63,6 +66,38 @@ export default function InquiriesView() {
     pageSize: pagination.rowsPerPage,
     filterPostCategoryIndexes: filters.category || undefined,
     filterPostAnswerStatuses: statusFilter,
+    searchingKey: searchKey,
+    searchingVal: filters.searchValue || undefined,
+    sortBy: 'postIdx',
+    sortOrder: 'DESC',
+  });
+  const { data: allCountData } = useBoardPosts({
+    postGubun: '문의/답변',
+    page: 1,
+    pageSize: 1,
+    filterPostCategoryIndexes: filters.category || undefined,
+    searchingKey: searchKey,
+    searchingVal: filters.searchValue || undefined,
+    sortBy: 'postIdx',
+    sortOrder: 'DESC',
+  });
+  const { data: completedCountData } = useBoardPosts({
+    postGubun: '문의/답변',
+    page: 1,
+    pageSize: 1,
+    filterPostCategoryIndexes: filters.category || undefined,
+    filterPostAnswerStatuses: '1',
+    searchingKey: searchKey,
+    searchingVal: filters.searchValue || undefined,
+    sortBy: 'postIdx',
+    sortOrder: 'DESC',
+  });
+  const { data: pendingCountData } = useBoardPosts({
+    postGubun: '문의/답변',
+    page: 1,
+    pageSize: 1,
+    filterPostCategoryIndexes: filters.category || undefined,
+    filterPostAnswerStatuses: '0',
     searchingKey: searchKey,
     searchingVal: filters.searchValue || undefined,
     sortBy: 'postIdx',
@@ -127,8 +162,20 @@ export default function InquiriesView() {
       return true;
     });
 
-    const totalCount = postsData?.totalCount || filtered.length || 0;
-    return filtered.map((post: BoardPost, index: number) => {
+    const sorted = [...filtered].sort((a, b) => {
+      const aDateValue = a.registrationDate || a.createAt || a.updateAt || '';
+      const bDateValue = b.registrationDate || b.createAt || b.updateAt || '';
+      const aTs = aDateValue ? dayjs(aDateValue).valueOf() : 0;
+      const bTs = bDateValue ? dayjs(bDateValue).valueOf() : 0;
+      if (aTs !== bTs) return bTs - aTs;
+
+      const aPostIdx = a.postIdx ?? 0;
+      const bPostIdx = b.postIdx ?? 0;
+      return bPostIdx - aPostIdx;
+    });
+
+    const totalCount = Math.max(postsData?.totalCount ?? 0, posts.length, filtered.length);
+    return sorted.map((post: BoardPost, index: number) => {
       const sequence = totalCount - ((pagination.currentPage - 1) * pagination.rowsPerPage + index);
       const status = post.postAnswerStatus === 1 ? 'completed' : 'pending';
       return {
@@ -150,18 +197,22 @@ export default function InquiriesView() {
         commentInformation: post.commentInformation,
       } as InquiryRow;
     });
-  }, [postsData, filters.startDate, filters.endDate, pagination.currentPage, pagination.rowsPerPage]);
+  }, [
+    postsData,
+    filters.startDate,
+    filters.endDate,
+    pagination.currentPage,
+    pagination.rowsPerPage,
+  ]);
 
-  const counts = useMemo(() => {
-    const posts = postsData?.posts || ([] as BoardPost[]);
-    const completedCount = posts.filter((post: BoardPost) => post.postAnswerStatus === 1).length;
-    const pendingCount = posts.filter((post: BoardPost) => post.postAnswerStatus !== 1).length;
-    return {
-      all: postsData?.totalCount || posts.length,
-      completed: completedCount,
-      pending: pendingCount,
-    };
-  }, [postsData]);
+  const counts = useMemo(
+    () => ({
+      all: allCountData?.totalCount ?? 0,
+      completed: completedCountData?.totalCount ?? 0,
+      pending: pendingCountData?.totalCount ?? 0,
+    }),
+    [allCountData, completedCountData, pendingCountData]
+  );
 
   if (view === 'new') {
     return <InquiryNewView onBack={handleBackToList} />;
@@ -182,19 +233,19 @@ export default function InquiriesView() {
   return (
     <DashboardContent>
       <Container maxWidth="xl">
-        <InquiriesBreadcrumbs onNewInquiry={handleNewInquiry} onCategoryManage={handleCategoryManage} />
+        <InquiriesBreadcrumbs
+          onNewInquiry={handleNewInquiry}
+          onCategoryManage={handleCategoryManage}
+        />
 
         <Card sx={{ boxShadow: '0 0 20px rgba(0,0,0,0.05)', borderRadius: 2 }}>
-          <InquiriesTabs
-            currentTab={currentTab}
-            onChangeTab={handleTabChange}
-            counts={counts}
-          />
+          <InquiriesTabs currentTab={currentTab} onChangeTab={handleTabChange} counts={counts} />
 
           <InquiriesFilter filters={filters} categories={categories} onFilters={handleFilters} />
 
           <InquiriesTable
             rows={rows}
+            isSuperAdmin={isSuperAdmin}
             onEdit={handleEditInquiry}
             onReply={handleReplyInquiry}
             onViewAnswer={handleViewAnswer}

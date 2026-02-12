@@ -14,13 +14,17 @@ import Container from '@mui/material/Container';
 
 import { DashboardContent } from 'src/layouts/dashboard';
 import InquiryHeader from './components/header';
-// import InquiryEditorToolbar from './components/editor-toolbar';
 import {
   useBoardCategories,
   useDeleteBoardPosts,
   useUpdateBoardPost,
 } from 'src/sections/Board/hooks/use-board-api';
 import type { BoardCategory } from 'src/services/board/board.types';
+import { resolveAdminImageUrlsInHtml, stripAdminImageOriginFromHtml } from 'src/utils/rich-text';
+import InquiryQuillToolbar, {
+  inquiryQuillFormats,
+  inquiryQuillModules,
+} from './components/quill-toolbar';
 
 // ----------------------------------------------------------------------
 
@@ -35,12 +39,14 @@ type Props = {
   };
 };
 
+const toolbarId = 'inquiry-quill-toolbar-edit';
+
 export default function InquiryEditView({ onBack, inquiry }: Props) {
   const [category, setCategory] = useState(
     inquiry.postCategoryIdx ? String(inquiry.postCategoryIdx) : ''
   );
   const [title, setTitle] = useState(inquiry.title);
-  const [content, setContent] = useState(inquiry.content);
+  const [content, setContent] = useState(() => stripAdminImageOriginFromHtml(inquiry.content));
   const { data: categoryData } = useBoardCategories({ postCategoryType: '문의/답변' });
   const categories = categoryData?.categories || [];
   const updatePostMutation = useUpdateBoardPost();
@@ -50,6 +56,8 @@ export default function InquiryEditView({ onBack, inquiry }: Props) {
     if (!category) return undefined;
     return Number(category) || undefined;
   }, [category]);
+
+  const renderedContent = useMemo(() => resolveAdminImageUrlsInHtml(content), [content]);
 
   const handleSubmit = async () => {
     if (!inquiry.postIdx) return;
@@ -129,21 +137,31 @@ export default function InquiryEditView({ onBack, inquiry }: Props) {
                   '& .quill': {
                     bgcolor: 'grey.50',
                     border: 'none',
-                    '& .ql-toolbar': {
-                      border: 'none',
-                      borderBottom: '1px solid',
-                      borderColor: 'divider',
-                      bgcolor: 'white',
-                    },
                     '& .ql-container': {
                       border: 'none',
                       minHeight: 320,
                       typography: 'body1',
                     },
                   },
+                  '& .ql-toolbar': {
+                    border: 'none',
+                    borderBottom: '1px solid',
+                    borderColor: 'divider',
+                    bgcolor: 'white',
+                  },
+                  '& .ql-formats': {
+                    marginRight: '8px',
+                  },
                 }}
               >
-                <ReactQuill theme="snow" value={content} onChange={setContent} />
+                <InquiryQuillToolbar toolbarId={toolbarId} />
+                <ReactQuill
+                  theme="snow"
+                  modules={inquiryQuillModules(toolbarId)}
+                  formats={inquiryQuillFormats}
+                  value={renderedContent}
+                  onChange={(value) => setContent(stripAdminImageOriginFromHtml(value))}
+                />
               </Box>
             </Box>
 

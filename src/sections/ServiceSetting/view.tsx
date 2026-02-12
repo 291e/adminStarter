@@ -13,6 +13,7 @@ import ServiceSettingBreadcrumbs from './components/Breadcrumbs';
 import ServiceSettingFilters from './components/Filters';
 import ServiceSettingTable from './components/Table';
 import ServiceSettingPagination from './components/Pagination';
+import AdminSubscriptionChart from 'src/sections/AdminDashBoard/components/AdminSubscriptionChart';
 import CreateServiceModal, { type ServiceFormData } from './components/CreateServiceModal';
 import EditServiceModal, { type ServiceEditFormData } from './components/EditServiceModal';
 import { useServiceSetting } from './hooks/use-service-setting';
@@ -85,100 +86,117 @@ export function ServiceSettingView({ title = '서비스 관리', description, sx
     return (
       <Box
         sx={{
-          bgcolor: 'background.paper',
-          borderRadius: 2,
-          boxShadow: (theme) => theme.customShadows.card,
+          display: 'flex',
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          alignItems: 'stretch',
+          gap: 3,
           width: '100%',
-          overflow: 'hidden',
         }}
       >
-        <ServiceSettingFilters
-          status={logic.filters.status}
-          onChangeStatus={(status) => {
-            logic.onChangeStatus(status);
-            // '활성' -> 'ACTIVE', '비활성' -> 'INACTIVE', '전체' -> undefined
-            const statusValue =
-              status === 'all' || status === '전체'
-                ? undefined
-                : status === 'active' || status === '활성'
-                  ? 'ACTIVE'
-                  : status === 'inactive' || status === '비활성'
-                    ? 'INACTIVE'
-                    : (status as 'ACTIVE' | 'INACTIVE');
-            setFilters((prev) => ({ ...prev, status: statusValue }));
-            setPage(1);
-          }}
-          searchFilter={logic.filters.searchFilter}
-          onChangeSearchFilter={(filter) => {
-            logic.onChangeSearchFilter(filter);
-          }}
-          searchValue={logic.filters.searchValue}
-          onChangeSearchValue={(value) => {
-            logic.onChangeSearchValue(value);
-            setFilters((prev) => ({ ...prev, search: value || undefined }));
-            setPage(1);
-          }}
-        />
+        <Box sx={{ flex: '1 1 320px', minWidth: 280, maxWidth: { xs: '100%' } }}>
+          <AdminSubscriptionChart title="구독 서비스 현황" sx={{ height: '100%' }} />
+        </Box>
 
-        <ServiceSettingTable
-          rows={logic.filtered}
-          onViewDetail={(row) => {
-            if (import.meta.env.DEV) {
-              console.log('서비스 상세 보기:', row);
-            }
+        <Box
+          sx={{
+            flex: '2 1 760px',
+            minWidth: 0,
+            bgcolor: 'background.paper',
+            borderRadius: 2,
+            boxShadow: (theme) => theme.customShadows.card,
+            width: '100%',
+            overflow: 'hidden',
           }}
-          onEdit={(row) => {
-            setSelectedService(row);
-            setEditModalOpen(true);
-          }}
-          onDeactivate={async (row) => {
-            if (!row.serviceSettingIdx) {
-              console.error('서비스 ID가 없습니다.');
-              return;
-            }
-            try {
-              await deactivateServiceMutation.mutateAsync({
-                serviceSettingIdx: row.serviceSettingIdx,
-              });
+        >
+          <ServiceSettingFilters
+            status={logic.filters.status}
+            onChangeStatus={(status) => {
+              logic.onChangeStatus(status);
+              // '활성' -> 'ACTIVE', '비활성' -> 'INACTIVE', '전체' -> undefined
+              const statusValue =
+                status === 'all' || status === '전체'
+                  ? undefined
+                  : status === 'active' || status === '활성'
+                    ? 'ACTIVE'
+                    : status === 'inactive' || status === '비활성'
+                      ? 'INACTIVE'
+                      : (status as 'ACTIVE' | 'INACTIVE');
+              setFilters((prev) => ({ ...prev, status: statusValue }));
+              setPage(1);
+            }}
+            searchFilter={logic.filters.searchFilter}
+            onChangeSearchFilter={(filter) => {
+              logic.onChangeSearchFilter(filter);
+            }}
+            searchValue={logic.filters.searchValue}
+            onChangeSearchValue={(value) => {
+              logic.onChangeSearchValue(value);
+              setFilters((prev) => ({ ...prev, search: value || undefined }));
+              setPage(1);
+            }}
+          />
+
+          <ServiceSettingTable
+            rows={logic.filtered}
+            onViewDetail={(row) => {
               if (import.meta.env.DEV) {
-                console.log('서비스 비활성화 성공:', row);
+                console.log('서비스 상세 보기:', row);
               }
-            } catch (error) {
-              console.error('서비스 비활성화 실패:', error);
-            }
-          }}
-          onDelete={async (row) => {
-            if (!row.serviceSettingIdx) {
-              console.error('서비스 ID가 없습니다.');
-              return;
-            }
-            if (window.confirm('정말 삭제하시겠습니까?')) {
+            }}
+            onEdit={(row) => {
+              setSelectedService(row);
+              setEditModalOpen(true);
+            }}
+            onDeactivate={async (row) => {
+              if (!row.serviceSettingIdx) {
+                console.error('서비스 ID가 없습니다.');
+                return;
+              }
               try {
-                await deleteServiceMutation.mutateAsync({
+                await deactivateServiceMutation.mutateAsync({
                   serviceSettingIdx: row.serviceSettingIdx,
                 });
                 if (import.meta.env.DEV) {
-                  console.log('서비스 삭제 성공:', row);
+                  console.log('서비스 비활성화 성공:', row);
                 }
               } catch (error) {
-                console.error('서비스 삭제 실패:', error);
+                console.error('서비스 비활성화 실패:', error);
               }
-            }
-          }}
-        />
+            }}
+            onDelete={async (row) => {
+              if (!row.serviceSettingIdx) {
+                console.error('서비스 ID가 없습니다.');
+                return;
+              }
+              if (window.confirm('정말 삭제하시겠습니까?')) {
+                try {
+                  await deleteServiceMutation.mutateAsync({
+                    serviceSettingIdx: row.serviceSettingIdx,
+                  });
+                  if (import.meta.env.DEV) {
+                    console.log('서비스 삭제 성공:', row);
+                  }
+                } catch (error) {
+                  console.error('서비스 삭제 실패:', error);
+                }
+              }
+            }}
+          />
 
-        <ServiceSettingPagination
-          count={totalCount}
-          page={page - 1}
-          rowsPerPage={pageSize}
-          onChangePage={(newPage) => {
-            setPage(newPage + 1);
-          }}
-          onChangeRowsPerPage={(newRowsPerPage) => {
-            setPageSize(newRowsPerPage);
-            setPage(1);
-          }}
-        />
+          <ServiceSettingPagination
+            count={totalCount}
+            page={page - 1}
+            rowsPerPage={pageSize}
+            onChangePage={(newPage) => {
+              setPage(newPage + 1);
+            }}
+            onChangeRowsPerPage={(newRowsPerPage) => {
+              setPageSize(newRowsPerPage);
+              setPage(1);
+            }}
+          />
+        </Box>
       </Box>
     );
   };

@@ -1,5 +1,3 @@
-import { useNavigate } from 'react-router';
-
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
@@ -8,7 +6,6 @@ import MenuItem from '@mui/material/MenuItem';
 import FormControl from '@mui/material/FormControl';
 
 import { Iconify } from 'src/components/iconify';
-import { paths } from 'src/routes/paths';
 
 // ----------------------------------------------------------------------
 
@@ -16,10 +13,11 @@ type StatCardProps = {
   icon: string;
   title: string;
   count: number;
+  navigateLabel?: string;
   onNavigate?: () => void;
 };
 
-function StatCard({ icon, title, count, onNavigate }: StatCardProps) {
+function StatCard({ icon, title, count, navigateLabel = '바로가기', onNavigate }: StatCardProps) {
   return (
     <Box
       sx={{
@@ -118,7 +116,7 @@ function StatCard({ icon, title, count, onNavigate }: StatCardProps) {
             },
           }}
         >
-          바로가기
+          {navigateLabel}
         </Button>
       </div>
     </Box>
@@ -130,25 +128,24 @@ type PeriodType = 'year' | 'month' | 'week';
 type Props = {
   periodType: PeriodType;
   periodValue: string;
-  accidentCount: number;
-  riskCount: number;
+  documentCount: number;
+  emergencyCount: number;
   onPeriodTypeChange?: (type: PeriodType) => void;
   onPeriodValueChange?: (value: string) => void;
-  onAccidentNavigate?: () => void;
-  onRiskNavigate?: () => void;
+  onDocumentNavigate?: () => void;
+  onEmergencyNavigate?: () => void;
 };
 
 export default function AccidentReportCard({
   periodType,
   periodValue,
-  accidentCount,
-  riskCount,
+  documentCount,
+  emergencyCount,
   onPeriodTypeChange,
   onPeriodValueChange,
-  onAccidentNavigate,
-  onRiskNavigate,
+  onDocumentNavigate,
+  onEmergencyNavigate,
 }: Props) {
-  const navigate = useNavigate();
   // 현재 연도 및 주차 계산
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
@@ -303,24 +300,18 @@ export default function AccidentReportCard({
         }}
       >
         <StatCard
-          icon="material-symbols:mobile-chat-rounded"
+          icon="solar:document-text-bold"
           title="사고 발생"
-          count={accidentCount}
-          onNavigate={() => {
-            // 채팅 페이지의 "사고 발생 현황" 채팅방으로 이동
-            navigate(`${paths.dashboard.operation.chat}?roomId=emergency`);
-            onAccidentNavigate?.();
-          }}
+          count={documentCount}
+          navigateLabel="문서 현황 바로가기"
+          onNavigate={onDocumentNavigate}
         />
         <StatCard
-          icon="solar:danger-triangle-bold"
+          icon="material-symbols:mobile-chat-rounded"
           title="위험 보고"
-          count={riskCount}
-          onNavigate={() => {
-            // 현장 운영 관리 - 위험 보고 페이지로 이동
-            navigate(paths.dashboard.operation.riskReport);
-            onRiskNavigate?.();
-          }}
+          count={emergencyCount}
+          navigateLabel="채팅방 바로가기"
+          onNavigate={onEmergencyNavigate}
         />
       </Box>
     </Box>

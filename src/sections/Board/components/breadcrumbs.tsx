@@ -10,14 +10,19 @@ import { RouterLink } from 'src/routes/components';
 
 // ----------------------------------------------------------------------
 
-export default function BoardBreadcrumbs() {
+type Props = {
+  onCategoryManage?: () => void;
+  onNewPost?: () => void;
+};
+
+export default function BoardBreadcrumbs({ onCategoryManage, onNewPost }: Props) {
   const { data: myInfo } = useMyInfo();
   const isSuperAdmin = myInfo?.isSuperAdmin === true;
 
   return (
     <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
       <Stack spacing={1}>
-        <Typography variant="h4">공지사항</Typography>
+        <Typography variant="h4">산업안전보건 게시판</Typography>
         <Breadcrumbs
           separator={<Typography sx={{ color: 'text.disabled', fontSize: 12 }}>•</Typography>}
         >
@@ -29,20 +34,41 @@ export default function BoardBreadcrumbs() {
           >
             대시보드
           </Link>
-          <Typography sx={{ fontSize: 13, color: 'text.primary' }}>공지사항</Typography>
+          <Typography sx={{ fontSize: 13, color: 'text.primary' }}>산업안전보건 게시판</Typography>
         </Breadcrumbs>
       </Stack>
 
-      {isSuperAdmin && (
-        <Stack direction="row" spacing={1}>
-          <Button variant="contained" color="info">
+      <Stack direction="row" spacing={1}>
+        {isSuperAdmin && (
+          <Button
+            variant="contained"
+            color="info"
+            onClick={onCategoryManage}
+            sx={{
+              px: 2,
+              height: 40,
+              borderRadius: 1,
+              fontWeight: 600,
+            }}
+          >
             카테고리 관리
           </Button>
-          <Button variant="contained" color="inherit">
-            공지사항 등록
-          </Button>
-        </Stack>
-      )}
+        )}
+        <Button
+          variant="contained"
+          onClick={onNewPost}
+          sx={{
+            bgcolor: '#212B36',
+            '&:hover': { bgcolor: '#161C24' },
+            px: 2,
+            height: 40,
+            borderRadius: 1,
+            fontWeight: 600,
+          }}
+        >
+          산업안전보건 게시판 등록
+        </Button>
+      </Stack>
     </Stack>
   );
 }

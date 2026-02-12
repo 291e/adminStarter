@@ -129,6 +129,7 @@ export type UpdateLibraryReportParams = {
   thumbnailUrl?: string;
   memo?: string;
   isActive?: number;
+  educationType?: 'MANDATORY' | 'REGULAR';
 };
 
 export type UpdateLibraryReportResponse = BaseResponseDto<LibraryReport>;

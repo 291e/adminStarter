@@ -321,7 +321,7 @@ export function LibraryReportView({ title = '라이브러리', description, sx }
 
           const uploadResponse = await uploadVod({
             video: form.videoFile,
-            educationType: 'MANDATORY',
+            educationType: form.educationType ?? 'MANDATORY',
           });
           const vodIdxValue = (uploadResponse as any)?.vodIdx;
           if (!vodIdxValue) {
@@ -420,6 +420,7 @@ export function LibraryReportView({ title = '라이브러리', description, sx }
           vodIdx: vodIdx || undefined,
           thumbnailUrl,
           memo: selectedRow.memo || undefined,
+          educationType: form.educationType || undefined,
         };
 
         const response = await updateContentMutation.mutateAsync(payload);

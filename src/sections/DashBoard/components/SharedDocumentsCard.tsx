@@ -314,16 +314,6 @@ export default function SharedDocumentsCard({
               />
             )}
           </Box>
-          <Box
-            sx={{
-              width: 52,
-              minWidth: 52,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              p: { xs: 1.5, sm: 2 },
-            }}
-          />
         </Box>
 
         {/* 테이블 바디 */}
