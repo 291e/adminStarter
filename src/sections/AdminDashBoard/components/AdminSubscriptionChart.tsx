@@ -27,9 +27,16 @@ const StyledChartContainer = styled('div')(({ theme }) => ({
 type Props = CardProps & {
   title?: string;
   subheader?: string;
+  items?: Array<{ planName: string; subscriberCount: number; ratio?: number }>;
 };
 
-export default function AdminSubscriptionChart({ title, subheader, sx, ...other }: Props) {
+export default function AdminSubscriptionChart({
+  title,
+  subheader,
+  items = [],
+  sx,
+  ...other
+}: Props) {
   const theme = useTheme();
 
   const chartColors = [
@@ -38,15 +45,18 @@ export default function AdminSubscriptionChart({ title, subheader, sx, ...other 
     theme.palette.primary.light,
   ];
 
-  const series = [
-    { label: '안전해YOU 스타터', value: 450 },
-    { label: '안전해YOU 라이트', value: 350 },
-    { label: '안전해YOU 스탠다드', value: 200 },
-  ];
+  const series = items.map((item) => ({
+    label: item.planName,
+    value: item.subscriberCount,
+    ratio: item.ratio,
+  }));
+  const safeSeries =
+    series.length > 0 ? series : [{ label: '데이터 없음', value: 1, ratio: 100 }];
+  const totalCount = series.reduce((acc, i) => acc + i.value, 0);
 
   const chartOptions = useChart({
     colors: chartColors,
-    labels: series.map((i) => i.label),
+    labels: safeSeries.map((i) => i.label),
     stroke: {
       show: false,
     },
@@ -62,7 +72,7 @@ export default function AdminSubscriptionChart({ title, subheader, sx, ...other 
             total: {
               show: true,
               label: '전체',
-              formatter: () => `${series.reduce((acc, i) => acc + i.value, 0).toLocaleString()} 개`,
+              formatter: () => `${totalCount.toLocaleString()} 개`,
             },
           },
         },
@@ -105,7 +115,7 @@ export default function AdminSubscriptionChart({ title, subheader, sx, ...other 
       <StyledChartContainer>
         <Chart
           type="donut"
-          series={series.map((i) => i.value)}
+          series={safeSeries.map((i) => i.value)}
           options={chartOptions}
           sx={{ width: 300, height: 300, mx: 'auto' }}
         />
@@ -113,10 +123,16 @@ export default function AdminSubscriptionChart({ title, subheader, sx, ...other 
         <ChartLegends
           colors={chartOptions?.colors || []}
           labels={chartOptions?.labels || []}
-          values={series.map(
-            (i) =>
-              `${Math.round((i.value / series.reduce((acc, val) => acc + val.value, 0)) * 100)}%`
-          )}
+          values={safeSeries.map((i) => {
+            if (series.length === 0) return '0.0%';
+            const ratio =
+              typeof i.ratio === 'number'
+                ? i.ratio
+                : totalCount > 0
+                  ? (i.value / totalCount) * 100
+                  : 0;
+            return `${ratio.toFixed(1)}%`;
+          })}
           sx={{
             mt: 3,
             width: 1,

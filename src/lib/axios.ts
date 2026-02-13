@@ -250,10 +250,20 @@ export const endpoints = {
     educationCompletionRate: '/dashboard/education-completion-rate',
     prioritySettings: '/dashboard/priority-settings',
   },
+  adminDashboard: {
+    summary: '/admin/dashboard/summary',
+    memberCompanies: '/admin/dashboard/member-companies',
+    subscriptionDistribution: '/admin/dashboard/subscriptions/distribution',
+    salesTrend: '/admin/dashboard/sales/trend',
+    documentStatusMatrix: '/admin/dashboard/document-status/matrix',
+    documentStatusDetails: '/admin/dashboard/document-status/details',
+    defaultRange: '/admin/dashboard/filters/default-range',
+  },
   // Safety System
   safetySystem: {
     systems: '/safety-system/systems',
     documents: '/safety-system/documents',
+    actions: '/safety-system/actions',
     items: '/safety-system/items',
     chemicals: '/safety-system/chemicals',
     riskAssessmentCriteria: '/safety-system/risk-assessment-criteria',

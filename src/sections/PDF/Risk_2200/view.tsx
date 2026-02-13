@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import type { Theme, SxProps } from '@mui/material/styles';
 import { useLocation } from 'react-router';
 import dayjs from 'dayjs';
@@ -12,7 +12,6 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useNavigate } from 'react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { CONFIG } from 'src/global-config';
 import {
   getSafetySystemItem,
   deleteSafetySystemDocument,
@@ -33,9 +32,12 @@ import RiskAssessmentSettingModal, {
 import PDFDownloadModal from './components/PDFDownloadModal';
 import DeleteDocumentModal from './components/DeleteDocumentModal';
 import { useRisk_2200 } from './hooks/use-risk-2200';
+import { useExportRisk2200Documents } from './hooks/use-risk-2200-api';
 import { getTableDataByDocument } from 'src/_mock/_safety-system';
 import { downloadDocumentPDF } from './utils/download-pdf';
-import SampleViewModal, { parseSampleUrls } from './components/SampleViewModal';
+import { parseSampleUrls } from './components/SampleViewModal';
+import DownloadFormatModal, { type DownloadFormat } from './components/DownloadFormatModal';
+import { resolveFileUrl } from './utils/file-url';
 
 // ----------------------------------------------------------------------
 
@@ -54,10 +56,18 @@ export function Risk_2200View({ safetyId, title = 'Blank', description, sx }: Pr
     | undefined;
   const [riskAssessmentModalOpen, setRiskAssessmentModalOpen] = useState(false);
   const [pdfDownloadModalOpen, setPdfDownloadModalOpen] = useState(false);
-  const [sampleViewModalOpen, setSampleViewModalOpen] = useState(false);
+  const [downloadFormatModalOpen, setDownloadFormatModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [downloadLoadingTitle, setDownloadLoadingTitle] = useState('파일 다운로드');
+  const [downloadLoadingMessage, setDownloadLoadingMessage] = useState('파일을 생성하고 있습니다...');
   const [selectedDeleteRow, setSelectedDeleteRow] = useState<Risk_2200Row | null>(null);
+  const [selectedDownloadTarget, setSelectedDownloadTarget] = useState<{
+    id: string;
+    safetySystemItemIdx?: number;
+    documentName?: string;
+  } | null>(null);
   const queryClient = useQueryClient();
+  const exportDocumentsMutation = useExportRisk2200Documents();
 
   // 아이템 상세 정보 조회 (문서 목록 포함)
   const { data: itemDetailResponse, isLoading: isItemLoading } = useQuery({
@@ -253,16 +263,79 @@ export function Risk_2200View({ safetyId, title = 'Blank', description, sx }: Pr
     deleteDocumentMutation.mutate(safetySystemDocumentIdx);
   };
 
-  const handleDownloadPDF = async (id: string, safetySystemItemIdx?: number) => {
-    if (safetyId) {
-      setPdfDownloadModalOpen(true);
-      try {
-        await downloadDocumentPDF(id, safetyId, safetySystemItemIdx);
-      } catch (error) {
-        console.error('PDF 다운로드 실패:', error);
-      } finally {
-        setPdfDownloadModalOpen(false);
+  const handleDownload = (id: string, safetySystemItemIdx?: number) => {
+    const targetRow = rows.find((row) => row.id === id);
+    setSelectedDownloadTarget({
+      id,
+      safetySystemItemIdx,
+      documentName: targetRow?.documentName,
+    });
+    setDownloadFormatModalOpen(true);
+  };
+
+  const formatActionMap: Record<
+    Exclude<DownloadFormat, 'pdf'>,
+    'EXPORT_EXCEL' | 'EXPORT_WORD' | 'EXPORT_PPT'
+  > = {
+    excel: 'EXPORT_EXCEL',
+    word: 'EXPORT_WORD',
+    ppt: 'EXPORT_PPT',
+  };
+
+  const triggerDownloadByUrl = (url: string) => {
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.target = '_blank';
+    anchor.rel = 'noopener noreferrer';
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+  };
+
+  const handleSelectDownloadFormat = async (format: DownloadFormat) => {
+    if (!selectedDownloadTarget) return;
+
+    setDownloadFormatModalOpen(false);
+    setPdfDownloadModalOpen(true);
+    setDownloadLoadingTitle('파일 다운로드');
+    setDownloadLoadingMessage('파일을 생성하고 있습니다...');
+
+    try {
+      if (format === 'pdf') {
+        if (!safetyId) {
+          toast.error('안전보건체계 정보가 없습니다.');
+          return;
+        }
+        setDownloadLoadingTitle('PDF 다운로드');
+        setDownloadLoadingMessage('PDF를 생성하고 있습니다...');
+        await downloadDocumentPDF(
+          selectedDownloadTarget.id,
+          safetyId,
+          selectedDownloadTarget.safetySystemItemIdx
+        );
+        return;
       }
+
+      const response = await exportDocumentsMutation.mutateAsync({
+        action: formatActionMap[format],
+        selectedIds: [selectedDownloadTarget.id],
+      });
+
+      const downloadUrl =
+        (response as any)?.downloadUrl || (response as any)?.body?.downloadUrl || '';
+
+      if (!downloadUrl) {
+        toast.error('다운로드 URL을 받지 못했습니다.');
+        return;
+      }
+
+      triggerDownloadByUrl(downloadUrl);
+    } catch (error: any) {
+      console.error('파일 다운로드 실패:', error);
+      toast.error(error?.response?.data?.header?.resultMessage || '파일 다운로드에 실패했습니다.');
+    } finally {
+      setPdfDownloadModalOpen(false);
+      setSelectedDownloadTarget(null);
     }
   };
 
@@ -321,17 +394,6 @@ export function Risk_2200View({ safetyId, title = 'Blank', description, sx }: Pr
     console.log('게시 상태 변경:', id, published);
   };
 
-  // 파일 URL을 전체 URL로 변환
-  const getFullFileUrl = (url: string | null | undefined): string | null => {
-    if (!url) return null;
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      return url;
-    }
-    const baseUrl = CONFIG.serverUrl.replace(/\/$/, '');
-    const path = url.startsWith('/') ? url : `/${url}`;
-    return `${baseUrl}${path}`;
-  };
-
   // 팝업 창 열기 헬퍼 함수
   const openPopup = (url: string, name: string) => {
     const width = 1200;
@@ -351,19 +413,19 @@ export function Risk_2200View({ safetyId, title = 'Blank', description, sx }: Pr
     if (sampleUrl) {
       const samples = parseSampleUrls(sampleUrl);
       if (samples.length > 0) {
-        // 단일/다중 샘플 모두 모달로 표시
-        setSampleViewModalOpen(true);
+        const firstSampleUrl = resolveFileUrl(samples[0]?.url);
+        if (!firstSampleUrl) {
+          toast.error('샘플 파일 URL이 유효하지 않습니다.');
+          return;
+        }
+        openPopup(firstSampleUrl, 'risk2200-sample-view');
+      } else {
+        toast.error('등록된 샘플 파일이 없습니다.');
       }
     } else {
       toast.error('등록된 샘플 파일이 없습니다.');
     }
   };
-
-  // 샘플 목록 가져오기 (모달용)
-  const sampleList = useMemo(() => {
-    const sampleUrl = itemDetail?.sample || state?.item?.sample;
-    return parseSampleUrls(sampleUrl);
-  }, [itemDetail, state?.item]);
 
   // 1200번대 문서 여부 확인 (safetyIdx=1, itemNumber=2)
   const is1200Series = state?.system?.safetyIdx === 1 && state?.item?.itemNumber === 2;
@@ -501,7 +563,7 @@ export function Risk_2200View({ safetyId, title = 'Blank', description, sx }: Pr
               onSelectRow={logic.onSelectRow}
               onEdit={handleEdit}
               onDelete={handleDelete}
-              onDownloadPDF={handleDownloadPDF}
+              onDownload={handleDownload}
               onCopy={handleCopy}
               onTogglePublish={handleTogglePublish}
             />
@@ -535,13 +597,20 @@ export function Risk_2200View({ safetyId, title = 'Blank', description, sx }: Pr
       />
 
       {/* PDF 다운로드 로딩 모달 */}
-      <PDFDownloadModal open={pdfDownloadModalOpen} />
+      <PDFDownloadModal
+        open={pdfDownloadModalOpen}
+        title={downloadLoadingTitle}
+        message={downloadLoadingMessage}
+      />
 
-      {/* 샘플 보기 모달 */}
-      <SampleViewModal
-        open={sampleViewModalOpen}
-        onClose={() => setSampleViewModalOpen(false)}
-        samples={sampleList}
+      <DownloadFormatModal
+        open={downloadFormatModalOpen}
+        documentName={selectedDownloadTarget?.documentName}
+        onClose={() => {
+          setDownloadFormatModalOpen(false);
+          setSelectedDownloadTarget(null);
+        }}
+        onSelect={handleSelectDownloadFormat}
       />
 
       {/* 삭제 확인 모달 */}

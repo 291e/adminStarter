@@ -9,6 +9,7 @@ import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 
 import { useState, useEffect, useMemo } from 'react';
+import type { ReactNode } from 'react';
 
 import { fDateTime } from 'src/utils/format-time';
 import type { Organization, CompanyType } from 'src/services/organization/organization.types';
@@ -104,20 +105,24 @@ const formatBusinessNumber = (value: string) => {
 type Props = {
   organization: Organization;
   organizationId: number;
+  initialTab?: number;
   onTabChange?: (tabValue: number) => void;
   companyMemberList?: any[]; // 조직 상세 API 응답의 companyMemberList (담당자 정보 조회용)
+  educationTabContent?: ReactNode;
 };
 
 export default function OrganizationInfo({
   organization,
   organizationId,
+  initialTab = 0,
   onTabChange,
   companyMemberList,
+  educationTabContent,
 }: Props) {
   const queryClient = useQueryClient();
   const updateOrganizationMutation = useUpdateOrganization();
   const { data: myInfo } = useMyInfo();
-  const [tabValue, setTabValue] = useState(0);
+  const [tabValue, setTabValue] = useState(initialTab);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
 
@@ -163,6 +168,10 @@ export default function OrganizationInfo({
     setTabValue(newValue);
     onTabChange?.(newValue);
   };
+
+  useEffect(() => {
+    setTabValue(initialTab);
+  }, [initialTab]);
 
   // 조직 정보 초기화
   const orgData = useMemo(() => organization, [organization]);
@@ -315,6 +324,7 @@ export default function OrganizationInfo({
         <Tab label="조직 정보" />
         <Tab label="무재해 사업장" />
         <Tab label="구독 서비스" />
+        <Tab label="교육 이수 현황" />
       </Tabs>
 
       {tabValue === 0 && (
@@ -736,6 +746,8 @@ export default function OrganizationInfo({
       {tabValue === 1 && <AccidentFreeWorkplace organizationId={organizationId.toString()} />}
 
       {tabValue === 2 && <SubscriptionService organizationId={organizationId.toString()} />}
+
+      {tabValue === 3 && educationTabContent}
     </Box>
   );
 }

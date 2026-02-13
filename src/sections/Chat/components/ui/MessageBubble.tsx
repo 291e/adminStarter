@@ -162,10 +162,20 @@ export default function MessageBubble({
   const [isLoadingAddress, setIsLoadingAddress] = useState(false);
   const normalizedAvatarUrl = getChatAvatarUrl(avatarUrl);
 
-  const isSharedDocument = messageType === 'FILE' && Boolean(sharedDocumentIdx);
+  const parsedSharedDocumentIdx =
+    sharedDocumentIdx != null && !Number.isNaN(Number(sharedDocumentIdx))
+      ? Number(sharedDocumentIdx)
+      : null;
+  const isSystemSharedDocumentNotice =
+    messageType === 'SYSTEM' &&
+    parsedSharedDocumentIdx !== null &&
+    (message.includes('새 문서가 등록되었습니다') || message.includes('문서가 등록되었습니다'));
+  const isSharedDocument =
+    parsedSharedDocumentIdx !== null &&
+    (messageType === 'FILE' || isSystemSharedDocumentNotice);
   const handleFileClick = () => {
-    if (isSharedDocument && sharedDocumentIdx && onFileClick) {
-      onFileClick(sharedDocumentIdx);
+    if (isSharedDocument && parsedSharedDocumentIdx && onFileClick) {
+      onFileClick(parsedSharedDocumentIdx);
     }
   };
 

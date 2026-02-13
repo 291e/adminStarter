@@ -292,11 +292,11 @@ export function SharedDocumentView({ title = '공유 문서함', description, sx
     setShareToChatModalOpen(true);
   };
 
-  const handleShareToChatConfirm = async (chatRoomIdxList: number[], documentId: string) => {
+  const handleShareToChatConfirm = async (chatRoomIdList: string[], documentId: string) => {
     try {
       await shareToChatMutation.mutateAsync({
         sharedDocumentIdx: Number(documentId),
-        chatRoomIdxList,
+        chatRoomIdList,
       });
       setShareToChatModalOpen(false);
       setSelectedDocumentForShare(null);

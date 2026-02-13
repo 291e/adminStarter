@@ -100,7 +100,7 @@ export type SendRisk2200NotificationResponse = BaseResponseDto<void>;
 
 // 액션 처리 (엑셀 내보내기, 인쇄 등)
 export type ExportRisk2200DocumentsParams = {
-  action: string;
+  action: 'EXPORT_EXCEL' | 'EXPORT_WORD' | 'EXPORT_PPT';
   selectedIds: string[];
 };
 
@@ -219,4 +219,3 @@ export type CasNumber = {
 export type GetCasNumbersResponse = BaseResponseDto<{
   casNumbers: CasNumber[];
 }>;
-

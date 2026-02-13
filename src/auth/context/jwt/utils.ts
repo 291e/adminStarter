@@ -1,6 +1,3 @@
-import { paths } from 'src/routes/paths';
-import { buildAppPath } from 'src/routes/utils';
-
 import axios from 'src/lib/axios';
 
 import { JWT_STORAGE_KEY } from './constant';
@@ -52,21 +49,21 @@ export function isValidToken(accessToken: string) {
 
 // ----------------------------------------------------------------------
 
-export function tokenExpired(exp: number) {
-  const currentTime = Date.now();
-  const timeLeft = exp * 1000 - currentTime;
+// export function tokenExpired(exp: number) {
+//   const currentTime = Date.now();
+//   const timeLeft = exp * 1000 - currentTime;
 
-  setTimeout(() => {
-    try {
-      alert('Token expired!');
-      sessionStorage.removeItem(JWT_STORAGE_KEY);
-      window.location.href = buildAppPath(paths.auth.jwt.signIn);
-    } catch (error) {
-      console.error('Error during token expiration:', error);
-      throw error;
-    }
-  }, timeLeft);
-}
+//   setTimeout(() => {
+//     try {
+//       alert('로그인이 만료되었습니다. 다시 로그인해주세요.');
+//       sessionStorage.removeItem(JWT_STORAGE_KEY);
+//       window.location.href = buildAppPath(paths.auth.jwt.signIn);
+//     } catch (error) {
+//       console.error('Error during token expiration:', error);
+//       throw error;
+//     }
+//   }, timeLeft);
+// }
 
 // ----------------------------------------------------------------------
 
@@ -80,7 +77,7 @@ export async function setSession(accessToken: string | null) {
       const decodedToken = jwtDecode(accessToken); // ~3 days by minimals server
 
       if (decodedToken && 'exp' in decodedToken) {
-        tokenExpired(decodedToken.exp);
+        // tokenExpired(decodedToken.exp);
       } else {
         throw new Error('Invalid access token!');
       }

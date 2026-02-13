@@ -126,7 +126,7 @@ export type DeleteSharedDocumentParams = {
 // 공유 문서 채팅방 공유 요청
 export type ShareDocumentToChatRoomParams = {
   sharedDocumentIdx: number; // 경로 파라미터
-  chatRoomIdxList: number[]; // 채팅방 Index 목록
+  chatRoomIdList: string[]; // Firestore 채팅방 ID 목록
 };
 
 // 사고·위험 보고 통계 조회 요청

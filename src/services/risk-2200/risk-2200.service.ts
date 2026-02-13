@@ -1,4 +1,4 @@
-import axiosInstance from 'src/lib/axios';
+import axiosInstance, { endpoints } from 'src/lib/axios';
 
 import type {
   GetRisk2200DocumentsParams,
@@ -150,14 +150,19 @@ export async function sendRisk2200Notification(
 
 /**
  * 액션 처리 (엑셀 내보내기, 인쇄 등)
- * POST /api/risk-2200/documents/actions
+ * POST /safety-system/actions?responseMode=flat
  */
 export async function exportRisk2200Documents(
   params: ExportRisk2200DocumentsParams
 ): Promise<ExportRisk2200DocumentsResponse> {
   const response = await axiosInstance.post<ExportRisk2200DocumentsResponse>(
-    '/api/risk-2200/documents/actions',
-    params
+    endpoints.safetySystem.actions,
+    params,
+    {
+      params: {
+        responseMode: 'flat',
+      },
+    }
   );
 
   return response.data;

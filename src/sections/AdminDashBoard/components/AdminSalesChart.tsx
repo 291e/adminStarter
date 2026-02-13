@@ -1,6 +1,6 @@
 import type { CardProps } from '@mui/material/Card';
 
-import { useState, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 import { usePopover } from 'minimal-shared/hooks';
 
@@ -23,12 +23,34 @@ import { Chart, useChart } from 'src/components/chart';
 type Props = CardProps & {
   title?: string;
   subheader?: string;
+  unit?: 'week' | 'month' | 'year';
+  labels?: string[];
+  salesSeries?: number[];
+  subscriptionSeries?: number[];
+  totalSalesAmount?: number;
+  totalSubscriptions?: number;
+  onUnitChange?: (unit: 'week' | 'month' | 'year') => void;
 };
 
-export default function AdminSalesChart({ title, subheader, sx, ...other }: Props) {
+export default function AdminSalesChart({
+  title,
+  subheader,
+  unit = 'month',
+  labels = [],
+  salesSeries = [],
+  subscriptionSeries = [],
+  totalSalesAmount = 0,
+  totalSubscriptions = 0,
+  onUnitChange,
+  sx,
+  ...other
+}: Props) {
   const theme = useTheme();
 
-  const [seriesData, setSeriesData] = useState('월');
+  const [seriesData, setSeriesData] = useState<'week' | 'month' | 'year'>(unit);
+  useEffect(() => {
+    setSeriesData(unit);
+  }, [unit]);
 
   const popover = usePopover();
 
@@ -50,14 +72,12 @@ export default function AdminSalesChart({ title, subheader, sx, ...other }: Prop
     fill: {
       type: ['solid', 'solid'],
     },
-    labels: ['1월', '2월', '3월', '4월', '5월', '6월'],
+    labels,
     xaxis: {
       type: 'category',
     },
     yaxis: {
       min: 0,
-      max: 100,
-      tickAmount: 5,
     },
     markers: {
       size: 4,
@@ -88,22 +108,25 @@ export default function AdminSalesChart({ title, subheader, sx, ...other }: Prop
     {
       name: '매출액',
       type: 'column',
-      data: [65, 35, 42, 65, 55, 92],
+      data: salesSeries,
     },
     {
       name: '구독',
       type: 'line',
-      data: [65, 20, 20, 20, 20, 62],
+      data: subscriptionSeries,
     },
   ];
 
   const handleChangeSeries = useCallback(
-    (newValue: string) => {
+    (newValue: 'week' | 'month' | 'year') => {
       popover.onClose();
       setSeriesData(newValue);
+      onUnitChange?.(newValue);
     },
-    [popover]
+    [onUnitChange, popover]
   );
+
+  const unitLabelMap = { week: '주', month: '월', year: '년' } as const;
 
   return (
     <Card sx={{ height: 1, ...sx }} {...other}>
@@ -123,7 +146,7 @@ export default function AdminSalesChart({ title, subheader, sx, ...other }: Prop
             }
             sx={{ borderRadius: 1 }}
           >
-            {seriesData}
+            {unitLabelMap[seriesData]}
           </Button>
         }
       />
@@ -138,7 +161,7 @@ export default function AdminSalesChart({ title, subheader, sx, ...other }: Prop
               매출액
             </Typography>
           </Box>
-          <Typography variant="h4">{fCurrency(56315000)}</Typography>
+          <Typography variant="h4">{fCurrency(totalSalesAmount)}</Typography>
         </Box>
 
         <Box>
@@ -150,7 +173,7 @@ export default function AdminSalesChart({ title, subheader, sx, ...other }: Prop
               구독
             </Typography>
           </Box>
-          <Typography variant="h4">{fNumber(1000)}건</Typography>
+          <Typography variant="h4">{fNumber(totalSubscriptions)}건</Typography>
         </Box>
       </Box>
 
@@ -162,13 +185,13 @@ export default function AdminSalesChart({ title, subheader, sx, ...other }: Prop
       />
 
       <CustomPopover open={popover.open} onClose={popover.onClose} sx={{ width: 140 }}>
-        {['주', '월', '년'].map((option) => (
+        {(['week', 'month', 'year'] as const).map((option) => (
           <MenuItem
             key={option}
             selected={option === seriesData}
             onClick={() => handleChangeSeries(option)}
           >
-            {option}
+            {unitLabelMap[option]}
           </MenuItem>
         ))}
       </CustomPopover>

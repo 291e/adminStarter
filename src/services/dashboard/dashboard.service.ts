@@ -112,11 +112,68 @@ export async function deleteSharedDocument(params: DeleteSharedDocumentParams): 
 export async function shareDocumentToChatRoom(
   params: ShareDocumentToChatRoomParams
 ): Promise<void> {
-  // sharedDocumentIdx는 URL 경로에만 포함, body에는 제외
-  const { sharedDocumentIdx, chatRoomIdxList } = params;
-  await axiosInstance.post(`${endpoints.dashboard.sharedDocuments}/${sharedDocumentIdx}/share`, {
-    chatRoomIdxList,
-  });
+  const { sharedDocumentIdx, chatRoomIdList } = params;
+  if (!Array.isArray(chatRoomIdList) || chatRoomIdList.length === 0) {
+    throw new Error('공유할 채팅방이 없습니다.');
+  }
+
+  let chatRoomIdxList: number[] = [];
+  try {
+    // 레거시 호환용: roomId -> roomIdx 매핑 가능하면 함께 전송
+    const chatRoomsResponse = await axiosInstance.get(endpoints.chat.rooms, {
+      params: { page: 1, pageSize: 1000 },
+    });
+
+    const candidates = [
+      (chatRoomsResponse.data as any)?.chatRoomList,
+      (chatRoomsResponse.data as any)?.chatRooms,
+      (chatRoomsResponse.data as any)?.roomList,
+      (chatRoomsResponse.data as any)?.rooms,
+      (chatRoomsResponse.data as any)?.body?.chatRoomList,
+      (chatRoomsResponse.data as any)?.body?.chatRooms,
+      (chatRoomsResponse.data as any)?.body?.roomList,
+      (chatRoomsResponse.data as any)?.body?.rooms,
+      (chatRoomsResponse.data as any)?.body?.data?.chatRoomList,
+      (chatRoomsResponse.data as any)?.body?.data?.chatRooms,
+      (chatRoomsResponse.data as any)?.body?.data?.roomList,
+      (chatRoomsResponse.data as any)?.body?.data?.rooms,
+    ];
+    const list = candidates.find((candidate) => Array.isArray(candidate));
+    const roomList = Array.isArray(list) ? list : [];
+
+    const roomIdToIdx = new Map<string, number>();
+    roomList.forEach((room: any) => {
+      const roomId = String(room?.chatRoomId || room?.roomId || '').trim();
+      const roomIdx = Number(room?.chatRoomIdx);
+      if (!roomId || Number.isNaN(roomIdx) || roomIdx <= 0) return;
+      roomIdToIdx.set(roomId, roomIdx);
+    });
+
+    chatRoomIdxList = Array.from(
+      new Set(
+        chatRoomIdList
+          .map((roomId) => roomIdToIdx.get(String(roomId)))
+          .filter((roomIdx): roomIdx is number => typeof roomIdx === 'number' && roomIdx > 0)
+      )
+    );
+  } catch {
+    // 매핑 실패해도 chatRoomIdList 전송은 계속 시도
+  }
+
+  const payload: {
+    chatRoomIdList: string[];
+    chatRoomIdxList?: number[];
+  } = {
+    chatRoomIdList,
+  };
+  if (chatRoomIdxList.length > 0) {
+    payload.chatRoomIdxList = chatRoomIdxList;
+  }
+
+  await axiosInstance.post(
+    `${endpoints.dashboard.sharedDocuments}/${sharedDocumentIdx}/share`,
+    payload
+  );
 }
 
 /**

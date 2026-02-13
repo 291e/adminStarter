@@ -76,7 +76,18 @@ export function useOrganizationDetail(
   const members = useMemo(() => {
     // 조직 상세 API 응답의 companyMemberList 사용
     if (companyMemberList && companyMemberList.length > 0) {
-      return companyMemberList.map((member: any, index: number) => ({
+      const sortedCompanyMembers = [...companyMemberList].sort((a: any, b: any) => {
+        const aIdx = Number(a?.memberIdx || 0);
+        const bIdx = Number(b?.memberIdx || 0);
+        if (aIdx !== bIdx) {
+          return bIdx - aIdx;
+        }
+        const aTime = a?.createAt ? new Date(a.createAt).getTime() : 0;
+        const bTime = b?.createAt ? new Date(b.createAt).getTime() : 0;
+        return bTime - aTime;
+      });
+
+      return sortedCompanyMembers.map((member: any, index: number) => ({
         // API 응답의 Member 타입을 UI에서 사용하는 Member 타입으로 매핑
         member: null,
         memberIdx: member.memberIdx || index,
@@ -189,6 +200,12 @@ export function useOrganizationDetail(
     });
   }, [filteredMembers, filters.tab]);
 
+  // 페이지네이션 (클라이언트 사이드)
+  const pagedMembers = useMemo(() => {
+    const start = page * rowsPerPage;
+    return filteredByTab.slice(start, start + rowsPerPage);
+  }, [filteredByTab, page, rowsPerPage]);
+
   // 카운트 계산
   const counts = useMemo(() => {
     // companyMemberList를 사용하는 경우
@@ -247,8 +264,8 @@ export function useOrganizationDetail(
     rowsPerPage,
     onChangePage,
     onChangeRowsPerPage,
-    filtered: filteredByTab,
-    total: companyMemberList ? companyMemberList.length : responseData?.total || 0,
+    filtered: pagedMembers,
+    total: filteredByTab.length,
     counts,
     isLoading: companyMemberList ? false : isLoading, // companyMemberList가 있으면 로딩 완료
     isError: companyMemberList ? false : isError, // companyMemberList가 있으면 에러 없음

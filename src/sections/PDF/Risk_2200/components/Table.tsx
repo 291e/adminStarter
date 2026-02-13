@@ -41,7 +41,7 @@ type Props = {
   onSelectRow: (id: string) => void;
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
-  onDownloadPDF?: (id: string, safetySystemItemIdx?: number) => void;
+  onDownload?: (id: string, safetySystemItemIdx?: number) => void;
   onCopy?: (id: string) => void;
   onTogglePublish?: (id: string, published: boolean) => void;
   onViewProgress?: (id: string) => void;
@@ -54,7 +54,7 @@ export default function Risk_2200Table({
   onSelectRow,
   onEdit,
   onDelete,
-  onDownloadPDF,
+  onDownload,
   onCopy,
   onTogglePublish,
   onViewProgress,
@@ -394,7 +394,7 @@ export default function Risk_2200Table({
                   textAlign: 'center',
                 }}
               >
-                PDF
+                다운로드
               </TableCell>
               <TableCell
                 sx={{
@@ -573,10 +573,10 @@ export default function Risk_2200Table({
                   <Badge label={getStatusLabel(row)} variant={getStatusVariant(row)} />
                 </TableCell>
                 <TableCell sx={{ width: 80, minWidth: 80, p: 1, textAlign: 'center' }}>
-                  <Tooltip title="PDF 다운로드">
+                  <Tooltip title="다운로드">
                     <IconButton
                       size="small"
-                      onClick={() => onDownloadPDF?.(row.id, row.safetySystemItemIdx)}
+                      onClick={() => onDownload?.(row.id, row.safetySystemItemIdx)}
                       sx={{
                         color: 'text.secondary',
                         '&:hover': {

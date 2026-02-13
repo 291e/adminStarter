@@ -1,5 +1,5 @@
-import { useParams, useNavigate } from 'react-router';
-import { useState } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router';
+import { useEffect, useMemo, useState } from 'react';
 
 import type { Theme, SxProps } from '@mui/material/styles';
 
@@ -22,6 +22,13 @@ import MemberFilters from './components/MemberFilters';
 import MemberTable from './components/MemberTable';
 import MemberPagination from './components/MemberPagination';
 import EditMemberModal from './components/EditMemberModal';
+import EducationReportFilters from 'src/sections/EducationReport/components/Filters';
+import EducationReportTable from 'src/sections/EducationReport/components/Table';
+import EducationReportPagination from 'src/sections/EducationReport/components/Pagination';
+import EducationDetailModal from 'src/sections/EducationReport/components/EducationDetailModal';
+import { useEducationReports } from 'src/sections/EducationReport/hooks/use-education-report-api';
+import { useEducationReport } from 'src/sections/EducationReport/hooks/use-education-report';
+import type { EducationReport } from 'src/services/education-report/education-report.types';
 import type { Organization } from 'src/services/organization/organization.types';
 import type { Member } from 'src/sections/Organization/types/member';
 
@@ -36,11 +43,15 @@ type Props = {
 export function OrganizationDetailView({ title = '조직 관리', description, sx }: Props) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuthContext();
   const { data: myInfo } = useMyInfo();
-  const [activeTab, setActiveTab] = useState(0);
+  const focus = new URLSearchParams(location.search).get('focus');
+  const [activeTab, setActiveTab] = useState<number>(focus === 'education-status' ? 3 : 0);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [educationDetailModalOpen, setEducationDetailModalOpen] = useState(false);
+  const [selectedEducationReportIdx, setSelectedEducationReportIdx] = useState<number | null>(null);
 
   // 현재 사용자 역할 및 슈퍼 어드민 여부 추출
   const currentUserRole = ((myInfo as any)?.memberRole || (user as any)?.memberRole) as
@@ -74,10 +85,32 @@ export function OrganizationDetailView({ title = '조직 관리', description, s
   // 멤버 목록 및 필터링 로직 (조직 상세 API 응답의 companyMemberList 사용)
   const companyMemberList = responseData?.companyMemberList;
   const logic = useOrganizationDetail(organizationId, companyMemberList);
+  const { data: educationReportsData, isLoading: isLoadingEducationReports } = useEducationReports(
+    organizationId
+      ? {
+          page: 1,
+          pageSize: 1000,
+          companyIdx: organizationId,
+        }
+      : undefined
+  );
+  const educationReports = useMemo(() => {
+    if (!educationReportsData?.body?.educationReports) {
+      return [];
+    }
+    return educationReportsData.body.educationReports as EducationReport[];
+  }, [educationReportsData]);
+  const educationLogic = useEducationReport(educationReports);
 
   const handleBack = () => {
     navigate('/dashboard/organization');
   };
+
+  useEffect(() => {
+    if (focus === 'education-status') {
+      setActiveTab(3);
+    }
+  }, [focus]);
 
   // 로딩 상태
   if (isLoadingOrganization) {
@@ -130,10 +163,69 @@ export function OrganizationDetailView({ title = '조직 관리', description, s
         <OrganizationInfo
           organization={organization as Organization}
           organizationId={organizationId || 0}
+          initialTab={activeTab}
           companyMemberList={companyMemberList}
           onTabChange={(tabValue) => {
             setActiveTab(tabValue);
           }}
+          educationTabContent={
+            <Box
+              sx={{
+                borderTop: '1px solid',
+                borderColor: 'divider',
+              }}
+            >
+              <EducationReportFilters
+                role={educationLogic.filters.role}
+                onChangeRole={educationLogic.onChangeRole}
+                searchFilter={educationLogic.filters.searchFilter}
+                onChangeSearchFilter={educationLogic.onChangeSearchFilter}
+                searchValue={educationLogic.filters.searchValue}
+                onChangeSearchValue={educationLogic.onChangeSearchValue}
+              />
+
+              {isLoadingEducationReports ? (
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    minHeight: 200,
+                  }}
+                >
+                  <CircularProgress />
+                </Box>
+              ) : (
+                <>
+                  <EducationReportTable
+                    rows={educationLogic.filtered}
+                    selectedIds={educationLogic.selectedIds}
+                    onSelectAll={educationLogic.onSelectAll}
+                    onSelectRow={educationLogic.onSelectRow}
+                    onViewDetail={(row) => {
+                      const reportIdx =
+                        row.educationReportIdx ||
+                        (row.educationReportId ? Number(row.educationReportId) : null) ||
+                        (row.id ? Number(row.id) : null);
+                      if (!reportIdx) {
+                        return;
+                      }
+                      setSelectedEducationReportIdx(reportIdx);
+                      setEducationDetailModalOpen(true);
+                    }}
+                  />
+
+                  <EducationReportPagination
+                    count={educationLogic.total}
+                    page={educationLogic.page}
+                    rowsPerPage={educationLogic.rowsPerPage}
+                    onChangePage={educationLogic.onChangePage}
+                    onChangeRowsPerPage={educationLogic.onChangeRowsPerPage}
+                  />
+                </>
+              )}
+            </Box>
+          }
         />
 
         {/* 멤버 리스트 섹션 - 조직 정보 탭일 때만 표시 */}
@@ -219,7 +311,17 @@ export function OrganizationDetailView({ title = '조직 관리', description, s
             )}
           </Box>
         )}
+
       </Box>
+
+      <EducationDetailModal
+        open={educationDetailModalOpen}
+        onClose={() => {
+          setEducationDetailModalOpen(false);
+          setSelectedEducationReportIdx(null);
+        }}
+        educationReportIdx={selectedEducationReportIdx}
+      />
     </DashboardContent>
   );
 }

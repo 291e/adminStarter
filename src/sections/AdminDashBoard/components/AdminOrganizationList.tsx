@@ -1,9 +1,11 @@
-import type { Organization } from 'src/services/organization/organization.types';
+import type { AdminDashboardMemberCompany } from 'src/services/admin-dashboard/admin-dashboard.types';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Table from '@mui/material/Table';
 import Button from '@mui/material/Button';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
@@ -11,25 +13,35 @@ import TableRow from '@mui/material/TableRow';
 import CardHeader from '@mui/material/CardHeader';
 import TableContainer from '@mui/material/TableContainer';
 import Typography from '@mui/material/Typography';
-import Chip from '@mui/material/Chip';
-
 import Stack from '@mui/material/Stack';
-
-import { Label } from 'src/components/label';
-import { Scrollbar } from 'src/components/scrollbar';
-import { Iconify } from 'src/components/iconify';
-import { fNumber } from 'src/utils/format-number';
 import TextField from '@mui/material/TextField';
 import InputAdornment from '@mui/material/InputAdornment';
 import Tooltip from '@mui/material/Tooltip';
+import TablePagination from '@mui/material/TablePagination';
+import Chip from '@mui/material/Chip';
+
+import { Scrollbar } from 'src/components/scrollbar';
+import { Iconify } from 'src/components/iconify';
+import { fNumber } from 'src/utils/format-number';
 
 // ----------------------------------------------------------------------
 
 type Props = {
   title?: string;
   subheader?: string;
-  tableData: Organization[];
+  tableData: AdminDashboardMemberCompany[];
   tableLabels: { id: string; label: string; align?: 'left' | 'center' | 'right' }[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  search: string;
+  isActive?: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
+  onSearchChange: (search: string) => void;
+  onIsActiveChange: (isActive?: number) => void;
+  onEducationStatusClick?: (companyIdx: number) => void;
+  onViewAll?: () => void;
 };
 
 export default function AdminOrganizationList({
@@ -37,6 +49,17 @@ export default function AdminOrganizationList({
   subheader,
   tableData,
   tableLabels,
+  totalCount,
+  page,
+  pageSize,
+  search,
+  isActive,
+  onPageChange,
+  onPageSizeChange,
+  onSearchChange,
+  onIsActiveChange,
+  onEducationStatusClick,
+  onViewAll,
   ...other
 }: Props) {
   return (
@@ -49,6 +72,7 @@ export default function AdminOrganizationList({
             size="small"
             color="inherit"
             endIcon={<Iconify icon="eva:arrow-ios-forward-fill" width={18} />}
+            onClick={onViewAll}
             sx={{
               bgcolor: 'grey.100',
               borderRadius: 1,
@@ -92,18 +116,50 @@ export default function AdminOrganizationList({
           </Stack>
         </Stack>
 
-        <TextField
-          placeholder="조직명을 검색해 주세요."
-          size="small"
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Iconify icon="eva:search-fill" sx={{ color: 'text.disabled' }} />
-              </InputAdornment>
-            ),
-          }}
-          sx={{ width: { xs: 1, md: 320 } }}
-        />
+        <Stack direction="row" spacing={1} sx={{ width: { xs: 1, md: 'auto' } }}>
+          <Select
+            size="small"
+            value={typeof isActive === 'number' ? String(isActive) : 'all'}
+            onChange={(event) => {
+              const value = event.target.value;
+              if (value === '1') {
+                onIsActiveChange(1);
+                onPageChange(1);
+                return;
+              }
+              if (value === '0') {
+                onIsActiveChange(0);
+                onPageChange(1);
+                return;
+              }
+              onIsActiveChange(undefined);
+              onPageChange(1);
+            }}
+            sx={{ minWidth: 100 }}
+          >
+            <MenuItem value="all">전체</MenuItem>
+            <MenuItem value="1">활성</MenuItem>
+            <MenuItem value="0">비활성</MenuItem>
+          </Select>
+
+          <TextField
+            placeholder="조직명을 검색해 주세요."
+            size="small"
+            value={search}
+            onChange={(event) => {
+              onSearchChange(event.target.value);
+              onPageChange(1);
+            }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Iconify icon="eva:search-fill" sx={{ color: 'text.disabled' }} />
+                </InputAdornment>
+              ),
+            }}
+            sx={{ width: { xs: 1, md: 320 } }}
+          />
+        </Stack>
       </Stack>
 
       <TableContainer sx={{ position: 'relative', overflow: 'unset' }}>
@@ -125,7 +181,11 @@ export default function AdminOrganizationList({
 
             <TableBody>
               {tableData.map((row) => (
-                <AdminOrganizationTableRow key={row.companyIdx} row={row} />
+                <AdminOrganizationTableRow
+                  key={row.companyIdx}
+                  row={row}
+                  onEducationStatusClick={onEducationStatusClick}
+                />
               ))}
 
               {tableData.length === 0 && (
@@ -142,37 +202,21 @@ export default function AdminOrganizationList({
         </Scrollbar>
       </TableContainer>
 
-      <Box
-        sx={{
-          p: 2,
-          display: 'flex',
-          justifyContent: 'flex-end',
-          borderTop: 'dashed 1px',
-          borderColor: 'divider',
-        }}
-      >
-        <Stack direction="row" alignItems="center" spacing={2}>
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            표시행 수
-          </Typography>
-          <Stack direction="row" alignItems="center" spacing={0.5}>
-            <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
-              5
-            </Typography>
-            <Iconify icon={'eva:chevron-down-fill' as any} width={16} />
-          </Stack>
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            1-10 of 2
-          </Typography>
-          <Stack direction="row" spacing={1}>
-            <Iconify
-              icon={'eva:chevron-left-fill' as any}
-              width={18}
-              sx={{ color: 'text.disabled' }}
-            />
-            <Iconify icon={'eva:chevron-right-fill' as any} width={18} />
-          </Stack>
-        </Stack>
+      <Box sx={{ borderTop: 'dashed 1px', borderColor: 'divider' }}>
+        <TablePagination
+          component="div"
+          count={totalCount}
+          page={Math.max(page - 1, 0)}
+          rowsPerPage={pageSize}
+          onPageChange={(_, nextPage) => onPageChange(nextPage + 1)}
+          onRowsPerPageChange={(event) => {
+            onPageSizeChange(parseInt(event.target.value, 10));
+            onPageChange(1);
+          }}
+          rowsPerPageOptions={[10, 20, 30]}
+          labelRowsPerPage="표시 행 수 :"
+          labelDisplayedRows={({ from, to, count }) => `${from}-${to} / ${count}`}
+        />
       </Box>
     </Card>
   );
@@ -181,21 +225,21 @@ export default function AdminOrganizationList({
 // ----------------------------------------------------------------------
 
 type RowProps = {
-  row: Organization;
+  row: AdminDashboardMemberCompany;
+  onEducationStatusClick?: (companyIdx: number) => void;
 };
 
-function AdminOrganizationTableRow({ row }: RowProps) {
-  // Dummy data for missing fields
-  const totalMembers = 120;
-  const subscription = (row as any).subscriptionType || '안전해YOU 스타터';
-  const revenue = 56315000;
-  const lastPaymentAt = '2025-09-30T16:45:35';
+function AdminOrganizationTableRow({ row, onEducationStatusClick }: RowProps) {
+  const eduNotStarted = row.educationStatus?.notStarted ?? 0;
+  const eduInProgress = row.educationStatus?.inProgress ?? 0;
+  const eduCompleted = row.educationStatus?.completed ?? 0;
+  const eduTotal = eduNotStarted + eduInProgress + eduCompleted;
 
-  // Education breakdown (dummy)
-  const eduTotal = 50;
-  const eduNotStarted = 15;
-  const eduInProgress = 20;
-  const eduCompleted = 15;
+  const notStartedRatio = eduTotal > 0 ? (eduNotStarted / eduTotal) * 100 : 0;
+  const inProgressRatio = eduTotal > 0 ? (eduInProgress / eduTotal) * 100 : 0;
+  const completedRatio = eduTotal > 0 ? (eduCompleted / eduTotal) * 100 : 0;
+
+  const isAccidentFree = Number((row as any).isAccidentFreeWorksite) === 1;
 
   return (
     <TableRow hover>
@@ -203,9 +247,13 @@ function AdminOrganizationTableRow({ row }: RowProps) {
 
       <TableCell align="center">{row.representativeName || '-'}</TableCell>
 
-      <TableCell align="center">{totalMembers}</TableCell>
+      <TableCell align="center">{row.totalMembers}</TableCell>
 
-      <TableCell align="center" sx={{ minWidth: 200 }}>
+      <TableCell
+        align="center"
+        sx={{ minWidth: 200, cursor: 'pointer' }}
+        onClick={() => onEducationStatusClick?.(row.companyIdx)}
+      >
         <Stack spacing={0.5} sx={{ alignItems: 'center' }}>
           <Tooltip
             title={
@@ -228,108 +276,51 @@ function AdminOrganizationTableRow({ row }: RowProps) {
                 bgcolor: 'grey.100',
               }}
             >
-              <Box sx={{ width: `${(eduNotStarted / eduTotal) * 100}%`, bgcolor: 'error.main' }} />
-              <Box
-                sx={{ width: `${(eduInProgress / eduTotal) * 100}%`, bgcolor: 'warning.main' }}
-              />
-              <Box sx={{ width: `${(eduCompleted / eduTotal) * 100}%`, bgcolor: 'success.main' }} />
+              <Box sx={{ width: `${notStartedRatio}%`, bgcolor: 'error.main' }} />
+              <Box sx={{ width: `${inProgressRatio}%`, bgcolor: 'warning.main' }} />
+              <Box sx={{ width: `${completedRatio}%`, bgcolor: 'success.main' }} />
             </Box>
           </Tooltip>
-          <Typography
-            variant="caption"
-            sx={{ color: 'text.disabled', width: 160, textAlign: 'right' }}
-          >
+          <Typography variant="caption" sx={{ color: 'text.disabled', width: 160, textAlign: 'right' }}>
             총 {eduTotal}명
           </Typography>
         </Stack>
       </TableCell>
 
       <TableCell align="center">
-        {(() => {
-          const accidentStatus = row.accidentFreeStatus || 'APPROVED'; // Dummy status for demo
-          const accidentLabel = '2024년 무재해 사업장';
-
-          if (!row.isAccidentFreeWorksite && accidentStatus === 'none') {
-            return <Typography variant="body2">-</Typography>;
-          }
-
-          if (accidentStatus === 'APPROVED') {
-            return (
-              <Chip
-                color="info"
-                variant="outlined"
-                size="small"
-                label={accidentLabel}
-                sx={{ fontWeight: 600, pointerEvents: 'none' }}
-              />
-            );
-          }
-
-          if (accidentStatus === 'PENDING') {
-            return (
-              <Button
-                variant="outlined"
-                color="inherit"
-                size="small"
-                endIcon={<Iconify icon={'eva:arrow-forward-fill' as any} width={16} />}
-                sx={{
-                  height: 24,
-                  minHeight: 24,
-                  px: 0.75,
-                  py: 0,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  lineHeight: '20px',
-                  borderRadius: 0.75,
-                  borderWidth: 1,
-                  borderColor: 'grey.900',
-                  color: 'grey.900',
-                  textTransform: 'none',
-                  '&:hover': {
-                    borderColor: 'grey.800',
-                    bgcolor: 'action.hover',
-                  },
-                }}
-              >
-                검토 대기
-              </Button>
-            );
-          }
-
-          return <Typography variant="body2">-</Typography>;
-        })()}
+        {isAccidentFree ? (
+          <Chip color="info" variant="outlined" size="small" label="무재해 사업장" sx={{ fontWeight: 600 }} />
+        ) : (
+          <Typography variant="body2">-</Typography>
+        )}
       </TableCell>
 
       <TableCell align="center">
-        <Label
-          variant="soft"
-          color={row.status === 'active' ? 'success' : 'default'}
-          sx={{ textTransform: 'none', borderRadius: 0.75 }}
-        >
-          {row.status === 'active' ? '활성' : '비활성'}
-        </Label>
+        <Chip
+          size="small"
+          variant="outlined"
+          color={row.isActive === 1 ? 'success' : 'default'}
+          label={row.isActive === 1 ? '활성' : '비활성'}
+          sx={{ borderRadius: 0.75 }}
+        />
       </TableCell>
 
       <TableCell>
         <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>
-          {subscription}
+          {row.hasActiveSubscription === 1 ? '활성 구독' : '-'}
         </Typography>
       </TableCell>
 
       <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
-        {fNumber(revenue)}원
+        {fNumber(row.totalSalesAmount || 0)}원
       </TableCell>
 
       <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
-        <Typography variant="body2">{new Date(lastPaymentAt).toLocaleDateString()}</Typography>
-        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
-          {new Date(lastPaymentAt).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false,
-          })}
-        </Typography>
+        {row.recentPaymentDate ? (
+          <Typography variant="body2">{new Date(row.recentPaymentDate).toLocaleDateString()}</Typography>
+        ) : (
+          <Typography variant="body2">-</Typography>
+        )}
       </TableCell>
     </TableRow>
   );
