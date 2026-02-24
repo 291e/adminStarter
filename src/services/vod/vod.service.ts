@@ -73,6 +73,22 @@ export function getVodVttUrl(vodIdx: number, lang: string): string {
 }
 
 /**
+ * 언어별 자막 파일 본문 조회 (vtt/srt)
+ * GET /vods/{vodIdx}/subtitles?lang=ko&format=vtt
+ */
+export async function getVodSubtitleContent(
+  vodIdx: number,
+  lang: string,
+  format: 'vtt' | 'srt' = 'vtt'
+): Promise<string> {
+  const response = await axiosInstance.get<string>(`${endpoints.vod.base}/${vodIdx}/subtitles`, {
+    params: { lang, format },
+    responseType: 'text',
+  });
+  return response.data;
+}
+
+/**
  * 자막이 포함된 비디오 다운로드 (Soft Sub)
  * GET /vods/{vodIdx}/download
  * 모든 언어의 자막을 포함한 MP4 파일을 다운로드합니다.

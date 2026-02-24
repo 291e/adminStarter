@@ -96,8 +96,6 @@ export function useAdminDashboardData({
     queryKey: [
       'adminDashboard',
       'documentStatusMatrix',
-      from,
-      to,
       companyIdx,
       matrixSearchField,
       matrixSearchValue,
@@ -105,13 +103,11 @@ export function useAdminDashboardData({
     ],
     queryFn: () =>
       getAdminDashboardDocumentStatusMatrix({
-        from,
-        to,
         companyIdx,
-        searchField: matrixSearchField,
+        searchField: undefined,
         searchValue: matrixSearchValue || undefined,
       }),
-    enabled: !!from && !!to,
+    enabled: true,
   });
 
   return {

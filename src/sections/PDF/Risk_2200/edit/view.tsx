@@ -176,6 +176,25 @@ const initialTable1400Data: Table1400Data = {
   ],
 };
 
+const buildEducationVideoRowsFromWorkerSignatureList = (
+  workerList: any[]
+): Table2400TBMEducationVideoRow[] =>
+  workerList.map((worker) => {
+    const signatureData = worker.signatureData ?? worker.signature ?? undefined;
+    return {
+      participant: {
+        memberIdx: worker.targetMemberIdx,
+        name: worker.memberName || '',
+        department: worker.department || '',
+      },
+      educationVideo: worker.vodTitle || '',
+      vodIdx: worker.vodIdx,
+      workerSignatureIdx:
+        worker.documentWorkerSignatureIdx ?? worker.workerSignatureIdx ?? undefined,
+      signature: signatureData ? signatureData : worker.status === 'SIGNED' ? 'SIGNED' : '',
+    };
+  });
+
 export function Risk_2200EditView({
   safetyId,
   title = 'Blank',
@@ -725,17 +744,25 @@ export function Risk_2200EditView({
 
     if (parsedTableData) {
       const tableType = parsedTableData.tableType;
+      const workerSignatureList =
+        (currentDocument as any)?.workerSignatureList ||
+        (currentDocument as any)?.educationVideoRows ||
+        [];
 
-      if (
-        tableType === '2400-tbm' &&
-        parsedTableData.data?.educationVideoRows &&
-        !initialWorkerListRef.current
-      ) {
+      if (tableType === '2400-tbm' && !initialWorkerListRef.current) {
+        const baseEducationVideoRows =
+          Array.isArray(parsedTableData.data?.educationVideoRows) &&
+          parsedTableData.data.educationVideoRows.length > 0
+            ? parsedTableData.data.educationVideoRows
+            : Array.isArray(workerSignatureList)
+              ? buildEducationVideoRowsFromWorkerSignatureList(workerSignatureList)
+              : [];
+
         const toKey = (row: any) =>
           row?.participant?.memberIdx && row?.vodIdx
             ? `${row.participant.memberIdx}:${row.vodIdx}`
             : null;
-        const keys = parsedTableData.data.educationVideoRows
+        const keys = baseEducationVideoRows
           .map((row: any) => toKey(row))
           .filter(Boolean) as string[];
         initialWorkerListRef.current = keys;
@@ -794,43 +821,66 @@ export function Risk_2200EditView({
             return prev;
           }
 
-          // workerSignatureList에서 서명 데이터 매핑
-          const workerSignatureList = (currentDocument as any)?.workerSignatureList || [];
           let processedData = parsedTableData.data as Table2400TBMData;
+          const baseEducationVideoRows =
+            Array.isArray(processedData.educationVideoRows) &&
+            processedData.educationVideoRows.length > 0
+              ? processedData.educationVideoRows
+              : Array.isArray(workerSignatureList)
+                ? buildEducationVideoRowsFromWorkerSignatureList(workerSignatureList)
+                : [];
 
-          if (workerSignatureList.length > 0 && processedData.educationVideoRows) {
-            const signatureMap = new Map<string, { signatureData?: string; status?: string }>();
+          if (
+            Array.isArray(workerSignatureList) &&
+            workerSignatureList.length > 0 &&
+            baseEducationVideoRows.length > 0
+          ) {
+            const signatureMap = new Map<
+              string,
+              { signatureData?: string; status?: string; workerSignatureIdx?: number }
+            >();
 
             workerSignatureList.forEach((worker: any) => {
               const vodIdx = worker.vodIdx ?? '';
               const key = `${worker.targetMemberIdx}:${vodIdx}`;
               signatureMap.set(key, {
-                signatureData: worker.signatureData,
+                signatureData: worker.signatureData ?? worker.signature,
                 status: worker.status,
+                workerSignatureIdx:
+                  worker.documentWorkerSignatureIdx ?? worker.workerSignatureIdx ?? undefined,
               });
             });
 
-            const updatedRows = processedData.educationVideoRows.map((row: any) => {
-              if (row.signature) return row;
+            const updatedRows = baseEducationVideoRows.map((row: any) => {
               const memberIdx = row.participant?.memberIdx ?? '';
               const vodIdx = row.vodIdx ?? '';
               const directKey = `${memberIdx}:${vodIdx}`;
               const fallbackKey = `${memberIdx}:`;
               const match = signatureMap.get(directKey) || signatureMap.get(fallbackKey);
 
-              if (!match) return row;
-              if (match.signatureData) {
-                return { ...row, signature: match.signatureData };
-              }
-              if (match.status === 'SIGNED') {
-                return { ...row, signature: 'SIGNED' };
-              }
-              return row;
+              const resolvedSignature = match
+                ? match.signatureData
+                  ? match.signatureData
+                  : match.status === 'SIGNED'
+                    ? 'SIGNED'
+                    : ''
+                : row.signature || '';
+
+              return {
+                ...row,
+                workerSignatureIdx: match?.workerSignatureIdx ?? row.workerSignatureIdx,
+                signature: resolvedSignature,
+              };
             });
 
             processedData = {
               ...processedData,
               educationVideoRows: updatedRows,
+            };
+          } else {
+            processedData = {
+              ...processedData,
+              educationVideoRows: baseEducationVideoRows,
             };
           }
 

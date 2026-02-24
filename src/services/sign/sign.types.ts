@@ -77,3 +77,43 @@ export type SignInResponseDto = BaseResponseDto<{
 export type SignOutResponseDto = BaseResponseDto<{
   success: boolean;
 }>;
+
+// 아이디 찾기 요청
+export type FindIdRequestDto = {
+  memberEmail: string;
+};
+
+export type FindIdRequestResponseDto = BaseResponseDto<{
+  success?: boolean;
+}>;
+
+// 아이디 찾기 인증코드 확인
+export type FindIdConfirmDto = {
+  link: string;
+  code: string;
+};
+
+export type FindIdConfirmResponseDto = BaseResponseDto<{
+  memberIds: string[];
+}>;
+
+// 비밀번호 재설정 요청
+export type PasswordResetRequestDto = {
+  memberId: string;
+  memberEmail: string;
+};
+
+export type PasswordResetRequestResponseDto = BaseResponseDto<{
+  success?: boolean;
+}>;
+
+// 비밀번호 재설정 인증코드 확인 + 새 비밀번호 설정
+export type PasswordResetConfirmDto = {
+  link: string;
+  code: string;
+  newPassword: string;
+};
+
+export type PasswordResetConfirmResponseDto = BaseResponseDto<{
+  success?: boolean;
+}>;

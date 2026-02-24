@@ -52,6 +52,19 @@ export default function AdminDocumentStatus({
   onRefresh,
 }: Props) {
   const router = useRouter();
+  const documentCodeLabelMap: Record<string, string> = {
+    '1200-industrial': '1-2. 사고조사 보고서',
+    '1200-near-miss': '1-2. 아차사고조사표',
+    '2300': '2-3. 감소 대책 수립·이행',
+    '2200': '2-2. 위험요인 제거·대체 및 통제',
+    '2100': '2-1. 위험요인별 위험성 평가',
+    '1500': '1-5. 위험장소 및 작업형태별 위험요인',
+    '1400': '1-4. 유해인자',
+    '1300': '1-3. 위험 기계·기구·설비',
+    '1100': '1-1. 위험 기계·기구·설비',
+    '2400-education': '2-4. 연간 교육 계획',
+    '2400-tbm': '2-4. Tool Box Meeting 일지',
+  };
 
   const matrixMap = useMemo(() => {
     const map = new Map<string, number[]>();
@@ -162,6 +175,7 @@ export default function AdminDocumentStatus({
             <TableBody>
               {documentCodes.map((code) => {
                 const counts = matrixMap.get(code) || [];
+                const displayCode = documentCodeLabelMap[code] || code;
                 return (
                   <TableRow
                     key={code}
@@ -187,7 +201,7 @@ export default function AdminDocumentStatus({
                         textAlign: 'center',
                       }}
                     >
-                      {code}
+                      {displayCode}
                     </TableCell>
 
                     {companies.map((company, index) => (

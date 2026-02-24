@@ -19,6 +19,7 @@ export type LibraryReportCategoryInformation = {
 export type LibraryReport = {
   id: string;
   libraryReportIdx?: number;
+  order?: number | null;
   vodIdx?: number;
   educationType?: 'MANDATORY' | 'REGULAR';
   libraryCategoryIdx?: number | null;
@@ -150,3 +151,14 @@ export type UnhideLibraryReportParams = {
 export type RegisterAsSharedDocumentParams = {
   libraryReportIdx: number;
 };
+
+export type UpdateLibraryReportOrderItem = {
+  libraryReportIdx: number;
+  order: number;
+};
+
+export type UpdateLibraryReportOrderParams = {
+  reportOrderList: UpdateLibraryReportOrderItem[];
+};
+
+export type UpdateLibraryReportOrderResponse = BaseResponseDto;

@@ -16,6 +16,7 @@ import { CONFIG } from 'src/global-config';
 
 import { Iconify } from 'src/components/iconify';
 import { Form, Field } from 'src/components/hook-form';
+import { requestFindIdCode } from 'src/services/sign/sign.service';
 
 import { getErrorMessage } from '../../utils';
 import { FormHead } from '../../components/form-head';
@@ -63,8 +64,9 @@ export function JwtFindIdView() {
     try {
       setErrorMessage(null);
 
-      // TODO: API 호출 - 인증 코드 전송
-      // await sendVerificationCode({ email: data.email });
+      await requestFindIdCode({
+        memberEmail: data.email.trim(),
+      });
 
       // 인증 코드 입력 페이지로 이동
       router.push(

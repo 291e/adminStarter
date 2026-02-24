@@ -16,6 +16,7 @@ import { CONFIG } from 'src/global-config';
 
 import { Iconify } from 'src/components/iconify';
 import { Form, Field } from 'src/components/hook-form';
+import { requestPasswordResetCode } from 'src/services/sign/sign.service';
 
 import { getErrorMessage } from '../../utils';
 import { FormHead } from '../../components/form-head';
@@ -24,11 +25,13 @@ import { useAuthI18n } from '../../i18n/auth-i18n';
 // ----------------------------------------------------------------------
 
 export type ResetPasswordSchemaType = {
+  memberId: string;
   email: string;
 };
 
 const createResetPasswordSchema = (t: (key: string) => string) =>
   zod.object({
+    memberId: zod.string().min(1, { message: t('signIn.validation.idRequired') }),
     email: zod
       .string()
       .min(1, { message: t('resetPassword.validation.emailRequired') })
@@ -44,6 +47,7 @@ export function JwtResetPasswordView() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const defaultValues: ResetPasswordSchemaType = {
+    memberId: '',
     email: '',
   };
 
@@ -63,12 +67,17 @@ export function JwtResetPasswordView() {
     try {
       setErrorMessage(null);
 
-      // TODO: API 호출 - 인증 코드 전송
-      // await sendVerificationCode({ email: data.email });
+      const memberId = data.memberId.trim();
+      const email = data.email.trim();
+
+      await requestPasswordResetCode({
+        memberId,
+        memberEmail: email,
+      });
 
       // 인증 코드 입력 페이지로 이동
       router.push(
-        `${paths.auth.jwt.verifyCode}?email=${encodeURIComponent(data.email)}&type=resetPassword`
+        `${paths.auth.jwt.verifyCode}?email=${encodeURIComponent(email)}&memberId=${encodeURIComponent(memberId)}&type=resetPassword`
       );
     } catch (error) {
       console.error(error);
@@ -79,6 +88,15 @@ export function JwtResetPasswordView() {
 
   const renderForm = () => (
     <Box sx={{ gap: 3, display: 'flex', flexDirection: 'column' }}>
+      <Field.Text
+        name="memberId"
+        label={t('common.id')}
+        placeholder="your-id"
+        slotProps={{
+          inputLabel: { shrink: true, required: true },
+        }}
+      />
+
       <Field.Text
         name="email"
         label={t('common.email')}

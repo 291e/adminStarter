@@ -16,6 +16,8 @@ import type {
   HideLibraryReportParams,
   UnhideLibraryReportParams,
   RegisterAsSharedDocumentParams,
+  UpdateLibraryReportOrderParams,
+  UpdateLibraryReportOrderResponse,
   LibraryReport,
   LibraryReportSummary,
   LibraryCategory,
@@ -72,6 +74,12 @@ const normalizeLibraryReport = (item: any, index: number): LibraryReport => {
     id: String(libraryReportIdx ?? `library-${index}`),
     libraryReportIdx:
       typeof libraryReportIdx === 'number' ? libraryReportIdx : Number(libraryReportIdx) || index,
+    order:
+      typeof item?.order === 'number'
+        ? item.order
+        : item?.order !== undefined && item?.order !== null && !Number.isNaN(Number(item.order))
+          ? Number(item.order)
+          : null,
     vodIdx: item?.vodIdx ?? undefined,
     educationType: item?.educationType ?? item?.education_type ?? undefined,
     libraryCategoryIdx: item?.libraryCategoryIdx ?? item?.categoryIdx ?? null,
@@ -273,4 +281,18 @@ export async function registerAsSharedDocument(
   await axiosInstance.post(
     `${endpoints.library.reports}/${params.libraryReportIdx}/shared-document`
   );
+}
+
+/**
+ * 라이브러리 리포트 정렬 순서 변경
+ * PATCH /library/reports/order
+ */
+export async function updateLibraryReportOrder(
+  params: UpdateLibraryReportOrderParams
+): Promise<UpdateLibraryReportOrderResponse> {
+  const response = await axiosInstance.patch<UpdateLibraryReportOrderResponse>(
+    endpoints.library.reportsOrder,
+    params
+  );
+  return response.data;
 }

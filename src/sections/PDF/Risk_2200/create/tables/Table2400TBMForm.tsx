@@ -1093,7 +1093,7 @@ export default function Table2400TBMForm({
                       >
                         {row.participant?.name || '대상자 선택'}
                       </Button>
-                      {groupInfo.rowspan === 1 && row.participant?.name ? (
+                      {row.participant?.name ? (
                         <IconButton
                           size="small"
                           onClick={() => setParticipantModalState({ index, mode: 'append' })}

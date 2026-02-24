@@ -17,6 +17,8 @@ type Props = {
   onChangeRowsPerPage: (rows: number) => void;
   onDownload?: () => void;
   onMoveSelected?: () => void;
+  onOrderUpSelected?: () => void;
+  onOrderDownSelected?: () => void;
   onDeleteSelected?: () => void;
   selectedCount?: number;
 };
@@ -29,6 +31,8 @@ export default function LibraryReportPagination({
   onChangeRowsPerPage,
   onDownload,
   onMoveSelected,
+  onOrderUpSelected,
+  onOrderDownSelected,
   onDeleteSelected,
   selectedCount = 0,
 }: Props) {
@@ -59,7 +63,7 @@ export default function LibraryReportPagination({
         px: 2,
       }}
     >
-      {(onDownload || onMoveSelected || onDeleteSelected) && (
+      {(onDownload || onMoveSelected || onOrderUpSelected || onOrderDownSelected || onDeleteSelected) && (
         <Stack direction="row" spacing={1} sx={{ mr: 'auto' }}>
           {onDownload && (
             <Button
@@ -81,6 +85,28 @@ export default function LibraryReportPagination({
               size="small"
             >
               카테고리 이동 ({selectedCount})
+            </Button>
+          )}
+          {onOrderUpSelected && (
+            <Button
+              variant="outlined"
+              startIcon={<Iconify icon="eva:arrow-upward-fill" />}
+              onClick={onOrderUpSelected}
+              disabled={selectedCount !== 1}
+              size="small"
+            >
+              순서 올리기
+            </Button>
+          )}
+          {onOrderDownSelected && (
+            <Button
+              variant="outlined"
+              startIcon={<Iconify icon="eva:arrow-downward-fill" />}
+              onClick={onOrderDownSelected}
+              disabled={selectedCount !== 1}
+              size="small"
+            >
+              순서 내리기
             </Button>
           )}
           {onDeleteSelected && (

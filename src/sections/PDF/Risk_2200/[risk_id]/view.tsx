@@ -44,6 +44,23 @@ type Props = {
   sx?: SxProps<Theme>;
 };
 
+const buildEducationVideoRowsFromWorkerSignatureList = (workerList: any[]) =>
+  workerList.map((worker) => {
+    const signatureData = worker.signatureData ?? worker.signature ?? undefined;
+    return {
+      participant: {
+        memberIdx: worker.targetMemberIdx,
+        name: worker.memberName || '',
+        department: worker.department || '',
+      },
+      educationVideo: worker.vodTitle || '',
+      vodIdx: worker.vodIdx,
+      workerSignatureIdx:
+        worker.documentWorkerSignatureIdx ?? worker.workerSignatureIdx ?? undefined,
+      signature: signatureData ? signatureData : worker.status === 'SIGNED' ? 'SIGNED' : '',
+    };
+  });
+
 export function Risk_2200View({
   riskId,
   safetyId,
@@ -186,27 +203,25 @@ export function Risk_2200View({
     }
   };
 
-  // 자동 PDF 다운로드 (URL 파라미터로 트리거)
+  // 자동 PDF 다운로드 (URL 파라미터로 트리거) — searchParams 직접 변이 금지(무한 리렌더 방지)
+  const autoDownloadTriggeredRef = useRef(false);
   useEffect(() => {
     const autoDownload = searchParams.get('autoDownload');
-    if (autoDownload === 'true' && pdfRef.current) {
-      // 컴포넌트 렌더링 완료 대기
-      const timer = setTimeout(() => {
-        handleDownloadPDF().then(() => {
-          // PDF 다운로드 후 URL에서 파라미터 제거 및 창 닫기
-          searchParams.delete('autoDownload');
-          setSearchParams(searchParams, { replace: true });
-          // 새 창에서 열린 경우 창 닫기
-          if (window.opener) {
-            window.close();
-          }
-        });
-      }, 1500);
-
-      return () => clearTimeout(timer);
+    if (autoDownload !== 'true' || !pdfRef.current || autoDownloadTriggeredRef.current) {
+      return undefined;
     }
-    // 조건이 맞지 않을 때는 cleanup function이 필요 없으므로 undefined 반환
-    return undefined;
+    autoDownloadTriggeredRef.current = true;
+    const timer = setTimeout(() => {
+      handleDownloadPDF().then(() => {
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.delete('autoDownload');
+        setSearchParams(nextParams, { replace: true });
+        if (window.opener) {
+          window.close();
+        }
+      });
+    }, 1500);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
@@ -324,44 +339,75 @@ export function Risk_2200View({
           ? JSON.parse(currentDocument.tableData)
           : currentDocument.tableData;
 
-      if (
-        parsed?.tableType === '2400-tbm' &&
-        parsed?.data?.educationVideoRows &&
-        currentDocument?.workerSignatureList?.length
-      ) {
-        const signatureMap = new Map<string, { signatureData?: string; status?: string }>();
+      if (parsed?.tableType === '2400-tbm') {
+        const workerSignatureList =
+          (currentDocument as any)?.workerSignatureList ||
+          (currentDocument as any)?.educationVideoRows ||
+          [];
 
-        currentDocument.workerSignatureList.forEach((worker) => {
+        const rowsFromTableData = Array.isArray(parsed?.data?.educationVideoRows)
+          ? parsed.data.educationVideoRows
+          : [];
+
+        const baseEducationVideoRows =
+          rowsFromTableData.length > 0
+            ? rowsFromTableData
+            : Array.isArray(workerSignatureList)
+              ? buildEducationVideoRowsFromWorkerSignatureList(workerSignatureList)
+              : [];
+
+        if (!Array.isArray(workerSignatureList) || workerSignatureList.length === 0) {
+          return {
+            ...parsed,
+            data: {
+              ...(parsed.data ?? {}),
+              educationVideoRows: baseEducationVideoRows,
+            },
+          };
+        }
+
+        const signatureMap = new Map<
+          string,
+          { signatureData?: string; status?: string; workerSignatureIdx?: number }
+        >();
+
+        workerSignatureList.forEach((worker: any) => {
           const vodIdx = (worker as any).vodIdx ?? '';
           const key = `${worker.targetMemberIdx}:${vodIdx}`;
           signatureMap.set(key, {
-            signatureData: worker.signatureData,
+            signatureData: worker.signatureData ?? worker.signature,
             status: worker.status,
+            workerSignatureIdx:
+              worker.documentWorkerSignatureIdx ?? worker.workerSignatureIdx ?? undefined,
           });
         });
 
-        const educationVideoRows = parsed.data.educationVideoRows.map((row: any) => {
-          if (row.signature) return row;
+        const educationVideoRows = baseEducationVideoRows.map((row: any) => {
           const memberIdx = row.participant?.memberIdx ?? '';
           const vodIdx = row.vodIdx ?? '';
           const directKey = `${memberIdx}:${vodIdx}`;
           const fallbackKey = `${memberIdx}:`;
           const match = signatureMap.get(directKey) || signatureMap.get(fallbackKey);
 
-          if (!match) return row;
-          if (match.signatureData) {
-            return { ...row, signature: match.signatureData };
-          }
-          if (match.status === 'SIGNED') {
-            return { ...row, signature: 'SIGNED' };
-          }
-          return row;
+          const resolvedSignature = match
+            ? match.signatureData
+              ? match.signatureData
+              : match.status === 'SIGNED'
+                ? 'SIGNED'
+                : ''
+            : row.signature || '';
+
+          return {
+            ...row,
+            workerSignatureIdx: match?.workerSignatureIdx ?? row.workerSignatureIdx,
+            signature: resolvedSignature,
+          };
         });
 
         return {
           ...parsed,
           data: {
-            ...parsed.data,
+            ...(parsed.data ?? {}),
             educationVideoRows,
           },
         };
@@ -371,7 +417,7 @@ export function Risk_2200View({
       console.error('tableData 파싱 실패:', error);
       return null;
     }
-  }, [currentDocument?.tableData, currentDocument?.workerSignatureList]);
+  }, [currentDocument]);
 
   // safetyIdx와 itemNumber 추출 (item/system이 없으면 riskId에서 추출)
   const safetyIdx = item?.safetyIdx || system?.safetyIdx || extractedInfo?.safetyIdx;

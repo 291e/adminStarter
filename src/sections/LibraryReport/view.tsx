@@ -37,6 +37,7 @@ import {
   useUploadVOD,
   useUpdateContent,
   useDeleteContent,
+  useUpdateLibraryReportOrder,
 } from './hooks/use-library-report-api';
 import { uploadFile } from 'src/services/system/system.service';
 import {
@@ -78,6 +79,7 @@ export function LibraryReportView({ title = '라이브러리', description, sx }
   const uploadVodMutation = useUploadVOD();
   const updateContentMutation = useUpdateContent();
   const deleteContentMutation = useDeleteContent();
+  const updateLibraryReportOrderMutation = useUpdateLibraryReportOrder();
 
   const categoryQuery = useCategories();
 
@@ -566,6 +568,80 @@ export function LibraryReportView({ title = '라이브러리', description, sx }
     [selectedRows, updateContentMutation, logic]
   );
 
+  const handleChangeSelectedOrder = useCallback(
+    async (direction: 'up' | 'down') => {
+      if (logic.selectedIds.length !== 1) {
+        toast.warning('순서 변경은 항목 1개를 선택한 상태에서 가능합니다.');
+        return;
+      }
+
+      const selectedId = logic.selectedIds[0];
+      const currentIndex = allRows.findIndex((row) => {
+        const rowId = row.id ?? String(row.libraryReportIdx ?? '');
+        return rowId === selectedId;
+      });
+
+      if (currentIndex < 0) {
+        toast.error('선택한 항목을 찾을 수 없습니다.');
+        return;
+      }
+
+      const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+      if (targetIndex < 0 || targetIndex >= allRows.length) {
+        toast.warning(
+          direction === 'up' ? '이미 최상단 항목입니다.' : '이미 최하단 항목입니다.'
+        );
+        return;
+      }
+
+      const reordered = [...allRows];
+      [reordered[currentIndex], reordered[targetIndex]] = [reordered[targetIndex], reordered[currentIndex]];
+
+      const reportOrderList = reordered
+        .map((row, index) => {
+          const libraryReportIdx = row.libraryReportIdx ?? Number(row.id);
+          if (!libraryReportIdx || Number.isNaN(libraryReportIdx)) {
+            return null;
+          }
+          return {
+            libraryReportIdx,
+            order: index + 1,
+          };
+        })
+        .filter((item): item is { libraryReportIdx: number; order: number } => Boolean(item));
+
+      if (reportOrderList.length !== reordered.length) {
+        toast.error('일부 항목의 Index가 없어 순서를 변경할 수 없습니다.');
+        return;
+      }
+
+      await updateLibraryReportOrderMutation.mutateAsync({ reportOrderList });
+
+      queryClient.setQueryData<GetLibraryReportsResult>(['libraryReports'], (prev) => {
+        if (!prev) return prev;
+
+        const reorderedIds = new Map(
+          reordered.map((row, index) => [row.libraryReportIdx ?? Number(row.id), index + 1] as const)
+        );
+
+        const reorderedRows = [...prev.libraryReports].sort((a, b) => {
+          const aId = a.libraryReportIdx ?? Number(a.id);
+          const bId = b.libraryReportIdx ?? Number(b.id);
+          return (reorderedIds.get(aId) ?? Number.MAX_SAFE_INTEGER) - (reorderedIds.get(bId) ?? Number.MAX_SAFE_INTEGER);
+        });
+
+        return {
+          ...prev,
+          libraryReports: reorderedRows.map((row) => ({
+            ...row,
+            order: reorderedIds.get(row.libraryReportIdx ?? Number(row.id)) ?? row.order ?? null,
+          })),
+        };
+      });
+    },
+    [logic.selectedIds, allRows, updateLibraryReportOrderMutation, queryClient]
+  );
+
   const handleDownloadSelected = useCallback(async () => {
     if (logic.selectedIds.length === 0) {
       toast.warning('다운로드할 파일을 선택해주세요.');
@@ -861,6 +937,12 @@ export function LibraryReportView({ title = '라이브러리', description, sx }
           onChangeRowsPerPage={logic.onChangeRowsPerPage}
           onDownload={handleDownloadSelected}
           onMoveSelected={handleMoveSelected}
+          onOrderUpSelected={() => {
+            void handleChangeSelectedOrder('up');
+          }}
+          onOrderDownSelected={() => {
+            void handleChangeSelectedOrder('down');
+          }}
           onDeleteSelected={handleDeleteSelected}
           selectedCount={logic.selectedIds.length}
         />

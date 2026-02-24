@@ -20,6 +20,7 @@ import { CONFIG } from 'src/global-config';
 
 import { Iconify } from 'src/components/iconify';
 import { Form, Field } from 'src/components/hook-form';
+import { confirmPasswordReset } from 'src/services/sign/sign.service';
 
 import { getErrorMessage } from '../../utils';
 import { FormHead } from '../../components/form-head';
@@ -48,7 +49,8 @@ export const ResetPasswordNewSchema = zod
 export function JwtResetPasswordNewView() {
   const router = useRouter();
   const [searchParams] = useSearchParams();
-  const email = searchParams.get('email') || '';
+  const code = searchParams.get('code') || '';
+  const link = searchParams.get('link') || window.location.href;
 
   const showPassword = useBoolean();
   const showConfirmPassword = useBoolean();
@@ -73,8 +75,15 @@ export function JwtResetPasswordNewView() {
     try {
       setErrorMessage(null);
 
-      // TODO: API 호출 - 비밀번호 재설정
-      // await resetPassword({ email, password: data.password });
+      if (!code) {
+        throw new Error('인증 코드 정보가 없습니다. 이전 단계부터 다시 진행해주세요.');
+      }
+
+      await confirmPasswordReset({
+        link,
+        code,
+        newPassword: data.password,
+      });
 
       // 비밀번호 저장 성공 시 로그인 화면으로 이동
       router.push(paths.auth.jwt.signIn);
@@ -227,4 +236,3 @@ export function JwtResetPasswordNewView() {
     </>
   );
 }
-

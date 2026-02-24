@@ -47,6 +47,26 @@ import type { WorkerSignatureStatusInfo } from 'src/services/safety-system/safet
 
 // ----------------------------------------------------------------------
 
+const buildEducationVideoRowsFromWorkerSignatureList = (
+  workerList: WorkerSignatureStatusInfo[]
+): Table2400TBMEducationVideoRow[] =>
+  workerList.map((worker) => {
+    const signatureData = (worker as any).signatureData ?? (worker as any).signature ?? undefined;
+
+    return {
+      participant: {
+        memberIdx: worker.targetMemberIdx,
+        name: worker.memberName || '',
+        department: worker.department || '',
+      },
+      educationVideo: (worker as any).vodTitle || '',
+      vodIdx: worker.vodIdx,
+      workerSignatureIdx:
+        worker.documentWorkerSignatureIdx ?? worker.workerSignatureIdx ?? undefined,
+      signature: signatureData ? signatureData : worker.status === 'SIGNED' ? 'SIGNED' : '',
+    };
+  });
+
 // Video.js 플레이어 래퍼 컴포넌트 (자막 지원)
 const VideoPlayerWithSubtitle = ({
   vodIdx,
@@ -276,52 +296,69 @@ export default function SharedDocumentDetailModal({
 
       // 2400-tbm 타입이고 workerSignatureList가 있는 경우 서명 정보 업데이트
       const tableType = tableData?.tableType || tableData?.type;
-      if (
-        tableType === '2400-tbm' &&
-        tableData?.data?.educationVideoRows &&
-        resolvedWorkerSignatureList
-      ) {
-        // educationVideoRows 업데이트
-        // 타입 캐스팅을 통해 Table2400TBMData 구조에 맞게 처리
-        const educationVideoRows = tableData.data
-          .educationVideoRows as Table2400TBMEducationVideoRow[];
+      if (tableType === '2400-tbm') {
+        const rowsFromTableData = Array.isArray(tableData?.data?.educationVideoRows)
+          ? (tableData.data.educationVideoRows as Table2400TBMEducationVideoRow[])
+          : [];
 
-        tableData.data.educationVideoRows = educationVideoRows.map((row) => {
-          if (!row.participant?.memberIdx) return row;
+        const baseRows =
+          rowsFromTableData.length > 0
+            ? rowsFromTableData
+            : resolvedWorkerSignatureList
+              ? buildEducationVideoRowsFromWorkerSignatureList(resolvedWorkerSignatureList)
+              : [];
 
-          // 해당 대상자의 최신 서명/상태 정보 찾기
-          const workerInfo = resolvedWorkerSignatureList.find((worker) => {
-            if (worker.targetMemberIdx !== row.participant?.memberIdx) {
-              return false;
-            }
-            if (worker.vodIdx && row.vodIdx) {
-              return worker.vodIdx === row.vodIdx;
-            }
-            return true;
-          });
+        const mergedRows = resolvedWorkerSignatureList
+          ? baseRows.map((row) => {
+              if (!row.participant?.memberIdx) return row;
 
-          if (workerInfo) {
-            const signatureData =
-              (workerInfo as any).signatureData ?? (workerInfo as any).signature ?? row.signature;
-            const resolvedSignature =
-              signatureData || workerInfo.status === 'SIGNED' ? signatureData || 'SIGNED' : '';
-            return {
-              ...row,
-              workerSignatureIdx:
-                workerInfo.documentWorkerSignatureIdx ??
-                workerInfo.workerSignatureIdx ??
-                row.workerSignatureIdx,
-              signature: resolvedSignature || row.signature || '', // 최신 서명 이미지 사용
-              // 필요한 경우 status 등 다른 정보도 업데이트 가능
-            };
-          }
-          return row;
-        });
+              // 해당 대상자의 최신 서명/상태 정보 찾기
+              const workerInfo = resolvedWorkerSignatureList.find((worker) => {
+                if (worker.targetMemberIdx !== row.participant?.memberIdx) {
+                  return false;
+                }
+                if (worker.vodIdx && row.vodIdx) {
+                  return worker.vodIdx === row.vodIdx;
+                }
+                return true;
+              });
 
-        console.log(
-          '✅ [SharedDocumentDetailModal] workerSignatureList 병합 완료:',
-          tableData.data.educationVideoRows
-        );
+              if (workerInfo) {
+                const signatureData =
+                  (workerInfo as any).signatureData ?? (workerInfo as any).signature ?? undefined;
+                const resolvedSignature = signatureData
+                  ? signatureData
+                  : workerInfo.status === 'SIGNED'
+                    ? 'SIGNED'
+                    : '';
+                return {
+                  ...row,
+                  workerSignatureIdx:
+                    workerInfo.documentWorkerSignatureIdx ??
+                    workerInfo.workerSignatureIdx ??
+                    row.workerSignatureIdx,
+                  signature: resolvedSignature, // workerSignatureList 기준으로 최신화
+                };
+              }
+
+              return {
+                ...row,
+                signature: row.signature || '',
+              };
+            })
+          : baseRows;
+
+        tableData.data = {
+          ...(tableData.data ?? {}),
+          educationVideoRows: mergedRows,
+        };
+
+        if (resolvedWorkerSignatureList) {
+          console.log(
+            '✅ [SharedDocumentDetailModal] workerSignatureList 병합 완료:',
+            tableData.data.educationVideoRows
+          );
+        }
       }
 
       return tableData;

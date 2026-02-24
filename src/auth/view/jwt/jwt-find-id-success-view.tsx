@@ -34,12 +34,22 @@ export function JwtFindIdSuccessView() {
   const router = useRouter();
   const { t } = useAuthI18n();
   const [searchParams] = useSearchParams();
-  const email = searchParams.get('email') || '';
+  const memberIdsParam = searchParams.get('memberIds');
 
-  // URL 파라미터에서 아이디 가져오기 (실제로는 API 응답에서 받아올 것)
-  // TODO: API 호출로 실제 아이디 가져오기
-  const actualUserId = 'master'; // 임시 값 (실제로는 API 응답에서 받아올 것)
-  const userId = maskUserId(actualUserId);
+  const memberIds = (() => {
+    if (!memberIdsParam) return [];
+    try {
+      const parsed = JSON.parse(memberIdsParam);
+      return Array.isArray(parsed) ? parsed.filter((id) => typeof id === 'string') : [];
+    } catch {
+      return [];
+    }
+  })();
+
+  const userId =
+    memberIds.length > 0
+      ? memberIds.map((id) => maskUserId(id)).join(', ')
+      : maskUserId('master');
 
   const handleLogin = () => {
     router.push(paths.auth.jwt.signIn);

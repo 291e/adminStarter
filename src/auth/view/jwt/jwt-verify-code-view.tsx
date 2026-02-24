@@ -18,6 +18,11 @@ import { CONFIG } from 'src/global-config';
 
 import { Iconify } from 'src/components/iconify';
 import { Form } from 'src/components/hook-form';
+import {
+  confirmFindIdCode,
+  requestFindIdCode,
+  requestPasswordResetCode,
+} from 'src/services/sign/sign.service';
 
 import { getErrorMessage } from '../../utils';
 import { FormHead } from '../../components/form-head';
@@ -40,6 +45,8 @@ export function JwtVerifyCodeView() {
   const [searchParams] = useSearchParams();
   const email = searchParams.get('email') || 'example@gmail.com';
   const type = searchParams.get('type') || 'findId'; // findId 또는 resetPassword
+  const memberId = searchParams.get('memberId') || '';
+  const link = searchParams.get('link') || window.location.href;
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [codeValues, setCodeValues] = useState<string[]>(['', '', '', '', '', '']);
@@ -120,42 +127,68 @@ export function JwtVerifyCodeView() {
     try {
       setErrorMessage(null);
 
-      // TODO: API 호출 - 인증 코드 확인
-      // await verifyCode({ email, code: data.code });
+      if (type === 'findId') {
+        const response = await confirmFindIdCode({
+          link,
+          code: data.code,
+        });
 
-      // 임시 로직: 111111은 성공, 그 외는 실패
-      if (data.code === '111111') {
-        // 성공 시 타입에 따라 적절한 페이지로 이동
-        if (type === 'findId') {
-          // 아이디 찾기 성공 페이지로 이동 (실제 아이디는 API 응답에서 받아올 것)
-          router.push(`${paths.auth.jwt.findIdSuccess}?email=${encodeURIComponent(email)}`);
-        } else if (type === 'resetPassword') {
-          // 비밀번호 재설정 페이지로 이동
-          router.push(`${paths.auth.jwt.resetPasswordNew}?email=${encodeURIComponent(email)}`);
+        const memberIds =
+          ((response as any)?.memberIds as string[] | undefined) ||
+          ((response as any)?.data?.memberIds as string[] | undefined) ||
+          [];
+
+        if (Array.isArray(memberIds) && memberIds.length > 0) {
+          router.push(
+            `${paths.auth.jwt.findIdSuccess}?email=${encodeURIComponent(email)}&memberIds=${encodeURIComponent(JSON.stringify(memberIds))}`
+          );
+          return;
         }
-      } else {
-        // 실패 시 타입에 따라 적절한 페이지로 이동
-        if (type === 'findId') {
-          router.push(`${paths.auth.jwt.findIdFail}?email=${encodeURIComponent(email)}`);
-        } else if (type === 'resetPassword') {
-          // TODO: 비밀번호 재설정 실패 페이지로 이동
-          // router.push(`${paths.auth.jwt.resetPasswordFail}?email=${encodeURIComponent(email)}`);
-        }
+
+        router.push(`${paths.auth.jwt.findIdFail}?email=${encodeURIComponent(email)}`);
+        return;
       }
+
+      // resetPassword: 코드와 링크를 다음 단계(새 비밀번호 입력)로 전달 후 confirm API 호출
+      router.push(
+        `${paths.auth.jwt.resetPasswordNew}?email=${encodeURIComponent(email)}&memberId=${encodeURIComponent(memberId)}&code=${encodeURIComponent(data.code)}&link=${encodeURIComponent(link)}`
+      );
     } catch (error) {
       console.error(error);
+      if (type === 'findId') {
+        router.push(`${paths.auth.jwt.findIdFail}?email=${encodeURIComponent(email)}`);
+        return;
+      }
       const feedbackMessage = getErrorMessage(error);
       setErrorMessage(feedbackMessage);
     }
   });
 
-  const handleResend = () => {
-    // TODO: API 호출 - 인증 코드 재전송
-    // await resendVerificationCode({ email });
-    setTimeLeft(300); // 타이머 리셋
-    setCodeValues(['', '', '', '', '', '']);
-    methods.setValue('code', '');
-    inputRefs.current[0]?.focus();
+  const handleResend = async () => {
+    try {
+      setErrorMessage(null);
+
+      if (type === 'findId') {
+        await requestFindIdCode({ memberEmail: email });
+      } else {
+        if (!memberId) {
+          throw new Error('아이디 정보가 없습니다. 이전 단계부터 다시 진행해주세요.');
+        }
+        await requestPasswordResetCode({
+          memberId,
+          memberEmail: email,
+        });
+      }
+
+      setTimeLeft(300); // 타이머 리셋
+      setCodeValues(['', '', '', '', '', '']);
+      methods.setValue('code', '');
+      inputRefs.current[0]?.focus();
+    } catch (error) {
+      console.error(error);
+      const feedbackMessage = getErrorMessage(error);
+      setErrorMessage(feedbackMessage);
+    }
   };
 
   const renderForm = () => (

@@ -8,6 +8,7 @@ import {
   createLibraryReport,
   updateLibraryReport,
   deleteLibraryReport,
+  updateLibraryReportOrder,
 } from 'src/services/library-report/library-report.service';
 import type {
   GetLibraryReportsParams,
@@ -17,6 +18,7 @@ import type {
   DeleteLibraryReportParams,
   GetLibraryReportsResult,
   GetLibraryCategoryListResult,
+  UpdateLibraryReportOrderParams,
 } from 'src/services/library-report/library-report.types';
 
 // ----------------------------------------------------------------------
@@ -139,3 +141,27 @@ export function useDeleteContent() {
   });
 }
 
+/**
+ * 라이브러리 리포트 순서 변경 Mutation Hook
+ */
+export function useUpdateLibraryReportOrder() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (params: UpdateLibraryReportOrderParams) => updateLibraryReportOrder(params),
+    onSuccess: (response) => {
+      const resultMessage = response?.header?.resultMessage || '순서가 변경되었습니다.';
+      if (resultMessage && resultMessage !== 'SUCCESS') {
+        toast.success(resultMessage);
+      } else {
+        toast.success('순서가 변경되었습니다.');
+      }
+      queryClient.invalidateQueries({ queryKey: ['libraryReports'] });
+    },
+    onError: (error: any) => {
+      const resultMessage =
+        error?.response?.data?.header?.resultMessage || error?.message || '순서 변경에 실패했습니다.';
+      toast.error(resultMessage);
+    },
+  });
+}

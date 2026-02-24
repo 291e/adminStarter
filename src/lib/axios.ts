@@ -209,6 +209,7 @@ export const endpoints = {
   // Library
   library: {
     reports: '/library/reports',
+    reportsOrder: '/library/reports/order',
     categories: '/library/categories',
   },
   // Service Setting
@@ -288,6 +289,10 @@ export const endpoints = {
     signIn: '/user/signin',
     signout: '/user/signout',
     checkId: '/user/check-id',
+    findIdRequest: '/user/find-id/request',
+    findIdConfirm: '/user/find-id/confirm',
+    passwordResetRequest: '/user/password-reset/request',
+    passwordResetConfirm: '/user/password-reset/confirm',
   },
   mail: {
     list: '/api/mail/list',

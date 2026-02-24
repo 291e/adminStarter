@@ -275,7 +275,7 @@ export default function ApprovalSection({
           minHeight: 30,
           display: 'flex',
           flexDirection: 'column',
-          alignItems: 'flex-start',
+          alignItems: 'center',
           justifyContent: 'center',
           width: 90,
         }}
@@ -284,8 +284,8 @@ export default function ApprovalSection({
           sx={{
             fontSize: 14,
             fontWeight: 600,
-            lineHeight: '20px',
             color: 'text.primary',
+            textAlign: 'center',
           }}
         >
           {signature.name}
@@ -296,6 +296,7 @@ export default function ApprovalSection({
               fontSize: 12,
               lineHeight: '18px',
               color: 'text.secondary',
+              textAlign: 'center',
             }}
           >
             {signature.date}
