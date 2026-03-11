@@ -11,6 +11,7 @@ import MenuItem from '@mui/material/MenuItem';
 
 import { Iconify } from 'src/components/iconify';
 import { uploadFile } from 'src/services/system/system.service';
+import type { RiskReport } from 'src/services/operation/operation.types';
 
 import type {
   Table1200NearMissRow,
@@ -20,6 +21,7 @@ import type {
 import { resolveFileUrl } from '../../utils/file-url';
 import ImageUploadModal from './modal/ImageUploadModal';
 import InvestigationTeamSelectModal from './modal/InvestigationTeamSelectModal';
+import RiskReportSelectModal from './modal/RiskReportSelectModal';
 
 // ----------------------------------------------------------------------
 
@@ -60,6 +62,7 @@ export default function Table1200NearMissForm({ row, onRowChange }: Props) {
   const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isReporterModalOpen, setIsReporterModalOpen] = useState(false);
+  const [isRiskReportModalOpen, setIsRiskReportModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const headerCellStyle: React.CSSProperties = {
@@ -103,6 +106,28 @@ export default function Table1200NearMissForm({ row, onRowChange }: Props) {
       onRowChange('reporterDepartment', selected.department);
     }
     setIsReporterModalOpen(false);
+  };
+
+  const handleRiskReportModalClose = () => {
+    setIsRiskReportModalOpen(false);
+  };
+
+  const handleRiskReportSelect = (report: RiskReport) => {
+    const imageUrls =
+      report.imageUrls && report.imageUrls.length > 0
+        ? report.imageUrls
+        : report.imageUrl
+          ? [report.imageUrl]
+          : [];
+    const reporterName = report.reporterName || '';
+    const reporterDepartment = report.reporterDepartment || report.companyName || '';
+
+    onRowChange('reporter', reporterName);
+    onRowChange('reporterDepartment', reporterDepartment);
+    onRowChange('accidentContent', report.content || '');
+    onRowChange('siteSituation', report.location || '');
+    onRowChange('siteImages', imageUrls);
+    setIsRiskReportModalOpen(false);
   };
 
   const handleAddImages = async (files?: FileList | File[]) => {
@@ -265,7 +290,22 @@ export default function Table1200NearMissForm({ row, onRowChange }: Props) {
         </colgroup>
         <tbody>
           <tr>
-            <th style={headerCellStyle}>작업명</th>
+            <th
+              style={{ ...headerCellStyle, cursor: 'pointer' }}
+              onClick={() => setIsRiskReportModalOpen(true)}
+            >
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  gap: 1,
+                }}
+              >
+                <Typography sx={{ fontSize: 16, fontWeight: 600 }}>작업명</Typography>
+                <Iconify icon="eva:search-fill" width={24} />
+              </Box>
+            </th>
             <td style={bodyCellStyle} colSpan={3}>
               <TextField
                 size="small"
@@ -756,6 +796,11 @@ export default function Table1200NearMissForm({ row, onRowChange }: Props) {
         onClose={handleReporterModalClose}
         onConfirm={handleReporterModalConfirm}
         isNearMiss
+      />
+      <RiskReportSelectModal
+        open={isRiskReportModalOpen}
+        onClose={handleRiskReportModalClose}
+        onSelect={handleRiskReportSelect}
       />
     </Box>
   );

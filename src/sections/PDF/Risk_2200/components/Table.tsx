@@ -133,25 +133,29 @@ export default function Risk_2200Table({
     return { hasWorkers: false, allSigned: false, progress: 0 };
   };
 
-  // 상태 라벨 매핑 (서명 진행 상태 우선)
+  // 상태 라벨 매핑 (백엔드 결재 상태 우선, PENDING/DRAFT에서만 서명 상태 보정)
   // DRAFT=임시저장, PENDING=결재대기, IN_PROGRESS=결재진행중, COMPLETED=결재완료
   // SIGNATURE_IN_PROGRESS=서명진행중, SIGNATURE_COMPLETED=서명완료
   const getDisplayStatus = (row: Risk_2200Row): Risk_2200Row['status'] => {
     const workerInfo = getWorkerSignatureInfo(row);
-    const hasApproval = (row.signatureList?.length ?? 0) > 0 || (row.approvalStep ?? 0) > 0;
-
-    if (workerInfo.hasWorkers && !workerInfo.allSigned) {
-      return 'SIGNATURE_IN_PROGRESS';
+    // 결재 최종완료/진행중은 백엔드 상태를 그대로 우선 사용
+    if (row.status === 'COMPLETED' || row.status === 'IN_PROGRESS') {
+      return row.status;
     }
 
-    if (workerInfo.hasWorkers && workerInfo.allSigned) {
-      if (hasApproval) {
-        const approvalProgress = row.approvalProgress ?? 0;
-        if (approvalProgress >= 100) return 'COMPLETED';
-        if (approvalProgress > 0) return 'IN_PROGRESS';
-        return 'PENDING';
+    // 백엔드가 이미 서명 상태를 계산해서 내려준 경우 유지
+    if (row.status === 'SIGNATURE_IN_PROGRESS' || row.status === 'SIGNATURE_COMPLETED') {
+      return row.status;
+    }
+
+    // 그 외(PENDING/DRAFT)에서만 근로자 서명 상태 보정
+    if (row.status === 'PENDING' || row.status === 'DRAFT') {
+      if (workerInfo.hasWorkers && !workerInfo.allSigned) {
+        return 'SIGNATURE_IN_PROGRESS';
       }
-      return 'SIGNATURE_COMPLETED';
+      if (workerInfo.hasWorkers && workerInfo.allSigned) {
+        return 'SIGNATURE_COMPLETED';
+      }
     }
 
     return row.status;
@@ -198,22 +202,34 @@ export default function Risk_2200Table({
     }
   };
 
-  // 진행률 계산 (결재자 > 근로자 서명 우선순위)
-  // 백엔드에서 workerSignatureProgress도 제공하면 그것 활용
+  // 진행률 계산 (표시 상태와 일관되게 계산)
   const getProgress = (row: Risk_2200Row): number => {
     const workerInfo = getWorkerSignatureInfo(row);
     const hasApproval = (row.signatureList?.length ?? 0) > 0 || (row.approvalStep ?? 0) > 0;
+    const displayStatus = getDisplayStatus(row);
 
-    if (workerInfo.hasWorkers && !workerInfo.allSigned) {
+    if (displayStatus === 'COMPLETED') {
+      return 100;
+    }
+
+    if (displayStatus === 'IN_PROGRESS') {
+      return row.approvalProgress ?? 0;
+    }
+
+    if (displayStatus === 'SIGNATURE_IN_PROGRESS') {
       return workerInfo.progress;
+    }
+
+    if (displayStatus === 'SIGNATURE_COMPLETED') {
+      return 100;
     }
 
     if (hasApproval) {
       return row.approvalProgress ?? 0;
     }
 
-    if (workerInfo.hasWorkers && workerInfo.allSigned) {
-      return 100;
+    if (workerInfo.hasWorkers) {
+      return workerInfo.allSigned ? 100 : workerInfo.progress;
     }
 
     return 0;

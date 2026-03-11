@@ -50,7 +50,8 @@ export function JwtResetPasswordNewView() {
   const router = useRouter();
   const [searchParams] = useSearchParams();
   const code = searchParams.get('code') || '';
-  const link = searchParams.get('link') || window.location.href;
+  const email = searchParams.get('email') || '';
+  const memberId = searchParams.get('memberId') || '';
 
   const showPassword = useBoolean();
   const showConfirmPassword = useBoolean();
@@ -78,9 +79,13 @@ export function JwtResetPasswordNewView() {
       if (!code) {
         throw new Error('인증 코드 정보가 없습니다. 이전 단계부터 다시 진행해주세요.');
       }
+      if (!memberId || !email) {
+        throw new Error('인증 대상 정보가 없습니다. 이전 단계부터 다시 진행해주세요.');
+      }
 
       await confirmPasswordReset({
-        link,
+        memberId,
+        memberEmail: email,
         code,
         newPassword: data.password,
       });

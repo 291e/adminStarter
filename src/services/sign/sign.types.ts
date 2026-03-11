@@ -89,7 +89,7 @@ export type FindIdRequestResponseDto = BaseResponseDto<{
 
 // 아이디 찾기 인증코드 확인
 export type FindIdConfirmDto = {
-  link: string;
+  memberEmail: string;
   code: string;
 };
 
@@ -109,7 +109,8 @@ export type PasswordResetRequestResponseDto = BaseResponseDto<{
 
 // 비밀번호 재설정 인증코드 확인 + 새 비밀번호 설정
 export type PasswordResetConfirmDto = {
-  link: string;
+  memberId: string;
+  memberEmail: string;
   code: string;
   newPassword: string;
 };

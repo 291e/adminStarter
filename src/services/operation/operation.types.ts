@@ -19,6 +19,7 @@ export type RiskReport = {
   companyName?: string;
   companyIdx?: number;
   reporterName?: string;
+  reporterDepartment?: string;
   reporterMemberIdx?: number | null;
   authorName?: string;
   authorMemberIdx?: number | null;

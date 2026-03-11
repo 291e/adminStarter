@@ -16,6 +16,7 @@ import dayjs, { type Dayjs } from 'dayjs';
 
 import { Iconify } from 'src/components/iconify';
 import { uploadFile } from 'src/services/system/system.service';
+import type { RiskReport } from 'src/services/operation/operation.types';
 
 import type {
   Table1200IndustrialAccidentRow,
@@ -25,6 +26,7 @@ import type {
 import { resolveFileUrl } from '../../utils/file-url';
 import InvestigationTeamSelectModal from './modal/InvestigationTeamSelectModal';
 import ImageUploadModal from './modal/ImageUploadModal';
+import RiskReportSelectModal from './modal/RiskReportSelectModal';
 
 // ----------------------------------------------------------------------
 
@@ -87,6 +89,7 @@ export default function Table1200IndustrialAccidentForm({
   const [dragOverInvestigationIndex, setDragOverInvestigationIndex] = useState<number | null>(null);
   const [dragOverHumanDamageIndex, setDragOverHumanDamageIndex] = useState<number | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isRiskReportModalOpen, setIsRiskReportModalOpen] = useState(false);
 
   const handleInvestigationDragStart = (index: number) => {
     setDraggedInvestigationIndex(index);
@@ -369,6 +372,28 @@ export default function Table1200IndustrialAccidentForm({
     }
   };
 
+  const handleRiskReportModalClose = () => {
+    setIsRiskReportModalOpen(false);
+  };
+
+  const handleRiskReportSelect = (report: RiskReport) => {
+    const reportDate = report.registeredAt ? dayjs(report.registeredAt) : null;
+    const imageUrls =
+      report.imageUrls && report.imageUrls.length > 0
+        ? report.imageUrls
+        : report.imageUrl
+          ? [report.imageUrl]
+          : [];
+
+    onRowChange('accidentName', report.title || '');
+    onRowChange('accidentDate', reportDate?.isValid() ? reportDate.format('YYYY-MM-DD') : '');
+    onRowChange('accidentTime', reportDate?.isValid() ? reportDate.format('HH:mm') : '');
+    onRowChange('accidentLocation', report.location || '');
+    onRowChange('accidentContent', report.content || '');
+    onRowChange('investigationImages', imageUrls);
+    setIsRiskReportModalOpen(false);
+  };
+
   useEffect(() => {
     // investigationImages는 이제 URL 문자열 배열
     if (row.investigationImages && row.investigationImages.length > 0) {
@@ -403,7 +428,22 @@ export default function Table1200IndustrialAccidentForm({
           <tbody>
             {/* 사고명, 사고 일시 */}
             <tr>
-              <th style={{ ...headerCellStyle, width: '154px' }}>사고명</th>
+              <th
+                style={{ ...headerCellStyle, width: '154px', cursor: 'pointer' }}
+                onClick={() => setIsRiskReportModalOpen(true)}
+              >
+                <Box
+                  sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 0.5,
+                  }}
+                >
+                  <Iconify icon="eva:search-fill" width={24} />
+                  <Typography sx={{ fontSize: 16, fontWeight: 600 }}>사고명</Typography>
+                </Box>
+              </th>
               <td colSpan={4} style={bodyCellStyle}>
                 <TextField
                   size="small"
@@ -1573,6 +1613,11 @@ export default function Table1200IndustrialAccidentForm({
         onClose={handleUploadModalClose}
         onConfirm={handleUploadModalConfirm}
         initialImages={[]}
+      />
+      <RiskReportSelectModal
+        open={isRiskReportModalOpen}
+        onClose={handleRiskReportModalClose}
+        onSelect={handleRiskReportSelect}
       />
     </Box>
   );

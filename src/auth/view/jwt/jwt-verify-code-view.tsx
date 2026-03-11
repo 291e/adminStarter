@@ -46,7 +46,6 @@ export function JwtVerifyCodeView() {
   const email = searchParams.get('email') || 'example@gmail.com';
   const type = searchParams.get('type') || 'findId'; // findId 또는 resetPassword
   const memberId = searchParams.get('memberId') || '';
-  const link = searchParams.get('link') || window.location.href;
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [codeValues, setCodeValues] = useState<string[]>(['', '', '', '', '', '']);
@@ -129,13 +128,15 @@ export function JwtVerifyCodeView() {
 
       if (type === 'findId') {
         const response = await confirmFindIdCode({
-          link,
+          memberEmail: email,
           code: data.code,
         });
 
         const memberIds =
           ((response as any)?.memberIds as string[] | undefined) ||
           ((response as any)?.data?.memberIds as string[] | undefined) ||
+          ((response as any)?.body?.data?.memberIds as string[] | undefined) ||
+          ((response as any)?.body?.memberIds as string[] | undefined) ||
           [];
 
         if (Array.isArray(memberIds) && memberIds.length > 0) {
@@ -151,7 +152,7 @@ export function JwtVerifyCodeView() {
 
       // resetPassword: 코드와 링크를 다음 단계(새 비밀번호 입력)로 전달 후 confirm API 호출
       router.push(
-        `${paths.auth.jwt.resetPasswordNew}?email=${encodeURIComponent(email)}&memberId=${encodeURIComponent(memberId)}&code=${encodeURIComponent(data.code)}&link=${encodeURIComponent(link)}`
+        `${paths.auth.jwt.resetPasswordNew}?email=${encodeURIComponent(email)}&memberId=${encodeURIComponent(memberId)}&code=${encodeURIComponent(data.code)}`
       );
     } catch (error) {
       console.error(error);

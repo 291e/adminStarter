@@ -33,6 +33,7 @@ type RawRiskReport = {
   companyName?: string;
   companyIdx?: number;
   reporterName?: string;
+  reporterDepartment?: string;
   reporterMemberIdx?: number | null;
   authorName?: string;
   authorMemberIdx?: number | null;
@@ -92,6 +93,7 @@ export async function getRiskReports(
     companyName: item.companyName,
     companyIdx: item.companyIdx,
     reporterName: item.reporterName,
+    reporterDepartment: item.reporterDepartment,
     reporterMemberIdx: item.reporterMemberIdx ?? null,
     authorName: item.authorName,
     authorMemberIdx: item.authorMemberIdx ?? null,
