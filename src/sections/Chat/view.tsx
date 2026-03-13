@@ -213,6 +213,17 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     [rooms, memberMap]
   );
 
+  const activeSelectedRoom = useMemo(() => {
+    if (isChatbotRoom || !selectedRoom) return null;
+    return (
+      roomsWithParticipants.find(
+        (room) =>
+          room.chatRoomId === selectedRoom.chatRoomId ||
+          room.roomId === selectedRoom.roomId
+      ) || null
+    );
+  }, [isChatbotRoom, roomsWithParticipants, selectedRoom]);
+
   // 채팅방 변이 훅 (chat2)
   const createChatRoomMutation = useCreateChat2Room();
   const renameChatRoomMutation = useRenameChat2Room();
@@ -229,14 +240,14 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     participants: roomParticipantDocs,
     presenceByUserId,
   } = useChat2RoomFirestore({
-    chatRoomId: !isChatbotRoom ? selectedRoom?.chatRoomId : undefined,
+    chatRoomId: activeSelectedRoom?.chatRoomId,
   });
 
   const participantsFromRoom: ChatParticipant2[] = useMemo(() => {
-    if (!selectedRoom) return [];
+    if (!activeSelectedRoom) return [];
     const byId = new Map<string, any>();
     roomParticipantDocs.forEach((p) => byId.set(p.userId, p));
-    return selectedRoom.participantIds.map((id) => {
+    return activeSelectedRoom.participantIds.map((id) => {
       const member = memberMap.get(id);
       const baseIdx = Number(id);
       const participantDoc = byId.get(id);
@@ -261,7 +272,7 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
         mutedUntil: participantDoc?.mutedUntil ?? null,
       };
     });
-  }, [selectedRoom, roomParticipantDocs, presenceByUserId, memberMap]);
+  }, [activeSelectedRoom, roomParticipantDocs, presenceByUserId, memberMap]);
 
   const participantLookup = useMemo(() => {
     const map = new Map<number, { name: string; avatarUrl?: string }>();
