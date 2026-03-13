@@ -517,6 +517,21 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
   }, [searchParams, roomsWithParticipants]);
 
   useEffect(() => {
+    if (isChatbotRoom || !selectedRoom) return;
+
+    const stillExists = roomsWithParticipants.some(
+      (room) =>
+        room.chatRoomId === selectedRoom.chatRoomId ||
+        room.roomId === selectedRoom.roomId
+    );
+    if (stillExists) return;
+
+    setSelectedRoom(null);
+    setReplyingTo(null);
+    setSearchParams({});
+  }, [isChatbotRoom, roomsWithParticipants, selectedRoom, setSearchParams]);
+
+  useEffect(() => {
     setReplyingTo(null);
   }, [selectedRoom?.chatRoomId, isChatbotRoom]);
 
