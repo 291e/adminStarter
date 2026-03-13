@@ -1,10 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type {
-  DocumentData,
-  QueryDocumentSnapshot,
-  Unsubscribe,
-} from 'firebase/firestore';
+import type { DocumentData, QueryDocumentSnapshot, Unsubscribe } from 'firebase/firestore';
 import {
   collection,
   doc,
@@ -23,11 +19,13 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth, firestore } from 'src/config/firebase';
 import { useAuthContext } from 'src/auth/hooks';
 import * as chat2Service from 'src/services/chat2/chat2.service';
+import type { Chat2ReplyToPayload } from 'src/services/chat2/chat2.types';
 
 // ----------------------------------------------------------------------
 
 type MessageMetadata = {
   type?: string;
+  replyTo?: Chat2ReplyToPayload;
   location?: {
     latitude: number;
     longitude: number;
@@ -84,6 +82,10 @@ export type ChatAttachmentMeta = {
   mimeType?: string;
 };
 
+type SendMessageOptions = {
+  replyTo?: Chat2ReplyToPayload;
+};
+
 type UseChatRoomFirestoreProps = {
   chatRoomId?: string;
 };
@@ -130,14 +132,22 @@ const extractFileName = (url?: string | null) => {
   return parts[parts.length - 1] || '';
 };
 
-const buildLastMessagePreview = (messageType: Chat2Message['messageType'], message: string) => {
+const buildLastMessagePreview = (
+  messageType: Chat2Message['messageType'],
+  message: string,
+  metadata?: MessageMetadata
+) => {
   const trimmed = message.trim();
-  if (messageType === 'IMAGE') return '[이미지]';
-  if (messageType === 'VIDEO') return '[동영상]';
-  if (messageType === 'FILE') return trimmed || '[파일]';
-  if (messageType === 'SYSTEM') return trimmed || '시스템 메시지';
-  if (messageType === 'EMERGENCY') return trimmed || '긴급 메시지';
-  return trimmed;
+  let preview = trimmed;
+  if (messageType === 'IMAGE') preview = '[이미지]';
+  if (messageType === 'VIDEO') preview = '[동영상]';
+  if (messageType === 'FILE') preview = trimmed || metadata?.fileName || '[파일]';
+  if (messageType === 'SYSTEM') preview = trimmed || '시스템 메시지';
+  if (messageType === 'EMERGENCY') preview = trimmed || metadata?.address || '긴급 메시지';
+  if (metadata?.replyTo?.messageId) {
+    return preview ? `답글: ${preview}` : '답글';
+  }
+  return preview;
 };
 
 const toMillisOrUndefined = (value: unknown): number | undefined => {
@@ -166,8 +176,7 @@ const resolveSenderName = (user: ReturnType<typeof useAuthContext>['user']) =>
   (user as any)?.companyMember?.memberName ||
   '';
 
-const createClientMessageId = () =>
-  `c_${Date.now()}_${Math.floor(Math.random() * 10000000000)}`;
+const createClientMessageId = () => `c_${Date.now()}_${Math.floor(Math.random() * 10000000000)}`;
 
 const mapMessageDoc = (docSnap: QueryDocumentSnapshot<DocumentData>): Chat2Message => {
   const data = docSnap.data() ?? {};
@@ -198,7 +207,8 @@ const mapMessageDoc = (docSnap: QueryDocumentSnapshot<DocumentData>): Chat2Messa
         : undefined,
     createdAtMs,
     timestamp: String(createdAtMs),
-    sharedDocumentIdx: typeof data.sharedDocumentIdx === 'number' ? data.sharedDocumentIdx : undefined,
+    sharedDocumentIdx:
+      typeof data.sharedDocumentIdx === 'number' ? data.sharedDocumentIdx : undefined,
     attachments: Array.isArray(data.attachments)
       ? (data.attachments as unknown[]).map((v) => String(v)).filter((v) => v.trim().length > 0)
       : null,
@@ -211,7 +221,7 @@ const mapParticipantDoc = (docSnap: QueryDocumentSnapshot<DocumentData>): RoomPa
   return {
     userId: String(data.userId || docSnap.id),
     joinedAt: toMillisOrUndefined(data.joinedAt),
-    leftAt: data.leftAt ? toMillisOrUndefined(data.leftAt) ?? null : null,
+    leftAt: data.leftAt ? (toMillisOrUndefined(data.leftAt) ?? null) : null,
     customRoomName: data.customRoomName ? String(data.customRoomName) : undefined,
     customRoomNameAuto:
       typeof data.customRoomNameAuto === 'boolean' ? data.customRoomNameAuto : undefined,
@@ -219,7 +229,7 @@ const mapParticipantDoc = (docSnap: QueryDocumentSnapshot<DocumentData>): RoomPa
       typeof data.notificationsEnabled === 'boolean' ? data.notificationsEnabled : undefined,
     lastReadAt: toMillisOrUndefined(data.lastReadAt),
     unreadCount: typeof data.unreadCount === 'number' ? data.unreadCount : undefined,
-    mutedUntil: data.mutedUntil ? toMillisOrUndefined(data.mutedUntil) ?? null : null,
+    mutedUntil: data.mutedUntil ? (toMillisOrUndefined(data.mutedUntil) ?? null) : null,
   };
 };
 
@@ -323,7 +333,6 @@ export function useChat2RoomFirestore({ chatRoomId }: UseChatRoomFirestoreProps)
     );
 
     return () => unsubscribe();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatRoomId, uid]);
 
   const messages = useMemo(() => {
@@ -450,7 +459,8 @@ export function useChat2RoomFirestore({ chatRoomId }: UseChatRoomFirestoreProps)
       attachments?: string[],
       signalType?: string | null,
       sharedDocumentIdx?: number,
-      attachmentMeta?: ChatAttachmentMeta
+      attachmentMeta?: ChatAttachmentMeta,
+      options?: SendMessageOptions
     ) => {
       if (!chatRoomId) {
         throw new Error('채팅방이 선택되지 않았습니다.');
@@ -490,6 +500,12 @@ export function useChat2RoomFirestore({ chatRoomId }: UseChatRoomFirestoreProps)
       } else if (resolvedType === 'EMERGENCY' && signalType) {
         metadata.type = signalType;
       }
+      if (options?.replyTo) {
+        metadata.replyTo = options.replyTo;
+      }
+      if (sharedDocumentIdx != null) {
+        metadata.sharedDocumentIdx = sharedDocumentIdx;
+      }
 
       const translations = emptyTranslations();
       const trimmed = content.trim();
@@ -498,6 +514,24 @@ export function useChat2RoomFirestore({ chatRoomId }: UseChatRoomFirestoreProps)
           ? senderLang
           : 'ko';
         translations[key] = trimmed;
+      }
+
+      try {
+        await chat2Service.createMessage({
+          chatRoomId,
+          message: trimmed,
+          messageType: resolvedType,
+          clientMessageId: messageId,
+          ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
+        });
+        return;
+      } catch (backendError) {
+        if (import.meta.env.DEV) {
+          console.warn(
+            '[chat2] createMessage failed, fallback to direct Firestore write',
+            backendError
+          );
+        }
       }
 
       const payload: Record<string, any> = {
@@ -525,8 +559,11 @@ export function useChat2RoomFirestore({ chatRoomId }: UseChatRoomFirestoreProps)
 
       await setDoc(doc(firestore, 'chatRooms', chatRoomId, 'messages', messageId), payload);
 
-      // Optimistic userRooms update for sender for a snappy room list.
-      const preview = buildLastMessagePreview(resolvedType, trimmed || metadata.fileName || '');
+      const preview = buildLastMessagePreview(
+        resolvedType,
+        trimmed || metadata.fileName || '',
+        metadata
+      );
       await setDoc(
         doc(firestore, 'userRooms', senderId, 'rooms', chatRoomId),
         {
@@ -538,7 +575,6 @@ export function useChat2RoomFirestore({ chatRoomId }: UseChatRoomFirestoreProps)
         { merge: true }
       );
 
-      // Server fan-out: unreadCount + lastMessage updates for all participants.
       chat2Service
         .notifyMessageSent({ chatRoomId, messageId })
         .catch((error) => console.warn('[chat2] notifyMessageSent failed', error));

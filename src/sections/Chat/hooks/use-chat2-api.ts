@@ -7,6 +7,7 @@ import type {
   InviteParticipantsParams,
   LeaveRoomParams,
   MarkReadParams,
+  RemoveParticipantsParams,
   RenameRoomParams,
 } from 'src/services/chat2/chat2.types';
 
@@ -53,9 +54,19 @@ export function useLeaveChat2Room() {
   });
 }
 
+export function useRemoveChat2Participants() {
+  return useMutation({
+    mutationFn: (params: RemoveParticipantsParams) => chat2Service.removeParticipants(params),
+    onSuccess: () => toast.success('참가자를 내보냈습니다.'),
+    onError: (error: any) => {
+      const message = error?.message || '참가자 내보내기에 실패했습니다.';
+      toast.error(message);
+    },
+  });
+}
+
 export function useMarkChat2Read() {
   return useMutation({
     mutationFn: (params: MarkReadParams) => chat2Service.markRead(params),
   });
 }
-

@@ -7,7 +7,9 @@ import type { ChatRoom2 } from '../../chat2.types';
 type ChatMessage = {
   id: string;
   sender: string;
+  senderId?: string;
   message: string;
+  rawMessage?: string;
   timestamp: string;
   dateLabel?: string;
   avatarUrl?: string;
@@ -15,6 +17,12 @@ type ChatMessage = {
   messageType?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
   sharedDocumentIdx?: number;
   attachments?: string[] | null;
+  translations?: Record<string, string>;
+  replyTo?: {
+    messageId: string;
+    senderName: string;
+    preview: string;
+  } | null;
   metadata?: {
     type?: string;
     location?: {
@@ -22,7 +30,17 @@ type ChatMessage = {
       longitude: number;
       address?: string;
     };
+    [key: string]: any;
   };
+};
+
+type ReplyComposer = {
+  messageId: string;
+  senderId: string;
+  senderName: string;
+  messageType: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
+  rawMessage: string;
+  preview: string;
 };
 
 type Props = {
@@ -32,6 +50,9 @@ type Props = {
   messageInput?: string;
   onMessageInputChange?: (value: string) => void;
   onSendMessage?: (payload?: ChatInputPayload) => void;
+  replyingTo?: ReplyComposer | null;
+  onReplyMessage?: (message: ChatMessage) => void;
+  onCancelReply?: () => void;
   emergencyStats?: { month: number; count: number };
   onFileMessageClick?: (sharedDocumentIdx: number) => void;
   hasMore?: boolean;
@@ -46,6 +67,9 @@ export default function CenterSection({
   messageInput,
   onMessageInputChange,
   onSendMessage,
+  replyingTo,
+  onReplyMessage,
+  onCancelReply,
   emergencyStats,
   onFileMessageClick,
   hasMore,
@@ -77,6 +101,9 @@ export default function CenterSection({
           messageInput={messageInput}
           onMessageInputChange={onMessageInputChange}
           onSendMessage={onSendMessage}
+          replyingTo={replyingTo}
+          onReplyMessage={onReplyMessage}
+          onCancelReply={onCancelReply}
           roomId={room.chatRoomId}
           hasMore={hasMore}
           isLoadingMore={isLoadingMore}
@@ -93,6 +120,9 @@ export default function CenterSection({
           messageInput={messageInput}
           onMessageInputChange={onMessageInputChange}
           onSendMessage={onSendMessage}
+          replyingTo={replyingTo}
+          onReplyMessage={onReplyMessage}
+          onCancelReply={onCancelReply}
           roomId={room.chatRoomId}
           onFileMessageClick={onFileMessageClick}
           hasMore={hasMore}

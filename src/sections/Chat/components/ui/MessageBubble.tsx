@@ -48,12 +48,20 @@ type Props = {
   message: string;
   timestamp: string;
   isOwn: boolean;
+  isHighlighted?: boolean;
   avatarUrl?: string;
   messageType?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
   sharedDocumentIdx?: number;
   attachments?: string[] | null;
+  replyTo?: {
+    messageId: string;
+    senderName: string;
+    preview: string;
+  } | null;
   metadata?: MessageMetadata;
   onFileClick?: (sharedDocumentIdx: number) => void;
+  onReply?: () => void;
+  onReplyReferenceClick?: () => void;
 };
 
 // 이미지 URL 패턴 파싱 함수 (앱에서 보낸 [이미지]|URL 또는 사고 현장 보고 [이미지]|URL 형식)
@@ -146,12 +154,16 @@ export default function MessageBubble({
   message,
   timestamp,
   isOwn,
+  isHighlighted = false,
   avatarUrl,
   messageType,
   sharedDocumentIdx,
   attachments,
+  replyTo,
   metadata,
   onFileClick,
+  onReply,
+  onReplyReferenceClick,
 }: Props) {
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -161,6 +173,29 @@ export default function MessageBubble({
   const [address, setAddress] = useState<string | null>(metadata?.location?.address || null);
   const [isLoadingAddress, setIsLoadingAddress] = useState(false);
   const normalizedAvatarUrl = getChatAvatarUrl(avatarUrl);
+  const highlightMotionSx = isHighlighted
+    ? {
+        animation: 'reply-target-bounce 0.7s cubic-bezier(.2,.9,.2,1.2) 2',
+        transformOrigin: isOwn ? 'right center' : 'left center',
+        '@keyframes reply-target-bounce': {
+          '0%': {
+            transform: 'scale(1)',
+          },
+          '30%': {
+            transform: 'scale(1.035) translateY(-2px)',
+          },
+          '55%': {
+            transform: 'scale(0.992) translateY(0)',
+          },
+          '80%': {
+            transform: 'scale(1.018) translateY(-1px)',
+          },
+          '100%': {
+            transform: 'scale(1)',
+          },
+        },
+      }
+    : undefined;
 
   const parsedSharedDocumentIdx =
     sharedDocumentIdx != null && !Number.isNaN(Number(sharedDocumentIdx))
@@ -171,8 +206,7 @@ export default function MessageBubble({
     parsedSharedDocumentIdx !== null &&
     (message.includes('새 문서가 등록되었습니다') || message.includes('문서가 등록되었습니다'));
   const isSharedDocument =
-    parsedSharedDocumentIdx !== null &&
-    (messageType === 'FILE' || isSystemSharedDocumentNotice);
+    parsedSharedDocumentIdx !== null && (messageType === 'FILE' || isSystemSharedDocumentNotice);
   const handleFileClick = () => {
     if (isSharedDocument && parsedSharedDocumentIdx && onFileClick) {
       onFileClick(parsedSharedDocumentIdx);
@@ -301,13 +335,10 @@ export default function MessageBubble({
       .filter((url): url is string => url !== null) || [];
   // metadata에서 온 동영상 URL - 정규화 적용
   const metadataVideoUrl = normalizeMediaUrl(metadata?.videoUrl);
-  const parsedVideoUrl = parsedVideo.videoUrl
-    ? normalizeMediaUrl(parsedVideo.videoUrl)
-    : null;
+  const parsedVideoUrl = parsedVideo.videoUrl ? normalizeMediaUrl(parsedVideo.videoUrl) : null;
   const metadataFileUrl = normalizeMediaUrl(metadata?.fileUrl);
   const fileVideoUrl =
-    metadataFileUrl &&
-    (isVideoUrl(metadataFileUrl) || isVideoUrl(metadata?.fileName || ''))
+    metadataFileUrl && (isVideoUrl(metadataFileUrl) || isVideoUrl(metadata?.fileName || ''))
       ? metadataFileUrl
       : null;
   // metadata에서 온 단일 이미지 URL - 정규화 적용
@@ -425,6 +456,57 @@ export default function MessageBubble({
       </Typography>
     </Stack>
   );
+
+  const renderReplyReference = (
+    accentColor: string,
+    textColor: string,
+    backgroundColor: string
+  ) => {
+    if (!replyTo) return null;
+
+    return (
+      <Box
+        onClick={(event) => {
+          event.stopPropagation();
+          onReplyReferenceClick?.();
+        }}
+        sx={{
+          mb: 1,
+          px: 1,
+          py: 0.75,
+          borderRadius: 1,
+          bgcolor: backgroundColor,
+          borderLeft: '3px solid',
+          borderColor: accentColor,
+          cursor: onReplyReferenceClick ? 'pointer' : 'default',
+        }}
+      >
+        <Typography
+          variant="caption"
+          sx={{
+            display: 'block',
+            fontWeight: 700,
+            color: accentColor,
+          }}
+        >
+          {replyTo.senderName}
+        </Typography>
+        <Typography
+          variant="body2"
+          sx={{
+            fontSize: 12,
+            lineHeight: '18px',
+            color: textColor,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {replyTo.preview}
+        </Typography>
+      </Box>
+    );
+  };
 
   // 이미지 메시지 렌더링 컴포넌트
   const renderImageContent = (imgUrl: string, label?: string) => (
@@ -813,6 +895,11 @@ export default function MessageBubble({
     return (
       <>
         <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="flex-end">
+          {onReply && (
+            <IconButton size="small" onClick={onReply} sx={{ color: 'text.secondary' }}>
+              <Iconify icon={'solar:reply-bold' as any} width={18} />
+            </IconButton>
+          )}
           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
             {timestamp}
           </Typography>
@@ -830,9 +917,15 @@ export default function MessageBubble({
                   bgcolor: 'primary.dark',
                 },
               }),
+              ...highlightMotionSx,
             }}
             onClick={isSharedDocument ? handleFileClick : undefined}
           >
+            {renderReplyReference(
+              'rgba(255,255,255,0.92)',
+              'rgba(255,255,255,0.9)',
+              'rgba(255,255,255,0.14)'
+            )}
             {isImageWithLocation && accidentImageUrl && metadata?.location ? (
               renderAccidentReportContent(accidentImageUrl, metadata.location)
             ) : isEmergencyWithLocation ? (
@@ -975,9 +1068,11 @@ export default function MessageBubble({
                     bgcolor: 'grey.300',
                   },
                 }),
+                ...highlightMotionSx,
               }}
               onClick={isSharedDocument ? handleFileClick : undefined}
             >
+              {renderReplyReference('primary.main', 'text.secondary', 'rgba(255,255,255,0.85)')}
               {isImageWithLocation && accidentImageUrl && metadata?.location ? (
                 renderAccidentReportContent(accidentImageUrl, metadata.location)
               ) : isEmergencyWithLocation ? (
@@ -1005,6 +1100,11 @@ export default function MessageBubble({
             >
               {timestamp}
             </Typography>
+            {onReply && (
+              <IconButton size="small" onClick={onReply} sx={{ color: 'text.secondary' }}>
+                <Iconify icon={'solar:reply-bold' as any} width={18} />
+              </IconButton>
+            )}
           </Stack>
         </Stack>
       </Stack>

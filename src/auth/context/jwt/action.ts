@@ -9,9 +9,18 @@ import {
 import { auth } from 'src/config/firebase';
 
 import { setSession } from './utils';
-import { JWT_STORAGE_KEY } from './constant';
 
 // ----------------------------------------------------------------------
+
+const readToken = (
+  payload: any,
+  key: 'accessToken' | 'refreshToken' | 'firebaseToken'
+) =>
+  payload?.body?.data?.[key] ||
+  payload?.body?.data?.body?.data?.[key] ||
+  payload?.body?.[key] ||
+  payload?.data?.[key] ||
+  payload?.[key];
 
 export type SignInParams = {
   email: string;
@@ -46,19 +55,9 @@ export const signInWithPassword = async ({ email, password }: SignInParams): Pro
     // 실제 응답 구조 확인 (여러 가능성 체크)
     // 타입 안전성을 위해 any로 캐스팅하여 유연하게 처리
     const resAny = res as any;
-    const accessToken =
-      resAny.body?.data?.accessToken ||
-      resAny.body?.data?.body?.data?.accessToken ||
-      resAny.body?.accessToken ||
-      resAny.data?.accessToken ||
-      resAny.accessToken;
-
-    const firebaseToken =
-      resAny.body?.data?.firebaseToken ||
-      resAny.body?.data?.body?.data?.firebaseToken ||
-      resAny.body?.firebaseToken ||
-      resAny.data?.firebaseToken ||
-      resAny.firebaseToken;
+    const accessToken = readToken(resAny, 'accessToken');
+    const refreshToken = readToken(resAny, 'refreshToken');
+    const firebaseToken = readToken(resAny, 'firebaseToken');
 
     if (!accessToken) {
       console.error('❌ Response structure:', res);
@@ -72,7 +71,7 @@ export const signInWithPassword = async ({ email, password }: SignInParams): Pro
       throw new Error('로그인 에러');
     }
 
-    setSession(accessToken);
+    await setSession(accessToken, typeof refreshToken === 'string' ? refreshToken : null);
 
     if (firebaseToken) {
       try {
@@ -121,19 +120,15 @@ export const signUp = async ({
 
     // 실제 응답 구조 확인 (여러 가능성 체크)
     const resAny = res as any;
-    const accessToken =
-      resAny.body?.data?.accessToken ||
-      resAny.body?.data?.body?.data?.accessToken ||
-      resAny.body?.accessToken ||
-      resAny.data?.accessToken ||
-      resAny.accessToken;
+    const accessToken = readToken(resAny, 'accessToken');
+    const refreshToken = readToken(resAny, 'refreshToken');
 
     if (!accessToken) {
       console.error('❌ Response structure:', res);
       throw new Error('로그인 에러');
     }
 
-    sessionStorage.setItem(JWT_STORAGE_KEY, accessToken);
+    await setSession(accessToken, typeof refreshToken === 'string' ? refreshToken : null);
   } catch (error) {
     console.error('Error during sign up:', error);
     throw error;

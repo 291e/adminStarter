@@ -12,7 +12,9 @@ import MessageBubble from './MessageBubble';
 type ChatMessage = {
   id: string;
   sender: string;
+  senderId?: string;
   message: string;
+  rawMessage?: string;
   timestamp: string;
   dateLabel?: string;
   avatarUrl?: string;
@@ -20,6 +22,12 @@ type ChatMessage = {
   messageType?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
   sharedDocumentIdx?: number;
   attachments?: string[] | null;
+  translations?: Record<string, string>;
+  replyTo?: {
+    messageId: string;
+    senderName: string;
+    preview: string;
+  } | null;
   metadata?: {
     type?: string;
     location?: {
@@ -27,6 +35,7 @@ type ChatMessage = {
       longitude: number;
       address?: string;
     };
+    [key: string]: any;
   };
 };
 
@@ -35,6 +44,7 @@ type Props = {
   conversationDate?: string;
   roomId?: string | number; // 채팅방 변경 감지용
   onFileMessageClick?: (sharedDocumentIdx: number) => void;
+  onReply?: (message: ChatMessage) => void;
   hasMore?: boolean;
   isLoadingMore?: boolean;
   onLoadMore?: () => void;
@@ -45,18 +55,22 @@ export default function MessageList({
   conversationDate,
   roomId,
   onFileMessageClick,
+  onReply,
   hasMore,
   isLoadingMore,
   onLoadMore,
 }: Props) {
   const scrollbarRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [isAtBottom, setIsAtBottom] = useState(true);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const prevMessagesLengthRef = useRef(messages.length);
   const prevLastMessageIdRef = useRef<string | undefined>(messages[messages.length - 1]?.id);
   const prevRoomIdRef = useRef<string | number | undefined>(roomId);
   const isUserScrollingRef = useRef(false);
+  const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
 
   const dateLabel =
     conversationDate || messages[0]?.dateLabel || new Date().toLocaleDateString('ko-KR');
@@ -164,6 +178,15 @@ export default function MessageList({
     };
   }, []);
 
+  useEffect(
+    () => () => {
+      if (highlightTimeoutRef.current) {
+        clearTimeout(highlightTimeoutRef.current);
+      }
+    },
+    []
+  );
+
   // 채팅방 변경 시 초기화 및 스크롤
   useEffect(() => {
     if (roomId !== undefined && roomId !== prevRoomIdRef.current) {
@@ -223,17 +246,56 @@ export default function MessageList({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages, roomId]);
 
+  const handleReplyReferenceClick = (messageId: string) => {
+    const target = messageRefs.current[messageId];
+    const scrollableNode = scrollbarRef.current?.querySelector(
+      '.simplebar-content-wrapper'
+    ) as HTMLElement | null;
+    if (!target || !scrollableNode) return;
+
+    if (highlightTimeoutRef.current) {
+      clearTimeout(highlightTimeoutRef.current);
+    }
+
+    setHighlightedMessageId(null);
+
+    requestAnimationFrame(() => {
+      setHighlightedMessageId(messageId);
+
+      const containerRect = scrollableNode.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      const relativeTop = targetRect.top - containerRect.top + scrollableNode.scrollTop;
+      const centeredTop = relativeTop - scrollableNode.clientHeight / 2 + targetRect.height / 2;
+      const nextTop = Math.max(
+        0,
+        Math.min(centeredTop, scrollableNode.scrollHeight - scrollableNode.clientHeight)
+      );
+
+      scrollableNode.scrollTo({
+        top: nextTop,
+        behavior: 'smooth',
+      });
+    });
+
+    highlightTimeoutRef.current = setTimeout(() => {
+      setHighlightedMessageId((current) => (current === messageId ? null : current));
+    }, 1800);
+  };
+
   return (
-    <Scrollbar ref={scrollbarRef} sx={{ flex: 1, p: { xs: 2, lg: 2.5 } }}>
+    <Scrollbar
+      ref={scrollbarRef}
+      sx={{
+        flex: 1,
+        pt: { xs: 2, lg: 2.5 },
+        px: { xs: 2, lg: 2.5 },
+        pb: { xs: 1, lg: 1.25 },
+      }}
+    >
       <Stack spacing={2}>
         {hasMore && onLoadMore && (
           <Box sx={{ display: 'flex', justifyContent: 'center', pt: 1 }}>
-            <Button
-              size="small"
-              variant="outlined"
-              onClick={onLoadMore}
-              disabled={isLoadingMore}
-            >
+            <Button size="small" variant="outlined" onClick={onLoadMore} disabled={isLoadingMore}>
               {isLoadingMore ? '불러오는 중...' : '이전 메시지 더보기'}
             </Button>
           </Box>
@@ -248,24 +310,63 @@ export default function MessageList({
         </Box>
 
         {messages.map((message) => (
-          <Box key={message.id} sx={{ mb: 2 }}>
+          <Box
+            key={message.id}
+            ref={(node) => {
+              messageRefs.current[message.id] = node as HTMLDivElement | null;
+            }}
+            data-message-id={message.id}
+            sx={{
+              mb: 2,
+              borderRadius: 2,
+              transition: 'background-color 0.25s ease, transform 0.25s ease',
+              ...(highlightedMessageId === message.id && {
+                animation: 'reply-target-wrapper-bounce 0.7s cubic-bezier(.2,.9,.2,1.2) 2',
+                '@keyframes reply-target-wrapper-bounce': {
+                  '0%': {
+                    transform: 'scale(1)',
+                  },
+                  '30%': {
+                    transform: 'scale(1.015) translateY(-2px)',
+                  },
+                  '55%': {
+                    transform: 'scale(0.995)',
+                  },
+                  '80%': {
+                    transform: 'scale(1.01)',
+                  },
+                  '100%': {
+                    transform: 'scale(1)',
+                  },
+                },
+              }),
+            }}
+          >
             <MessageBubble
               sender={message.sender}
               message={message.message}
               timestamp={message.timestamp}
               avatarUrl={message.avatarUrl}
               isOwn={message.isOwn || false}
+              isHighlighted={highlightedMessageId === message.id}
               messageType={message.messageType}
               sharedDocumentIdx={message.sharedDocumentIdx}
               attachments={message.attachments}
+              replyTo={message.replyTo}
               metadata={message.metadata}
               onFileClick={onFileMessageClick}
+              onReply={onReply ? () => onReply(message) : undefined}
+              onReplyReferenceClick={
+                message.replyTo
+                  ? () => handleReplyReferenceClick(message.replyTo!.messageId)
+                  : undefined
+              }
             />
           </Box>
         ))}
-        {/* 스크롤 앵커: 자동 스크롤을 위한 더미 엘리먼트 */}
-        <div ref={messagesEndRef} style={{ height: 1, width: '100%' }} />
       </Stack>
+      {/* 스크롤 앵커: 마지막 메시지 아래 여백을 늘리지 않도록 Stack 밖에 둡니다. */}
+      <div ref={messagesEndRef} style={{ height: 1, width: '100%' }} />
     </Scrollbar>
   );
 }

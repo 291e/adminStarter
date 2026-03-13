@@ -1,6 +1,17 @@
 import type { BaseResponseDto } from '../common';
 
 export type Chat2RoomType = 'DIRECT' | 'GROUP' | 'EMERGENCY';
+export type Chat2MessageType = 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
+
+export type Chat2ReplyToPayload = {
+  messageId: string;
+  senderId?: string;
+  senderName: string;
+  messageType: Chat2MessageType | string;
+  message: string;
+  translations?: Record<string, string>;
+  metadata?: Record<string, any>;
+};
 
 export type CreateRoomParams = {
   type: Chat2RoomType;
@@ -19,6 +30,11 @@ export type InviteParticipantsParams = {
 
 export type LeaveRoomParams = {
   roomId: string;
+};
+
+export type RemoveParticipantsParams = {
+  roomId: string;
+  participantIds: string[];
 };
 
 export type RenameRoomParams = {
@@ -48,3 +64,14 @@ export type NotifyMessageSentParams = {
   messageId: string;
 };
 
+export type CreateMessageParams = {
+  chatRoomId: string;
+  message: string;
+  messageType?: Chat2MessageType | string;
+  clientMessageId?: string;
+  metadata?: Record<string, any>;
+};
+
+export type CreateMessageResponse = BaseResponseDto<{
+  messageId: string;
+}>;

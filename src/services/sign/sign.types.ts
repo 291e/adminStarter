@@ -44,6 +44,7 @@ export type SignInDto = {
 export type SignInResponseDto = BaseResponseDto<{
   data?: {
     accessToken: string;
+    refreshToken?: string;
     firebaseToken?: string;
     member?: {
       memberIdx: number;
@@ -57,6 +58,7 @@ export type SignInResponseDto = BaseResponseDto<{
     body?: {
       data?: {
         accessToken: string;
+        refreshToken?: string;
         firebaseToken?: string;
         member?: {
           memberIdx: number;

@@ -7,7 +7,9 @@ import ChatInput, { type ChatInputPayload } from '../ui/ChatInput';
 type ChatMessage = {
   id: string;
   sender: string;
+  senderId?: string;
   message: string;
+  rawMessage?: string;
   timestamp: string;
   dateLabel?: string;
   avatarUrl?: string;
@@ -15,6 +17,11 @@ type ChatMessage = {
   messageType?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
   sharedDocumentIdx?: number;
   attachments?: string[] | null;
+  replyTo?: {
+    messageId: string;
+    senderName: string;
+    preview: string;
+  } | null;
   metadata?: {
     type?: string;
     location?: {
@@ -22,7 +29,17 @@ type ChatMessage = {
       longitude: number;
       address?: string;
     };
+    [key: string]: any;
   };
+};
+
+type ReplyComposer = {
+  messageId: string;
+  senderId: string;
+  senderName: string;
+  messageType: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
+  rawMessage: string;
+  preview: string;
 };
 
 type Props = {
@@ -32,6 +49,9 @@ type Props = {
   messageInput?: string;
   onMessageInputChange?: (value: string) => void;
   onSendMessage?: (payload?: ChatInputPayload) => void;
+  replyingTo?: ReplyComposer | null;
+  onReplyMessage?: (message: ChatMessage) => void;
+  onCancelReply?: () => void;
   roomId?: string | number;
   hasMore?: boolean;
   isLoadingMore?: boolean;
@@ -45,6 +65,9 @@ export default function EmergencyChatView({
   messageInput,
   onMessageInputChange,
   onSendMessage,
+  replyingTo,
+  onReplyMessage,
+  onCancelReply,
   roomId,
   hasMore,
   isLoadingMore,
@@ -69,6 +92,7 @@ export default function EmergencyChatView({
         messages={messages}
         conversationDate={conversationDate}
         roomId={roomId}
+        onReply={onReplyMessage}
         hasMore={hasMore}
         isLoadingMore={isLoadingMore}
         onLoadMore={onLoadMore}
@@ -78,6 +102,8 @@ export default function EmergencyChatView({
         value={messageInput}
         onChange={onMessageInputChange}
         onSend={onSendMessage}
+        replyingTo={replyingTo}
+        onCancelReply={onCancelReply}
       />
     </Box>
   );

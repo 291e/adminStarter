@@ -36,6 +36,7 @@ import { useAuthContext } from '../../hooks';
 import { getErrorMessage } from '../../utils';
 import { FormHead } from '../../components/form-head';
 import TermsModal from '../../components/TermsModal';
+import { setSession } from '../../context/jwt';
 import {
   verifyInvitationCode,
   acceptInvitation,
@@ -352,8 +353,7 @@ export function JwtSignUpView() {
         // axios 인터셉터가 평탄화하므로 data에 직접 접근
         const responseData = (response as any)?.body ?? response;
         if (responseData?.accessToken && responseData?.refreshToken) {
-          localStorage.setItem('accessToken', responseData.accessToken);
-          localStorage.setItem('refreshToken', responseData.refreshToken);
+          await setSession(responseData.accessToken, responseData.refreshToken);
         }
 
         await checkUserSession?.();

@@ -15,14 +15,29 @@ export type ChatInputPayload = {
   mimeType?: string;
 };
 
+type ReplyPreview = {
+  messageId: string;
+  senderName: string;
+  preview: string;
+};
+
 type Props = {
   value?: string;
   onChange?: (value: string) => void;
   onSend?: (payload?: ChatInputPayload) => void;
   isEmergency?: boolean;
+  replyingTo?: ReplyPreview | null;
+  onCancelReply?: () => void;
 };
 
-export default function ChatInput({ value = '', onChange, onSend, isEmergency = false }: Props) {
+export default function ChatInput({
+  value = '',
+  onChange,
+  onSend,
+  isEmergency = false,
+  replyingTo,
+  onCancelReply,
+}: Props) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -128,90 +143,141 @@ export default function ChatInput({ value = '', onChange, onSend, isEmergency = 
         borderTop: '1px solid',
         borderColor: 'divider',
         display: 'flex',
-        alignItems: 'center',
         gap: { xs: 0.5, lg: 1 },
         bgcolor: isEmergency ? '#F26221' : 'white',
+        flexDirection: 'column',
+        alignItems: 'stretch',
       }}
     >
-      <IconButton
-        size="small"
-        sx={{
-          bgcolor: isEmergency ? 'white' : 'grey.200',
-          transition: 'background-color 0.2s ease-in-out',
-          '&:hover': {
-            bgcolor: isEmergency ? 'grey.200' : 'grey.300',
-          },
-        }}
-        onClick={handleCameraClick}
-        disabled={isUploading}
-      >
-        <Iconify icon={'mdi:camera' as any} width={24} />
-      </IconButton>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*,video/*,application/*"
-        hidden
-        onChange={handleFileSelect}
-      />
-      <InputBase
-        fullWidth
-        placeholder="메시지를 입력하세요..."
-        value={value}
-        onChange={(e) => onChange?.(e.target.value)}
-        onKeyPress={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleSend();
-          }
-        }}
-        sx={{
-          bgcolor: isEmergency ? 'white' : 'grey.100',
-          borderRadius: 9999,
-          px: 2,
-          py: 1.25, // 상하 padding 증가
-          color: isEmergency ? 'text.primary' : 'text.primary',
-          minHeight: 44, // 최소 높이 증가 (커서가 잘리지 않도록)
-          display: 'flex',
-          alignItems: 'center',
-          '&::placeholder': {
-            color: isEmergency ? 'text.disabled' : 'text.disabled',
-            opacity: 1,
-          },
-          '& .MuiInputBase-input': {
-            py: 0,
-            lineHeight: 1.5, // line-height 명시적으로 설정
-            minHeight: '1.5em', // 최소 높이 설정
-            paddingLeft: '2px',
-            paddingRight: '2px',
+      {replyingTo && (
+        <Box
+          sx={{
+            mb: 1,
+            px: 1.5,
+            py: 1,
+            borderRadius: 1.5,
+            bgcolor: isEmergency ? 'rgba(255,255,255,0.16)' : 'grey.100',
+            borderLeft: '3px solid',
+            borderColor: isEmergency ? 'white' : 'primary.main',
+          }}
+        >
+          <Stack direction="row" spacing={1} alignItems="flex-start">
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography
+                variant="caption"
+                sx={{
+                  display: 'block',
+                  fontWeight: 700,
+                  color: isEmergency ? 'common.white' : 'primary.main',
+                }}
+              >
+                {replyingTo.senderName}
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{
+                  color: isEmergency ? 'common.white' : 'text.secondary',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {replyingTo.preview}
+              </Typography>
+            </Box>
+            <IconButton
+              size="small"
+              onClick={onCancelReply}
+              sx={{
+                color: isEmergency ? 'common.white' : 'text.secondary',
+              }}
+            >
+              <Iconify icon={'mingcute:close-line' as any} width={18} />
+            </IconButton>
+          </Stack>
+        </Box>
+      )}
+      <Stack direction="row" spacing={{ xs: 0.5, lg: 1 }} alignItems="center">
+        <IconButton
+          size="small"
+          sx={{
+            bgcolor: isEmergency ? 'white' : 'grey.200',
+            transition: 'background-color 0.2s ease-in-out',
+            '&:hover': {
+              bgcolor: isEmergency ? 'grey.200' : 'grey.300',
+            },
+          }}
+          onClick={handleCameraClick}
+          disabled={isUploading}
+        >
+          <Iconify icon={'mdi:camera' as any} width={24} />
+        </IconButton>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,video/*,application/*"
+          hidden
+          onChange={handleFileSelect}
+        />
+        <InputBase
+          fullWidth
+          placeholder="메시지를 입력하세요..."
+          value={value}
+          onChange={(e) => onChange?.(e.target.value)}
+          onKeyPress={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              handleSend();
+            }
+          }}
+          sx={{
+            bgcolor: isEmergency ? 'white' : 'grey.100',
+            borderRadius: 9999,
+            px: 2,
+            py: 1.25, // 상하 padding 증가
+            color: isEmergency ? 'text.primary' : 'text.primary',
+            minHeight: 44, // 최소 높이 증가 (커서가 잘리지 않도록)
+            display: 'flex',
+            alignItems: 'center',
             '&::placeholder': {
+              color: isEmergency ? 'text.disabled' : 'text.disabled',
               opacity: 1,
             },
-          },
-          '&:focus-within': {
-            outline: 'none',
             '& .MuiInputBase-input': {
-              caretColor: isEmergency ? 'text.primary' : 'text.primary',
+              py: 0,
+              lineHeight: 1.5, // line-height 명시적으로 설정
+              minHeight: '1.5em', // 최소 높이 설정
               paddingLeft: '2px',
               paddingRight: '2px',
+              '&::placeholder': {
+                opacity: 1,
+              },
             },
-          },
-        }}
-      />
-      <IconButton
-        size="small"
-        sx={{
-          transition: 'background-color 0.2s ease-in-out',
-          bgcolor: isEmergency ? 'white' : 'grey.200',
-          '&:hover': {
-            bgcolor: isEmergency ? 'grey.200' : 'grey.300',
-          },
-        }}
-        onClick={handleSend}
-        disabled={isUploading}
-      >
-        <Iconify icon={'solar:plain-2-bold' as any} width={24} />
-      </IconButton>
+            '&:focus-within': {
+              outline: 'none',
+              '& .MuiInputBase-input': {
+                caretColor: isEmergency ? 'text.primary' : 'text.primary',
+                paddingLeft: '2px',
+                paddingRight: '2px',
+              },
+            },
+          }}
+        />
+        <IconButton
+          size="small"
+          sx={{
+            transition: 'background-color 0.2s ease-in-out',
+            bgcolor: isEmergency ? 'white' : 'grey.200',
+            '&:hover': {
+              bgcolor: isEmergency ? 'grey.200' : 'grey.300',
+            },
+          }}
+          onClick={handleSend}
+          disabled={isUploading}
+        >
+          <Iconify icon={'solar:plain-2-bold' as any} width={24} />
+        </IconButton>
+      </Stack>
       {/* 파일 미리보기 */}
       {hasFile && (
         <Box

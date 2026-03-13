@@ -8,7 +8,7 @@ import { CONFIG } from 'src/global-config';
 import { SplashScreen } from 'src/components/loading-screen';
 
 import { useAuthContext } from '../hooks';
-import { JWT_STORAGE_KEY } from '../context/jwt/constant';
+import { clearStoredTokens } from '../context/jwt/storage';
 import { setSession } from '../context/jwt/utils';
 
 // ----------------------------------------------------------------------
@@ -60,11 +60,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     if (memberRole === 'WORKER') {
       // 세션 정리 및 외부 사이트로 리다이렉트
       await setSession(null);
-      sessionStorage.removeItem(JWT_STORAGE_KEY);
-      sessionStorage.removeItem('accessToken');
-      sessionStorage.removeItem('refreshToken');
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
+      clearStoredTokens();
 
       // WORKER 역할 사용자는 safeyou365.com으로 리다이렉트
       window.location.href = 'https://safeyou365.com/';

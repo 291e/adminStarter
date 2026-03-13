@@ -1,6 +1,10 @@
 import axios from 'src/lib/axios';
 
-import { JWT_STORAGE_KEY } from './constant';
+import {
+  clearStoredTokens,
+  storeAccessToken,
+  storeRefreshToken,
+} from './storage';
 
 // ----------------------------------------------------------------------
 
@@ -67,14 +71,20 @@ export function isValidToken(accessToken: string) {
 
 // ----------------------------------------------------------------------
 
-export async function setSession(accessToken: string | null) {
+export async function setSession(
+  accessToken: string | null,
+  refreshToken?: string | null
+) {
   try {
     if (accessToken) {
-      sessionStorage.setItem(JWT_STORAGE_KEY, accessToken);
+      storeAccessToken(accessToken);
+      if (typeof refreshToken === 'string' && refreshToken.trim()) {
+        storeRefreshToken(refreshToken);
+      }
 
       axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 
-      const decodedToken = jwtDecode(accessToken); // ~3 days by minimals server
+      const decodedToken = jwtDecode(accessToken);
 
       if (decodedToken && 'exp' in decodedToken) {
         // tokenExpired(decodedToken.exp);
@@ -82,7 +92,7 @@ export async function setSession(accessToken: string | null) {
         throw new Error('Invalid access token!');
       }
     } else {
-      sessionStorage.removeItem(JWT_STORAGE_KEY);
+      clearStoredTokens();
       delete axios.defaults.headers.common.Authorization;
     }
   } catch (error) {

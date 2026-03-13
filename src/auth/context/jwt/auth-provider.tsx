@@ -3,12 +3,12 @@ import type { AuthState } from '../../types';
 import { useSetState } from 'minimal-shared/hooks';
 import { useMemo, useEffect, useCallback } from 'react';
 
-import axios, { endpoints } from 'src/lib/axios';
+import axios, { endpoints, refreshAuthSession } from 'src/lib/axios';
 import { initWebFcm } from 'src/services/notifications/web-fcm';
 
-import { JWT_STORAGE_KEY } from './constant';
 import { AuthContext } from '../auth-context';
 import { setSession, isValidToken } from './utils';
+import { getStoredAccessToken } from './storage';
 
 // ----------------------------------------------------------------------
 
@@ -27,16 +27,20 @@ export function AuthProvider({ children }: Props) {
 
   const checkUserSession = useCallback(async () => {
     try {
-      const accessToken = sessionStorage.getItem(JWT_STORAGE_KEY);
+      let accessToken = getStoredAccessToken();
+
+      if (accessToken && !isValidToken(accessToken)) {
+        accessToken = await refreshAuthSession();
+      }
 
       if (accessToken && isValidToken(accessToken)) {
-        setSession(accessToken);
+        await setSession(accessToken);
 
         const res = await axios.get(endpoints.auth.me);
 
         // body.data가 평탄화되어 오면 res.data = { memberIdx, memberName, ..., header } 또는 { user: {...}, header }
         // user 키가 없으면 res.data 전체(header 제외)를 user로 사용; data 한 단계 감싼 경우도 처리
-        const { user: userFromData, header, data: nestedData, ...restData } = res.data || {};
+        const { user: userFromData, data: nestedData, ...restData } = res.data || {};
         const user = userFromData ?? nestedData ?? restData;
 
         setState({

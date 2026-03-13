@@ -1,7 +1,14 @@
-import type { AxiosRequestConfig } from 'axios';
+import type { AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
 
-import axios from 'axios';
+import axios, { AxiosHeaders } from 'axios';
 
+import {
+  clearStoredTokens,
+  getStoredAccessToken,
+  getStoredRefreshToken,
+  storeAccessToken,
+  storeRefreshToken,
+} from 'src/auth/context/jwt/storage';
 import { CONFIG } from 'src/global-config';
 
 // ----------------------------------------------------------------------
@@ -23,15 +30,96 @@ const axiosInstance = axios.create({
   },
 });
 
+type RetryableRequestConfig = AxiosRequestConfig & {
+  _retriedAfterRefresh?: boolean;
+  skipAuthRefresh?: boolean;
+};
+
+const authFailurePattern = /(token|jwt|unauthorized|로그인|로그아웃|세션)/i;
+let refreshPromise: Promise<string | null> | null = null;
+
+const applyAccessToken = (
+  headers: InternalAxiosRequestConfig['headers'] | AxiosRequestConfig['headers'] | undefined,
+  accessToken: string
+) => {
+  const normalizedHeaders = AxiosHeaders.from((headers || {}) as any);
+  normalizedHeaders.set('Authorization', `Bearer ${accessToken}`);
+  return normalizedHeaders;
+};
+
+const isAuthFailureEnvelope = (payload: any): boolean => {
+  const header = payload?.header;
+  if (!header || header.isSuccess !== false) return false;
+
+  const code = Number(header.resultCode);
+  const message = String(header.resultMessage || header.message || '');
+  return [401, 403, 445].includes(code) || authFailurePattern.test(message);
+};
+
+const shouldRefreshAuth = (config?: RetryableRequestConfig | null) => {
+  if (!config) return false;
+  if (config.skipAuthRefresh || config._retriedAfterRefresh) return false;
+
+  const url = String(config.url || '');
+  return url !== endpoints.auth.signIn && url !== endpoints.auth.refreshToken;
+};
+
+export async function refreshAuthSession(): Promise<string | null> {
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  refreshPromise = (async () => {
+    try {
+      const refreshToken = getStoredRefreshToken();
+      if (!refreshToken) {
+        clearStoredTokens();
+        delete axiosInstance.defaults.headers.common.Authorization;
+        return null;
+      }
+
+      const response = await axios.post(`${getBaseURL()}${endpoints.auth.refreshToken}`, {
+        refreshToken,
+      });
+      const payload = response.data;
+
+      if (isAuthFailureEnvelope(payload)) {
+        throw new Error(payload?.header?.resultMessage || '세션이 만료되었습니다.');
+      }
+
+      const bodyData = payload?.body?.data ?? payload?.body ?? payload?.data ?? payload;
+      const nextAccessToken = String(bodyData?.accessToken || '').trim();
+      const nextRefreshToken = String(bodyData?.refreshToken || '').trim();
+
+      if (!nextAccessToken || !nextRefreshToken) {
+        throw new Error('토큰 갱신 응답이 올바르지 않습니다.');
+      }
+
+      storeAccessToken(nextAccessToken);
+      storeRefreshToken(nextRefreshToken);
+      axiosInstance.defaults.headers.common.Authorization = `Bearer ${nextAccessToken}`;
+
+      return nextAccessToken;
+    } catch {
+      clearStoredTokens();
+      delete axiosInstance.defaults.headers.common.Authorization;
+      return null;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
 /**
  * Request Interceptor: Add token and logging
  */
 axiosInstance.interceptors.request.use(
   (config) => {
-    // 토큰 추가
-    const token = localStorage.getItem('accessToken');
+    const token = getStoredAccessToken();
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+      config.headers = applyAccessToken(config.headers, token);
     }
 
     return config;
@@ -46,7 +134,17 @@ axiosInstance.interceptors.request.use(
  * Response Interceptor: Error handling and logging
  */
 axiosInstance.interceptors.response.use(
-  (response) => {
+  async (response) => {
+    const originalRequest = response.config as RetryableRequestConfig;
+    if (isAuthFailureEnvelope(response.data) && shouldRefreshAuth(originalRequest)) {
+      const nextAccessToken = await refreshAuthSession();
+      if (nextAccessToken) {
+        originalRequest._retriedAfterRefresh = true;
+        originalRequest.headers = applyAccessToken(originalRequest.headers, nextAccessToken);
+        return axiosInstance(originalRequest);
+      }
+    }
+
     // BaseResponseDto 구조 평탄화: data.body.data -> data
     if (response.data?.body?.data !== undefined) {
       const bodyData = response.data.body.data;
@@ -98,7 +196,7 @@ axiosInstance.interceptors.response.use(
     }
     return response;
   },
-  (error) => {
+  async (error) => {
     // 디버깅: 에러 응답 로그
     const errorInfo = {
       method: error?.config?.method?.toUpperCase(),
@@ -110,6 +208,17 @@ axiosInstance.interceptors.response.use(
     };
 
     console.error('❌ API Error:', errorInfo);
+
+    const originalRequest = error?.config as RetryableRequestConfig | undefined;
+    const status = Number(error?.response?.status);
+    if ((status === 401 || status === 403) && shouldRefreshAuth(originalRequest)) {
+      const nextAccessToken = await refreshAuthSession();
+      if (nextAccessToken && originalRequest) {
+        originalRequest._retriedAfterRefresh = true;
+        originalRequest.headers = applyAccessToken(originalRequest.headers, nextAccessToken);
+        return axiosInstance(originalRequest);
+      }
+    }
 
     // 에러 메시지 추출
     const message =
@@ -287,6 +396,7 @@ export const endpoints = {
     invitation: '/user/invitation',
     signUp: '/user/signup',
     signIn: '/user/signin',
+    refreshToken: '/user/refresh-token',
     signout: '/user/signout',
     checkId: '/user/check-id',
     findIdRequest: '/user/find-id/request',

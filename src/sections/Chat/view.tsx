@@ -30,6 +30,7 @@ import {
   useCreateChat2Room,
   useLeaveChat2Room,
   useMarkChat2Read,
+  useRemoveChat2Participants,
   useRenameChat2Room,
 } from './hooks/use-chat2-api';
 import { useMyInfo } from './hooks/use-my-info';
@@ -39,6 +40,7 @@ import { getChatAvatarUrl } from 'src/sections/Chat/utils/avatar';
 import { resolveFileUrl } from 'src/sections/Chat/utils/file-url';
 import { getCompanyMembers } from 'src/services/organization/organization.service';
 import type { ChatAttachment2, ChatParticipant2, ChatRoom2 } from './chat2.types';
+import type { Chat2ReplyToPayload } from 'src/services/chat2/chat2.types';
 
 // ----------------------------------------------------------------------
 
@@ -51,7 +53,9 @@ type Props = {
 type ChatMessageItem = {
   id: string;
   sender: string;
+  senderId: string;
   message: string;
+  rawMessage: string;
   timestamp: string;
   dateLabel?: string;
   avatarUrl?: string;
@@ -59,6 +63,13 @@ type ChatMessageItem = {
   messageType?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
   sharedDocumentIdx?: number;
   attachments?: string[] | null;
+  translations?: Record<string, string>;
+  replyTo?: {
+    messageId: string;
+    senderName: string;
+    preview: string;
+  } | null;
+  replyToRaw?: Chat2ReplyToPayload | null;
   metadata?: {
     type?: string;
     location?: {
@@ -66,7 +77,31 @@ type ChatMessageItem = {
       longitude: number;
       address?: string;
     };
+    replyTo?: Chat2ReplyToPayload;
+    [key: string]: any;
   };
+};
+
+type ReplyComposerState = {
+  messageId: string;
+  senderId: string;
+  senderName: string;
+  messageType: NonNullable<ChatMessageItem['messageType']>;
+  rawMessage: string;
+  translations?: Record<string, string>;
+  metadata?: Record<string, any>;
+  preview: string;
+};
+
+type ReplyableMessage = {
+  id: string;
+  sender: string;
+  senderId?: string;
+  message: string;
+  rawMessage?: string;
+  messageType?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
+  translations?: Record<string, string>;
+  metadata?: Record<string, any>;
 };
 
 export function ChatView({ title = '채팅', description, sx }: Props) {
@@ -74,6 +109,7 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
   const { user } = useAuthContext();
   const [selectedRoom, setSelectedRoom] = useState<ChatRoom2 | null>(null);
   const [messageInput, setMessageInput] = useState('');
+  const [replyingTo, setReplyingTo] = useState<ReplyComposerState | null>(null);
   const [isChatbotRoom, setIsChatbotRoom] = useState(false);
   const [chatbotMessages, setChatbotMessages] = useState<ChatMessageItem[]>([]);
   const [errorSnackbar, setErrorSnackbar] = useState<{ open: boolean; message: string }>({
@@ -83,7 +119,7 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
   const [documentDetailModalOpen, setDocumentDetailModalOpen] = useState(false);
   const [selectedDocumentIdx, setSelectedDocumentIdx] = useState<number | null>(null);
 
-  const { rooms: rooms, isLoading: isRoomsLoading } = useChat2RoomsFirestore(true);
+  const { rooms, isLoading: isRoomsLoading } = useChat2RoomsFirestore(true);
 
   // 내 정보 (Firebase 메시지 전송 시 memberIdx 사용)
   const { data: myInfoData } = useMyInfo();
@@ -174,13 +210,14 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
         });
         return { ...room, participants };
       }),
-    [rooms, memberMap],
+    [rooms, memberMap]
   );
 
   // 채팅방 변이 훅 (chat2)
   const createChatRoomMutation = useCreateChat2Room();
   const renameChatRoomMutation = useRenameChat2Room();
   const leaveChatRoomMutation = useLeaveChat2Room();
+  const removeParticipantsMutation = useRemoveChat2Participants();
   const markReadMutation = useMarkChat2Read();
 
   const {
@@ -301,6 +338,24 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
   const formatMessageText = (msg: any, translatedText?: string) => {
     const base = translatedText || msg.message || msg.text || '';
     const type = msg.messageType as string | undefined;
+    const metadata = msg.metadata || {};
+    const metadataType = String(metadata?.type || '');
+
+    if (
+      metadataType === 'rescue_request' ||
+      metadataType === 'evacuation_signal' ||
+      metadataType === 'accident_report'
+    ) {
+      return metadata.address || base || '긴급 메시지';
+    }
+
+    if (
+      metadataType === 'multi_image' &&
+      Array.isArray(metadata.imageUrls) &&
+      metadata.imageUrls.length > 0
+    ) {
+      return `사진 ${metadata.imageUrls.length}장`;
+    }
 
     if (type === 'IMAGE') {
       if (base.includes('[이미지]|')) {
@@ -318,7 +373,7 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     }
 
     if (type === 'FILE') {
-      return base || '공유 문서';
+      return metadata.fileName || base || '공유 문서';
     }
 
     if (type === 'SYSTEM') {
@@ -372,20 +427,59 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
             address: translatedAddress ?? rawMetadata.address,
           }
         : undefined;
+      const replyToRaw =
+        rawMetadata?.replyTo && typeof rawMetadata.replyTo === 'object'
+          ? (rawMetadata.replyTo as Chat2ReplyToPayload)
+          : null;
+      const replyTo = !replyToRaw?.messageId
+        ? null
+        : (() => {
+            const replyMetadata =
+              replyToRaw.metadata && typeof replyToRaw.metadata === 'object'
+                ? {
+                    ...replyToRaw.metadata,
+                    address:
+                      replyToRaw.metadata.addressTranslations &&
+                      typeof replyToRaw.metadata.addressTranslations === 'object'
+                        ? pickTranslation(replyToRaw.metadata.addressTranslations, preferredLang) ||
+                          replyToRaw.metadata.address
+                        : replyToRaw.metadata.address,
+                  }
+                : replyToRaw.metadata;
+            const translatedReply = pickTranslation(replyToRaw.translations, preferredLang);
+            const preview = formatMessageText(
+              {
+                message: replyToRaw.message,
+                text: replyToRaw.message,
+                messageType: replyToRaw.messageType,
+                metadata: replyMetadata,
+              },
+              translatedReply
+            );
+
+            return {
+              messageId: replyToRaw.messageId,
+              senderName: replyToRaw.senderName?.trim() || '알 수 없음',
+              preview: preview || '메시지',
+            };
+          })();
 
       return {
         id: msg.id,
         sender: senderName,
+        senderId: String(msg.senderId || ''),
         avatarUrl,
-        // message 또는 text 필드 사용
         message: messageText,
+        rawMessage: msg.message || msg.text || '',
         timestamp: timeLabel,
         dateLabel,
         isOwn: currentMemberIdx === senderMemberIdxNum,
         messageType: msg.messageType,
         sharedDocumentIdx: msg.sharedDocumentIdx,
         attachments: msg.attachments,
-        // metadata 전달 (위치 정보 등)
+        translations: msg.translations,
+        replyTo,
+        replyToRaw,
         metadata,
       };
     });
@@ -412,13 +506,19 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     }
 
     if (roomsWithParticipants.length > 0) {
-      const room = roomsWithParticipants.find((r) => r.chatRoomId === roomId || r.roomId === roomId);
+      const room = roomsWithParticipants.find(
+        (r) => r.chatRoomId === roomId || r.roomId === roomId
+      );
       if (room) {
         setIsChatbotRoom(false);
         setSelectedRoom(room);
       }
     }
   }, [searchParams, roomsWithParticipants]);
+
+  useEffect(() => {
+    setReplyingTo(null);
+  }, [selectedRoom?.chatRoomId, isChatbotRoom]);
 
   // 채팅방 선택 시 읽음 처리 (챗봇방 제외)
   const prevRoomIdRef = useRef<string | undefined>(undefined);
@@ -463,7 +563,9 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
         const userMessage: ChatMessageItem = {
           id: `chatbot-${Date.now()}-user`,
           sender: '나',
+          senderId: String(currentMemberIdx),
           message: messageInput.trim(),
+          rawMessage: messageInput.trim(),
           timestamp: fTime(new Date(), 'HH:mm'),
           dateLabel: fDate(new Date(), 'YYYY년 M월 D일'),
           isOwn: true,
@@ -508,7 +610,9 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
         const botMessage: ChatMessageItem = {
           id: `chatbot-${Date.now()}-bot`,
           sender: '챗봇',
+          senderId: 'chatbot',
           message: botResponseMessage,
+          rawMessage: botResponseMessage,
           timestamp: fTime(new Date(), 'HH:mm'),
           dateLabel: fDate(new Date(), 'YYYY년 M월 D일'),
           avatarUrl: `${CONFIG.assetsDir}/bot.png`,
@@ -525,7 +629,9 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
         const errorMessage: ChatMessageItem = {
           id: `chatbot-${Date.now()}-error`,
           sender: '챗봇',
+          senderId: 'chatbot',
           message: '메시지 전송 중 오류가 발생했습니다. 다시 시도해주세요.',
+          rawMessage: '메시지 전송 중 오류가 발생했습니다. 다시 시도해주세요.',
           timestamp: fTime(new Date(), 'HH:mm'),
           dateLabel: fDate(new Date(), 'YYYY년 M월 D일'),
           avatarUrl: `${CONFIG.assetsDir}/bot.png`,
@@ -542,6 +648,17 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     try {
       const trimmedMessage = messageInput.trim();
       const hasAttachments = Boolean(attachments?.length);
+      const replyToPayload = replyingTo
+        ? {
+            messageId: replyingTo.messageId,
+            senderId: replyingTo.senderId,
+            senderName: replyingTo.senderName,
+            messageType: replyingTo.messageType,
+            message: replyingTo.rawMessage,
+            ...(replyingTo.translations ? { translations: replyingTo.translations } : {}),
+            ...(replyingTo.metadata ? { metadata: replyingTo.metadata } : {}),
+          }
+        : undefined;
 
       // 첨부파일이 있으면 Flutter와 동일하게 파일 메시지만 전송
       const messageContent = hasAttachments ? '' : trimmedMessage;
@@ -551,9 +668,11 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
         attachments,
         undefined,
         undefined,
-        attachmentMeta
+        attachmentMeta,
+        { replyTo: replyToPayload }
       );
       setMessageInput('');
+      setReplyingTo(null);
     } catch (error) {
       console.error('Failed to send message:', error);
     }
@@ -563,12 +682,32 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     // ParticipantList의 InviteParticipantModal에서 직접 API 호출하므로 여기서는 빈 함수
   };
 
+  const handleReplyMessage = (message: ReplyableMessage) => {
+    if (isChatbotRoom) return;
+
+    setReplyingTo({
+      messageId: message.id,
+      senderId: message.senderId || '',
+      senderName: message.sender,
+      messageType: message.messageType || 'TEXT',
+      rawMessage: message.rawMessage || message.message || '',
+      translations: message.translations,
+      metadata: message.metadata,
+      preview: message.message || message.rawMessage || '메시지',
+    });
+  };
+
   const handleRemoveParticipants = async (participantIds: string[]) => {
     if (!selectedRoom || participantIds.length === 0) return;
-    setErrorSnackbar({
-      open: true,
-      message: '현재 버전에서는 참가자 내보내기 기능이 지원되지 않습니다.',
-    });
+
+    try {
+      await removeParticipantsMutation.mutateAsync({
+        roomId: selectedRoom.roomId,
+        participantIds,
+      });
+    } catch (error) {
+      console.error('Failed to remove participants:', error);
+    }
   };
 
   const handleRoomNameChange = async (newName: string) => {
@@ -675,7 +814,12 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
         const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
-        const messagesCol = collection(firestore, 'chatRooms', emergencyRoom.chatRoomId, 'messages');
+        const messagesCol = collection(
+          firestore,
+          'chatRooms',
+          emergencyRoom.chatRoomId,
+          'messages'
+        );
         const messagesQuery = query(
           messagesCol,
           where('createdAt', '>=', Timestamp.fromDate(startOfMonth)),
@@ -997,6 +1141,9 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
                   messageInput={messageInput}
                   onMessageInputChange={setMessageInput}
                   onSendMessage={handleSendMessage}
+                  replyingTo={replyingTo}
+                  onReplyMessage={handleReplyMessage}
+                  onCancelReply={() => setReplyingTo(null)}
                   emergencyStats={
                     selectedRoom?.type === 'EMERGENCY' ? currentEmergencyStats : undefined
                   }
