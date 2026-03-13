@@ -47,10 +47,25 @@ import type { WorkerSignatureStatusInfo } from 'src/services/safety-system/safet
 
 // ----------------------------------------------------------------------
 
+const isValidWorkerSignature = (worker: {
+  targetMemberIdx?: number | null;
+  memberName?: string | null;
+}): boolean => {
+  const targetMemberIdx = worker?.targetMemberIdx;
+  if (!targetMemberIdx || targetMemberIdx <= 0) {
+    return false;
+  }
+
+  const memberName = worker?.memberName?.trim();
+  return Boolean(memberName);
+};
+
 const buildEducationVideoRowsFromWorkerSignatureList = (
   workerList: WorkerSignatureStatusInfo[]
 ): Table2400TBMEducationVideoRow[] =>
-  workerList.map((worker) => {
+  workerList
+    .filter((worker) => isValidWorkerSignature(worker))
+    .map((worker) => {
     const signatureData = (worker as any).signatureData ?? (worker as any).signature ?? undefined;
 
     return {
@@ -258,28 +273,33 @@ export default function SharedDocumentDetailModal({
 
   const resolvedWorkerSignatureList = useMemo(() => {
     if (Array.isArray(workerSignatureList) && workerSignatureList.length > 0) {
-      return workerSignatureList;
+      const validRows = workerSignatureList.filter((worker) => isValidWorkerSignature(worker));
+      if (validRows.length > 0) {
+        return validRows;
+      }
     }
 
     const fallbackRows = (workerSignatureSourceDocument as any)?.educationVideoRows;
     if (Array.isArray(fallbackRows) && fallbackRows.length > 0) {
-      return fallbackRows.map((row: any) => ({
-        documentWorkerSignatureIdx:
-          row.documentWorkerSignatureIdx ?? row.workerSignatureIdx ?? undefined,
-        workerSignatureIdx: row.workerSignatureIdx ?? undefined,
-        targetMemberIdx: row.targetMemberIdx,
-        signatureData: row.signatureData ?? row.signature ?? undefined,
-        status: row.status,
-        vodIdx: row.vodIdx,
-        signedAt: row.signedAt,
-        watchProgress: row.watchProgress,
-        watchedAt: row.watchedAt,
-        memberName: row.memberName,
-        memberEmail: row.memberEmail,
-        memberRole: row.memberRole,
-        position: row.position,
-        department: row.department,
-      })) as WorkerSignatureStatusInfo[];
+      return fallbackRows
+        .filter((row: any) => isValidWorkerSignature(row))
+        .map((row: any) => ({
+          documentWorkerSignatureIdx:
+            row.documentWorkerSignatureIdx ?? row.workerSignatureIdx ?? undefined,
+          workerSignatureIdx: row.workerSignatureIdx ?? undefined,
+          targetMemberIdx: row.targetMemberIdx,
+          signatureData: row.signatureData ?? row.signature ?? undefined,
+          status: row.status,
+          vodIdx: row.vodIdx,
+          signedAt: row.signedAt,
+          watchProgress: row.watchProgress,
+          watchedAt: row.watchedAt,
+          memberName: row.memberName,
+          memberEmail: row.memberEmail,
+          memberRole: row.memberRole,
+          position: row.position,
+          department: row.department,
+        })) as WorkerSignatureStatusInfo[];
     }
 
     return undefined;
@@ -303,7 +323,12 @@ export default function SharedDocumentDetailModal({
 
         const baseRows =
           rowsFromTableData.length > 0
-            ? rowsFromTableData
+            ? rowsFromTableData.filter(
+                (row) =>
+                  Boolean(row.participant?.memberIdx) &&
+                  typeof row.participant?.name === 'string' &&
+                  row.participant.name.trim() !== ''
+              )
             : resolvedWorkerSignatureList
               ? buildEducationVideoRowsFromWorkerSignatureList(resolvedWorkerSignatureList)
               : [];

@@ -12,6 +12,8 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import Radio from '@mui/material/Radio';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
 
 import { Iconify } from 'src/components/iconify';
 import axiosInstance from 'src/lib/axios';
@@ -91,7 +93,48 @@ export default function Table2400TBMForm({
   const [signatureModalRowIndex, setSignatureModalRowIndex] = useState<number | null>(null);
   const [evidenceTargetRowIndex, setEvidenceTargetRowIndex] = useState<number | null>(null);
   const [evidenceUploadingIndex, setEvidenceUploadingIndex] = useState<number | null>(null);
+  const [offlineTab, setOfflineTab] = useState<'participants' | 'evidence'>('participants');
   const evidenceFileInputRef = useRef<HTMLInputElement>(null);
+
+  const getEvidenceFileNames = (row: Table2400TBMEducationVideoRow): string[] =>
+    row.evidenceFileNames && row.evidenceFileNames.length > 0
+      ? row.evidenceFileNames
+      : row.evidenceFileName
+        ? [row.evidenceFileName]
+        : [];
+
+  const getEvidenceFileUrls = (row: Table2400TBMEducationVideoRow): string[] =>
+    row.evidenceFileUrls && row.evidenceFileUrls.length > 0
+      ? row.evidenceFileUrls
+      : row.evidenceFileUrl
+        ? [row.evidenceFileUrl]
+        : [];
+
+  const getEvidenceDisplayText = (row: Table2400TBMEducationVideoRow): string => {
+    const names = getEvidenceFileNames(row);
+    if (names.length === 0) return '';
+    if (names.length === 1) return names[0];
+    return `${names[0]} 외 ${names.length - 1}개`;
+  };
+
+  const getEvidenceGroupKey = (row: Table2400TBMEducationVideoRow, index: number): string => {
+    const urls = getEvidenceFileUrls(row);
+    const names = getEvidenceFileNames(row);
+    if (urls.length > 0) return urls.join('|');
+    if (names.length > 0) return names.join('|');
+    return `row-${index}`;
+  };
+
+  const findWorkerSignatureRowIndex = (
+    rows: Table2400TBMEducationVideoRow[],
+    worker: { targetMemberIdx: number; vodIdx?: number }
+  ) =>
+    rows.findIndex(
+      (row) =>
+        row.participant?.memberIdx === worker.targetMemberIdx &&
+        !row.workerSignatureIdx &&
+        (worker.vodIdx != null ? row.vodIdx === worker.vodIdx : !row.vodIdx)
+    );
 
   // 점검내용 드래그 핸들러
   const handleInspectionDragStart = (index: number) => setDraggedInspectionIndex(index);
@@ -244,12 +287,7 @@ export default function Table2400TBMForm({
           const workerSignatureIdx = workerSignatureIndices[i];
 
           // 해당 targetMemberIdx와 vodIdx를 가진 행 찾기
-          const targetRowIndex = newRows.findIndex(
-            (row) =>
-              row.vodIdx === worker.vodIdx &&
-              row.participant?.memberIdx === worker.targetMemberIdx &&
-              !row.workerSignatureIdx
-          );
+          const targetRowIndex = findWorkerSignatureRowIndex(newRows, worker);
 
           if (targetRowIndex !== -1) {
             console.log('✅ [근로자 서명 등록 API] 행 업데이트:', {
@@ -313,13 +351,7 @@ export default function Table2400TBMForm({
           for (let i = 0; i < workerList.length && i < workerSignatureIndices.length; i++) {
             const worker = workerList[i];
             const workerSignatureIdx = workerSignatureIndices[i];
-
-            const targetRowIndex = updatedRows.findIndex(
-              (row) =>
-                row.vodIdx === worker.vodIdx &&
-                row.participant?.memberIdx === worker.targetMemberIdx &&
-                !row.workerSignatureIdx
-            );
+            const targetRowIndex = findWorkerSignatureRowIndex(updatedRows, worker);
 
             if (targetRowIndex !== -1) {
               console.log('✅ [근로자 서명 등록 API] 함수형 업데이트 - 행 업데이트:', {
@@ -428,6 +460,8 @@ export default function Table2400TBMForm({
           vodIdx: video.vodIdx,
           evidenceFileName: undefined,
           evidenceFileUrl: undefined,
+          evidenceFileNames: [],
+          evidenceFileUrls: [],
           // 영상이 변경되면 기존 서명 정보 초기화
           ...(isVideoChanged && {
             workerSignatureIdx: undefined,
@@ -475,7 +509,12 @@ export default function Table2400TBMForm({
       const clearedRows = prev.educationVideoRows.map((row) => ({
         ...row,
         ...(value === 'ONLINE'
-          ? { evidenceFileName: undefined, evidenceFileUrl: undefined }
+          ? {
+              evidenceFileName: undefined,
+              evidenceFileUrl: undefined,
+              evidenceFileNames: [],
+              evidenceFileUrls: [],
+            }
           : { educationVideo: '', vodIdx: undefined, workerSignatureIdx: undefined, signature: '' }),
       }));
       return {
@@ -497,6 +536,10 @@ export default function Table2400TBMForm({
         ? Math.max(0, Math.floor(numeric))
         : undefined;
     onDataChange((prev) => ({ ...prev, educationTimeMinutes: nextValue }));
+  };
+
+  const handleEducationPlaceChange = (value: string) => {
+    onDataChange((prev) => ({ ...prev, educationPlace: value }));
   };
 
   const getSignatureSrc = (signature?: string) => {
@@ -527,26 +570,31 @@ export default function Table2400TBMForm({
   };
 
   const handleEvidenceFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || evidenceTargetRowIndex === null) return;
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0 || evidenceTargetRowIndex === null) return;
 
     setEvidenceUploadingIndex(evidenceTargetRowIndex);
     try {
-      const uploadResponse = await uploadFile({ files: [file] });
-      let fileUrl: string | undefined;
+      const uploadResponse = await uploadFile({ files });
+      const fileUrls: string[] = [];
+      const fileNames = files.map((file) => file.name);
 
       if ((uploadResponse as any)?.fileUrls && Array.isArray((uploadResponse as any).fileUrls)) {
-        fileUrl = (uploadResponse as any).fileUrls[0];
+        fileUrls.push(...(uploadResponse as any).fileUrls);
       } else if ((uploadResponse as any)?.files && Array.isArray((uploadResponse as any).files)) {
-        fileUrl = (uploadResponse as any).files[0]?.fileUrl;
+        fileUrls.push(
+          ...(uploadResponse as any).files
+            .map((item: any) => item?.fileUrl)
+            .filter(Boolean)
+        );
       } else if (
         (uploadResponse as any)?.data?.fileUrls &&
         Array.isArray((uploadResponse as any).data.fileUrls)
       ) {
-        fileUrl = (uploadResponse as any).data.fileUrls[0];
+        fileUrls.push(...(uploadResponse as any).data.fileUrls);
       }
 
-      if (!fileUrl) {
+      if (fileUrls.length === 0) {
         toast.error('증빙자료 업로드에 실패했습니다.');
         return;
       }
@@ -555,11 +603,19 @@ export default function Table2400TBMForm({
         const newRows = [...prev.educationVideoRows];
         const currentRow = newRows[evidenceTargetRowIndex];
         if (!currentRow) return prev;
-        newRows[evidenceTargetRowIndex] = {
-          ...currentRow,
-          evidenceFileName: file.name,
-          evidenceFileUrl: fileUrl,
-        };
+        const currentGroupKey = getEvidenceGroupKey(currentRow, evidenceTargetRowIndex);
+        const nextNames = [...getEvidenceFileNames(currentRow), ...fileNames];
+        const nextUrls = [...getEvidenceFileUrls(currentRow), ...fileUrls];
+        newRows.forEach((row, index) => {
+          if (getEvidenceGroupKey(row, index) !== currentGroupKey) return;
+          newRows[index] = {
+            ...row,
+            evidenceFileName: nextNames[0],
+            evidenceFileUrl: nextUrls[0],
+            evidenceFileNames: nextNames,
+            evidenceFileUrls: nextUrls,
+          };
+        });
         return { ...prev, educationVideoRows: newRows };
       });
     } catch (error) {
@@ -611,20 +667,19 @@ export default function Table2400TBMForm({
       return;
     }
 
-    const groupKey = isVideoMethod
-      ? String(currentRow.vodIdx ?? 'no-vod')
-      : currentRow.evidenceFileUrl || currentRow.evidenceFileName || `row-${participantModalState.index}`;
+    const rowEvidenceKey = (row: Table2400TBMEducationVideoRow, index: number) =>
+      isVideoMethod ? String(row.vodIdx ?? 'no-vod') : getEvidenceGroupKey(row, index);
 
     // 기존 행의 대상자들을 제외하고 새로운 대상자들만 추가
+    const groupKey = rowEvidenceKey(currentRow, participantModalState.index);
     const existingMemberIndices = new Set(
       data.educationVideoRows
+        .map((row, index) => ({ row, index }))
         .filter((row) => {
-          const rowKey = isVideoMethod
-            ? String(row.vodIdx ?? 'no-vod')
-            : row.evidenceFileUrl || row.evidenceFileName || `row-${participantModalState.index}`;
-          return rowKey === groupKey && row.participant?.memberIdx;
+          const rowKey = rowEvidenceKey(row.row, row.index);
+          return rowKey === groupKey && row.row.participant?.memberIdx;
         })
-        .map((row) => row.participant!.memberIdx)
+        .map((row) => row.row.participant!.memberIdx)
     );
 
     console.log('🔍 [대상자 선택] 기존 대상자 확인:', {
@@ -679,6 +734,8 @@ export default function Table2400TBMForm({
       vodIdx: currentRow.vodIdx,
       evidenceFileName: currentRow.evidenceFileName,
       evidenceFileUrl: currentRow.evidenceFileUrl,
+      evidenceFileNames: getEvidenceFileNames(currentRow),
+      evidenceFileUrls: getEvidenceFileUrls(currentRow),
       signature: '',
       workerSignatureIdx: undefined,
     }));
@@ -702,12 +759,12 @@ export default function Table2400TBMForm({
 
     // 문서가 이미 있고 영상 정보(vodIdx)가 있다면 대상자 등록 API 호출
     // 여러 명을 한 번에 등록 (API가 workerList 배열을 받을 수 있음)
-    if (safetySystemDocumentIdx && currentRow.vodIdx) {
+    if (safetySystemDocumentIdx && (isVideoMethod ? currentRow.vodIdx : true)) {
       const workerList = newMembers
         .filter((m) => m.memberIdx)
         .map((m) => ({
           targetMemberIdx: m.memberIdx!,
-          vodIdx: currentRow.vodIdx!,
+          ...(isVideoMethod && { vodIdx: currentRow.vodIdx! }),
         }));
 
       console.log('🔍 [대상자 선택] API 호출 준비:', {
@@ -780,8 +837,11 @@ export default function Table2400TBMForm({
             participant: null,
             educationVideo: '',
             signature: '',
+            workerSignatureIdx: undefined,
             evidenceFileName: undefined,
             evidenceFileUrl: undefined,
+            evidenceFileNames: [],
+            evidenceFileUrls: [],
           },
         ],
       });
@@ -800,17 +860,56 @@ export default function Table2400TBMForm({
 
   const isInPerson = isOffline;
 
-  // 동일한 영상(vodIdx)을 가진 행들을 그룹화하여 rowspan 계산
+  const evidenceGroups = useMemo(() => {
+    if (!isInPerson) return [];
+
+    const groupMap = new Map<
+      string,
+      {
+        key: string;
+        representativeIndex: number;
+        row: Table2400TBMEducationVideoRow;
+        participantCount: number;
+        participantNames: string[];
+      }
+    >();
+
+    data.educationVideoRows.forEach((row, index) => {
+      const key = getEvidenceGroupKey(row, index);
+      const existingGroup = groupMap.get(key);
+      const participantName = row.participant?.name?.trim();
+
+      if (!existingGroup) {
+        groupMap.set(key, {
+          key,
+          representativeIndex: index,
+          row,
+          participantCount: participantName ? 1 : 0,
+          participantNames: participantName ? [participantName] : [],
+        });
+        return;
+      }
+
+      existingGroup.participantCount += participantName ? 1 : 0;
+      if (participantName) {
+        existingGroup.participantNames.push(participantName);
+      }
+    });
+
+    return Array.from(groupMap.values());
+  }, [data.educationVideoRows, isInPerson]);
+
+  // 동일한 교육 항목(온라인: 영상, 오프라인: 증빙자료) 그룹화하여 rowspan 계산
   const rowGroups = useMemo(() => {
     const groups: Array<{ startIndex: number; count: number; vodKey: number | string }> = [];
     let currentGroup: { startIndex: number; count: number; vodKey: number | string } | null = null;
 
     data.educationVideoRows.forEach((row, index) => {
-      const vodKey = isInPerson
-        ? row.evidenceFileUrl || row.evidenceFileName || `empty-${index}`
+      const groupKey = isInPerson
+        ? getEvidenceGroupKey(row, index)
         : row.vodIdx ?? `empty-${index}`;
 
-      if (!currentGroup || currentGroup.vodKey !== vodKey) {
+      if (!currentGroup || currentGroup.vodKey !== groupKey) {
         // 새로운 그룹 시작
         if (currentGroup) {
           groups.push(currentGroup);
@@ -818,7 +917,7 @@ export default function Table2400TBMForm({
         currentGroup = {
           startIndex: index,
           count: 1,
-          vodKey,
+          vodKey: groupKey,
         };
       } else {
         // 같은 그룹에 추가
@@ -870,9 +969,10 @@ export default function Table2400TBMForm({
         <Box component="table" sx={tableStyle}>
           <thead>
             <tr>
-              <th style={{ width: '34%' }}>교육 방법</th>
-              <th style={{ width: '33%' }}>교육 구분</th>
-              <th style={{ width: '33%' }}>교육 시간(분)</th>
+              <th style={{ width: '25%' }}>교육 방법</th>
+              <th style={{ width: '25%' }}>교육 구분</th>
+              <th style={{ width: '25%' }}>교육 시간(분)</th>
+              <th style={{ width: '25%' }}>교육 장소</th>
             </tr>
           </thead>
           <tbody>
@@ -939,6 +1039,23 @@ export default function Table2400TBMForm({
                     VOD 길이 자동 계산
                   </Typography>
                 )}
+              </td>
+              <td>
+                <TextField
+                  size="small"
+                  fullWidth
+                  value={data.educationPlace || ''}
+                  onChange={(e) => handleEducationPlaceChange(e.target.value)}
+                  placeholder={
+                    isOffline
+                      ? '교육 장소를 입력하세요'
+                      : '집체 교육만 입력'
+                  }
+                  disabled={!isOffline}
+                  error={isOffline && !data.educationPlace}
+                  helperText={isOffline && !data.educationPlace ? '집체 교육은 교육 장소가 필요합니다.' : ''}
+                  sx={{ maxWidth: 220, margin: '0 auto' }}
+                />
               </td>
             </tr>
           </tbody>
@@ -1036,6 +1153,66 @@ export default function Table2400TBMForm({
 
       {/* 3. TBM 교육영상 및 대상자 */}
       <Box sx={{ pb: 5, width: '100%' }}>
+        {isInPerson ? (
+          <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+            <Tabs
+              value={offlineTab}
+              onChange={(_, value) => setOfflineTab(value)}
+              sx={{ minHeight: 40 }}
+            >
+              <Tab value="participants" label="대상자 선택" sx={{ minHeight: 40 }} />
+              <Tab value="evidence" label="증빙자료 업로드" sx={{ minHeight: 40 }} />
+            </Tabs>
+          </Box>
+        ) : null}
+
+        {isInPerson && offlineTab === 'evidence' ? (
+          <Box component="table" sx={tableStyle}>
+            <thead>
+              <tr style={{ height: 48 }}>
+                <th style={{ width: '30%' }}>증빙자료</th>
+                <th style={{ width: '20%' }}>첨부 현황</th>
+                <th style={{ width: '30%' }}>대상자</th>
+                <th style={{ width: '20%' }}>업로드</th>
+              </tr>
+            </thead>
+            <tbody>
+              {evidenceGroups.map((group) => (
+                <tr key={group.key}>
+                  <td>
+                    <Typography sx={{ fontSize: 14, fontWeight: 400 }}>
+                      {getEvidenceDisplayText(group.row) || '증빙자료를 업로드하세요'}
+                    </Typography>
+                  </td>
+                  <td>
+                    <Typography sx={{ fontSize: 14, fontWeight: 400 }}>
+                      {getEvidenceFileNames(group.row).length > 0
+                        ? `${getEvidenceFileNames(group.row).length}건`
+                        : '미업로드'}
+                    </Typography>
+                  </td>
+                  <td>
+                    <Typography sx={{ fontSize: 14, fontWeight: 400, whiteSpace: 'pre-wrap' }}>
+                      {group.participantNames.length > 0
+                        ? group.participantNames.join(', ')
+                        : '대상자 미선택'}
+                    </Typography>
+                  </td>
+                  <td>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => handleEvidenceSelectClick(group.representativeIndex)}
+                      disabled={evidenceUploadingIndex === group.representativeIndex}
+                    >
+                      {evidenceUploadingIndex === group.representativeIndex ? '업로드 중' : '파일 선택'}
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </Box>
+        ) : (
         <Box component="table" sx={tableStyle}>
           <thead>
             <tr style={{ height: 48 }}>
@@ -1069,7 +1246,7 @@ export default function Table2400TBMForm({
                         }}
                       >
                         {isInPerson
-                          ? row.evidenceFileName || '증빙자료 선택'
+                          ? getEvidenceDisplayText(row) || '증빙자료 선택'
                           : row.educationVideo || '교육영상 선택'}
                       </Button>
                     </td>
@@ -1080,11 +1257,7 @@ export default function Table2400TBMForm({
                         variant="outlined"
                         size="small"
                         onClick={() => setParticipantModalState({ index, mode: 'replace' })}
-                        disabled={
-                          isInPerson
-                            ? false
-                            : !row.vodIdx || !row.educationVideo
-                        }
+                        disabled={isInPerson ? false : !row.vodIdx || !row.educationVideo}
                         sx={{
                           minWidth: 120,
                           justifyContent: 'flex-start',
@@ -1115,9 +1288,7 @@ export default function Table2400TBMForm({
                       <Button
                         variant="outlined"
                         size="small"
-                        disabled={
-                          !safetySystemDocumentIdx || !row.vodIdx || !row.workerSignatureIdx
-                        }
+                        disabled={!safetySystemDocumentIdx || !row.workerSignatureIdx}
                         onClick={() => setSignatureModalRowIndex(index)}
                       >
                         서명
@@ -1134,6 +1305,7 @@ export default function Table2400TBMForm({
             })}
           </tbody>
         </Box>
+        )}
       <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
         <Button
           variant="outlined"
@@ -1143,11 +1315,12 @@ export default function Table2400TBMForm({
           행 추가
         </Button>
       </Box>
-    </Box>
+      </Box>
 
       <input
         ref={evidenceFileInputRef}
         type="file"
+        multiple
         accept="image/*,application/pdf"
         style={{ display: 'none' }}
         onChange={handleEvidenceFileChange}

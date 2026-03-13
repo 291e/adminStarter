@@ -31,36 +31,43 @@ const DEFAULT_CLASSIFICATION_ROWS: Table2100ClassificationRow[] = [
   {
     number: 1,
     category: '기계적 요인',
+    processName: '',
     hazardFactors: '협착, 끼임, 절단, 충돌, 낙하, 비래, 감김 등',
   },
   {
     number: 2,
     category: '전기적 요인',
+    processName: '',
     hazardFactors: '감전, 누전, 정전기, 아크, 과열 등',
   },
   {
     number: 3,
     category: '화학적 요인',
+    processName: '',
     hazardFactors: '가스, 분진, 미스트, 증기, 중독, 질식, 폭발 등',
   },
   {
     number: 4,
     category: '물리적 요인',
+    processName: '',
     hazardFactors: '소음, 진동, 방사선, 온도, 조도 등',
   },
   {
     number: 5,
     category: '생물학적 요인',
+    processName: '',
     hazardFactors: '바이러스, 박테리아, 곰팡이, 기생충, 체액 등',
   },
   {
     number: 6,
     category: '인간공학적 요인',
+    processName: '',
     hazardFactors: '반복동작, 중량물 취급, 부적절한 자세, 과로 등',
   },
   {
     number: 7,
     category: '작업환경 요인',
+    processName: '',
     hazardFactors: '미끄럼, 넘어짐, 환기불량, 고온·저온, 공기질도 등',
   },
 ];
@@ -193,6 +200,7 @@ export default function Table2100Form({ data, onDataChange, riskAssessmentData }
     const newRow: Table2100ClassificationRow = {
       number: data.classification.length + 1,
       category: '',
+      processName: '',
       hazardFactors: '',
     };
     onDataChange({ ...data, classification: [...data.classification, newRow] });
@@ -330,11 +338,27 @@ export default function Table2100Form({ data, onDataChange, riskAssessmentData }
         <Box component="table" sx={tableStyle}>
           <thead>
             <tr>
-              <th style={{ width: 94 }}>번호</th>
-              <th style={{ width: 164 }}>구분</th>
-              <th style={{ flex: 1 }}>해당 유해·위험요인</th>
-              <th style={{ width: 30 }}>이동</th>
-              <th style={{ width: 39 }}>삭제</th>
+              <th style={{ width: 94 }} rowSpan={2}>
+                번호
+              </th>
+              <th style={{ width: 164 }} rowSpan={2}>
+                구분
+              </th>
+              <th style={{ width: 160, height: 30 }}>
+                공종흐름도
+              </th>
+              <th style={{ flex: 1 }} rowSpan={2}>
+                해당 유해·위험요인
+              </th>
+              <th style={{ width: 30 }} rowSpan={2}>
+                이동
+              </th>
+              <th style={{ width: 39 }} rowSpan={2}>
+                삭제
+              </th>
+            </tr>
+            <tr>
+              <th style={{ width: 160, height: 30 }}>공종명</th>
             </tr>
           </thead>
           <tbody>
@@ -370,6 +394,22 @@ export default function Table2100Form({ data, onDataChange, riskAssessmentData }
                     size="small"
                     value={row.category}
                     onChange={(e) => handleClassificationChange(index, 'category', e.target.value)}
+                    fullWidth
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        fontSize: 14,
+                        height: 'auto',
+                      },
+                    }}
+                  />
+                </td>
+                <td>
+                  <TextField
+                    size="small"
+                    value={row.processName || ''}
+                    onChange={(e) =>
+                      handleClassificationChange(index, 'processName', e.target.value)
+                    }
                     fullWidth
                     sx={{
                       '& .MuiOutlinedInput-root': {

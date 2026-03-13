@@ -176,12 +176,37 @@ const initialTable1400Data: Table1400Data = {
   ],
 };
 
+const normalizeTbmEvidenceFields = (row: Partial<Table2400TBMEducationVideoRow>) => {
+  const evidenceFileNames =
+    Array.isArray(row.evidenceFileNames) && row.evidenceFileNames.length > 0
+      ? row.evidenceFileNames
+      : row.evidenceFileName
+        ? [row.evidenceFileName]
+        : [];
+  const evidenceFileUrls =
+    Array.isArray(row.evidenceFileUrls) && row.evidenceFileUrls.length > 0
+      ? row.evidenceFileUrls
+      : row.evidenceFileUrl
+        ? [row.evidenceFileUrl]
+        : [];
+
+  return {
+    ...row,
+    evidenceFileNames,
+    evidenceFileUrls,
+    evidenceFileName: evidenceFileNames[0],
+    evidenceFileUrl: evidenceFileUrls[0],
+  } as Table2400TBMEducationVideoRow;
+};
+
 const buildEducationVideoRowsFromWorkerSignatureList = (
   workerList: any[]
 ): Table2400TBMEducationVideoRow[] =>
-  workerList.map((worker) => {
+  workerList
+    .filter((worker: any) => worker?.targetMemberIdx > 0 && typeof worker?.memberName === 'string' && worker.memberName.trim() !== '')
+    .map((worker) => {
     const signatureData = worker.signatureData ?? worker.signature ?? undefined;
-    return {
+    return normalizeTbmEvidenceFields({
       participant: {
         memberIdx: worker.targetMemberIdx,
         name: worker.memberName || '',
@@ -192,8 +217,17 @@ const buildEducationVideoRowsFromWorkerSignatureList = (
       workerSignatureIdx:
         worker.documentWorkerSignatureIdx ?? worker.workerSignatureIdx ?? undefined,
       signature: signatureData ? signatureData : worker.status === 'SIGNED' ? 'SIGNED' : '',
-    };
+      evidenceFileName: worker.evidenceFileName,
+      evidenceFileUrl: worker.evidenceFileUrl,
+      evidenceFileNames: worker.evidenceFileNames,
+      evidenceFileUrls: worker.evidenceFileUrls,
+    });
   });
+
+const getTbmWorkerKey = (
+  row: { targetMemberIdx?: number | null; vodIdx?: number | null },
+  isOffline: boolean
+) => `${row.targetMemberIdx ?? ''}${isOffline ? '' : `:${row.vodIdx ?? ''}`}`;
 
 export function Risk_2200EditView({
   safetyId,
@@ -750,17 +784,25 @@ export function Risk_2200EditView({
         [];
 
       if (tableType === '2400-tbm' && !initialWorkerListRef.current) {
+        const normalizedMethod = normalizeTbmEducationMethod(parsedTableData.data?.educationMethod);
+        const isOffline = normalizedMethod === 'OFFLINE';
         const baseEducationVideoRows =
           Array.isArray(parsedTableData.data?.educationVideoRows) &&
           parsedTableData.data.educationVideoRows.length > 0
-            ? parsedTableData.data.educationVideoRows
+            ? parsedTableData.data.educationVideoRows.map((row: any) => normalizeTbmEvidenceFields(row))
             : Array.isArray(workerSignatureList)
               ? buildEducationVideoRowsFromWorkerSignatureList(workerSignatureList)
               : [];
 
         const toKey = (row: any) =>
-          row?.participant?.memberIdx && row?.vodIdx
-            ? `${row.participant.memberIdx}:${row.vodIdx}`
+          row?.participant?.memberIdx
+            ? getTbmWorkerKey(
+                {
+                  targetMemberIdx: row.participant.memberIdx,
+                  vodIdx: row.vodIdx,
+                },
+                isOffline
+              )
             : null;
         const keys = baseEducationVideoRows
           .map((row: any) => toKey(row))
@@ -822,41 +864,48 @@ export function Risk_2200EditView({
           }
 
           let processedData = parsedTableData.data as Table2400TBMData;
+          const normalizedMethod = normalizeTbmEducationMethod(processedData.educationMethod);
+          const isOffline = normalizedMethod === 'OFFLINE';
           const baseEducationVideoRows =
             Array.isArray(processedData.educationVideoRows) &&
             processedData.educationVideoRows.length > 0
-              ? processedData.educationVideoRows
+              ? processedData.educationVideoRows.map((row) => normalizeTbmEvidenceFields(row))
               : Array.isArray(workerSignatureList)
                 ? buildEducationVideoRowsFromWorkerSignatureList(workerSignatureList)
                 : [];
 
-          if (
-            Array.isArray(workerSignatureList) &&
-            workerSignatureList.length > 0 &&
-            baseEducationVideoRows.length > 0
-          ) {
-            const signatureMap = new Map<
-              string,
-              { signatureData?: string; status?: string; workerSignatureIdx?: number }
-            >();
+            if (
+              Array.isArray(workerSignatureList) &&
+              workerSignatureList.length > 0 &&
+              baseEducationVideoRows.length > 0
+            ) {
+              const signatureMap = new Map<
+                string,
+                { signatureData?: string; status?: string; workerSignatureIdx?: number }
+              >();
 
-            workerSignatureList.forEach((worker: any) => {
-              const vodIdx = worker.vodIdx ?? '';
-              const key = `${worker.targetMemberIdx}:${vodIdx}`;
-              signatureMap.set(key, {
-                signatureData: worker.signatureData ?? worker.signature,
-                status: worker.status,
-                workerSignatureIdx:
-                  worker.documentWorkerSignatureIdx ?? worker.workerSignatureIdx ?? undefined,
+              workerSignatureList.forEach((worker: any) => {
+                const key = getTbmWorkerKey(
+                  {
+                    targetMemberIdx: worker.targetMemberIdx,
+                    vodIdx: worker.vodIdx,
+                  },
+                  isOffline
+                );
+                signatureMap.set(key, {
+                  signatureData: worker.signatureData ?? worker.signature,
+                  status: worker.status,
+                  workerSignatureIdx:
+                    worker.documentWorkerSignatureIdx ?? worker.workerSignatureIdx ?? undefined,
+                });
               });
-            });
 
-            const updatedRows = baseEducationVideoRows.map((row: any) => {
-              const memberIdx = row.participant?.memberIdx ?? '';
-              const vodIdx = row.vodIdx ?? '';
-              const directKey = `${memberIdx}:${vodIdx}`;
-              const fallbackKey = `${memberIdx}:`;
-              const match = signatureMap.get(directKey) || signatureMap.get(fallbackKey);
+              const updatedRows = baseEducationVideoRows.map((row: any) => {
+                const memberIdx = row.participant?.memberIdx ?? '';
+                const vodIdx = row.vodIdx ?? '';
+                const directKey = getTbmWorkerKey({ targetMemberIdx: memberIdx, vodIdx }, isOffline);
+                const fallbackKey = getTbmWorkerKey({ targetMemberIdx: memberIdx, vodIdx: undefined }, isOffline);
+                const match = signatureMap.get(directKey) || signatureMap.get(fallbackKey);
 
               const resolvedSignature = match
                 ? match.signatureData
@@ -893,6 +942,7 @@ export function Risk_2200EditView({
             inspectionRows: processedData.inspectionRows,
             educationContent: processedData.educationContent,
             educationVideoRows: processedData.educationVideoRows || [],
+            educationPlace: processedData.educationPlace,
             educationApply:
               processedData.educationApply === 1 || documentEducationApply === 1 ? 1 : 0,
             educationMethod: normalizeTbmEducationMethod(
@@ -974,6 +1024,8 @@ export function Risk_2200EditView({
               return prev;
             }
             const raw = tableData.data as Table2400TBMData;
+            const normalizedMethod = normalizeTbmEducationMethod(raw.educationMethod);
+            const isOffline = normalizedMethod === 'OFFLINE';
             const documentEducationApply = (currentDocument as any)?.educationApply;
             const documentEducationType = (currentDocument as any)?.educationType;
             const documentEducationMethod = (currentDocument as any)?.educationMethod;
@@ -989,12 +1041,20 @@ export function Risk_2200EditView({
                   documentEducationMethod) as Table2400TBMEducationMethod
               ),
               educationType: raw.educationType ?? documentEducationType ?? prev.educationType,
+              educationPlace: raw.educationPlace ?? prev.educationPlace,
               educationTimeMinutes:
                 raw.educationTimeMinutes ??
                 documentEducationTimeMinutes ??
                 prev.educationTimeMinutes,
               educationContent: raw.educationContent ?? prev.educationContent,
-              educationVideoRows: raw.educationVideoRows ?? prev.educationVideoRows,
+              educationVideoRows: Array.isArray(raw.educationVideoRows)
+                ? raw.educationVideoRows.map((row) => normalizeTbmEvidenceFields(row))
+                : prev.educationVideoRows.filter(
+                    (row) =>
+                      row.participant?.memberIdx &&
+                      (isOffline || row.vodIdx) &&
+                      row.vodIdx !== undefined
+                  ),
               inspectionRows: raw.inspectionRows ?? prev.inspectionRows,
             };
           });
@@ -1714,6 +1774,26 @@ export function Risk_2200EditView({
       tableData = { tableType: '1100', rows: table1100Rows };
     }
 
+    let tbmEducationMethod: 'ONLINE' | 'OFFLINE' | undefined;
+    let isTbmOffline = false;
+
+    if (is2400TBM) {
+      tbmEducationMethod = normalizeTbmEducationMethod(table2400TBMData.educationMethod);
+      isTbmOffline = tbmEducationMethod === 'OFFLINE';
+
+      if (isTbmOffline) {
+        if (!table2400TBMData.educationPlace?.trim()) {
+          enqueueSnackbar('집체 교육은 교육 장소를 입력해야 합니다.', { variant: 'error' });
+          return;
+        }
+
+        if (!table2400TBMData.educationTimeMinutes || table2400TBMData.educationTimeMinutes <= 0) {
+          enqueueSnackbar('집체 교육은 교육 시간을 분 단위로 입력해야 합니다.', { variant: 'error' });
+          return;
+        }
+      }
+    }
+
     // API 요청 데이터 구성
     const requestData: any = {
       approvalDeadline: approvalDeadline ? approvalDeadline.format('YYYY-MM-DD') : undefined,
@@ -1721,11 +1801,12 @@ export function Risk_2200EditView({
       approvalStep, // approvalStep 포함
     };
 
-    if (is2400TBM) {
-      const normalizedMethod = normalizeTbmEducationMethod(table2400TBMData.educationMethod);
+    if (is2400TBM && tbmEducationMethod) {
+      requestData.educationApply = 1;
       requestData.educationType = table2400TBMData.educationType;
-      requestData.educationMethod = normalizedMethod;
-      if (normalizedMethod === 'OFFLINE') {
+      requestData.educationMethod = tbmEducationMethod;
+      requestData.educationPlace = table2400TBMData.educationPlace;
+      if (isTbmOffline) {
         requestData.educationTimeMinutes = table2400TBMData.educationTimeMinutes ?? undefined;
       }
     }
@@ -1738,20 +1819,31 @@ export function Risk_2200EditView({
       });
 
       const workerList = table2400TBMData.educationVideoRows
-        .filter((row) => row.participant?.memberIdx && row.vodIdx)
+        .filter((row) => row.participant?.memberIdx && (isTbmOffline || row.vodIdx))
         .map((row) => ({
           targetMemberIdx: row.participant!.memberIdx!,
-          vodIdx: row.vodIdx!,
+          ...(isTbmOffline ? {} : { vodIdx: row.vodIdx }),
         }));
+      const workerListMap = new Map<string, { targetMemberIdx: number; vodIdx?: number }>();
+      workerList.forEach((worker) =>
+        workerListMap.set(getTbmWorkerKey(worker, isTbmOffline), worker)
+      );
+      const dedupedWorkerList = Array.from(workerListMap.values());
 
       console.log('🔍 [문서 수정] 생성된 workerList:', {
-        workerList,
-        workerListCount: workerList.length,
-        details: workerList.map((w) => ({
+        workerList: dedupedWorkerList,
+        workerListCount: dedupedWorkerList.length,
+        details: dedupedWorkerList.map((w) => ({
           targetMemberIdx: w.targetMemberIdx,
           vodIdx: w.vodIdx,
           participantName: table2400TBMData.educationVideoRows.find(
-            (r) => r.participant?.memberIdx === w.targetMemberIdx && r.vodIdx === w.vodIdx
+            (r) => {
+              if (!r.participant?.memberIdx || r.participant.memberIdx !== w.targetMemberIdx) {
+                return false;
+              }
+              if (isTbmOffline) return true;
+              return r.vodIdx === w.vodIdx;
+            }
           )?.participant?.name,
         })),
       });
@@ -1761,30 +1853,28 @@ export function Risk_2200EditView({
         (currentDocument as any)?.educationVideoRows ||
         [];
       const existingWorkerList = Array.isArray(existingWorkerSource)
-        ? existingWorkerSource
-            .filter((row: any) => row?.targetMemberIdx && row?.vodIdx)
+            ? existingWorkerSource
+            .filter((row: any) => row?.targetMemberIdx && (isTbmOffline || row?.vodIdx))
             .map((row: any) => ({
               targetMemberIdx: row.targetMemberIdx,
-              vodIdx: row.vodIdx,
+              ...(isTbmOffline ? {} : { vodIdx: row.vodIdx }),
             }))
         : [];
 
-      const toKey = (w: { targetMemberIdx: number; vodIdx: number }) =>
-        `${w.targetMemberIdx}:${w.vodIdx}`;
-      const nextKeySet = new Set(workerList.map(toKey));
+      const nextKeySet = new Set(dedupedWorkerList.map((w) => getTbmWorkerKey(w, isTbmOffline)));
       const initialKeys =
         initialWorkerListRef.current && initialWorkerListRef.current.length > 0
           ? initialWorkerListRef.current
-          : existingWorkerList.map(toKey);
+          : existingWorkerList.map((w) => getTbmWorkerKey(w, isTbmOffline));
       const existingKeySet = new Set(initialKeys);
       const isSameWorkerList =
         nextKeySet.size === existingKeySet.size &&
         Array.from(nextKeySet).every((key) => existingKeySet.has(key));
 
-      if (workerList.length > 0 && !isSameWorkerList) {
-        requestData.workerList = workerList;
+      if (dedupedWorkerList.length > 0 && !isSameWorkerList) {
+        requestData.workerList = dedupedWorkerList;
         console.log('✅ [문서 수정] workerList 변경 감지 → API 전송');
-      } else if (workerList.length > 0 && isSameWorkerList) {
+      } else if (dedupedWorkerList.length > 0 && isSameWorkerList) {
         console.log('ℹ️ [문서 수정] workerList 동일 → 전송 생략 (서명 유지)');
       } else {
         console.warn('⚠️ [문서 수정] workerList가 비어있습니다. educationVideoRows 확인:', {

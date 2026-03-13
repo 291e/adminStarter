@@ -45,10 +45,13 @@ declare global {
 
 // ----------------------------------------------------------------------
 
-import type { CompanyType } from 'src/services/organization/organization.types';
+import type {
+  CompanyType,
+  CreateOrganizationParams,
+} from 'src/services/organization/organization.types';
 
 export type OrganizationFormData = {
-  companyType: CompanyType;
+  companyType: CompanyType | '';
   companyName: string;
   businessType: string;
   businessNumber: string;
@@ -69,12 +72,8 @@ type Props = {
 
 // 조직 구분 옵션 (한글 표시 -> API enum 값 매핑)
 const COMPANY_TYPE_OPTIONS: Array<{ label: string; value: CompanyType }> = [
-  { label: '운영사', value: 'OPERATOR' },
-  { label: '회원사', value: 'MEMBER' },
-  { label: '총판', value: 'DISTRIBUTOR' },
-  { label: '대리점', value: 'AGENCY' },
-  { label: '딜러', value: 'DEALER' },
-  { label: '비회원', value: 'NON_MEMBER' },
+  { label: '일반', value: 'MEMBER' },
+  { label: '공단보조', value: 'NON_MEMBER' },
 ];
 
 type BusinessTypeOption = {
@@ -88,7 +87,7 @@ const BUSINESS_TYPE_OPTIONS: BusinessTypeOption[] = [
 ];
 
 const DEFAULT_FORM_DATA: OrganizationFormData = {
-  companyType: 'MEMBER',
+  companyType: '',
   companyName: '',
   businessType: String(BUSINESS_TYPE_OPTIONS[0]?.value ?? ''),
   businessNumber: '',
@@ -103,7 +102,6 @@ const DEFAULT_FORM_DATA: OrganizationFormData = {
 };
 
 const REQUIRED_FIELDS: Array<keyof OrganizationFormData> = [
-  'companyType',
   'companyName',
   'representativeName',
   'representativePhone',
@@ -305,7 +303,7 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
 
     try {
       setErrorMessage(null);
-      const payload = {
+      const payload: CreateOrganizationParams = {
         companyName: sanitizeField(formData.companyName, 100),
         businessNumber: formData.businessNumber.trim() || undefined,
         businessType: businessTypeNumber, // 필수 필드
@@ -316,9 +314,11 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
         businessItem: sanitizeField(formData.businessItem, 100),
         address:
           [formData.address, formData.detailAddress].filter(Boolean).join(' ').trim() || undefined,
-        companyType: formData.companyType,
-        serviceSettingIdxes: undefined, // 구독 서비스 제거됨
       };
+
+      if (formData.companyType) {
+        payload.companyType = formData.companyType;
+      }
 
       if (import.meta.env.DEV) {
         console.log('📤 [CreateOrganizationModal] 조직 등록 요청', payload);
@@ -409,22 +409,16 @@ export default function CreateOrganizationModal({ open, onClose }: Props) {
               <FormControl fullWidth>
                 <InputLabel id="company-type-label">
                   구분
-                  <Typography component="span" sx={{ color: 'error.main', ml: 0.5 }}>
-                    *
-                  </Typography>
                 </InputLabel>
                 <Select
                   labelId="company-type-label"
-                  label="구분 *"
+                  label="구분"
                   value={formData.companyType}
                   onChange={(e) => handleChange('companyType', e.target.value as CompanyType)}
                 >
+                  <MenuItem value="">선택</MenuItem>
                   {COMPANY_TYPE_OPTIONS.map((option) => (
-                    <MenuItem
-                      key={option.value}
-                      value={option.value}
-                      disabled={option.value === 'OPERATOR'}
-                    >
+                    <MenuItem key={option.value} value={option.value}>
                       {option.label}
                     </MenuItem>
                   ))}

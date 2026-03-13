@@ -45,14 +45,17 @@ declare global {
 // ----------------------------------------------------------------------
 
 const BUSINESS_TYPE_OPTIONS = ['법인 사업자', '개인 사업자'];
+type OrganizationDivisionType = 'MEMBER' | 'NON_MEMBER' | '';
 const DIVISION_OPTIONS: Array<{ label: string; value: CompanyType }> = [
-  { label: '운영사', value: 'OPERATOR' },
-  { label: '회원사', value: 'MEMBER' },
-  { label: '총판', value: 'DISTRIBUTOR' },
-  { label: '대리점', value: 'AGENCY' },
-  { label: '딜러', value: 'DEALER' },
-  { label: '비회원', value: 'NON_MEMBER' },
+  { label: '일반', value: 'MEMBER' },
+  { label: '공단보조', value: 'NON_MEMBER' },
 ];
+
+const toDivisionValue = (companyType?: Organization['companyType']): OrganizationDivisionType => {
+  if (companyType === 'NON_MEMBER') return 'NON_MEMBER';
+  if (companyType === 'MEMBER') return 'MEMBER';
+  return '';
+};
 
 // businessType을 숫자로 변환 (0: 법인 사업자, 1: 개인 사업자)
 const businessTypeToNumber = (businessType: string): number | undefined => {
@@ -108,6 +111,7 @@ type Props = {
   initialTab?: number;
   onTabChange?: (tabValue: number) => void;
   companyMemberList?: any[]; // 조직 상세 API 응답의 companyMemberList (담당자 정보 조회용)
+  memberCount?: number;
   educationTabContent?: ReactNode;
 };
 
@@ -117,6 +121,7 @@ export default function OrganizationInfo({
   initialTab = 0,
   onTabChange,
   companyMemberList,
+  memberCount,
   educationTabContent,
 }: Props) {
   const queryClient = useQueryClient();
@@ -161,7 +166,7 @@ export default function OrganizationInfo({
     businessItem: '',
     address: '',
     detailAddress: '',
-    division: '',
+    division: '' as OrganizationDivisionType,
   });
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
@@ -191,7 +196,7 @@ export default function OrganizationInfo({
         businessItem: orgData.businessItem || '',
         address: orgData.address || '',
         detailAddress: orgData.addressDetail || '',
-        division: orgData.companyType || '', // 구분 (OPERATOR, MEMBER 등)
+        division: toDivisionValue(orgData.companyType), // 구분 (일반/공단보조)
       };
 
       setFormData(newFormData);
@@ -231,8 +236,10 @@ export default function OrganizationInfo({
       };
 
       // 슈퍼 어드민인 경우에만 companyType 전송
-      if (isSuperAdmin && formData.division) {
-        updateParams.companyType = formData.division as CompanyType;
+      if (isSuperAdmin) {
+        if (formData.division) {
+          updateParams.companyType = formData.division as CompanyType;
+        }
       }
 
       if (import.meta.env.DEV) {
@@ -301,7 +308,7 @@ export default function OrganizationInfo({
     ? fDateTime(orgData.createAt, 'YYYY-MM-DD HH:mm:ss')
     : '-';
 
-  // 담당자 정보에서 접속일과 최근 접속 IP 가져오기
+  // 담당자 정보에서 최근 접속일 가져오기
   const managerMemberIdx = (orgData as any).managerMemberIdx;
   const managerMember = companyMemberList?.find(
     (member: any) => member.memberIdx === managerMemberIdx
@@ -309,7 +316,6 @@ export default function OrganizationInfo({
   const lastAccessDate = managerMember?.lastSigninAt
     ? fDateTime(managerMember.lastSigninAt, 'YYYY-MM-DD HH:mm:ss')
     : '-';
-  const lastAccessIP = managerMember?.lastSigninIP || managerMember?.ipAddress || '-';
 
   return (
     <Box
@@ -567,7 +573,7 @@ export default function OrganizationInfo({
                     <Select
                       fullWidth
                       size="small"
-                      value={formData.division || ''}
+                      value={formData.division}
                       onChange={(e) => handleChange('division', e.target.value)}
                       disabled={!isEditMode}
                       sx={{
@@ -575,12 +581,9 @@ export default function OrganizationInfo({
                         lineHeight: '24px',
                       }}
                     >
+                      <MenuItem value="">선택</MenuItem>
                       {DIVISION_OPTIONS.map((option) => (
-                        <MenuItem
-                          key={option.value}
-                          value={option.value}
-                          disabled={option.value === 'OPERATOR'}
-                        >
+                        <MenuItem key={option.value} value={option.value}>
                           {option.label}
                         </MenuItem>
                       ))}
@@ -745,7 +748,13 @@ export default function OrganizationInfo({
 
       {tabValue === 1 && <AccidentFreeWorkplace organizationId={organizationId.toString()} />}
 
-      {tabValue === 2 && <SubscriptionService organizationId={organizationId.toString()} />}
+      {tabValue === 2 && (
+        <SubscriptionService
+          organizationId={organizationId.toString()}
+          organization={organization}
+          memberCount={memberCount}
+        />
+      )}
 
       {tabValue === 3 && educationTabContent}
     </Box>

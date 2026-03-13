@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -21,11 +21,13 @@ import Switch from '@mui/material/Switch';
 
 import { Iconify } from 'src/components/iconify';
 import { useUpdateOrganization } from '../hooks/use-organization-api';
-import { useServices } from 'src/sections/ServiceSetting/hooks/use-service-setting-api';
 import DeactivateMemberModal from './DeactivateMemberModal';
 
-import type { CompanyType, Organization } from 'src/services/organization/organization.types';
-import type { ServiceSetting } from 'src/services/service-setting/service-setting.types';
+import type {
+  CompanyType,
+  Organization,
+  UpdateOrganizationParams,
+} from 'src/services/organization/organization.types';
 
 declare global {
   interface Window {
@@ -54,7 +56,7 @@ type Props = {
 };
 
 type EditFormState = {
-  companyType: CompanyType;
+  companyType: CompanyType | '';
   companyName: string;
   businessType: string;
   businessNumber: string;
@@ -64,17 +66,12 @@ type EditFormState = {
   detailAddress: string;
   phone: string;
   email: string;
-  subscriptionService: string;
   managerName: string;
 };
 
 const COMPANY_TYPE_OPTIONS: Array<{ label: string; value: CompanyType }> = [
-  { label: '운영사', value: 'OPERATOR' },
-  { label: '회원사', value: 'MEMBER' },
-  { label: '총판', value: 'DISTRIBUTOR' },
-  { label: '대리점', value: 'AGENCY' },
-  { label: '딜러', value: 'DEALER' },
-  { label: '비회원', value: 'NON_MEMBER' },
+  { label: '일반', value: 'MEMBER' },
+  { label: '공단보조', value: 'NON_MEMBER' },
 ];
 
 const BUSINESS_TYPE_OPTIONS = [
@@ -83,7 +80,7 @@ const BUSINESS_TYPE_OPTIONS = [
 ];
 
 const DEFAULT_FORM_STATE: EditFormState = {
-  companyType: 'MEMBER',
+  companyType: '',
   companyName: '',
   businessType: '',
   businessNumber: '',
@@ -93,12 +90,10 @@ const DEFAULT_FORM_STATE: EditFormState = {
   detailAddress: '',
   phone: '',
   email: '',
-  subscriptionService: '',
   managerName: '',
 };
 
 const REQUIRED_FIELDS: Array<keyof EditFormState> = [
-  'companyType',
   'companyName',
   'businessCategory',
   'businessItem',
@@ -124,28 +119,6 @@ export default function EditOrganizationModal({ open, organization, onClose, onU
   const addressInputRef = useRef<HTMLInputElement>(null);
 
   const updateOrganizationMutation = useUpdateOrganization();
-
-  const {
-    data: servicesData,
-    isLoading: isLoadingServices,
-    isError: isErrorServices,
-  } = useServices({ page: 1, pageSize: 100, status: 'ACTIVE' });
-
-  const serviceOptions: ServiceSetting[] = useMemo(() => {
-    const list = (servicesData as any)?.serviceSettingList;
-    return Array.isArray(list) ? (list as ServiceSetting[]) : [];
-  }, [servicesData]);
-
-  const derivedSubscriptionId = useMemo(() => {
-    if (!organization) return '';
-    const subscribed = serviceOptions.find((service) =>
-      service.subscribedCompanies?.some(
-        (company) =>
-          company.companyIdx === organization.companyIdx && company.subscriptionStatus === 'ACTIVE'
-      )
-    );
-    return subscribed?.serviceSettingIdx?.toString() ?? '';
-  }, [organization, serviceOptions]);
 
   const loadPostcodeScript = () => {
     if (document.querySelector('script[src*="postcode.v2.js"]')) {
@@ -180,7 +153,7 @@ export default function EditOrganizationModal({ open, organization, onClose, onU
     const initialBusinessNumber = formatBusinessNumberValue(organization.businessNumber || '');
 
     setFormData({
-      companyType: organization.companyType || 'MEMBER',
+      companyType: organization.companyType || '',
       companyName: organization.companyName || '',
       businessType:
         organization.businessType !== undefined && organization.businessType !== null
@@ -193,13 +166,12 @@ export default function EditOrganizationModal({ open, organization, onClose, onU
       detailAddress: organization.addressDetail || '',
       phone: organization.phone || '',
       email: organization.email || '',
-      subscriptionService: derivedSubscriptionId,
       managerName: organization.manager?.memberName || '',
     });
     setIsActive(organization.isActive === 1 || organization.status === 'active');
     setErrorMessage(null);
     setBusinessNumberError(null);
-  }, [open, organization, derivedSubscriptionId]);
+  }, [open, organization]);
 
   const isSubmitting = updateOrganizationMutation.isPending;
 
@@ -285,19 +257,6 @@ export default function EditOrganizationModal({ open, organization, onClose, onU
     }
   };
 
-  // 참고: 구독 변경은 빌링키 등록/삭제를 통해 처리됩니다.
-  // 조직 정보 수정에서는 구독 변경을 처리하지 않습니다.
-  const syncSubscription = async () => {
-    // 구독 변경은 SubscriptionService에서 빌링키를 통해 처리됩니다.
-    // 여기서는 구독 정보를 표시만 하고 변경하지 않습니다.
-    if (import.meta.env.DEV) {
-      console.log('📝 [EditOrganizationModal] 구독 변경은 빌링키 등록/삭제를 통해 처리됩니다.', {
-        currentSubscription: derivedSubscriptionId,
-        selectedSubscription: formData.subscriptionService,
-      });
-    }
-  };
-
   const handleSubmit = async () => {
     if (!organization) return;
 
@@ -320,9 +279,8 @@ export default function EditOrganizationModal({ open, organization, onClose, onU
     try {
       setErrorMessage(null);
 
-      await updateOrganizationMutation.mutateAsync({
+      const updatePayload: UpdateOrganizationParams & { companyIdx: number } = {
         companyIdx: organization.companyIdx,
-        companyType: formData.companyType,
         companyName: sanitizeField(formData.companyName),
         businessNumber: formData.businessNumber.trim() || undefined,
         businessType:
@@ -336,9 +294,13 @@ export default function EditOrganizationModal({ open, organization, onClose, onU
         phone: formData.phone?.trim() || undefined,
         email: formData.email?.trim() || undefined,
         isActive: isActive ? 1 : 0,
-      });
+      };
 
-      await syncSubscription();
+      if (formData.companyType) {
+        updatePayload.companyType = formData.companyType;
+      }
+
+      await updateOrganizationMutation.mutateAsync(updatePayload);
 
       onUpdated?.();
       handleClose();
@@ -388,28 +350,20 @@ export default function EditOrganizationModal({ open, organization, onClose, onU
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <Box sx={{ flex: 1 }}>
                 <FormControl fullWidth>
-                  <InputLabel id="edit-company-type-label">
-                    구분
-                    <Typography component="span" sx={{ color: 'info.main', ml: 0.5 }}>
-                      *
-                    </Typography>
-                  </InputLabel>
+                  <InputLabel id="edit-company-type-label">구분</InputLabel>
                   <Select
                     labelId="edit-company-type-label"
-                    label="구분 *"
+                    label="구분"
                     value={formData.companyType}
                     onChange={(e) => handleChange('companyType', e.target.value as CompanyType)}
                   >
+                    <MenuItem value="">선택</MenuItem>
                     {COMPANY_TYPE_OPTIONS.map((option) => (
-                      <MenuItem
-                        key={option.value}
-                        value={option.value}
-                        disabled={option.value === 'OPERATOR'}
-                      >
-                        {option.label}
-                      </MenuItem>
-                    ))}
-                  </Select>
+                    <MenuItem key={option.value} value={option.value}>
+                      {option.label}
+                    </MenuItem>
+                  ))}
+                </Select>
                 </FormControl>
               </Box>
               <Box sx={{ flex: 1 }}>
@@ -541,32 +495,6 @@ export default function EditOrganizationModal({ open, organization, onClose, onU
               disabled
               helperText="담당자 정보는 멤버 관리에서 변경할 수 있습니다."
             />
-
-            <FormControl fullWidth>
-              <InputLabel id="edit-subscription-service-label">구독 서비스</InputLabel>
-              <Select
-                labelId="edit-subscription-service-label"
-                label="구독 서비스"
-                value={formData.subscriptionService}
-                onChange={(e) => handleChange('subscriptionService', e.target.value)}
-                disabled={isLoadingServices || serviceOptions.length === 0}
-              >
-                <MenuItem value="">선택 안 함</MenuItem>
-                {isErrorServices && (
-                  <MenuItem value="error" disabled>
-                    서비스 불러오기 실패
-                  </MenuItem>
-                )}
-                {serviceOptions.map((service) => (
-                  <MenuItem
-                    key={service.serviceSettingIdx}
-                    value={service.serviceSettingIdx?.toString() ?? ''}
-                  >
-                    {service.serviceName}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
 
             <Divider sx={{ borderStyle: 'dashed' }} />
 

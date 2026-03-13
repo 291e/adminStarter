@@ -24,6 +24,7 @@ const defaultData: Table2400TBMData = {
   educationMethod: 'ONLINE',
   educationType: 'MANDATORY',
   educationTimeMinutes: undefined,
+  educationPlace: '',
   educationContent:
     '아크릴로니트릴의 특성과 위험성, 작업 시 주의사항, 개인보호구 착용법, 비상대응 절차 등에 대한 안전 교육 내용입니다.',
   educationVideoRows: [
@@ -200,12 +201,27 @@ export default function RiskTable_2_4_2400_TBM({ data = defaultData }: Props) {
         ? `${data.educationTimeMinutes}분`
         : '-'
       : 'VOD 길이 자동 계산';
+  const educationPlaceLabel =
+    normalizedEducationMethod === 'OFFLINE' ? data.educationPlace?.trim() || '-' : '-';
   const educationTypeLabel =
     data.educationType === 'MANDATORY'
       ? '의무 교육'
       : data.educationType === 'REGULAR'
         ? '정기 교육'
         : '';
+
+  const getEvidenceDisplayText = (row: any) => {
+    const names =
+      Array.isArray(row?.evidenceFileNames) && row.evidenceFileNames.length > 0
+        ? row.evidenceFileNames
+        : row?.evidenceFileName
+          ? [row.evidenceFileName]
+          : [];
+
+    if (names.length === 0) return '';
+    if (names.length === 1) return names[0];
+    return `${names[0]} 외 ${names.length - 1}개`;
+  };
 
   return (
     <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -214,9 +230,10 @@ export default function RiskTable_2_4_2400_TBM({ data = defaultData }: Props) {
         <Box component="table" sx={tableStyle}>
           <thead>
             <tr style={{ height: 60 }}>
-              <th style={{ width: '34%' }}>교육 방법</th>
-              <th style={{ width: '33%' }}>교육 구분</th>
-              <th style={{ width: '33%' }}>교육 시간(분)</th>
+              <th style={{ width: '25%' }}>교육 방법</th>
+              <th style={{ width: '25%' }}>교육 구분</th>
+              <th style={{ width: '25%' }}>교육 시간(분)</th>
+              <th style={{ width: '25%' }}>교육 장소</th>
             </tr>
           </thead>
           <tbody>
@@ -231,6 +248,9 @@ export default function RiskTable_2_4_2400_TBM({ data = defaultData }: Props) {
               </td>
               <td>
                 <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{educationTimeLabel}</Typography>
+              </td>
+              <td>
+                <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{educationPlaceLabel}</Typography>
               </td>
             </tr>
           </tbody>
@@ -334,7 +354,7 @@ export default function RiskTable_2_4_2400_TBM({ data = defaultData }: Props) {
                 </td>
                 <td>
                   <Typography sx={{ fontSize: 14, fontWeight: 400 }}>
-                    {isInPerson ? row.evidenceFileName || '' : row.educationVideo || ''}
+                    {isInPerson ? getEvidenceDisplayText(row) || '' : row.educationVideo || ''}
                   </Typography>
                 </td>
                 <td>

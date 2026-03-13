@@ -37,8 +37,12 @@ type InvitableMember = {
   id: string;
   name: string;
   department: string;
+  position?: string;
   role: string;
   roleLabel: string;
+  workType?: string;
+  workTypeLabel: string;
+  combinedRoleLabel: string;
   completedHours?: number; // 이수시간 (2400번대용)
   totalHours?: number; // 총 이수시간 (2400번대용)
 };
@@ -77,6 +81,18 @@ const getRoleLabel = (role: string): string => {
   };
 
   return roleMap[roleUpper] || roleMap[role] || role;
+};
+
+const getWorkTypeLabel = (workType?: string | null): string => {
+  if (!workType) return '';
+
+  const normalizedWorkType = workType.toUpperCase();
+  const workTypeMap: Record<string, string> = {
+    PRODUCTION: '생산직',
+    OFFICE: '사무직',
+  };
+
+  return workTypeMap[normalizedWorkType] || workType;
 };
 
 export default function InvestigationTeamSelectModal({
@@ -249,13 +265,19 @@ export default function InvestigationTeamSelectModal({
       const educationInfo = educationMap.get(memberIdx);
       // 슈퍼 어드민이면 '최고관리자'로 표시
       const roleLabel = member.isSuperAdmin ? '최고관리자' : getRoleLabel(rawRole);
+      const workType = member.workType || member.memberWorkType || '';
+      const workTypeLabel = getWorkTypeLabel(workType);
 
       return {
         id: memberIdx?.toString() || member.id,
         name: member.memberName || member.name,
         department: member.deptName || member.departmentName || member.department || '',
+        position: member.position || member.memberPosition || '',
         role: rawRole,
         roleLabel,
+        workType,
+        workTypeLabel,
+        combinedRoleLabel: [roleLabel, workTypeLabel].filter(Boolean).join(' / '),
         // 실제 교육 이수 현황 사용 (2400번대인 경우)
         completedHours: is2400Series
           ? (educationInfo?.completedHours ?? 0)
@@ -272,7 +294,7 @@ export default function InvestigationTeamSelectModal({
         (member) =>
           member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           member.department.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          member.roleLabel.toLowerCase().includes(searchQuery.toLowerCase())
+          member.combinedRoleLabel.toLowerCase().includes(searchQuery.toLowerCase())
       ),
     [invitableMembers, searchQuery]
   );
@@ -334,6 +356,11 @@ export default function InvestigationTeamSelectModal({
         department: member.department,
         name: member.name,
         memberIdx: Number(member.id) || undefined, // id를 memberIdx로 변환
+        position: member.position,
+        workType: member.workType,
+        roleLabel: member.roleLabel,
+        completedHours: member.completedHours,
+        totalHours: member.totalHours,
       }))
     );
     handleClose();
@@ -412,7 +439,7 @@ export default function InvestigationTeamSelectModal({
                       py: 2,
                     }}
                   >
-                    이름 / 직급
+                    이름
                   </TableCell>
                   <TableCell
                     sx={{
@@ -440,6 +467,19 @@ export default function InvestigationTeamSelectModal({
                   >
                     역할
                   </TableCell>
+                  <TableCell
+                    sx={{
+                      bgcolor: 'grey.100',
+                      fontSize: 14,
+                      fontWeight: 600,
+                      lineHeight: '24px',
+                      color: 'text.secondary',
+                      px: 2,
+                      py: 2,
+                    }}
+                  >
+                    직종
+                  </TableCell>
                   {is2400Series && (
                     <TableCell
                       sx={{
@@ -462,7 +502,7 @@ export default function InvestigationTeamSelectModal({
                   <TableRow>
                     <TableCell
                       colSpan={
-                        is2400Series ? (shouldSingleSelect ? 4 : 5) : shouldSingleSelect ? 3 : 4
+                        is2400Series ? (shouldSingleSelect ? 5 : 6) : shouldSingleSelect ? 4 : 5
                       }
                       align="center"
                       sx={{ py: 4 }}
@@ -519,17 +559,6 @@ export default function InvestigationTeamSelectModal({
                               >
                                 {member.name}
                               </Typography>
-                              <Typography
-                                variant="body2"
-                                sx={{
-                                  fontSize: 14,
-                                  fontWeight: 400,
-                                  lineHeight: '22px',
-                                  color: 'text.disabled',
-                                }}
-                              >
-                                {member.roleLabel}
-                              </Typography>
                             </Stack>
                           </Stack>
                         </TableCell>
@@ -556,7 +585,20 @@ export default function InvestigationTeamSelectModal({
                               color: 'text.primary',
                             }}
                           >
-                            {member.roleLabel}
+                            {member.roleLabel || '-'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell sx={{ px: 2, py: 2 }}>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              fontSize: 14,
+                              fontWeight: 400,
+                              lineHeight: '22px',
+                              color: 'text.primary',
+                            }}
+                          >
+                            {member.workTypeLabel || '-'}
                           </Typography>
                         </TableCell>
                         {is2400Series && (

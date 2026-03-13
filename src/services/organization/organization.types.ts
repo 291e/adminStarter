@@ -9,11 +9,7 @@ export type OrganizationStatus = 'active' | 'inactive';
 
 // 조직 구분 (companyType)
 export type CompanyType =
-  | 'OPERATOR'
   | 'MEMBER'
-  | 'DISTRIBUTOR'
-  | 'AGENCY'
-  | 'DEALER'
   | 'NON_MEMBER';
 
 // 담당자 정보
@@ -49,7 +45,7 @@ export type Organization = {
   id?: string;
   companyIdx: number;
   companyName: string;
-  companyType?: CompanyType; // enum: OPERATOR, MEMBER, DISTRIBUTOR, AGENCY, DEALER, NON_MEMBER
+  companyType?: CompanyType | null;
 
   businessNumber?: string;
   representativeName?: string;
@@ -71,6 +67,10 @@ export type Organization = {
   accidentFreeExpiresAt?: string | null; // 무재해 사업장 만료일
   accidentFreeFileUrl?: string | null; // 무재해 인증 파일 URL
   accidentFreeInformation?: AccidentFreeInformation | null;
+  companyBillingType?: string | null;
+  companyBillingInfo?: string | null;
+  companyBillingKey?: string | null;
+  membershipExpireDate?: string | null;
   // description, memo, deletedAt 필드 제거됨
 };
 
@@ -88,12 +88,11 @@ export type CreateOrganizationParams = {
   address?: string;
   phone?: string;
   email?: string;
-  companyType: CompanyType;
+  companyType?: CompanyType;
   businessType: number; // 0: 개인사업자, 1: 법인사업자
   representativeName: string;
   businessCategory: string;
   businessItem: string;
-  serviceSettingIdxes?: number[]; // 구독 서비스 Index 목록
 };
 
 // 조직 등록 응답
@@ -111,7 +110,6 @@ export type UpdateOrganizationParams = {
   representativeName?: string;
   businessCategory?: string;
   businessItem?: string;
-  serviceSettingIdxes?: number[]; // 구독 서비스 Index 목록
   isActive?: number; // 0: 비활성, 1: 활성
   isAccidentFreeWorksite?: number; // 0: 아니오, 1: 예
   accidentFreeStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';

@@ -31,15 +31,18 @@ export function useCreateBillingKey() {
     mutationFn: (params: CreateBillingKeyParams) => createBillingKey(params),
     onSuccess: (response) => {
       // 성공 메시지 표시
-      const resultMessage = response?.header?.resultMessage || '빌링키가 등록되고 구독이 생성되었습니다.';
+      const resultMessage =
+        response?.header?.resultMessage || '빌링키가 등록되고 결제 정보가 반영되었습니다.';
       if (resultMessage && resultMessage !== 'SUCCESS') {
         toast.success(resultMessage);
       } else {
-        toast.success('빌링키가 등록되고 구독이 생성되었습니다.');
+        toast.success('빌링키가 등록되고 결제 정보가 반영되었습니다.');
       }
       // 빌링키 등록 후 관련 쿼리 무효화
       queryClient.invalidateQueries({ queryKey: ['paymentHistory'] });
       queryClient.invalidateQueries({ queryKey: ['organizations'] });
+      queryClient.invalidateQueries({ queryKey: ['organizationDetail'] });
+      queryClient.invalidateQueries({ queryKey: ['currentSubscription'] });
       queryClient.invalidateQueries({ queryKey: ['services'] });
     },
     onError: (error: any) => {
@@ -72,6 +75,8 @@ export function useDeleteBillingKey() {
       toast.success('빌링키가 삭제되었습니다.');
       queryClient.invalidateQueries({ queryKey: ['paymentHistory'] });
       queryClient.invalidateQueries({ queryKey: ['organizations'] });
+      queryClient.invalidateQueries({ queryKey: ['organizationDetail'] });
+      queryClient.invalidateQueries({ queryKey: ['currentSubscription'] });
     },
     onError: (error: any) => {
       if (import.meta.env.DEV) {
@@ -102,6 +107,8 @@ export function useDeleteBillingKeyForAdmin() {
       toast.success('빌링키가 삭제되었습니다.');
       queryClient.invalidateQueries({ queryKey: ['paymentHistory'] });
       queryClient.invalidateQueries({ queryKey: ['organizations'] });
+      queryClient.invalidateQueries({ queryKey: ['organizationDetail'] });
+      queryClient.invalidateQueries({ queryKey: ['currentSubscription'] });
     },
     onError: (error: any) => {
       if (import.meta.env.DEV) {
@@ -211,4 +218,3 @@ export function useCancelPayment() {
     },
   });
 }
-

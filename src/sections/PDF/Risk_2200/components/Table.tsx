@@ -20,7 +20,10 @@ import { Iconify } from 'src/components/iconify';
 import Badge from 'src/components/safeyoui/badge';
 import ProgressModal from './ProgressModal';
 import PublishModal from './PublishModal';
-import type { SafetySystemDocument } from 'src/services/safety-system/safety-system.types';
+import type {
+  SafetySystemDocument,
+  WorkerSignatureStatusInfo,
+} from 'src/services/safety-system/safety-system.types';
 
 // ----------------------------------------------------------------------
 
@@ -45,6 +48,13 @@ type Props = {
   onCopy?: (id: string) => void;
   onTogglePublish?: (id: string, published: boolean) => void;
   onViewProgress?: (id: string) => void;
+};
+
+const isValidWorkerSignature = (worker: WorkerSignatureStatusInfo): boolean => {
+  if (!worker?.targetMemberIdx || worker.targetMemberIdx <= 0) {
+    return false;
+  }
+  return Boolean(worker.memberName?.trim());
 };
 
 export default function Risk_2200Table({
@@ -113,7 +123,7 @@ export default function Risk_2200Table({
   };
 
   const getWorkerSignatureInfo = (row: Risk_2200Row) => {
-    const workerList = row.workerSignatureList ?? [];
+    const workerList = (row.workerSignatureList ?? []).filter((worker) => isValidWorkerSignature(worker));
     if (workerList.length > 0) {
       const signedCount = workerList.filter((w) => w.status === 'SIGNED').length;
       const progress = Math.round((signedCount / workerList.length) * 100);

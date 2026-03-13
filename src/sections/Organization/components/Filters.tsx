@@ -14,12 +14,8 @@ import { Iconify } from 'src/components/iconify';
 
 type DivisionType =
   | 'all'
-  | 'operator'
-  | 'member'
-  | 'distributor'
-  | 'agency'
-  | 'dealer'
-  | 'nonmember';
+  | 'general'
+  | 'industrialSupport';
 
 type Props = {
   division: DivisionType;
@@ -58,12 +54,8 @@ export default function OrganizationFilters({
             onChange={(e) => onChangeDivision(e.target.value as DivisionType)}
           >
             <MenuItem value="all">전체</MenuItem>
-            <MenuItem value="operator">운영사</MenuItem>
-            <MenuItem value="member">회원사</MenuItem>
-            <MenuItem value="distributor">총판</MenuItem>
-            <MenuItem value="agency">대리점</MenuItem>
-            <MenuItem value="dealer">딜러</MenuItem>
-            <MenuItem value="nonmember">비회원</MenuItem>
+            <MenuItem value="general">일반</MenuItem>
+            <MenuItem value="industrialSupport">공단보조</MenuItem>
           </Select>
         </FormControl>
 

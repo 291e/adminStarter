@@ -92,6 +92,7 @@ export type SafetySystemDocument = {
   educationType?: 'MANDATORY' | 'REGULAR'; // 교육 구분
   educationMethod?: 'ONLINE' | 'OFFLINE'; // 교육 방법
   educationTimeMinutes?: number | null; // 집체 교육 시간(분)
+  educationPlace?: string; // 집체 교육 장소
   approvalDeadline?: string; // YYYY-MM-DD
   approvalProgress?: number; // 결재 진행률 (0-100)
   approvalStep?: number | null; // 결재 단계 (0: 없음, 1: 승인만, 2: 작성+승인, 3: 작성+검토+승인)
@@ -123,6 +124,7 @@ export type CreateSafetySystemDocumentDto = {
   educationType?: 'MANDATORY' | 'REGULAR';
   educationMethod?: 'ONLINE' | 'OFFLINE';
   educationTimeMinutes?: number | null;
+  educationPlace?: string; // 집체 교육 장소
   tableData?: string; // JSON string
   workerList?: WorkerTargetDto[]; // 근로자 목록 (선택적) - 문서 생성 시 함께 등록
 };
@@ -140,6 +142,8 @@ export type UpdateSafetySystemDocumentDto = {
   educationType?: 'MANDATORY' | 'REGULAR';
   educationMethod?: 'ONLINE' | 'OFFLINE';
   educationTimeMinutes?: number | null;
+  educationPlace?: string; // 집체 교육 장소
+  workerList?: WorkerTargetDto[]; // 근로자 목록 (변경 시에만 전송)
 };
 
 // 문서 상세 조회 응답

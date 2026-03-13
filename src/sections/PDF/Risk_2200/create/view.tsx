@@ -313,16 +313,19 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
       { inspectionContent: '작업장 정리/정돈, 통보 확보', result: '' },
       { inspectionContent: '점검결과 조치사항', result: '' },
     ],
-    educationApply: 0,
+    educationApply: 1,
     educationMethod: 'ONLINE',
     educationType: 'MANDATORY',
     educationTimeMinutes: undefined,
+    educationPlace: '',
     educationContent: '',
     educationVideoRows: [
       {
         participant: null,
         educationVideo: '',
         signature: '',
+        evidenceFileNames: [],
+        evidenceFileUrls: [],
       },
     ],
   });
@@ -332,6 +335,32 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
     if (method === 'VIDEO') return 'ONLINE';
     return method ?? 'ONLINE';
   };
+
+  const normalizeTbmEvidenceFields = useCallback(
+    (row: Partial<Table2400TBMEducationVideoRow>): Table2400TBMEducationVideoRow => {
+      const evidenceFileNames =
+        Array.isArray(row.evidenceFileNames) && row.evidenceFileNames.length > 0
+          ? row.evidenceFileNames
+          : row.evidenceFileName
+            ? [row.evidenceFileName]
+            : [];
+      const evidenceFileUrls =
+        Array.isArray(row.evidenceFileUrls) && row.evidenceFileUrls.length > 0
+          ? row.evidenceFileUrls
+          : row.evidenceFileUrl
+            ? [row.evidenceFileUrl]
+            : [];
+
+      return {
+        ...row,
+        evidenceFileNames,
+        evidenceFileUrls,
+        evidenceFileName: evidenceFileNames[0],
+        evidenceFileUrl: evidenceFileUrls[0],
+      } as Table2400TBMEducationVideoRow;
+    },
+    []
+  );
   const [table2400EducationRows, setTable2400EducationRows] = useState<Table2400EducationRow[]>([
     {
       number: 1,
@@ -658,6 +687,9 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
         } else if (tableType === '2400-tbm' && parsedTableData.data) {
           setTable2400TBMData((prev) => {
             const raw = parsedTableData.data as Table2400TBMData;
+            const normalizedRows = Array.isArray(raw.educationVideoRows)
+              ? raw.educationVideoRows.map((row) => normalizeTbmEvidenceFields(row))
+              : prev.educationVideoRows;
             return {
               ...prev,
               ...raw,
@@ -665,8 +697,9 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
               educationMethod: normalizeTbmEducationMethod(raw.educationMethod),
               educationType: raw.educationType ?? prev.educationType,
               educationTimeMinutes: raw.educationTimeMinutes ?? prev.educationTimeMinutes,
+              educationPlace: raw.educationPlace ?? prev.educationPlace,
               educationContent: raw.educationContent ?? prev.educationContent,
-              educationVideoRows: raw.educationVideoRows ?? prev.educationVideoRows,
+              educationVideoRows: normalizedRows,
               inspectionRows: raw.inspectionRows ?? prev.inspectionRows,
             };
           });
@@ -712,6 +745,9 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
             } else if (tableData.type === '2400-tbm') {
               setTable2400TBMData((prev) => {
                 const raw = tableData.data as Table2400TBMData;
+                const normalizedRows = Array.isArray(raw.educationVideoRows)
+                  ? raw.educationVideoRows.map((row) => normalizeTbmEvidenceFields(row))
+                  : prev.educationVideoRows;
                 return {
                   ...prev,
                   ...raw,
@@ -719,8 +755,9 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
                   educationMethod: normalizeTbmEducationMethod(raw.educationMethod),
                   educationType: raw.educationType ?? prev.educationType,
                   educationTimeMinutes: raw.educationTimeMinutes ?? prev.educationTimeMinutes,
+                  educationPlace: raw.educationPlace ?? prev.educationPlace,
                   educationContent: raw.educationContent ?? prev.educationContent,
-                  educationVideoRows: raw.educationVideoRows ?? prev.educationVideoRows,
+                  educationVideoRows: normalizedRows,
                   inspectionRows: raw.inspectionRows ?? prev.inspectionRows,
                 };
               });
@@ -1335,14 +1372,35 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
     // 2400TBM 문서인 경우 근로자 목록 수집
     let workerList: Array<{ targetMemberIdx: number; vodIdx?: number }> | undefined;
     if (is2400TBM) {
+      const normalizedMethod = normalizeTbmEducationMethod(table2400TBMData.educationMethod);
+      const isOffline = normalizedMethod === 'OFFLINE';
+
+      if (isOffline) {
+        if (!table2400TBMData.educationPlace?.trim()) {
+          alert('집체 교육은 교육 장소를 입력해야 합니다.');
+          return;
+        }
+
+        if (!table2400TBMData.educationTimeMinutes || table2400TBMData.educationTimeMinutes <= 0) {
+          alert('집체 교육은 교육 시간을 분 단위로 입력해야 합니다.');
+          return;
+        }
+      }
+
+      const workerListMap = new Map<string, { targetMemberIdx: number; vodIdx?: number }>();
+
       workerList = table2400TBMData.educationVideoRows
-        .filter(
-          (row) => row.participant?.memberIdx && row.vodIdx // 대상자가 선택되어 있고 // 교육영상이 선택되어 있는 경우
-        )
+        .filter((row) => row.participant?.memberIdx && (isOffline || row.vodIdx))
         .map((row) => ({
           targetMemberIdx: row.participant!.memberIdx!,
-          vodIdx: row.vodIdx,
+          ...(isOffline ? {} : { vodIdx: row.vodIdx }),
         }));
+
+      workerList.forEach((item) => {
+        const key = isOffline ? `${item.targetMemberIdx}` : `${item.targetMemberIdx}:${item.vodIdx}`;
+        workerListMap.set(key, item);
+      });
+      workerList = Array.from(workerListMap.values());
 
       if (import.meta.env.DEV) {
         console.log('📋 [Risk2200CreateView] 문서 생성 시 근로자 목록 수집:', {
@@ -1374,9 +1432,11 @@ export function Risk_2200CreateView({ safetyId, title = 'Blank', description, sx
     };
 
     if (is2400TBM) {
+      requestData.educationApply = 1;
       const normalizedMethod = normalizeTbmEducationMethod(table2400TBMData.educationMethod);
       requestData.educationType = table2400TBMData.educationType;
       requestData.educationMethod = normalizedMethod;
+      requestData.educationPlace = table2400TBMData.educationPlace;
       if (normalizedMethod === 'OFFLINE') {
         requestData.educationTimeMinutes = table2400TBMData.educationTimeMinutes ?? undefined;
       }

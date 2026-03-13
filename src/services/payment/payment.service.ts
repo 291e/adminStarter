@@ -21,7 +21,7 @@ import type {
 // ----------------------------------------------------------------------
 
 /**
- * 빌링키 등록 + serviceSettingIdx로 첫 결제/구독 생성
+ * 빌링키 등록 (정액제 연동 없이 빌링키 기준 결제 연동)
  * POST /payment/billingKey
  */
 export async function createBillingKey(
@@ -116,6 +116,5 @@ export async function cancelPayment(
   );
   return response.data;
 }
-
 
 

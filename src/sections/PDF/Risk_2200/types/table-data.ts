@@ -104,6 +104,7 @@ export type Table1500Row = {
 export type Table2100ClassificationRow = {
   number: number; // 번호
   category: string; // 구분
+  processName?: string; // 공종명
   hazardFactors: string; // 해당 유해, 위험요인
 };
 
@@ -160,6 +161,8 @@ export type Table2400TBMEducationVideoRow = {
   participant: InvestigationTeamMember | null; // 대상자
   educationVideo: string; // 교육영상
   vodIdx?: number; // 교육 영상 Index (VOD)
+  evidenceFileUrls?: string[]; // 집체 교육 증빙자료 파일 URL 리스트
+  evidenceFileNames?: string[]; // 집체 교육 증빙자료 파일명 리스트
   evidenceFileName?: string; // 집체 교육 증빙자료 파일명
   evidenceFileUrl?: string; // 집체 교육 증빙자료 파일 URL
   signature: string; // 서명 (이미지 URL 또는 파일)
@@ -178,6 +181,7 @@ export type Table2400TBMData = {
   educationMethod?: Table2400TBMEducationMethod; // 교육 방법 (온라인/오프라인)
   educationType?: 'MANDATORY' | 'REGULAR'; // 교육 구분 (의무/정기)
   educationTimeMinutes?: number | null; // 집체 교육 시간(분)
+  educationPlace?: string; // 집체 교육 장소
   educationContent: string; // 교육내용
   educationVideoRows: Table2400TBMEducationVideoRow[]; // 교육영상 테이블
 };
@@ -218,6 +222,11 @@ export type InvestigationTeamMember = {
   department: string; // 소속팀
   name: string; // 성명
   memberIdx?: number; // 멤버 인덱스 (결재 대상자 등록용, 선택적)
+  position?: string; // 직급
+  workType?: string; // 직종
+  roleLabel?: string; // 역할 라벨
+  completedHours?: number; // 현재 이수시간(분)
+  totalHours?: number; // 기준 이수시간(분)
 };
 
 export type HumanDamage = {

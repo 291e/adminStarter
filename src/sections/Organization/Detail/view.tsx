@@ -165,6 +165,7 @@ export function OrganizationDetailView({ title = '조직 관리', description, s
           organizationId={organizationId || 0}
           initialTab={activeTab}
           companyMemberList={companyMemberList}
+          memberCount={Array.isArray(companyMemberList) ? companyMemberList.length : undefined}
           onTabChange={(tabValue) => {
             setActiveTab(tabValue);
           }}

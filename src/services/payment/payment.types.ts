@@ -9,7 +9,6 @@ export type CreateBillingKeyParams = {
   PCD_PAYER_ID: string; // 빌링키
   memberBillingType: 'card' | 'transfer'; // 빌링타입
   memberBillingInfo: string; // 빌링 등록정보 (JSON 문자열)
-  serviceSettingIdx: number; // 서비스 설정 Index (요금/주기 결정)
 };
 
 // 빌링키 등록 응답
@@ -63,9 +62,9 @@ export type GetPaymentHistoryParams = {
 // 결제 내역 항목
 export type PaymentHistory = {
   paymentIdx: number;
-  companySubscriptionIdx: number;
+  companySubscriptionIdx?: number;
   companyIdx: number;
-  serviceSettingIdx: number;
+  serviceSettingIdx?: number;
   serviceName: string;
   paymentAmount: number;
   paymentDate: Date | string; // ISO date string or Date
@@ -95,6 +94,4 @@ export type CancelPaymentParams = {
 };
 
 export type CancelPaymentResponse = BaseResponseDto;
-
-
 

@@ -28,12 +28,8 @@ import CompanySalesTable, { type CompanySalesRow } from './components/company-sa
 
 const DIVISION_TO_COMPANY_TYPE: Record<string, string | undefined> = {
   all: undefined,
-  operator: 'OPERATOR',
-  member: 'MEMBER',
-  distributor: 'DISTRIBUTOR',
-  agency: 'AGENCY',
-  dealer: 'DEALER',
-  nonmember: 'NON_MEMBER',
+  general: 'MEMBER',
+  industrialSupport: 'NON_MEMBER',
 };
 
 const renderSalesIcon = (fileName: string) => (
@@ -49,9 +45,7 @@ export function SalesView() {
   const navigate = useNavigate();
 
   const [tab, setTab] = useState<'all' | 'active' | 'inactive'>('all');
-  const [division, setDivision] = useState<
-    'all' | 'operator' | 'member' | 'distributor' | 'agency' | 'dealer' | 'nonmember'
-  >('all');
+  const [division, setDivision] = useState<'all' | 'general' | 'industrialSupport'>('all');
   const [searchField, setSearchField] = useState<'all' | 'orgName' | 'manager'>('all');
   const [searchValue, setSearchValue] = useState('');
   const [startDate, setStartDate] = useState<Dayjs | null>(null);

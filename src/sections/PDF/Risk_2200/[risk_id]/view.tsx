@@ -44,10 +44,24 @@ type Props = {
   sx?: SxProps<Theme>;
 };
 
+const isValidWorkerSignature = (worker: {
+  targetMemberIdx?: number | null;
+  memberName?: string | null;
+}): boolean => {
+  if (!worker?.targetMemberIdx || worker.targetMemberIdx <= 0) {
+    return false;
+  }
+
+  const memberName = worker.memberName?.trim();
+  return Boolean(memberName);
+};
+
 const buildEducationVideoRowsFromWorkerSignatureList = (workerList: any[]) =>
-  workerList.map((worker) => {
+  workerList
+    .filter((worker) => isValidWorkerSignature(worker))
+    .map((worker) => {
     const signatureData = worker.signatureData ?? worker.signature ?? undefined;
-    return {
+    return normalizeTbmEvidenceFields({
       participant: {
         memberIdx: worker.targetMemberIdx,
         name: worker.memberName || '',
@@ -55,11 +69,49 @@ const buildEducationVideoRowsFromWorkerSignatureList = (workerList: any[]) =>
       },
       educationVideo: worker.vodTitle || '',
       vodIdx: worker.vodIdx,
+      evidenceFileName: worker.evidenceFileName,
+      evidenceFileUrl: worker.evidenceFileUrl,
+      evidenceFileNames: worker.evidenceFileNames,
+      evidenceFileUrls: worker.evidenceFileUrls,
       workerSignatureIdx:
         worker.documentWorkerSignatureIdx ?? worker.workerSignatureIdx ?? undefined,
       signature: signatureData ? signatureData : worker.status === 'SIGNED' ? 'SIGNED' : '',
-    };
+    });
   });
+
+const normalizeTbmEducationMethod = (method?: string | null) => {
+  if (method === 'IN_PERSON') return 'OFFLINE';
+  if (method === 'VIDEO') return 'ONLINE';
+  return method ?? 'ONLINE';
+};
+
+const normalizeTbmEvidenceFields = (row: any) => {
+  const evidenceFileNames =
+    Array.isArray(row?.evidenceFileNames) && row.evidenceFileNames.length > 0
+      ? row.evidenceFileNames
+      : row?.evidenceFileName
+        ? [row.evidenceFileName]
+        : [];
+  const evidenceFileUrls =
+    Array.isArray(row?.evidenceFileUrls) && row.evidenceFileUrls.length > 0
+      ? row.evidenceFileUrls
+      : row?.evidenceFileUrl
+        ? [row.evidenceFileUrl]
+        : [];
+
+  return {
+    ...row,
+    evidenceFileNames,
+    evidenceFileUrls,
+    evidenceFileName: evidenceFileNames[0],
+    evidenceFileUrl: evidenceFileUrls[0],
+  };
+};
+
+const getTbmWorkerKey = (
+  row: { targetMemberIdx?: number | null; vodIdx?: number | null },
+  isOffline: boolean
+) => `${row.targetMemberIdx ?? ''}${isOffline ? '' : `:${row.vodIdx ?? ''}`}`;
 
 export function Risk_2200View({
   riskId,
@@ -340,13 +392,25 @@ export function Risk_2200View({
           : currentDocument.tableData;
 
       if (parsed?.tableType === '2400-tbm') {
-        const workerSignatureList =
+        const normalizedMethod = normalizeTbmEducationMethod(
+          parsed?.data?.educationMethod ?? (currentDocument as any)?.educationMethod
+        );
+        const isOffline = normalizedMethod === 'OFFLINE';
+        const workerSignatureList = (
           (currentDocument as any)?.workerSignatureList ||
           (currentDocument as any)?.educationVideoRows ||
-          [];
+          []
+        ).filter((worker: any) => isValidWorkerSignature(worker));
 
         const rowsFromTableData = Array.isArray(parsed?.data?.educationVideoRows)
           ? parsed.data.educationVideoRows
+              .map((row: any) => normalizeTbmEvidenceFields(row))
+              .filter(
+              (row: any) =>
+                Boolean(row?.participant?.memberIdx) &&
+                typeof row?.participant?.name === 'string' &&
+                row.participant.name.trim() !== ''
+              )
           : [];
 
         const baseEducationVideoRows =
@@ -372,8 +436,7 @@ export function Risk_2200View({
         >();
 
         workerSignatureList.forEach((worker: any) => {
-          const vodIdx = (worker as any).vodIdx ?? '';
-          const key = `${worker.targetMemberIdx}:${vodIdx}`;
+          const key = getTbmWorkerKey(worker, isOffline);
           signatureMap.set(key, {
             signatureData: worker.signatureData ?? worker.signature,
             status: worker.status,
@@ -383,10 +446,14 @@ export function Risk_2200View({
         });
 
         const educationVideoRows = baseEducationVideoRows.map((row: any) => {
-          const memberIdx = row.participant?.memberIdx ?? '';
-          const vodIdx = row.vodIdx ?? '';
-          const directKey = `${memberIdx}:${vodIdx}`;
-          const fallbackKey = `${memberIdx}:`;
+          const directKey = getTbmWorkerKey(
+            { targetMemberIdx: row.participant?.memberIdx, vodIdx: row.vodIdx },
+            isOffline
+          );
+          const fallbackKey = getTbmWorkerKey(
+            { targetMemberIdx: row.participant?.memberIdx, vodIdx: undefined },
+            true
+          );
           const match = signatureMap.get(directKey) || signatureMap.get(fallbackKey);
 
           const resolvedSignature = match
@@ -408,6 +475,8 @@ export function Risk_2200View({
           ...parsed,
           data: {
             ...(parsed.data ?? {}),
+            educationMethod: normalizedMethod,
+            educationPlace: parsed?.data?.educationPlace,
             educationVideoRows,
           },
         };

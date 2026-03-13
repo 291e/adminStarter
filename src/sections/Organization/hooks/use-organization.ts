@@ -14,12 +14,8 @@ export type OrganizationFilters = {
 
 export type DivisionType =
   | 'all'
-  | 'operator'
-  | 'member'
-  | 'distributor'
-  | 'agency'
-  | 'dealer'
-  | 'nonmember';
+  | 'general'
+  | 'industrialSupport';
 
 export type UseOrganizationResult = {
   // 필터 상태
@@ -76,12 +72,8 @@ export function useOrganization(): UseOrganizationResult {
     if (division !== 'all') {
       const divisionToCompanyType: Record<DivisionType, string> = {
         all: '',
-        operator: 'OPERATOR',
-        member: 'MEMBER',
-        distributor: 'DISTRIBUTOR',
-        agency: 'AGENCY',
-        dealer: 'DEALER',
-        nonmember: 'NON_MEMBER',
+        general: 'MEMBER',
+        industrialSupport: 'NON_MEMBER',
       };
       params.companyType = divisionToCompanyType[division];
     }

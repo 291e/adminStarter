@@ -103,6 +103,14 @@ export default function ProgressModal({
     return roleMap[memberRole.toUpperCase()] || roleMap[memberRole] || memberRole;
   };
 
+  const isValidWorkerSignature = (worker: WorkerSignatureStatusInfo) => {
+    if (!worker?.targetMemberIdx || worker.targetMemberIdx <= 0) {
+      return false;
+    }
+    const memberName = worker.memberName?.trim();
+    return Boolean(memberName);
+  };
+
   // signatureList 및 workerSignatureList 병합하여 UI 타입으로 변환
   const signatureTargets = useMemo(() => {
     // API 응답 구조 대응: documentDetail이 BaseResponseDto인 경우 body나 직접 속성에 document가 있을 수 있음
@@ -119,8 +127,11 @@ export default function ProgressModal({
 
     // API에서 가져온 서명 목록이 있으면 사용 (없으면 props)
     const effectiveSignatureList: DocumentSignatureInfo[] = docData?.signatureList || signatureList;
-    const effectiveWorkerList: WorkerSignatureStatusInfo[] =
-      docData?.workerSignatureList || workerSignatureList;
+    const rawWorkerSignatureList = (docData?.workerSignatureList || workerSignatureList) as
+      WorkerSignatureStatusInfo[];
+    const effectiveWorkerList = rawWorkerSignatureList.filter((worker) =>
+      isValidWorkerSignature(worker)
+    );
 
     // 1. 결재자 목록 변환
     const approvalTargets = effectiveSignatureList.map((sig) => {

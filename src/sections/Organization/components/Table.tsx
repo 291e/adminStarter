@@ -111,14 +111,15 @@ export default function OrganizationTable({
   // 구분 매핑 함수 (companyType을 한글로 변환)
   const getDivisionLabel = (organization: Organization): string => {
     const companyTypeMap: Record<string, string> = {
-      OPERATOR: '운영사',
-      MEMBER: '회원사',
-      DISTRIBUTOR: '총판',
-      AGENCY: '대리점',
-      DEALER: '딜러',
-      NON_MEMBER: '비회원',
+      MEMBER: '일반',
+      OPERATOR: '일반',
+      DISTRIBUTOR: '공단보조',
+      AGENCY: '공단보조',
+      DEALER: '공단보조',
+      NON_MEMBER: '공단보조',
     };
-    return organization.companyType ? companyTypeMap[organization.companyType] || '기타' : '기타';
+
+    return organization.companyType ? companyTypeMap[organization.companyType] || '미지정' : '미지정';
   };
 
   return (

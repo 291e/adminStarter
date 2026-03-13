@@ -15,23 +15,37 @@ export default function RiskAssessmentTable_2_1_2100({ data }: Props) {
       {
         number: 1,
         category: '기계적 요인',
+        processName: '',
         hazardFactors: '끼임(감김), 위험한 표면, 충돌, 넘어짐, 추락등',
       },
-      { number: 2, category: '전기적 요인', hazardFactors: '감전, 아크, 정전기, 전기화재/폭발 등' },
-      { number: 3, category: '화학적 요인', hazardFactors: '가스, 증기, 전기화재/폭발 등' },
+      {
+        number: 2,
+        category: '전기적 요인',
+        processName: '',
+        hazardFactors: '감전, 아크, 정전기, 전기화재/폭발 등',
+      },
+      {
+        number: 3,
+        category: '화학적 요인',
+        processName: '',
+        hazardFactors: '가스, 증기, 전기화재/폭발 등',
+      },
       {
         number: 4,
         category: '작업특성 요인',
+        processName: '',
         hazardFactors: '소음, 진동, 근로자, 근로자 실수, 질식위험, 중량물 취급 등',
       },
       {
         number: 5,
         category: '작업환경 요인',
+        processName: '',
         hazardFactors: '고온/한랭, 조명, 이동통로, 주변 근로자, 안전문화 등',
       },
       {
         number: 6,
         category: '생물학적 요인',
+        processName: '',
         hazardFactors: '별원성 미생물, 바이러스, 유전자 변형물질 등',
       },
     ],
@@ -142,9 +156,21 @@ export default function RiskAssessmentTable_2_1_2100({ data }: Props) {
         <Box component="table" sx={tableStyle}>
           <thead>
             <tr>
-              <th style={{ width: 94 }}>번호</th>
-              <th style={{ width: 164 }}>구분</th>
-              <th style={{ flex: 1 }}>해당 유해·위험요인</th>
+              <th style={{ width: 94 }} rowSpan={2}>
+                번호
+              </th>
+              <th style={{ width: 164 }} rowSpan={2}>
+                구분
+              </th>
+              <th style={{ width: 160, height: 30 }}>
+                공종흐름도
+              </th>
+              <th style={{ flex: 1 }} rowSpan={2}>
+                해당 유해·위험요인
+              </th>
+            </tr>
+            <tr>
+              <th style={{ width: 160, height: 30 }}>공종명</th>
             </tr>
           </thead>
           <tbody>
@@ -157,6 +183,11 @@ export default function RiskAssessmentTable_2_1_2100({ data }: Props) {
                 </td>
                 <td>
                   <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{row.category}</Typography>
+                </td>
+                <td>
+                  <Typography sx={{ fontSize: 14, fontWeight: 400 }}>
+                    {row.processName || ''}
+                  </Typography>
                 </td>
                 <td>
                   <Typography sx={{ fontSize: 14, fontWeight: 400 }}>
