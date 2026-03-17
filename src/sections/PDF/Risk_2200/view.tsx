@@ -114,18 +114,16 @@ export function Risk_2200View({ safetyId, title = 'Blank', description, sx }: Pr
   const adapt = (docs: SafetySystemItem['documentList']): Risk_2200Row[] => {
     if (!docs) return [];
     return docs.map((doc, index): Risk_2200Row => {
-      const createAtStr =
-        typeof doc.createAt === 'string' ? doc.createAt : new Date(doc.createAt).toISOString();
-      const updateAtStr =
-        typeof doc.updateAt === 'string' ? doc.updateAt : new Date(doc.updateAt).toISOString();
+      const createAtDate = dayjs(doc.createAt);
+      const updateAtDate = dayjs(doc.updateAt);
 
       return {
         ...doc, // SafetySystemDocument의 모든 필드 포함
         id: `${doc.safetySystemDocumentIdx}`,
         sequence: index + 1,
-        registeredAt: createAtStr.split('T')[0],
-        registeredTime: createAtStr.split('T')[1]?.split('.')[0] || '',
-        writtenAt: updateAtStr.split('T')[0], // 작성일 (updateAt)
+        registeredAt: createAtDate.isValid() ? createAtDate.format('YYYY-MM-DD') : '',
+        registeredTime: createAtDate.isValid() ? createAtDate.format('HH:mm:ss') : '',
+        writtenAt: updateAtDate.isValid() ? updateAtDate.format('YYYY-MM-DD') : '', // 작성일 (updateAt)
         published: doc.isPublished === 1,
         // approvalProgress와 signatureList는 doc에서 직접 가져옴 (이미 SafetySystemDocument에 포함됨)
       };

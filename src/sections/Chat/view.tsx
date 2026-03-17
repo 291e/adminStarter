@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { collection, getDocs, query, Timestamp, where } from 'firebase/firestore';
@@ -275,13 +275,17 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
   }, [activeSelectedRoom, roomParticipantDocs, presenceByUserId, memberMap]);
 
   const participantLookup = useMemo(() => {
-    const map = new Map<number, { name: string; avatarUrl?: string }>();
+    const map = new Map<
+      number,
+      { name: string; avatarUrl?: string; department?: string }
+    >();
     participantsFromRoom.forEach((participant) => {
       const idx = Number(participant.memberIdx);
       if (!Number.isNaN(idx) && idx > 0) {
         map.set(idx, {
           name: participant.name || `사용자 ${idx}`,
           avatarUrl: getChatAvatarUrl(participant.profileImage),
+          department: participant.department,
         });
       }
     });
@@ -352,6 +356,10 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     const metadata = msg.metadata || {};
     const metadataType = String(metadata?.type || '');
 
+    if (type === 'DELETED' || base.trim() === '__deleted__') {
+      return '삭제된 메시지입니다.';
+    }
+
     if (
       metadataType === 'rescue_request' ||
       metadataType === 'evacuation_signal' ||
@@ -407,6 +415,15 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     return base;
   };
 
+  const resolveTranslatedMetaText = useCallback(
+    (translations: Record<string, string> | undefined, fallback?: string | null) => {
+      const translated = pickTranslation(translations, preferredLang);
+      const resolved = translated || fallback || '';
+      return resolved.trim();
+    },
+    [preferredLang]
+  );
+
   const chatMessages = useMemo<ChatMessageItem[]>(() => {
     // 챗봇방이면 챗봇 메시지 반환
     if (isChatbotRoom) {
@@ -428,14 +445,36 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
       const messageText = formatMessageText(msg, translated);
 
       const rawMetadata = (msg.metadata || undefined) as any;
+      const translatedSenderLabel = resolveTranslatedMetaText(
+        rawMetadata?.senderLabelTranslations,
+        rawMetadata?.senderLabel
+      );
+      const fallbackDepartment = (
+        rawMetadata?.senderDepartment ||
+        senderInfo?.department ||
+        ''
+      )
+        .toString()
+        .trim();
+      const senderLabel =
+        translatedSenderLabel ||
+        (fallbackDepartment ? `${fallbackDepartment} / ${senderName}` : senderName);
       const translatedAddress =
         rawMetadata?.addressTranslations && typeof rawMetadata.addressTranslations === 'object'
           ? pickTranslation(rawMetadata.addressTranslations, preferredLang) || rawMetadata.address
           : rawMetadata?.address;
+      const translatedOrganizationName =
+        rawMetadata?.organizationNameTranslations &&
+        typeof rawMetadata.organizationNameTranslations === 'object'
+          ? pickTranslation(rawMetadata.organizationNameTranslations, preferredLang) ||
+            rawMetadata.organizationName
+          : rawMetadata?.organizationName;
       const metadata = rawMetadata
         ? {
             ...rawMetadata,
             address: translatedAddress ?? rawMetadata.address,
+            organizationName: translatedOrganizationName ?? rawMetadata.organizationName,
+            senderLabel,
           }
         : undefined;
       const replyToRaw =
@@ -445,7 +484,7 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
       const replyTo = !replyToRaw?.messageId
         ? null
         : (() => {
-            const replyMetadata =
+            const replyMetadata: any =
               replyToRaw.metadata && typeof replyToRaw.metadata === 'object'
                 ? {
                     ...replyToRaw.metadata,
@@ -470,14 +509,20 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
 
             return {
               messageId: replyToRaw.messageId,
-              senderName: replyToRaw.senderName?.trim() || '알 수 없음',
+              senderName:
+                resolveTranslatedMetaText(
+                  replyMetadata?.senderLabelTranslations,
+                  replyMetadata?.senderLabel
+                ) ||
+                replyToRaw.senderName?.trim() ||
+                '알 수 없음',
               preview: preview || '메시지',
             };
           })();
 
       return {
         id: msg.id,
-        sender: senderName,
+        sender: senderLabel,
         senderId: String(msg.senderId || ''),
         avatarUrl,
         message: messageText,
@@ -501,6 +546,7 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     participantLookup,
     currentMemberIdx,
     preferredLang,
+    resolveTranslatedMetaText,
   ]);
 
   const conversationDateLabel = chatMessages[0]?.dateLabel;
@@ -1114,7 +1160,7 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
                         archived: false,
                         participants: [],
                       }
-                    : selectedRoom!
+                    : activeSelectedRoom ?? selectedRoom!
                 }
                 participants={isChatbotRoom ? [] : rightSectionParticipants}
                 onRoomNameChange={handleRoomNameChange}
@@ -1160,7 +1206,7 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
                           archived: false,
                           participants: [],
                         }
-                      : selectedRoom!
+                      : activeSelectedRoom ?? selectedRoom!
                   }
                   messages={chatMessages}
                   conversationDate={conversationDateLabel}
@@ -1171,7 +1217,9 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
                   onReplyMessage={handleReplyMessage}
                   onCancelReply={() => setReplyingTo(null)}
                   emergencyStats={
-                    selectedRoom?.type === 'EMERGENCY' ? currentEmergencyStats : undefined
+                    (activeSelectedRoom ?? selectedRoom)?.type === 'EMERGENCY'
+                      ? currentEmergencyStats
+                      : undefined
                   }
                   onFileMessageClick={handleFileMessageClick}
                   hasMore={hasMore}
@@ -1183,7 +1231,7 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
               {/* 우측 채팅 상세 정보 (챗봇방이 아닐 때만 표시) */}
               {!isChatbotRoom && selectedRoom && (
                 <RightSection
-                  room={selectedRoom}
+                  room={activeSelectedRoom ?? selectedRoom}
                   participants={rightSectionParticipants}
                   onInvite={handleInviteParticipant}
                   onRemove={handleRemoveParticipants}

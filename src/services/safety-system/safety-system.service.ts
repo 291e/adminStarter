@@ -278,12 +278,15 @@ export async function createWorkerSignature(
 // 근로자가 교육 영상 시청 완료 후 서명을 등록합니다. workerSignatureIdx는 토큰에서 추출하거나 더 이상 URL에 포함되지 않습니다.
 export async function addWorkerSignature(
   safetySystemDocumentIdx: number,
-  workerSignatureIdx: number, // 더 이상 사용되지 않음 (API 변경됨)
+  workerSignatureIdx: number,
   params: AddWorkerSignatureDto
 ): Promise<void> {
   await axiosInstance.post(
     `${endpoints.safetySystem.documents}/${safetySystemDocumentIdx}/worker-signatures/sign`,
-    params
+    {
+      ...params,
+      workerSignatureIdx: params.workerSignatureIdx ?? workerSignatureIdx,
+    }
   );
 }
 

@@ -273,6 +273,7 @@ export type CreateWorkerSignatureDto = {
 
 // 근로자 서명 등록 요청
 export type AddWorkerSignatureDto = {
+  workerSignatureIdx?: number; // 근로자 서명 대상 행 Index (선택)
   signatureData: string; // 서명 데이터 (Base64) (필수)
   description?: string; // 설명 (선택)
 };

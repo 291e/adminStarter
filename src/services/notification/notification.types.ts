@@ -36,7 +36,11 @@ export type NotificationType =
   | 'APPROVAL_PENDING_3' // 결재 미완료 (3일 전)
   | 'APPROVAL_PENDING_1' // 결재 미완료 (1일 전)
   | 'ACCIDENT_FREE_CERT_UPLOADED' // 무재해 사업장 인증 파일 업로드
-  | 'SUBSCRIPTION_CHANGED'; // 구독 서비스 변경
+  | 'SUBSCRIPTION_CHANGED' // 구독 서비스 변경(레거시)
+  | 'SUBSCRIPTION_SERVICE_CHANGED' // 구독 서비스 변경
+  | 'SUBSCRIPTION_BILLING_REMINDER' // 구독 결제 예정
+  | 'SUBSCRIPTION_PAYMENT_SUCCESS' // 구독 결제 승인
+  | 'SUBSCRIPTION_PAYMENT_FAILED'; // 구독 결제 실패
 
 // 문서 정보
 export type SafetySystemDocumentInformation = {

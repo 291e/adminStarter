@@ -609,14 +609,10 @@ export function Risk_2200EditView({
 
   // 등록일, 수정일
   const registeredAt = currentDocument?.createAt
-    ? typeof currentDocument.createAt === 'string'
-      ? currentDocument.createAt.split('T')[0]
-      : new Date(currentDocument.createAt).toISOString().split('T')[0]
+    ? dayjs(currentDocument.createAt).format('YYYY-MM-DD')
     : '';
   const modifiedAt = currentDocument?.updateAt
-    ? typeof currentDocument.updateAt === 'string'
-      ? currentDocument.updateAt.split('T')[0]
-      : new Date(currentDocument.updateAt).toISOString().split('T')[0]
+    ? dayjs(currentDocument.updateAt).format('YYYY-MM-DD')
     : '';
 
   // 기존 문서 데이터에서 approvalStep과 signatureList 로드하여 approvalSignatures 초기화

@@ -41,6 +41,10 @@ type MessageMetadata = {
   fileName?: string;
   address?: string;
   addressTranslations?: Record<string, string>;
+  organizationName?: string;
+  organizationNameTranslations?: Record<string, string>;
+  senderLabel?: string;
+  senderLabelTranslations?: Record<string, string>;
 };
 
 type Props = {
@@ -63,6 +67,40 @@ type Props = {
   onReply?: () => void;
   onReplyReferenceClick?: () => void;
 };
+
+type ChatImageProps = {
+  src: string;
+  alt: string;
+  onClick?: () => void;
+  sx?: Record<string, any>;
+};
+
+function ChatImage({ src, alt, onClick, sx }: ChatImageProps) {
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    setAttempt(0);
+  }, [src]);
+
+  const resolvedSrc =
+    attempt === 0 ? src : `${src}${src.includes('?') ? '&' : '?'}retry=${attempt}`;
+
+  return (
+    <Box
+      component="img"
+      src={resolvedSrc}
+      alt={alt}
+      onClick={onClick}
+      onError={() => {
+        if (attempt >= 4) return;
+        window.setTimeout(() => {
+          setAttempt((current) => (current >= 4 ? current : current + 1));
+        }, 250 * (attempt + 1));
+      }}
+      sx={sx}
+    />
+  );
+}
 
 // 이미지 URL 패턴 파싱 함수 (앱에서 보낸 [이미지]|URL 또는 사고 현장 보고 [이미지]|URL 형식)
 function parseImageMessage(message: string): {
@@ -516,8 +554,7 @@ export default function MessageBubble({
           {label}
         </Typography>
       )}
-      <Box
-        component="img"
+      <ChatImage
         src={imgUrl}
         alt="채팅 이미지"
         onClick={() => handleImageClick(imgUrl)}
@@ -545,9 +582,8 @@ export default function MessageBubble({
         {allImageUrls.length > 0 && (
           <Stack direction="row" flexWrap="wrap" gap={0.5}>
             {allImageUrls.map((imgUrl, idx) => (
-              <Box
+              <ChatImage
                 key={`img-${idx}`}
-                component="img"
                 src={imgUrl}
                 alt={`첨부 이미지 ${idx + 1}`}
                 onClick={() => handleImageClick(imgUrl)}
@@ -654,8 +690,21 @@ export default function MessageBubble({
           <Iconify icon={'mingcute:fullscreen-line' as any} width={16} />
         </Box>
       </Box>
-      {/* 주소 */}
-      <Stack direction="row" spacing={0.5} alignItems="center">
+      {/* 기관명 + 주소 */}
+      <Stack direction="column" spacing={0.5} alignItems="flex-start">
+        {metadata?.organizationName ? (
+          <Typography
+            variant="body2"
+            sx={{
+              fontSize: 12,
+              fontWeight: 700,
+              lineHeight: '18px',
+              color: isOwn ? 'primary.contrastText' : 'text.primary',
+            }}
+          >
+            {metadata.organizationName}
+          </Typography>
+        ) : null}
         {isLoadingAddress ? (
           <CircularProgress size={12} />
         ) : (
@@ -700,8 +749,7 @@ export default function MessageBubble({
           cursor: 'pointer',
         }}
       >
-        <Box
-          component="img"
+        <ChatImage
           src={imgUrl}
           alt="사고 현장 이미지"
           sx={{
@@ -756,8 +804,21 @@ export default function MessageBubble({
         </Box>
       </Box>
 
-      {/* 주소 */}
-      <Stack direction="row" spacing={0.5} alignItems="flex-start">
+      {/* 기관명 + 주소 */}
+      <Stack direction="column" spacing={0.5} alignItems="flex-start">
+        {metadata?.organizationName ? (
+          <Typography
+            variant="body2"
+            sx={{
+              fontSize: 11,
+              fontWeight: 700,
+              lineHeight: '16px',
+              color: isOwn ? 'primary.contrastText' : 'text.primary',
+            }}
+          >
+            {metadata.organizationName}
+          </Typography>
+        ) : null}
         {isLoadingAddress ? (
           <CircularProgress size={12} />
         ) : (
@@ -975,8 +1036,7 @@ export default function MessageBubble({
               <Iconify icon="mingcute:close-line" width={24} />
             </IconButton>
             {selectedImage && (
-              <Box
-                component="img"
+              <ChatImage
                 src={selectedImage}
                 alt="이미지 확대"
                 sx={{
@@ -1139,8 +1199,7 @@ export default function MessageBubble({
             <Iconify icon="mingcute:close-line" width={24} />
           </IconButton>
           {selectedImage && (
-            <Box
-              component="img"
+            <ChatImage
               src={selectedImage}
               alt="이미지 확대"
               sx={{

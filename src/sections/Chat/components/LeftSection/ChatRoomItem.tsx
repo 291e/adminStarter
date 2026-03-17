@@ -81,6 +81,9 @@ export default function ChatRoomItem({
   let messageText = translatedPreview || room.lastMessagePreview || '';
   const normalizePreview = (text: string, type?: string) => {
     const trimmed = text?.trim() || '';
+    if (trimmed === '__deleted__') {
+      return '삭제된 메시지입니다.';
+    }
     if (type === 'IMAGE') {
       if (trimmed.includes('[이미지]|')) {
         const label = trimmed.split('[이미지]|')[0]?.trim();

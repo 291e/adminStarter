@@ -33,6 +33,10 @@ function mapNotificationTypeToUIType(notificationType: string): string {
     APPROVAL_PENDING_1: 'delivery',
     ACCIDENT_FREE_CERT_UPLOADED: 'order',
     SUBSCRIPTION_CHANGED: 'order',
+    SUBSCRIPTION_SERVICE_CHANGED: 'order',
+    SUBSCRIPTION_BILLING_REMINDER: 'order',
+    SUBSCRIPTION_PAYMENT_SUCCESS: 'order',
+    SUBSCRIPTION_PAYMENT_FAILED: 'order',
   };
   return typeMap[notificationType] || 'order';
 }
@@ -65,6 +69,10 @@ function generateNotificationTitle(item: NotificationHistoryItem): string {
     APPROVAL_PENDING_1: `<strong>${docName}</strong>의 결재가 1일 전까지 완료되지 않았습니다.`,
     ACCIDENT_FREE_CERT_UPLOADED: '무재해 사업장 인증 파일이 업로드되었습니다.',
     SUBSCRIPTION_CHANGED: '구독 서비스가 변경되었습니다.',
+    SUBSCRIPTION_SERVICE_CHANGED: '구독 서비스가 변경되었습니다.',
+    SUBSCRIPTION_BILLING_REMINDER: '구독 결제 예정 알림입니다.',
+    SUBSCRIPTION_PAYMENT_SUCCESS: '구독 결제가 승인되었습니다.',
+    SUBSCRIPTION_PAYMENT_FAILED: '구독 결제가 승인되지 않았습니다.',
   };
 
   return titleMap[notificationType] || `<strong>${docName}</strong>에 대한 알림이 있습니다.`;
@@ -90,6 +98,10 @@ function generateNotificationCategory(notificationType: string): string {
     APPROVAL_PENDING_1: '결재',
     ACCIDENT_FREE_CERT_UPLOADED: '인증',
     SUBSCRIPTION_CHANGED: '서비스',
+    SUBSCRIPTION_SERVICE_CHANGED: '서비스',
+    SUBSCRIPTION_BILLING_REMINDER: '결제',
+    SUBSCRIPTION_PAYMENT_SUCCESS: '결제',
+    SUBSCRIPTION_PAYMENT_FAILED: '결제',
   };
   return categoryMap[notificationType] || '알림';
 }
