@@ -54,7 +54,7 @@ type Props = {
   isOwn: boolean;
   isHighlighted?: boolean;
   avatarUrl?: string;
-  messageType?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
+  messageType?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY' | 'DELETED';
   sharedDocumentIdx?: number;
   attachments?: string[] | null;
   replyTo?: {
@@ -65,6 +65,7 @@ type Props = {
   metadata?: MessageMetadata;
   onFileClick?: (sharedDocumentIdx: number) => void;
   onReply?: () => void;
+  onDelete?: () => void;
   onReplyReferenceClick?: () => void;
 };
 
@@ -201,6 +202,7 @@ export default function MessageBubble({
   metadata,
   onFileClick,
   onReply,
+  onDelete,
   onReplyReferenceClick,
 }: Props) {
   const [imageModalOpen, setImageModalOpen] = useState(false);
@@ -956,6 +958,11 @@ export default function MessageBubble({
     return (
       <>
         <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="flex-end">
+          {onDelete && (
+            <IconButton size="small" onClick={onDelete} sx={{ color: 'text.secondary' }}>
+              <Iconify icon={'solar:trash-bin-trash-bold' as any} width={18} />
+            </IconButton>
+          )}
           {onReply && (
             <IconButton size="small" onClick={onReply} sx={{ color: 'text.secondary' }}>
               <Iconify icon={'solar:reply-bold' as any} width={18} />

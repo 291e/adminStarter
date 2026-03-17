@@ -5,6 +5,7 @@ import type {
   CreateMessageResponse,
   CreateRoomParams,
   CreateRoomResponse,
+  DeleteMessageParams,
   InviteParticipantsParams,
   LeaveRoomParams,
   MarkReadParams,
@@ -26,6 +27,12 @@ export async function createMessage(params: CreateMessageParams): Promise<Create
     params
   );
   return response.data;
+}
+
+export async function deleteMessage(params: DeleteMessageParams): Promise<void> {
+  await axiosInstance.patch(`${endpoints.chat2.messages}/${params.messageId}/delete`, {
+    chatRoomId: params.chatRoomId,
+  });
 }
 
 export async function inviteParticipants(params: InviteParticipantsParams): Promise<void> {

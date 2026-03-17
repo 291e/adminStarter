@@ -76,13 +76,34 @@ export default function ChatRoomItem({
     return translations.ko || translations.en || '';
   };
 
+  const deletedMessageLabel = () => {
+    switch (resolvedPreferredLang) {
+      case 'en':
+        return 'Message deleted.';
+      case 'vi':
+        return 'Tin nhan da bi xoa.';
+      case 'zh':
+        return '消息已删除。';
+      case 'th':
+        return 'ลบข้อความแล้ว';
+      case 'ne':
+        return 'सन्देश मेटाइयो।';
+      case 'uz':
+        return 'Xabar ochirildi.';
+      case 'km':
+        return 'សារត្រូវបានលុប។';
+      default:
+        return '삭제된 메시지입니다.';
+    }
+  };
+
   const messageType = room.lastMessagePreview ? 'TEXT' : undefined;
   const translatedPreview = pickTranslation(room.lastMessageTranslations);
   let messageText = translatedPreview || room.lastMessagePreview || '';
   const normalizePreview = (text: string, type?: string) => {
     const trimmed = text?.trim() || '';
     if (trimmed === '__deleted__') {
-      return '삭제된 메시지입니다.';
+      return deletedMessageLabel();
     }
     if (type === 'IMAGE') {
       if (trimmed.includes('[이미지]|')) {

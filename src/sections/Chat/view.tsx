@@ -28,6 +28,7 @@ import { useChat2RoomsFirestore } from './hooks/use-chat2-rooms-firestore';
 import { useChat2RoomFirestore } from './hooks/use-chat2-room-firestore';
 import {
   useCreateChat2Room,
+  useDeleteChat2Message,
   useLeaveChat2Room,
   useMarkChat2Read,
   useRemoveChat2Participants,
@@ -56,11 +57,12 @@ type ChatMessageItem = {
   senderId: string;
   message: string;
   rawMessage: string;
+  createdAtMs?: number;
   timestamp: string;
   dateLabel?: string;
   avatarUrl?: string;
   isOwn: boolean;
-  messageType?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
+  messageType?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY' | 'DELETED';
   sharedDocumentIdx?: number;
   attachments?: string[] | null;
   translations?: Record<string, string>;
@@ -99,7 +101,8 @@ type ReplyableMessage = {
   senderId?: string;
   message: string;
   rawMessage?: string;
-  messageType?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
+  createdAtMs?: number;
+  messageType?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY' | 'DELETED';
   translations?: Record<string, string>;
   metadata?: Record<string, any>;
 };
@@ -228,6 +231,7 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
   const createChatRoomMutation = useCreateChat2Room();
   const renameChatRoomMutation = useRenameChat2Room();
   const leaveChatRoomMutation = useLeaveChat2Room();
+  const deleteMessageMutation = useDeleteChat2Message();
   const removeParticipantsMutation = useRemoveChat2Participants();
   const markReadMutation = useMarkChat2Read();
 
@@ -350,6 +354,29 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     return undefined;
   };
 
+  const deletedMessageLabel = useCallback((lang?: string) => {
+    switch ((lang || 'ko').toLowerCase()) {
+      case 'en':
+        return 'Message deleted.';
+      case 'vi':
+      case 'vn':
+        return 'Tin nhan da bi xoa.';
+      case 'zh':
+      case 'cn':
+        return '消息已删除。';
+      case 'th':
+        return 'ลบข้อความแล้ว';
+      case 'ne':
+        return 'सन्देश मेटाइयो।';
+      case 'uz':
+        return 'Xabar ochirildi.';
+      case 'km':
+        return 'សារត្រូវបានលុប។';
+      default:
+        return '삭제된 메시지입니다.';
+    }
+  }, []);
+
   const formatMessageText = (msg: any, translatedText?: string) => {
     const base = translatedText || msg.message || msg.text || '';
     const type = msg.messageType as string | undefined;
@@ -357,7 +384,7 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     const metadataType = String(metadata?.type || '');
 
     if (type === 'DELETED' || base.trim() === '__deleted__') {
-      return '삭제된 메시지입니다.';
+      return deletedMessageLabel(preferredLang);
     }
 
     if (
@@ -527,6 +554,7 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
         avatarUrl,
         message: messageText,
         rawMessage: msg.message || msg.text || '',
+        createdAtMs: msg.createdAtMs,
         timestamp: timeLabel,
         dateLabel,
         isOwn: currentMemberIdx === senderMemberIdxNum,
@@ -545,6 +573,7 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
     isChatbotRoom,
     participantLookup,
     currentMemberIdx,
+    deletedMessageLabel,
     preferredLang,
     resolveTranslatedMetaText,
   ]);
@@ -767,6 +796,36 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
       metadata: message.metadata,
       preview: message.message || message.rawMessage || '메시지',
     });
+  };
+
+  const handleDeleteMessage = async (message: ReplyableMessage) => {
+    if (isChatbotRoom || !selectedRoom || !message.id) return;
+    if (message.messageType === 'DELETED') return;
+    if (message.senderId !== uid) return;
+    const createdAtMs = Number(message.createdAtMs);
+    if (!Number.isNaN(createdAtMs)) {
+      const ageMs = Date.now() - createdAtMs;
+      if (ageMs < 0 || ageMs > 24 * 60 * 60 * 1000) {
+        setErrorSnackbar({
+          open: true,
+          message: '24시간 이내 메시지만 삭제할 수 있습니다.',
+        });
+        return;
+      }
+    }
+
+    try {
+      await deleteMessageMutation.mutateAsync({
+        chatRoomId: selectedRoom.chatRoomId,
+        messageId: message.id,
+      });
+    } catch (error) {
+      console.error('Failed to delete message:', error);
+      setErrorSnackbar({
+        open: true,
+        message: (error as any)?.message || '메시지 삭제에 실패했습니다.',
+      });
+    }
   };
 
   const handleRemoveParticipants = async (participantIds: string[]) => {
@@ -1215,6 +1274,7 @@ export function ChatView({ title = '채팅', description, sx }: Props) {
                   onSendMessage={handleSendMessage}
                   replyingTo={replyingTo}
                   onReplyMessage={handleReplyMessage}
+                  onDeleteMessage={handleDeleteMessage}
                   onCancelReply={() => setReplyingTo(null)}
                   emergencyStats={
                     (activeSelectedRoom ?? selectedRoom)?.type === 'EMERGENCY'

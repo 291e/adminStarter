@@ -48,7 +48,14 @@ export type Chat2Message = {
   senderName?: string;
   senderLang?: string;
   message: string;
-  messageType: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
+  messageType:
+    | 'TEXT'
+    | 'IMAGE'
+    | 'VIDEO'
+    | 'FILE'
+    | 'SYSTEM'
+    | 'EMERGENCY'
+    | 'DELETED';
   translations?: Record<string, string>;
   metadata?: MessageMetadata;
   createdAtMs: number;

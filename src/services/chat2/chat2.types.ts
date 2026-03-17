@@ -1,7 +1,14 @@
 import type { BaseResponseDto } from '../common';
 
 export type Chat2RoomType = 'DIRECT' | 'GROUP' | 'EMERGENCY';
-export type Chat2MessageType = 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
+export type Chat2MessageType =
+  | 'TEXT'
+  | 'IMAGE'
+  | 'VIDEO'
+  | 'FILE'
+  | 'SYSTEM'
+  | 'EMERGENCY'
+  | 'DELETED';
 
 export type Chat2ReplyToPayload = {
   messageId: string;
@@ -75,3 +82,8 @@ export type CreateMessageParams = {
 export type CreateMessageResponse = BaseResponseDto<{
   messageId: string;
 }>;
+
+export type DeleteMessageParams = {
+  chatRoomId: string;
+  messageId: string;
+};

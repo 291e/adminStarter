@@ -17,6 +17,7 @@ import Paper from '@mui/material/Paper';
 
 import { Iconify } from 'src/components/iconify';
 import { hexToRgba } from 'src/utils/color';
+import { fDateTime } from 'src/utils/format-time';
 import type {
   SharedDocument as ApiSharedDocument,
   PrioritySetting,
@@ -125,15 +126,8 @@ export default function SharedDocumentTable({
 
             const statusConfig = STATUS_CONFIG[row.isPublic] || STATUS_CONFIG[0];
             // createAt을 등록일로 사용 (YYYY-MM-DD 형식)
-            const createDate = row.createAt
-              ? new Date(row.createAt).toISOString().split('T')[0]
-              : '';
-            const createTime = row.createAt
-              ? new Date(row.createAt).toLocaleTimeString('ko-KR', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })
-              : '';
+            const createDate = row.createAt ? fDateTime(row.createAt, 'YYYY-MM-DD') : '';
+            const createTime = row.createAt ? fDateTime(row.createAt, 'HH:mm:ss') : '';
             const rowId = String(row.sharedDocumentIdx);
             const isMenuOpen = openMenuId === rowId;
 

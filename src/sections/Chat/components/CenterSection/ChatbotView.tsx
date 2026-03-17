@@ -7,13 +7,21 @@ type ChatMessage = {
   id: string;
   sender: string;
   message: string;
+  rawMessage?: string;
+  createdAtMs?: number;
+  senderId?: string;
   timestamp: string;
   dateLabel?: string;
   avatarUrl?: string;
   isOwn?: boolean;
-  messageType?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
+  messageType?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY' | 'DELETED';
   sharedDocumentIdx?: number;
   attachments?: string[] | null;
+  replyTo?: {
+    messageId: string;
+    senderName: string;
+    preview: string;
+  } | null;
   metadata?: {
     type?: string;
     location?: {
@@ -21,6 +29,7 @@ type ChatMessage = {
       longitude: number;
       address?: string;
     };
+    [key: string]: any;
   };
 };
 

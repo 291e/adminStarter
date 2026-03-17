@@ -10,6 +10,7 @@ import { Iconify } from 'src/components/iconify';
 import { useNavigate } from 'react-router';
 import { paths } from 'src/routes/paths';
 import { hexToRgba } from 'src/utils/color';
+import { fDateTime } from 'src/utils/format-time';
 import type { SharedDocument } from 'src/services/dashboard/dashboard.types';
 
 // ----------------------------------------------------------------------
@@ -440,9 +441,7 @@ export default function SharedDocumentsCard({
                   }}
                 >
                   <Typography variant="body2" sx={{ fontSize: { xs: 13, sm: 14 } }}>
-                    {row.documentWrittenAt
-                      ? new Date(row.documentWrittenAt).toLocaleDateString('ko-KR')
-                      : ''}
+                    {row.documentWrittenAt ? fDateTime(row.documentWrittenAt, 'YYYY-MM-DD') : ''}
                   </Typography>
                 </Box>
                 <Box
@@ -457,7 +456,7 @@ export default function SharedDocumentsCard({
                   }}
                 >
                   <Typography variant="body2" sx={{ fontSize: { xs: 13, sm: 14 } }}>
-                    {row.createAt ? new Date(row.createAt).toLocaleDateString('ko-KR') : ''}
+                    {row.createAt ? fDateTime(row.createAt, 'YYYY-MM-DD HH:mm:ss') : ''}
                   </Typography>
                 </Box>
               </Box>

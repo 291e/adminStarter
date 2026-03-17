@@ -15,11 +15,12 @@ type ChatMessage = {
   senderId?: string;
   message: string;
   rawMessage?: string;
+  createdAtMs?: number;
   timestamp: string;
   dateLabel?: string;
   avatarUrl?: string;
   isOwn?: boolean;
-  messageType?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
+  messageType?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY' | 'DELETED';
   sharedDocumentIdx?: number;
   attachments?: string[] | null;
   translations?: Record<string, string>;
@@ -45,6 +46,7 @@ type Props = {
   roomId?: string | number; // 채팅방 변경 감지용
   onFileMessageClick?: (sharedDocumentIdx: number) => void;
   onReply?: (message: ChatMessage) => void;
+  onDelete?: (message: ChatMessage) => void;
   hasMore?: boolean;
   isLoadingMore?: boolean;
   onLoadMore?: () => void;
@@ -56,6 +58,7 @@ export default function MessageList({
   roomId,
   onFileMessageClick,
   onReply,
+  onDelete,
   hasMore,
   isLoadingMore,
   onLoadMore,
@@ -71,6 +74,15 @@ export default function MessageList({
   const isUserScrollingRef = useRef(false);
   const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+
+  const canDeleteMessage = (message: ChatMessage) => {
+    if (!message.isOwn) return false;
+    if (message.messageType === 'DELETED') return false;
+    const createdAtMs = Number(message.createdAtMs);
+    if (Number.isNaN(createdAtMs) || createdAtMs <= 0) return false;
+    const ageMs = Date.now() - createdAtMs;
+    return ageMs >= 0 && ageMs <= 24 * 60 * 60 * 1000;
+  };
 
   const dateLabel =
     conversationDate || messages[0]?.dateLabel || new Date().toLocaleDateString('ko-KR');
@@ -356,6 +368,9 @@ export default function MessageList({
               metadata={message.metadata}
               onFileClick={onFileMessageClick}
               onReply={onReply ? () => onReply(message) : undefined}
+              onDelete={
+                onDelete && canDeleteMessage(message) ? () => onDelete(message) : undefined
+              }
               onReplyReferenceClick={
                 message.replyTo
                   ? () => handleReplyReferenceClick(message.replyTo!.messageId)

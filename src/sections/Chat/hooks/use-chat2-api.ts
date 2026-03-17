@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import * as chat2Service from 'src/services/chat2/chat2.service';
 import type {
   CreateRoomParams,
+  DeleteMessageParams,
   InviteParticipantsParams,
   LeaveRoomParams,
   MarkReadParams,
@@ -68,5 +69,16 @@ export function useRemoveChat2Participants() {
 export function useMarkChat2Read() {
   return useMutation({
     mutationFn: (params: MarkReadParams) => chat2Service.markRead(params),
+  });
+}
+
+export function useDeleteChat2Message() {
+  return useMutation({
+    mutationFn: (params: DeleteMessageParams) => chat2Service.deleteMessage(params),
+    onSuccess: () => toast.success('메시지를 삭제했습니다.'),
+    onError: (error: any) => {
+      const message = error?.message || '메시지 삭제에 실패했습니다.';
+      toast.error(message);
+    },
   });
 }

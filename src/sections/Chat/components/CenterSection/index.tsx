@@ -10,11 +10,12 @@ type ChatMessage = {
   senderId?: string;
   message: string;
   rawMessage?: string;
+  createdAtMs?: number;
   timestamp: string;
   dateLabel?: string;
   avatarUrl?: string;
   isOwn?: boolean;
-  messageType?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
+  messageType?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY' | 'DELETED';
   sharedDocumentIdx?: number;
   attachments?: string[] | null;
   translations?: Record<string, string>;
@@ -38,7 +39,7 @@ type ReplyComposer = {
   messageId: string;
   senderId: string;
   senderName: string;
-  messageType: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
+  messageType: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY' | 'DELETED';
   rawMessage: string;
   preview: string;
 };
@@ -52,6 +53,7 @@ type Props = {
   onSendMessage?: (payload?: ChatInputPayload) => void;
   replyingTo?: ReplyComposer | null;
   onReplyMessage?: (message: ChatMessage) => void;
+  onDeleteMessage?: (message: ChatMessage) => void;
   onCancelReply?: () => void;
   emergencyStats?: { month: number; count: number };
   onFileMessageClick?: (sharedDocumentIdx: number) => void;
@@ -69,6 +71,7 @@ export default function CenterSection({
   onSendMessage,
   replyingTo,
   onReplyMessage,
+  onDeleteMessage,
   onCancelReply,
   emergencyStats,
   onFileMessageClick,
@@ -103,6 +106,7 @@ export default function CenterSection({
           onSendMessage={onSendMessage}
           replyingTo={replyingTo}
           onReplyMessage={onReplyMessage}
+          onDeleteMessage={onDeleteMessage}
           onCancelReply={onCancelReply}
           roomId={room.chatRoomId}
           hasMore={hasMore}
@@ -122,6 +126,7 @@ export default function CenterSection({
           onSendMessage={onSendMessage}
           replyingTo={replyingTo}
           onReplyMessage={onReplyMessage}
+          onDeleteMessage={onDeleteMessage}
           onCancelReply={onCancelReply}
           roomId={room.chatRoomId}
           onFileMessageClick={onFileMessageClick}

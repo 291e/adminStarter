@@ -4,6 +4,7 @@ import IconButton from '@mui/material/IconButton';
 
 import { Iconify } from 'src/components/iconify';
 import type { DocumentSignature } from 'src/services/dashboard/dashboard.types';
+import { fDateTime } from 'src/utils/format-time';
 import EmptyPendingSignatures from './EmptyPendingSignatures';
 
 // ----------------------------------------------------------------------
@@ -167,25 +168,13 @@ export default function PendingSignaturesCard({
                   </Typography>
                   <Box sx={{ width: { xs: '100%', sm: 100 } }}>
                     <Typography variant="body2" sx={{ fontSize: { xs: 13, sm: 14 } }}>
-                      {row.requestedAt
-                        ? new Date(row.requestedAt).toLocaleDateString('ko-KR', {
-                            year: 'numeric',
-                            month: '2-digit',
-                            day: '2-digit',
-                          })
-                        : ''}
+                      {row.requestedAt ? fDateTime(row.requestedAt, 'YYYY-MM-DD') : ''}
                     </Typography>
                     <Typography
                       variant="caption"
                       sx={{ color: 'text.secondary', fontSize: { xs: 11, sm: 12 } }}
                     >
-                      {row.requestedAt
-                        ? new Date(row.requestedAt).toLocaleTimeString('ko-KR', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            hour12: true,
-                          })
-                        : ''}
+                      {row.requestedAt ? fDateTime(row.requestedAt, 'HH:mm:ss') : ''}
                     </Typography>
                   </Box>
                 </Box>

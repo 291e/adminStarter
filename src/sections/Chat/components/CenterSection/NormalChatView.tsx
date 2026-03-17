@@ -9,11 +9,12 @@ type ChatMessage = {
   senderId?: string;
   message: string;
   rawMessage?: string;
+  createdAtMs?: number;
   timestamp: string;
   dateLabel?: string;
   avatarUrl?: string;
   isOwn?: boolean;
-  messageType?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
+  messageType?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY' | 'DELETED';
   sharedDocumentIdx?: number;
   attachments?: string[] | null;
   replyTo?: {
@@ -36,7 +37,7 @@ type ReplyComposer = {
   messageId: string;
   senderId: string;
   senderName: string;
-  messageType: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY';
+  messageType: 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE' | 'SYSTEM' | 'EMERGENCY' | 'DELETED';
   rawMessage: string;
   preview: string;
 };
@@ -49,6 +50,7 @@ type Props = {
   onSendMessage?: (payload?: ChatInputPayload) => void;
   replyingTo?: ReplyComposer | null;
   onReplyMessage?: (message: ChatMessage) => void;
+  onDeleteMessage?: (message: ChatMessage) => void;
   onCancelReply?: () => void;
   roomId?: string | number;
   onFileMessageClick?: (sharedDocumentIdx: number) => void;
@@ -65,6 +67,7 @@ export default function NormalChatView({
   onSendMessage,
   replyingTo,
   onReplyMessage,
+  onDeleteMessage,
   onCancelReply,
   roomId,
   onFileMessageClick,
@@ -90,6 +93,7 @@ export default function NormalChatView({
         roomId={roomId}
         onFileMessageClick={onFileMessageClick}
         onReply={onReplyMessage}
+        onDelete={onDeleteMessage}
         hasMore={hasMore}
         isLoadingMore={isLoadingMore}
         onLoadMore={onLoadMore}
