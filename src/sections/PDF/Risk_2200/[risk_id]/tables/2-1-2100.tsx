@@ -156,21 +156,15 @@ export default function RiskAssessmentTable_2_1_2100({ data }: Props) {
         <Box component="table" sx={tableStyle}>
           <thead>
             <tr>
-              <th style={{ width: 94 }} rowSpan={2}>
+              <th style={{ width: 94 }}>
                 번호
               </th>
-              <th style={{ width: 164 }} rowSpan={2}>
+              <th style={{ width: 164 }}>
                 구분
               </th>
-              <th style={{ width: 160, height: 30 }}>
-                공종흐름도
-              </th>
-              <th style={{ flex: 1 }} rowSpan={2}>
+              <th style={{ flex: 1 }}>
                 해당 유해·위험요인
               </th>
-            </tr>
-            <tr>
-              <th style={{ width: 160, height: 30 }}>공종명</th>
             </tr>
           </thead>
           <tbody>
@@ -183,11 +177,6 @@ export default function RiskAssessmentTable_2_1_2100({ data }: Props) {
                 </td>
                 <td>
                   <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{row.category}</Typography>
-                </td>
-                <td>
-                  <Typography sx={{ fontSize: 14, fontWeight: 400 }}>
-                    {row.processName || ''}
-                  </Typography>
                 </td>
                 <td>
                   <Typography sx={{ fontSize: 14, fontWeight: 400 }}>
@@ -206,6 +195,7 @@ export default function RiskAssessmentTable_2_1_2100({ data }: Props) {
         <Box component="table" sx={tableStyle}>
           <thead>
             <tr>
+              <th style={{ width: 160 }}>작업명</th>
               <th style={{ width: 160 }}>유해·위험요인</th>
               <th style={{ width: 199 }}>위험한 상황과 결과</th>
               <th style={{ width: 160 }}>현재 안전조치</th>
@@ -223,6 +213,11 @@ export default function RiskAssessmentTable_2_1_2100({ data }: Props) {
           <tbody>
             {filteredAssessment.map((row, index) => (
               <tr key={index} style={{ height: index === 0 || index === 1 ? 72 : 48 }}>
+                <td>
+                  <Typography sx={{ fontSize: 14, fontWeight: 400 }}>
+                    {row.workName || ''}
+                  </Typography>
+                </td>
                 <td>
                   <Typography sx={{ fontSize: 14, fontWeight: 400 }}>{row.hazardFactor}</Typography>
                 </td>

@@ -109,6 +109,7 @@ export type Table2100ClassificationRow = {
 };
 
 export type Table2100AssessmentRow = {
+  workName?: string; // 작업명
   hazardFactor: string; // 유해/위험요인
   dangerousSituation: string; // 위험한 상황과 결과
   currentSafetyMeasure: string; // 현재 안전조치

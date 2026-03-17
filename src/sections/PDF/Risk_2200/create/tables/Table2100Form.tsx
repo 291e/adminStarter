@@ -272,6 +272,7 @@ export default function Table2100Form({ data, onDataChange, riskAssessmentData }
 
   const handleAssessmentAddRow = () => {
     const newRow: Table2100AssessmentRow = {
+      workName: '',
       hazardFactor: '',
       dangerousSituation: '',
       currentSafetyMeasure: '',
@@ -338,27 +339,21 @@ export default function Table2100Form({ data, onDataChange, riskAssessmentData }
         <Box component="table" sx={tableStyle}>
           <thead>
             <tr>
-              <th style={{ width: 94 }} rowSpan={2}>
+              <th style={{ width: 94 }}>
                 번호
               </th>
-              <th style={{ width: 164 }} rowSpan={2}>
+              <th style={{ width: 164 }}>
                 구분
               </th>
-              <th style={{ width: 160, height: 30 }}>
-                공종흐름도
-              </th>
-              <th style={{ flex: 1 }} rowSpan={2}>
+              <th style={{ flex: 1 }}>
                 해당 유해·위험요인
               </th>
-              <th style={{ width: 30 }} rowSpan={2}>
+              <th style={{ width: 30 }}>
                 이동
               </th>
-              <th style={{ width: 39 }} rowSpan={2}>
+              <th style={{ width: 39 }}>
                 삭제
               </th>
-            </tr>
-            <tr>
-              <th style={{ width: 160, height: 30 }}>공종명</th>
             </tr>
           </thead>
           <tbody>
@@ -394,22 +389,6 @@ export default function Table2100Form({ data, onDataChange, riskAssessmentData }
                     size="small"
                     value={row.category}
                     onChange={(e) => handleClassificationChange(index, 'category', e.target.value)}
-                    fullWidth
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        fontSize: 14,
-                        height: 'auto',
-                      },
-                    }}
-                  />
-                </td>
-                <td>
-                  <TextField
-                    size="small"
-                    value={row.processName || ''}
-                    onChange={(e) =>
-                      handleClassificationChange(index, 'processName', e.target.value)
-                    }
                     fullWidth
                     sx={{
                       '& .MuiOutlinedInput-root': {
@@ -506,6 +485,7 @@ export default function Table2100Form({ data, onDataChange, riskAssessmentData }
         <Box component="table" sx={tableStyle}>
           <thead>
             <tr>
+              <th style={{ width: 160 }}>작업명</th>
               <th style={{ width: 160 }}>유해·위험요인</th>
               <th style={{ width: 199 }}>위험한 상황과 결과</th>
               <th style={{ width: 160 }}>현재 안전조치</th>
@@ -540,6 +520,22 @@ export default function Table2100Form({ data, onDataChange, riskAssessmentData }
                   height: index === 0 ? 72 : index === 1 ? 72 : 48,
                 }}
               >
+                <td>
+                  <TextField
+                    size="small"
+                    value={row.workName || ''}
+                    onChange={(e) => handleAssessmentChange(index, 'workName', e.target.value)}
+                    fullWidth
+                    multiline
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        fontSize: 14,
+                        height: 'auto',
+                        p: 1,
+                      },
+                    }}
+                  />
+                </td>
                 <td>
                   <TextField
                     size="small"
