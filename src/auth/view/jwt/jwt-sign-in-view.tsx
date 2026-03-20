@@ -59,10 +59,7 @@ export function JwtSignInView() {
   const getSavedEmail = () => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('savedEmail');
-      if (saved) {
-        saveId.onTrue();
-        return saved;
-      }
+      if (saved) return saved;
     }
     return '';
   };
